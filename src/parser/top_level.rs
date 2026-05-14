@@ -4,12 +4,12 @@ use crate::{
     common::symbols::Symbol,
     lexer::TokenKind,
     parse_tree::{
-        annotation::{AstAnnotation, AstAnnotationItem},
+        annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
         top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundefArg, AstFundefDesc, AstFunsig,
-            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstModule, AstModuleDesc,
-            AstStructDef, AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
-            Fundef,
+            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface, AstModule,
+            AstModuleDesc, AstStructDef, AstStructDefField, AstTemplateArg, AstTopLevelItem,
+            AstTopLevelItemDesc, Fundef,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -236,7 +236,34 @@ impl<'db> Parser<'db> {
         while let Some(t) = self.peek_n(0)
             && !matches!(t.kind, TokenKind::CloseSqr)
         {
-            items.push(AstAnnotationItem::Named(self.parse_symbol()?.data));
+            let name = self.parse_symbol()?.data;
+            // Check if this is a Call form: `name(arg1, arg2, ...)`
+            let item = if let Some(t) = self.peek_n(0)
+                && matches!(t.kind, TokenKind::OpenPar)
+            {
+                self.consume(); // consume `(`
+                let mut args = vec![];
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::ClosePar)
+                {
+                    // Try to parse as a type expression; fall back to bare symbol
+                    let arg = self.parse_type_expr().map(AstAnnotationArg::Type)?;
+                    args.push(arg);
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Comma)
+                    {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+                AstAnnotationItem::Call { name, args }
+            } else {
+                AstAnnotationItem::Flag(name)
+            };
+            items.push(item);
             if let Some(t) = self.peek_n(0)
                 && matches!(t.kind, TokenKind::Comma)
             {
@@ -422,6 +449,31 @@ impl<'db> Parser<'db> {
                     AstTopLevelItemDesc::StructDef(struct_def),
                     annotations,
                     span,
+                ))
+            }
+            TokenKind::Interface => {
+                let start = self.get_start();
+                self.consume();
+                let name = self.parse_symbol()?.data;
+                let template_args = self.parse_optional_template_args()?;
+                self.expect(TokenKind::OpenBra)?;
+                self.consume();
+                let mut _items = vec![];
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::CloseBra)
+                {
+                    todo!()
+                }
+                self.expect(TokenKind::CloseBra)?;
+                self.consume();
+                Ok(AstTopLevelItem::new(
+                    AstTopLevelItemDesc::Interface(AstInterface {
+                        name,
+                        template_args,
+                        items: _items,
+                    }),
+                    vec![],
+                    start.span(&self.get_end()),
                 ))
             }
             x => todo!("{:?}: {}", self.get_start(), x.display(self.db)),
