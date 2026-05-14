@@ -86,6 +86,7 @@ pub struct TypeParam {
 pub enum TypeRef {
     Concrete(TypeId),
     Param(TypeParamId),
+    Zelf,
     Error,
 }
 
@@ -124,6 +125,7 @@ pub struct InternedBuiltinTypeId {
 pub enum ScopeOwnerId {
     Module(ModuleId),
     Impl(ImplId),
+    Interface(InterfaceRef),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

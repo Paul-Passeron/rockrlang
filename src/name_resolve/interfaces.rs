@@ -1,11 +1,17 @@
+use std::sync::Arc;
+
 use crate::{
     Db,
     common::symbols::InternedSymbol,
     name_resolve::{
         core_module,
         definition::{Definition, resolve_in_module},
+        module_items,
     },
-    ril::{EnumId, InterfaceId, ModuleId, StructId, TypeDefId},
+    parse_tree::top_level::{AstInterface, AstTopLevelItemDesc},
+    ril::{
+        EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId, StructId, TypeDefId,
+    },
 };
 
 #[salsa::tracked]
@@ -98,4 +104,35 @@ pub fn core_int_iter_struct<'db>(db: &'db dyn Db) -> StructId {
         Some(Definition::Type(TypeDefId::Struct(id))) => id,
         _ => panic!("core::iter::IntIter struct not found"),
     }
+}
+
+#[salsa::tracked]
+pub fn module_interfaces<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> Arc<Vec<AstInterface>> {
+    Arc::new(
+        module_items(db, module)
+            .into_iter()
+            .flatten()
+            .filter_map(|item| match item.data {
+                AstTopLevelItemDesc::Interface(ast_interface) => Some(ast_interface),
+                _ => None,
+            })
+            .collect(),
+    )
+}
+
+#[salsa::tracked]
+pub fn interface_item<'db>(
+    db: &'db dyn Db,
+    interface: InternedInterfaceId<'db>,
+) -> Arc<AstInterface> {
+    Arc::new(
+        module_interfaces(db, interface.parent(db).interned())
+            .iter()
+            .find(|inter| inter.name == interface.name(db))
+            .unwrap()
+            .clone(),
+    )
 }

@@ -125,18 +125,30 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_type_ref(&self, type_ref: &TypeRef, templates: &[InferTy]) -> InferTy {
+    pub fn allocate_type_ref(
+        &self,
+        type_ref: &TypeRef,
+        templates: &[InferTy],
+        zelf: Option<&InferTy>,
+    ) -> InferTy {
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
                 fields: type_id
                     .args(self.db)
                     .iter()
-                    .map(|ty| self.allocate_type_ref(ty, templates))
+                    .map(|ty| self.allocate_type_ref(ty, templates, zelf))
                     .collect(),
             },
             TypeRef::Param(type_param_id) => templates[type_param_id.0].clone(),
             TypeRef::Error => panic!(),
+            TypeRef::Zelf => {
+                if let Some(zelf) = zelf {
+                    zelf.clone()
+                } else {
+                    unreachable!()
+                }
+            }
         }
     }
 
@@ -144,11 +156,12 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         arg: &PartialTypeArg,
         templates: &[InferTy],
+        zelf: Option<&InferTy>,
     ) -> InferTy {
         match arg {
-            PartialTypeArg::Known(type_ref) => self.allocate_type_ref(type_ref, templates),
+            PartialTypeArg::Known(type_ref) => self.allocate_type_ref(type_ref, templates, zelf),
             PartialTypeArg::Partial(partial_type_ref) => {
-                self.allocate_partial_type_ref(partial_type_ref, templates)
+                self.allocate_partial_type_ref(partial_type_ref, templates, zelf)
             }
             PartialTypeArg::Infer => InferTy::Var(self.fresh_var()),
         }
@@ -158,14 +171,15 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         type_ref: &PartialTypeRef,
         templates: &[InferTy],
+        zelf: Option<&InferTy>,
     ) -> InferTy {
         match type_ref {
-            PartialTypeRef::Resolved(type_ref) => self.allocate_type_ref(type_ref, templates),
+            PartialTypeRef::Resolved(type_ref) => self.allocate_type_ref(type_ref, templates, zelf),
             PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
                 def: *def,
                 fields: args
                     .iter()
-                    .map(|arg| self.allocate_partial_type_arg(arg, templates))
+                    .map(|arg| self.allocate_partial_type_arg(arg, templates, zelf))
                     .collect(),
             },
         }
@@ -177,10 +191,19 @@ impl<'db> InferenceCtx<'db> {
         module: ModuleId,
         ast_template_args: &[AstTemplateArg],
         templates: &[InferTy],
+        zelf: Option<&InferTy>,
     ) -> Option<InferTy> {
         debug_assert_eq!(ast_template_args.len(), templates.len());
-        match resolve_type_expr_desc(self.db, type_expr, module.interned(), ast_template_args) {
-            TypeResolution::Type(type_ref) => Some(self.allocate_type_ref(&type_ref, templates)),
+        match resolve_type_expr_desc(
+            self.db,
+            type_expr,
+            module.interned(),
+            ast_template_args,
+            zelf.is_some(),
+        ) {
+            TypeResolution::Type(type_ref) => {
+                Some(self.allocate_type_ref(&type_ref, templates, zelf))
+            }
             _ => None,
         }
     }
@@ -201,6 +224,7 @@ impl<'db> InferenceCtx<'db> {
                         module,
                         ast_template_args,
                         templates,
+                        None,
                     )
                     .map(|ty| (field.name, ty))
                 })

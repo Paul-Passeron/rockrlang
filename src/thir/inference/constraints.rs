@@ -285,6 +285,7 @@ impl<'db> InferenceCtx<'db> {
                         module,
                         &ast_method_templates,
                         &method_templates,
+                        Some(receiver),
                     )
                     .unwrap();
                 self.unify(arg.clone(), arg_ty)
@@ -300,6 +301,7 @@ impl<'db> InferenceCtx<'db> {
                 module,
                 &ast_method_templates,
                 &method_templates,
+                Some(receiver),
             )
             .unwrap();
 

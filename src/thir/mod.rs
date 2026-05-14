@@ -120,6 +120,7 @@ impl<'db> TyCtx<'db> {
                         owning_module(this.db, this.function.parent(this.db)),
                         this.templates.as_ref(),
                         infer_templates.as_ref(),
+                        None,
                     )
                     .unwrap();
                 let local_ty = this.inf_ctx.infer_local(local.id);
@@ -182,7 +183,7 @@ impl<'db> TyCtx<'db> {
     fn get_ret_ty(&self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
         self.inf_ctx
-            .allocate_type_ref(&ret, self.inf_ctx.templates().as_ref())
+            .allocate_type_ref(&ret, self.inf_ctx.templates().as_ref(), self.inf_ctx.zelf())
     }
 
     fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {

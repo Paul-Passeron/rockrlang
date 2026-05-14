@@ -2,9 +2,11 @@ use std::sync::Arc;
 
 use crate::{
     Db,
+    common::symbols::Symbol,
     hir::{FunctionLikeAst, function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
+        interfaces::interface_item,
         module_items,
     },
     parse_tree::{
@@ -30,10 +32,13 @@ pub fn resolve_any_type_expr<'db>(
     any_type_expr: &'db AstAnyTypeExpr,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
+    has_zelf: bool,
 ) -> TypeResolution {
     match &any_type_expr.data {
         AstAnyTypeExprDesc::Any => TypeResolution::Infer,
-        AstAnyTypeExprDesc::Known(desc) => resolve_type_expr_desc(db, desc, module, template_args),
+        AstAnyTypeExprDesc::Known(desc) => {
+            resolve_type_expr_desc(db, desc, module, template_args, has_zelf)
+        }
     }
 }
 
@@ -42,25 +47,29 @@ pub fn resolve_type_expr_desc<'db>(
     type_expr: &'db AstTypeExprDesc,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
+    has_zelf: bool,
 ) -> TypeResolution {
     match type_expr {
         AstTypeExprDesc::Named { name, args } => {
-            if args.is_empty()
-                && let Some(idx) = template_args.iter().position(|p| p.name == *name)
-            {
-                return TypeResolution::Type(TypeRef::Param(TypeParamId(idx)));
+            if args.is_empty() {
+                if *name == Symbol::new(db, "Self") {
+                    return TypeResolution::Type(TypeRef::Zelf);
+                }
+                if let Some(idx) = template_args.iter().position(|p| p.name == *name) {
+                    return TypeResolution::Type(TypeRef::Param(TypeParamId(idx)));
+                }
             }
 
             resolve_in_module(db, name.interned(), module).map_or(TypeResolution::Error, |def| {
                 if let Definition::Type(type_def_id) = def {
                     let resolved_args = args
                         .iter()
-                        .map(
-                            |arg| match resolve_any_type_expr(db, arg, module, template_args) {
+                        .map(|arg| {
+                            match resolve_any_type_expr(db, arg, module, template_args, has_zelf) {
                                 TypeResolution::Type(type_ref) => Some(type_ref),
                                 _ => None,
-                            },
-                        )
+                            }
+                        })
                         .collect::<Option<Vec<_>>>();
                     match resolved_args {
                         Some(resolved_args) => {
@@ -76,13 +85,13 @@ pub fn resolve_type_expr_desc<'db>(
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr(db, to, module.interned(), template_args)
+                resolve_type_expr(db, to, module.interned(), template_args, has_zelf)
             } else {
                 TypeResolution::Error
             }
         }
         AstTypeExprDesc::Pointer { mutable, pointee } => {
-            match resolve_type_expr(db, pointee, module, template_args) {
+            match resolve_type_expr(db, pointee, module, template_args, has_zelf) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
                 }
@@ -90,7 +99,7 @@ pub fn resolve_type_expr_desc<'db>(
             }
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
-            match resolve_type_expr(db, pointee, module, template_args) {
+            match resolve_type_expr(db, pointee, module, template_args, has_zelf) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ref_of(db, pointee, *mutable).into())
                 }
@@ -99,7 +108,7 @@ pub fn resolve_type_expr_desc<'db>(
         }
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
-            match resolve_type_expr(db, ty, module, template_args) {
+            match resolve_type_expr(db, ty, module, template_args, has_zelf) {
                 TypeResolution::Type(elem) => TypeResolution::Type(slice_of(db, elem).into()),
                 _ => TypeResolution::Infer,
             }
@@ -108,7 +117,7 @@ pub fn resolve_type_expr_desc<'db>(
             let types = tys
                 .iter()
                 .map(
-                    |ty| match resolve_type_expr(db, ty, module, template_args) {
+                    |ty| match resolve_type_expr(db, ty, module, template_args, has_zelf) {
                         TypeResolution::Type(type_ref) => Some(type_ref),
                         _ => None,
                     },
@@ -128,8 +137,9 @@ pub fn resolve_type_expr<'db>(
     type_expr: &'db AstTypeExpr,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
+    has_zelf: bool,
 ) -> TypeResolution {
-    resolve_type_expr_desc(db, &type_expr.data, module, template_args)
+    resolve_type_expr_desc(db, &type_expr.data, module, template_args, has_zelf)
 }
 
 #[salsa::tracked]
@@ -181,9 +191,15 @@ pub fn get_templates_of_fun<'db>(
     match function.parent(db) {
         ScopeOwnerId::Module(_) => (),
         ScopeOwnerId::Impl(impl_id) => {
-            // Add templates from the impl_id, maybe
             let sources = impl_sources(db, impl_id.interned());
             res.extend(sources.into_iter().next().unwrap().templates(db));
+        }
+        ScopeOwnerId::Interface(id) => {
+            res.extend(
+                interface_item(db, id.def(db).interned())
+                    .template_args
+                    .clone(),
+            );
         }
     }
     let ast = function_ast(db, function);
@@ -193,6 +209,7 @@ pub fn get_templates_of_fun<'db>(
             res.extend(def.data.template_args.clone());
         }
         FunctionLikeAst::Method(def) => res.extend(def.data.template_args.clone()),
+        FunctionLikeAst::TraitMethod(sig) => res.extend(sig.data.template_args.clone()),
     }
     res.into()
 }

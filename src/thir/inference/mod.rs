@@ -44,6 +44,7 @@ pub struct InferenceCtx<'a> {
     db: &'a dyn Db,
     table: UnificationTable<InPlace<InferVar>>,
     local_map: HashMap<LocalId, InferVar>,
+    zelf: Option<InferTy>,
 
     current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
@@ -140,6 +141,7 @@ impl<'db> InferenceCtx<'db> {
             call_infos: HashMap::new(),
             next_constraint_id: 0,
             implements: HashMap::new(),
+            zelf: None, // TODO
         }
     }
 
@@ -151,6 +153,10 @@ impl<'db> InferenceCtx<'db> {
                 .map(|(i, _)| InferTy::Param(TypeParamId(i)))
                 .collect::<Box<[_]>>(),
         )
+    }
+
+    pub fn zelf(&self) -> Option<&InferTy> {
+        self.zelf.as_ref()
     }
 }
 

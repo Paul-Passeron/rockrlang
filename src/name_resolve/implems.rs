@@ -18,6 +18,7 @@ pub fn resolve_type_expr_as_interface<'db>(
     interface: &'db AstTypeExpr,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg],
+    has_zelf: bool,
 ) -> Option<InterfaceRef> {
     match &interface.data {
         AstTypeExprDesc::Named { name, args } => {
@@ -31,12 +32,12 @@ pub fn resolve_type_expr_as_interface<'db>(
                 if let Definition::Interface(interface_id) = def {
                     let resolved_args = args
                         .iter()
-                        .map(
-                            |arg| match resolve_any_type_expr(db, arg, module, template_args) {
+                        .map(|arg| {
+                            match resolve_any_type_expr(db, arg, module, template_args, has_zelf) {
                                 TypeResolution::Type(type_ref) => Some(type_ref),
                                 _ => None,
-                            },
-                        )
+                            }
+                        })
                         .collect::<Option<Vec<_>>>();
                     resolved_args.map(|args| InterfaceRef::new(db, interface_id, args))
                 } else {
@@ -47,7 +48,7 @@ pub fn resolve_type_expr_as_interface<'db>(
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr_as_interface(db, to, module.interned(), template_args)
+                resolve_type_expr_as_interface(db, to, module.interned(), template_args, has_zelf)
             } else {
                 None
             }
@@ -68,9 +69,13 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
             for arg in &item.template_args {
                 let mut constraints = Set::new();
                 for constraint in &arg.constraints {
-                    if let Some(interface) =
-                        resolve_type_expr_as_interface(db, constraint, module, &item.template_args)
-                    {
+                    if let Some(interface) = resolve_type_expr_as_interface(
+                        db,
+                        constraint,
+                        module,
+                        &item.template_args,
+                        false,
+                    ) {
                         constraints.insert(interface);
                     } else {
                         // TODO
@@ -79,10 +84,17 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                 templates.push(constraints);
             }
             if let TypeResolution::Type(implemented) =
-                resolve_type_expr(db, &item.implemented, module, &item.template_args)
+                resolve_type_expr(db, &item.implemented, module, &item.template_args, false)
+            // Zelf types are not allowed here
             {
                 match item.interface.as_ref().map(|interface| {
-                    resolve_type_expr_as_interface(db, interface, module, &item.template_args)
+                    resolve_type_expr_as_interface(
+                        db,
+                        interface,
+                        module,
+                        &item.template_args,
+                        false,
+                    )
                 }) {
                     Some(Some(value)) => {
                         let impl_id =

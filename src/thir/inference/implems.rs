@@ -22,7 +22,7 @@ impl<'a> InferenceCtx<'a> {
     ) -> Option<HashSet<InferenceConstraintKind>> {
         match ty {
             InferTy::Var(infer_var) => {
-                let allocated = self.allocate_type_ref(&matcher, templates);
+                let allocated = self.allocate_type_ref(&matcher, templates, None); // Self not allowed here
                 Some(HashSet::from_iter(once(InferenceConstraintKind::Unify {
                     a: InferTy::Var(*infer_var),
                     b: allocated,
@@ -56,6 +56,10 @@ impl<'a> InferenceCtx<'a> {
                     },
                 ))),
                 TypeRef::Error => None,
+                TypeRef::Zelf => {
+                    // A Self type should not have been encountered here
+                    None
+                }
             },
             InferTy::Param(_) => {
                 // TODO: I think that this should not be allowed
@@ -89,7 +93,7 @@ impl<'a> InferenceCtx<'a> {
                     let args = interface_ref
                         .args(self.db)
                         .iter()
-                        .map(|arg| self.allocate_type_ref(arg, &mapped_templates))
+                        .map(|arg| self.allocate_type_ref(arg, &mapped_templates, Some(ty)))
                         .collect::<Box<[_]>>();
                     constraints.insert(InferenceConstraintKind::Implements {
                         ty: InferTy::Var(*infer_ty),

@@ -125,6 +125,7 @@ impl fmt::Display for Display<'_, TypeRef> {
         match self.value {
             TypeRef::Concrete(type_id) => write!(f, "{}", type_id.display(self.db)),
             TypeRef::Param(param_id) => write!(f, "{}", param_id.display(self.db)),
+            TypeRef::Zelf => write!(f, "Self"),
             TypeRef::Error => write!(f, "{{ERROR}}"),
         }
     }

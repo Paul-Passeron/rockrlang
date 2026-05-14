@@ -390,6 +390,7 @@ impl<'db> LowerFundef<'db> {
                                                                 unreachable!()
                                                             }
                                                             TypeRef::Error => vec![],
+                                                            TypeRef::Zelf => todo!(),
                                                         }
                                                     }
                                                     PartialTypeRef::WithHoles { args, .. } => args,
@@ -1204,6 +1205,7 @@ pub(super) fn lower_fundef_body<'db>(
     let module = match function.parent(db) {
         ScopeOwnerId::Module(m) => m,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
     let template_args = ast.data.template_args.clone();
     let mut ctx = LowerFundef::new(db, function, module, template_args);

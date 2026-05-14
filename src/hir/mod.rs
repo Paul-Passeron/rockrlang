@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::sync::Arc;
+
 use crate::{
     Db,
     common::{
@@ -9,19 +11,21 @@ use crate::{
     hir::lower_fundef::lower_fundef_body,
     name_resolve::{
         implems::module_impls,
+        interfaces::module_interfaces,
         module_items,
         type_expr::{get_templates_of_fun, resolve_type_expr},
     },
     parse_tree::{
         expr::BinaryOperator,
         top_level::{
-            AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstMethodDef, AstTopLevelItemDesc,
+            AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstInterfaceItem, AstMethodDef,
+            AstMethodsig, AstTopLevelItemDesc,
         },
         type_expr::AstAnyTypeExpr,
     },
     ril::{
-        EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId, ModuleId,
-        ScopeOwnerId, StructId, TypeDefId, TypeRef,
+        EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
+        InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeDefId, TypeRef,
     },
 };
 
@@ -287,6 +291,7 @@ pub fn impl_sources<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<I
         .filter(|impl_| impl_.id(db) == impl_id.into())
         .collect()
 }
+
 #[salsa::tracked]
 pub fn impl_items<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<AstImplItem> {
     impl_sources(db, impl_id)
@@ -295,11 +300,28 @@ pub fn impl_items<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<Ast
         .collect()
 }
 
+#[salsa::tracked]
+pub fn interface_items<'db>(
+    db: &'db dyn Db,
+    interface_id: InternedInterfaceId<'db>,
+) -> Arc<Vec<AstInterfaceItem>> {
+    Arc::new(
+        module_interfaces(db, interface_id.parent(db).interned())
+            .iter()
+            .find(|interface| interface.name == interface_id.name(db))
+            .cloned()
+            .into_iter()
+            .flat_map(|interface| interface.items)
+            .collect(),
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum FunctionLikeAst {
     ExternDef(AstFunsig, bool),
     Fundef(AstFundef),
     Method(AstMethodDef),
+    TraitMethod(AstMethodsig),
 }
 
 #[salsa::tracked]
@@ -343,6 +365,19 @@ pub fn function_ast<'db>(
                 }
             }
         }
+        ScopeOwnerId::Interface(interface_ref) => {
+            for item in interface_items(db, interface_ref.def(db).interned()).iter() {
+                match item {
+                    AstInterfaceItem::Sig(sig) => {
+                        return InternedFunctionLikeAst::new(
+                            db,
+                            FunctionLikeAst::TraitMethod(sig.clone()),
+                        );
+                    }
+                    _ => (),
+                }
+            }
+        }
     }
     panic!("[INTERNAL COMPILER ERROR] FunctionId's Ast not found")
 }
@@ -355,6 +390,7 @@ pub fn hir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Opti
         FunctionLikeAst::Fundef(fundef) => Some(lower_fundef_body(db, function.into(), fundef)),
         FunctionLikeAst::Method(_) => todo!(),
         FunctionLikeAst::ExternDef(_, _) => None,
+        FunctionLikeAst::TraitMethod(_) => None,
     }
 }
 
@@ -362,6 +398,7 @@ pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
     match owner {
         ScopeOwnerId::Module(module_id) => module_id,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     }
 }
 
@@ -370,12 +407,19 @@ impl FunctionId {
         let templates = get_templates_of_fun(db, self.interned());
         let owning_module = owning_module(db, self.parent(db));
         let ast = function_ast(db, self.interned()).inner(db);
-        let type_expr = match ast {
-            FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.return_type,
-            FunctionLikeAst::Fundef(spanned) => &spanned.data.return_type,
-            FunctionLikeAst::Method(spanned) => &spanned.data.return_type,
+        let (type_expr, has_zelf) = match ast {
+            FunctionLikeAst::ExternDef(spanned, _) => (&spanned.data.return_type, false),
+            FunctionLikeAst::Fundef(spanned) => (&spanned.data.return_type, false),
+            FunctionLikeAst::Method(spanned) => (&spanned.data.return_type, true),
+            FunctionLikeAst::TraitMethod(spanned) => (&spanned.data.return_type, true),
         };
-        match resolve_type_expr(db, type_expr, owning_module.interned(), &templates) {
+        match resolve_type_expr(
+            db,
+            type_expr,
+            owning_module.interned(),
+            &templates,
+            has_zelf,
+        ) {
             crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => type_ref,
             _ => panic!("Unresolved type in function {}", self.name(db).display(db)),
         }
@@ -383,7 +427,7 @@ impl FunctionId {
 
     pub fn args<'db>(&'db self, db: &'db dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
         let ast = function_ast(db, self.interned()).inner(db);
-        let (receiver, args) = match ast {
+        match ast {
             FunctionLikeAst::ExternDef(spanned, _) => (None, spanned.data.args.clone()),
             FunctionLikeAst::Fundef(spanned) => (None, spanned.data.args.clone()),
             FunctionLikeAst::Method(spanned) => {
@@ -394,7 +438,10 @@ impl FunctionId {
 
                 (Some(receiver), spanned.data.args.clone())
             }
-        };
-        (receiver, args)
+            FunctionLikeAst::TraitMethod(spanned) => {
+                // TODO: receiver is supposed to be Self type
+                (None, spanned.data.args.clone())
+            }
+        }
     }
 }

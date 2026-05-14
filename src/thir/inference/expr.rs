@@ -136,8 +136,11 @@ impl<'db> InferenceCtx<'db> {
                             .iter()
                             .zip(args.iter())
                             .try_for_each(|(infer_ty, t_ref)| {
-                                let t_ref =
-                                    this.allocate_type_ref(t_ref, this.templates().as_ref());
+                                let t_ref = this.allocate_type_ref(
+                                    t_ref,
+                                    this.templates().as_ref(),
+                                    this.zelf.as_ref(),
+                                );
                                 this.unify(infer_ty.clone(), t_ref)
                             })
                     })
@@ -159,7 +162,13 @@ impl<'db> InferenceCtx<'db> {
 
                 self.snapshot(|this| {
                     args.iter()
-                        .map(|arg| this.allocate_partial_type_arg(arg, this.templates().as_ref()))
+                        .map(|arg| {
+                            this.allocate_partial_type_arg(
+                                arg,
+                                this.templates().as_ref(),
+                                this.zelf.clone().as_ref(),
+                            )
+                        })
                         .collect::<Box<[_]>>()
                         .into_iter()
                         .zip(templates.iter())
@@ -198,21 +207,32 @@ impl<'db> InferenceCtx<'db> {
 
             let module = struct_id.parent(self.db);
             let ast_template_args = &ast.template_args;
+            let zelf = self.fresh_var();
 
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
                     let ty = inferred_fields.get(&ast.name).unwrap().clone();
                     let resolved = this
-                        .allocate_ast_type_expr(&ast.ty.data, module, ast_template_args, &templates)
+                        .allocate_ast_type_expr(
+                            &ast.ty.data,
+                            module,
+                            ast_template_args,
+                            &templates,
+                            Some(&InferTy::Var(zelf)),
+                        )
                         .unwrap();
                     this.unify(ty, resolved)
                 })
             })?;
 
-            Ok(InferTy::Adt {
+            let as_struct = InferTy::Adt {
                 def: TypeDefId::Struct(struct_id),
                 fields: templates,
-            })
+            };
+
+            self.unify(InferTy::Var(zelf), as_struct.clone())?;
+
+            Ok(as_struct)
         } else {
             Err(UnificationError::NonStructForStructLit(ty.clone()))
         }
@@ -274,12 +294,18 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn get_ret_ty(&mut self, target: FunctionId, templates: &[InferTy]) -> InferTy {
+    fn get_ret_ty(
+        &mut self,
+        target: FunctionId,
+        templates: &[InferTy],
+        zelf: Option<&InferTy>,
+    ) -> InferTy {
         let ast = function_ast(self.db, target.interned()).inner(self.db);
         let ast_ret_ty = match ast {
             FunctionLikeAst::ExternDef(sig, _) => &sig.data.return_type,
             FunctionLikeAst::Fundef(def) => &def.data.return_type,
             FunctionLikeAst::Method(def) => &def.data.return_type,
+            FunctionLikeAst::TraitMethod(sig) => &sig.data.return_type,
         };
         let module = owning_module(self.db, target.parent(self.db));
         let ast_template_args = get_templates_of_fun(self.db, target.interned());
@@ -288,6 +314,7 @@ impl<'db> InferenceCtx<'db> {
             module,
             ast_template_args.as_ref(),
             templates,
+            zelf,
         )
         .unwrap()
     }
@@ -298,7 +325,8 @@ impl<'db> InferenceCtx<'db> {
         args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
         self.check_args_count(target, args.len())?;
-        let (_, ast_args) = target.args(self.db);
+        let (receiver, ast_args) = target.args(self.db);
+        assert!(receiver.is_none());
         let templates = get_templates_of_fun(self.db, target.interned());
         let inferred_templates = templates
             .iter()
@@ -308,8 +336,14 @@ impl<'db> InferenceCtx<'db> {
         let inferred_ast_args = ast_args
             .iter()
             .map(|arg| {
-                self.allocate_ast_type_expr(&arg.ty.data, module, &templates, &inferred_templates)
-                    .unwrap()
+                self.allocate_ast_type_expr(
+                    &arg.ty.data,
+                    module,
+                    &templates,
+                    &inferred_templates,
+                    None, // TODO: handle if receiver can be Some
+                )
+                .unwrap()
             })
             .collect::<Box<[_]>>();
         let inferred_args = args
@@ -321,7 +355,11 @@ impl<'db> InferenceCtx<'db> {
             .zip(inferred_args)
             .try_for_each(|(a, b)| self.unify(a, b))?;
 
-        Ok(self.get_ret_ty(target, &inferred_templates))
+        Ok(self.get_ret_ty(
+            target,
+            &inferred_templates,
+            None, // TODO: Same
+        ))
     }
 
     fn infer_binop(
