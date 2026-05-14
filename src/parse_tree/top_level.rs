@@ -46,6 +46,28 @@ pub struct AstFundefDesc {
     pub body: Vec<AstStmt>,
 }
 
+pub type AstMethodDef = Spanned<AstMethodDefDesc>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstMethodDefDesc {
+    pub name: Symbol,
+    pub receiver: AstReceiver,
+    pub args: Vec<AstFundefArg>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub return_type: AstTypeExpr,
+    pub body: Vec<AstStmt>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AstReceiver {
+    None,       // No receiver, static method
+    Zelf,       // self
+    RefZelf,    // &self
+    MutRefZelf, // &mut self
+    PtrZelf,    // *self
+    MutPtrZelf, // *mut self
+}
+
 pub type AstFunsig = Spanned<AstFunsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

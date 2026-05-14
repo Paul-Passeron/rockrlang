@@ -8,8 +8,8 @@ use crate::{
         top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundef, AstFundefArg, AstFundefDesc,
             AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
-            AstModule, AstModuleDesc, AstStructDef, AstStructDefField, AstTemplateArg,
-            AstTopLevelItem, AstTopLevelItemDesc,
+            AstMethodDef, AstMethodDefDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
+            AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -154,7 +154,60 @@ impl<'db> Parser<'db> {
         Ok(args)
     }
 
+    fn parse_receiver(&mut self) -> AstReceiver {
+        let position = self.position;
+        if let Some(r) = self.parse_receiver_aux() {
+            r
+        } else {
+            self.position = position;
+            AstReceiver::None
+        }
+    }
+
+    fn parse_receiver_aux(&mut self) -> Option<AstReceiver> {
+        if let Some(t) = self.peek_n(0) {
+            match t.kind {
+                TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "self") => {
+                    self.consume();
+                    Some(AstReceiver::Zelf)
+                }
+                TokenKind::BitAnd => {
+                    self.consume();
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Mut)
+                    {
+                        self.consume();
+                        Some(AstReceiver::MutRefZelf)
+                    } else {
+                        Some(AstReceiver::RefZelf)
+                    }
+                }
+                TokenKind::Mult => {
+                    self.consume();
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Mut)
+                    {
+                        self.consume();
+                        Some(AstReceiver::MutPtrZelf)
+                    } else {
+                        Some(AstReceiver::PtrZelf)
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     fn parse_funsig(&mut self) -> Result<AstFunsig, ParseError> {
+        Ok(self.parse_any_funsig(false)?.0)
+    }
+
+    fn parse_any_funsig(
+        &mut self,
+        accept_receiver: bool,
+    ) -> Result<(AstFunsig, Option<AstReceiver>), ParseError> {
         let annotations = self.annotations();
         let start = self.get_start();
         let name = self.parse_symbol()?;
@@ -173,7 +226,29 @@ impl<'db> Parser<'db> {
 
         self.expect(TokenKind::OpenPar)?;
         self.consume();
-        let args = self.parse_fundef_args()?;
+
+        let mut has_args = true;
+
+        let receiver = if accept_receiver {
+            let r = self.parse_receiver();
+            if let Some(t) = self.peek_n(0)
+                && matches!(t.kind, TokenKind::Comma)
+                && r != AstReceiver::None
+            {
+                self.consume();
+            } else {
+                has_args = false;
+            }
+            Some(r)
+        } else {
+            None
+        };
+
+        let args = if has_args {
+            self.parse_fundef_args()?
+        } else {
+            vec![]
+        };
         self.expect(TokenKind::ClosePar)?;
         self.consume();
 
@@ -184,15 +259,54 @@ impl<'db> Parser<'db> {
 
         let end = self.get_end();
 
-        Ok(AstFunsig::new(
-            AstFunsigDesc {
-                name: name.data,
+        Ok((
+            AstFunsig::new(
+                AstFunsigDesc {
+                    name: name.data,
+                    args,
+                    template_args,
+                    return_type,
+                },
+                annotations,
+                start.span(&end),
+            ),
+            receiver,
+        ))
+    }
+
+    fn parse_methoddef(&mut self) -> Result<AstMethodDef, ParseError> {
+        self.expect(TokenKind::Fun)?;
+        self.consume();
+        let (
+            AstFunsig {
+                data:
+                    AstFunsigDesc {
+                        name,
+                        args,
+                        template_args,
+                        return_type,
+                    },
+                annotations,
+                span,
+            },
+            receiver,
+        ) = self.parse_any_funsig(true)?;
+
+        let receiver = receiver.unwrap();
+        let body = self.parse_block()?;
+
+        let span = span.start().span(&self.get_end());
+        Ok(AstMethodDef::new(
+            AstMethodDefDesc {
+                name,
+                receiver,
                 args,
                 template_args,
                 return_type,
+                body,
             },
             annotations,
-            start.span(&end),
+            span,
         ))
     }
 
