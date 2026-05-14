@@ -105,15 +105,24 @@ impl<'db> InferenceCtx<'db> {
             .map(|(i, _)| InferTy::Param(TypeParamId(i)))
             .collect();
 
+        let l = infer_templates.len() - get_templates_of_fun_only(db, func.interned()).len();
+
+        let owner_ctx = ImplicitContext::new(
+            db,
+            func.parent(db),
+            Arc::new([]),
+            infer_templates.iter().take(l).cloned().collect(),
+            None,
+        )
+        .unwrap();
+
         let ctx = ImplicitContext::from_function(
             db,
             func,
             infer_templates.clone(),
-            if let ScopeOwnerId::Module(_) = func.parent(db) {
-                None
-            } else {
-                Some(InferTy::Zelf)
-            },
+            func.parent(db)
+                .get_canonical_zelf(db)
+                .map(|ty| Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap()),
         )
         .expect("Could not create implicit context for inference context. This should not fail");
 
