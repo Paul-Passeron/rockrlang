@@ -28,12 +28,12 @@ impl str {
 
     @[inline]
     fun println(&self): void {
-        printf("%s\n", self);
+        printf("%s\n", self.data);
     }
 
     @[inline]
     fun print(&self): void {
-        printf("%s", self);
+        printf("%s", self.data);
     }
 }
 
