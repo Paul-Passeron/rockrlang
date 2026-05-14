@@ -7,6 +7,6 @@ struct Foo {
 fun bar(a: &Foo, b: &mut Foo): void {
     let _ = a.x;
     let _ = b.x;
-    let c: & &Foo = a@;
+    let c: &&Foo = a@;
     let _ = c.x;
 }
