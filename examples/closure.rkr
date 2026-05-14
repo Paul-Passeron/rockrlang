@@ -1,5 +1,6 @@
 fun main(): int {
-    let x: int => 5;
+    let x: int = 5;
+    // This is not supported yet !
     fun add_one_to_x(): void {
         x += 1;
     }
