@@ -1,0 +1,8 @@
+@include std::datastructures
+
+interface A {}
+
+mod inner {
+    impl A for int {}
+    impl <T: A> A for Vec<T> {}
+}
