@@ -1,7 +1,58 @@
-interface Bar {
-    fun baz(&self): int;
+struct Box<T> {
+    x: T;
 }
 
-fun foo<T: Bar>(x: T): int {
-    return x.baz();
+impl <T> Box<T> {
+    fun inner(&self): T {
+        return self.x;
+    }
+
+    fun box(x: T): Box<T> {
+        return Box {.x: x};
+    }
+
+    fun tuple<X>(&self, x: X): Box<(T, X)> {
+        return Box {.x: (self.x, x)};
+    }
+}
+
+interface Bar<X> {
+    fun baz(&self): Box<X>;
+}
+
+impl <T> Bar<T> for Box<T> {
+    fun baz(&self): Box<T> {
+        return self$;
+    }
+}
+
+fun unpack4<A, B, C, D>(x: (A, B), y: (C, D)): (A, B, C, D) {
+    return (x.0, x.1, y.0, y.1);
+}
+
+impl <A, B, C, D> ((A, B),(C, D)) {
+    fun unpack4(self): (A, B, C, D) {
+        return unpack4(self.0, self.1);
+    }
+}
+
+fun inner_first<A, B>(x: (Box<A>, B)): (A, B) {
+    return (x.0.inner(), x.1);
+}
+
+fun foo<T: Bar<int>>(x: T): int {
+    let y = x.baz(); // Box<int>
+    let z = y.inner(); // int
+    let a = Box::box(z); // Box<int>
+    let b = Box::box(a); // Box<Box<int>>
+    let c = Box::box(b); // Box<Box<Box<int>>>
+    let d = c.baz().inner(); // Box<Box<int>>
+    let e = c.tuple("Hello !"); // Box<(Box<Box<int>>, str)>
+    let f = e.tuple(e); // Box<((Box<Box<int>>, str), Box<(Box<Box<int>>, str)>)>
+    let f = e.tuple(e.inner()); // Box<((Box<Box<int>>, str), (Box<Box<int>>, str))>
+    let g: (Box<Box<int>>, str, Box<Box<int>>, str) =
+        f.inner().unpack4(); // (Box<Box<int>>, str, Box<Box<int>>, str)
+    let h = Box::box(g.1);
+    let i = h.tuple(0);
+    return 8;
 }
