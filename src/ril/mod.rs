@@ -7,9 +7,16 @@ pub use plumbing::*;
 
 use crate::{
     Db, OwnedSourceFile, SourceFile,
-    common::{location::Span, symbols::Symbol, unord::Set},
-    name_resolve::type_expr::{templates_of_enum, templates_of_struct},
-    parse_tree::top_level::{AstImplItem, AstTemplateArg},
+    common::{
+        location::{Location, Span},
+        symbols::Symbol,
+        unord::Set,
+    },
+    name_resolve::{
+        module_items,
+        type_expr::{templates_of_enum, templates_of_struct},
+    },
+    parse_tree::top_level::{AstImplItem, AstTemplateArg, AstTopLevelItemDesc},
 };
 
 #[salsa::tracked]
@@ -182,8 +189,35 @@ pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
     }
 }
 
+impl SourceFile<'_> {
+    pub fn span(&self, db: &dyn Db) -> Span {
+        Location::new(0, self.path(db)).span(&Location::new(self.content(db).len(), self.path(db)))
+    }
+}
 impl ModuleId {
     pub fn get_span(&self, db: &dyn Db) -> Span {
-        todo!()
+        match self.parent(db) {
+            Some(parent) => {
+                for item in module_items(db, parent.interned()).into_iter().flatten() {
+                    if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
+                        && curr_mod.data.name == self.name(db)
+                    {
+                        return curr_mod.span.clone();
+                    }
+                }
+                unreachable!()
+            }
+            None => {
+                // is it a file ?
+                match self.package(db) {
+                    Some(package) => {
+                        let root = package.root(db);
+                        let file = root.file(db);
+                        file.span(db)
+                    }
+                    None => unreachable!(),
+                }
+            }
+        }
     }
 }

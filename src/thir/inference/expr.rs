@@ -306,8 +306,6 @@ impl<'db> InferenceCtx<'db> {
             ast.fields.iter().map(|f| f.name).collect::<HashSet<_>>(),
         );
         if field_sets.0 != field_sets.1 {
-            println!("Field sets mismatch");
-
             // For ast fields not in inferred fields
             for field in field_sets.1.difference(&field_sets.0) {
                 self.diagnostics.push(Diagnostic {
