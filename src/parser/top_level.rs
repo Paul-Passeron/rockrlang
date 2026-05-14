@@ -6,10 +6,10 @@ use crate::{
     parse_tree::{
         annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
         top_level::{
-            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundefArg, AstFundefDesc, AstFunsig,
-            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface, AstModule,
-            AstModuleDesc, AstStructDef, AstStructDefField, AstTemplateArg, AstTopLevelItem,
-            AstTopLevelItemDesc, Fundef,
+            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundef, AstFundefArg, AstFundefDesc,
+            AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
+            AstModule, AstModuleDesc, AstStructDef, AstStructDefField, AstTemplateArg,
+            AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -196,7 +196,7 @@ impl<'db> Parser<'db> {
         ))
     }
 
-    fn parse_fundef(&mut self) -> Result<Fundef, ParseError> {
+    fn parse_fundef(&mut self) -> Result<AstFundef, ParseError> {
         self.expect(TokenKind::Fun)?;
         self.consume();
         let AstFunsig {
@@ -215,7 +215,7 @@ impl<'db> Parser<'db> {
 
         let span = span.start().span(&self.get_end());
 
-        Ok(Fundef::new(
+        Ok(AstFundef::new(
             AstFundefDesc {
                 name,
                 args,

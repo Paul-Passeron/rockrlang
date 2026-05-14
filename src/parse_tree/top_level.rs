@@ -19,7 +19,7 @@ pub enum AstAnyTopLevelItemDesc {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstTopLevelItemDesc {
     Module(AstModule),
-    Fundef(Fundef),
+    Fundef(AstFundef),
     Interface(AstInterface),
     Const(AstConstDecl),
     Impl(AstImplBlock),
@@ -35,7 +35,7 @@ pub struct AstModuleDesc {
     pub includes: Vec<AstIncludePath>,
 }
 
-pub type Fundef = Spanned<AstFundefDesc>;
+pub type AstFundef = Spanned<AstFundefDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFundefDesc {
@@ -101,7 +101,7 @@ pub struct AstImplBlock {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
     Type { name: Symbol, ty: AstTypeExpr },
-    Fundef(Fundef),
+    Fundef(AstFundef),
 }
 
 #[salsa::tracked]
