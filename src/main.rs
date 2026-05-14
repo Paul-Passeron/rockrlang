@@ -1,9 +1,6 @@
 use clap::Parser;
 use clap_derive::Parser;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     common::location::get_loc_info,
@@ -22,7 +19,12 @@ use crate::{
     thir::type_check_function,
 };
 
+pub use common::location::OwnedSourceFile;
+pub use common::location::SourceFile;
+pub use db::*;
+
 mod common;
+pub mod db;
 mod driver;
 mod hir;
 mod lexer;
@@ -30,9 +32,8 @@ mod name_resolve;
 mod parse_tree;
 mod parser;
 mod ril;
-mod thir;
-
 mod tests;
+mod thir;
 
 #[macro_export]
 macro_rules! unused {
@@ -56,65 +57,6 @@ pub struct CliArgs {
 pub struct CompilerConfig {
     pub no_std: bool,
     pub skip_core: bool,
-}
-
-#[salsa::db]
-#[derive(Clone)]
-pub struct RockrDb {
-    storage: salsa::Storage<Self>,
-    config: CompilerConfig,
-}
-
-#[salsa::db]
-pub trait Db: salsa::Database {
-    fn config(&self) -> &CompilerConfig;
-}
-
-#[salsa::db]
-impl Db for RockrDb {
-    fn config(&self) -> &CompilerConfig {
-        &self.config
-    }
-}
-
-impl RockrDb {
-    fn new(config: CompilerConfig) -> Self {
-        Self {
-            storage: salsa::Storage::default(),
-            config,
-        }
-    }
-}
-
-#[salsa::db]
-impl salsa::Database for RockrDb {}
-
-#[salsa::interned]
-pub struct SourceFile {
-    pub path: PathBuf,
-    pub content: Arc<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct OwnedSourceFile {
-    pub path: PathBuf,
-    pub content: Arc<String>,
-}
-
-impl OwnedSourceFile {
-    pub fn new(path: PathBuf, content: Arc<String>) -> Self {
-        Self { path, content }
-    }
-
-    pub fn to_source_file<'db>(&self, db: &'db dyn Db) -> SourceFile<'db> {
-        SourceFile::new(db, self.path.clone(), self.content.clone())
-    }
-}
-
-impl<'db> SourceFile<'db> {
-    pub fn to_owned(&self, db: &'db dyn Db) -> OwnedSourceFile {
-        OwnedSourceFile::new(self.path(db), self.content(db))
-    }
 }
 
 fn print_module_tree<'db>(db: &'db dyn Db, module: FileModule<'db>, indent: usize) {

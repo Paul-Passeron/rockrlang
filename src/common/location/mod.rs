@@ -1,6 +1,34 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
-use crate::{SourceFile, get_source_file, ril::ModuleId};
+use crate::{Db, get_source_file, ril::ModuleId};
+
+#[salsa::interned]
+pub struct SourceFile {
+    pub path: PathBuf,
+    pub content: Arc<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OwnedSourceFile {
+    pub path: PathBuf,
+    pub content: Arc<String>,
+}
+
+impl OwnedSourceFile {
+    pub fn new(path: PathBuf, content: Arc<String>) -> Self {
+        Self { path, content }
+    }
+
+    pub fn to_source_file<'db>(&self, db: &'db dyn Db) -> SourceFile<'db> {
+        SourceFile::new(db, self.path.clone(), self.content.clone())
+    }
+}
+
+impl<'db> SourceFile<'db> {
+    pub fn to_owned(&self, db: &'db dyn Db) -> OwnedSourceFile {
+        OwnedSourceFile::new(self.path(db), self.content(db))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Location {
