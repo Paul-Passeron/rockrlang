@@ -169,7 +169,7 @@ pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
                     String::new()
                 } else {
                     format!(
-                        "<{}>",
+                        " <{}>",
                         impl_id
                             .templates(db)
                             .iter()
