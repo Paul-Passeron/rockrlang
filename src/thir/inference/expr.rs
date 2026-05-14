@@ -201,6 +201,18 @@ impl<'db> InferenceCtx<'db> {
         type_ref: &PartialTypeRef,
     ) -> Option<(StructId, Box<[InferTy]>)> {
         match type_ref {
+            PartialTypeRef::Resolved(TypeRef::Zelf) => {
+                let zelf = self.implicit_ctx().zelf()?.clone();
+                match zelf {
+                    InferTy::Adt { def, fields } => {
+                        let TypeDefId::Struct(struct_id) = def else {
+                            return None;
+                        };
+                        Some((struct_id, fields))
+                    }
+                    _ => None,
+                }
+            }
             PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => match type_id.def(self.db) {
                 TypeDefId::Struct(struct_id) => {
                     let templates = templates_of_struct(self.db, struct_id.interned());
