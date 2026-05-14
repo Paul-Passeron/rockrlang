@@ -75,6 +75,7 @@ pub enum AstStmtDesc {
         scrutinee: AstExpr,
         branches: Vec<AstMatchBranch>,
     },
+    Break,
     Expr(AstExpr),
     Defer(Box<AstStmt>),
 }

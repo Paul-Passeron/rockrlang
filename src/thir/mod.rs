@@ -9,20 +9,28 @@ use std::{
 use crate::{
     Db,
     hir::{
-        HirBody, HirExpr, HirExprDesc, HirId, HirPlace, HirStmt, HirStmtKind, LocalId, LocalInfo,
-        Mutability, PartialTypeArg, PartialTypeRef, hir_body, owning_module,
+        HirBody, HirExpr, HirExprDesc, HirId, HirMatchBranch, HirPattern,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind, LocalId,
+        LocalInfo, PartialTypeArg, PartialTypeRef, hir_body, owning_module,
     },
     name_resolve::{
         definition::{Definition, resolve_in_module},
-        type_expr::{TypeResolution, get_templates_of_fun, resolve_type_expr},
+        type_expr::{
+            TypeResolution, enum_item, get_templates_of_fun, resolve_type_expr, struct_item,
+        },
     },
-    parse_tree::type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+    parse_tree::{
+        top_level::{AstEnumVariant, AstEnumVariantKind, AstStructDefField},
+        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+    },
     ril::{
-        BuiltinTypeId, FunctionId, InternedFunctionId, ModuleId, TypeDefId, TypeId, TypeParamId,
-        TypeRef, bool_id, char_id, display::RilDisplay, get_template_param_count, never_id, ptr_of,
-        str_id, void_id,
+        BuiltinTypeId, FunctionId, InternedFunctionId, ModuleId, Package, TypeDefId, TypeId,
+        TypeParamId, TypeRef, display::RilDisplay, get_template_param_count, str_id,
     },
+    thir::methods::{ImplMatchConstraint, ImplMatchConstraints, find_method_for_partial_ref},
 };
+
+pub mod methods;
 
 #[derive(Clone)]
 pub(self) struct InferCallInfos {
@@ -62,10 +70,12 @@ struct TyCtx<'db> {
     function: FunctionId,
     locals: &'db [LocalInfo],
     params: &'db [LocalId],
+    packages: Vec<Package<'db>>,
 
     // Inference
     templates: Vec<TyVarId>,
-    type_eq_constrs: Vec<(InferTy, InferTy)>,
+    forwards: HashMap<InferTy, InferTy>,
+    // type_eq_constrs: Vec<(InferTy, InferTy)>,
     calls: HashMap<ExprId, InferCallInfos>,
     exprs: HashMap<ExprId, InferTy>,
     infer_locals: HashMap<LocalId, InferTy>,
@@ -83,11 +93,11 @@ pub struct PatternId(HirId);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct TyVarId(usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct IntVarId(usize);
+// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+// struct IntVarId(usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct FloatVarId(usize);
+// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+// struct FloatVarId(usize);
 
 impl TyVarId {
     pub fn alloc() -> Self {
@@ -98,31 +108,20 @@ impl TyVarId {
     }
 }
 
-impl IntVarId {
-    pub fn alloc() -> Self {
-        static NEXT: Mutex<usize> = Mutex::new(0);
-        let res = Self(*NEXT.lock().unwrap());
-        *NEXT.lock().unwrap() += 1;
-        res
-    }
-}
-
-impl FloatVarId {
-    pub fn alloc() -> Self {
-        static NEXT: Mutex<usize> = Mutex::new(0);
-        let res = Self(*NEXT.lock().unwrap());
-        *NEXT.lock().unwrap() += 1;
-        res
-    }
-}
-
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum InferTy {
-    Known(TypeRef),
+pub(self) enum InferTy {
+    Param(TypeParamId),
     Var(TyVarId),
-    IntVar(IntVarId),
-    FloatVar(FloatVarId),
-    Ptr(Mutability, Box<InferTy>),
+    Adt {
+        def: TypeDefId,
+        args: Vec<InferTy>,
+    },
+    Deref(Box<InferTy>),
+    RefOrDerefLike {
+        base: Box<InferTy>, // Let's call this T
+        like: Box<InferTy>, // if this is not a ref: T,
+                            // if this is &mut ... => &mut T and if &... => &T
+    },
     Error,
 }
 
@@ -140,20 +139,32 @@ impl InferTy {
 impl<'a> fmt::Display for InferTyDisplay<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.ty {
-            InferTy::Known(type_ref) => write!(f, "{}", type_ref.display(self.db)),
             InferTy::Var(ty_var_id) => write!(f, "'{}'", ty_var_id.0),
-            InferTy::IntVar(int_var_id) => write!(f, "int({})", int_var_id.0),
-            InferTy::FloatVar(float_var_id) => write!(f, "float({})", float_var_id.0),
-            InferTy::Ptr(mutability, infer_ty) => write!(
-                f,
-                "*{}{}",
-                match mutability {
-                    Mutability::Mutable => "mut ",
-                    Mutability::Immutable => "",
-                },
-                infer_ty.display(self.db)
-            ),
+            InferTy::Param(id) => write!(f, "T{}", id.0),
             InferTy::Error => write!(f, "{{ERROR}}"),
+            InferTy::Adt { def, args } => {
+                write!(f, "{}", def.name(self.db).display(self.db))?;
+                if !args.is_empty() {
+                    write!(f, "<")?;
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", arg.display(self.db))?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
+            InferTy::Deref(infer_ty) => write!(f, "Deref{{{}}}", infer_ty.display(self.db)),
+            InferTy::RefOrDerefLike { base, like } => {
+                write!(
+                    f,
+                    "RefOrDerefLike({} as {})",
+                    base.display(self.db),
+                    like.display(self.db)
+                )
+            }
         }
     }
 }
@@ -164,6 +175,7 @@ impl<'db> TyCtx<'db> {
         function: FunctionId,
         locals: &'db [LocalInfo],
         params: &'db [LocalId],
+        packages: Vec<Package<'db>>,
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned())
             .iter()
@@ -175,7 +187,8 @@ impl<'db> TyCtx<'db> {
             locals,
             params,
             templates,
-            type_eq_constrs: Vec::new(),
+            packages,
+            forwards: HashMap::new(),
             calls: HashMap::new(),
             exprs: HashMap::new(),
             infer_locals: HashMap::new(),
@@ -191,18 +204,163 @@ impl<'db> TyCtx<'db> {
                 let partially_resolved =
                     this.resolve_holed_desc(desc, owning_module(db, function.parent(db)));
                 let inferred_annotation = this.allocate_partial(partially_resolved);
-                this.type_eq_constrs
-                    .push((InferTy::Var(var_id), inferred_annotation));
+                this.unify(InferTy::Var(var_id), inferred_annotation);
             }
         }
-
         this
+    }
+
+    fn find(&self, ty: InferTy) -> InferTy {
+        let mut res = ty;
+        while let Some(other) = self.forwards.get(&res)
+            && other != &InferTy::Error
+        {
+            res = other.clone();
+        }
+        res
+    }
+
+    fn is_var_in_ty(var: TyVarId, ty: &InferTy) -> bool {
+        match ty {
+            InferTy::Var(ty_var_id) => *ty_var_id == var,
+            InferTy::Adt { args, .. } => args.iter().any(|arg| Self::is_var_in_ty(var, arg)),
+            _ => false,
+        }
+    }
+
+    fn occurence_unify(&mut self, var: TyVarId, ty: InferTy) {
+        if Self::is_var_in_ty(var, &ty) {
+            // Recursive type def, error and breaking the forwards chain (see find)
+            self.forwards
+                .entry(InferTy::Var(var))
+                .insert_entry(InferTy::Error);
+        } else {
+            // We know that var is the last in its forward chain
+            let equates_to = self.find(ty);
+            self.forwards.insert(InferTy::Var(var), equates_to);
+        }
+    }
+
+    fn unify(&mut self, ty_a: InferTy, ty_b: InferTy) {
+        let ty_a = self.find(ty_a);
+        let ty_b = self.find(ty_b);
+        println!(
+            "Unifying {} and {}",
+            ty_a.display(self.db),
+            ty_b.display(self.db)
+        );
+        match (ty_a, ty_b) {
+            (InferTy::Error, b) => {
+                self.forwards.insert(b, InferTy::Error);
+            }
+            (InferTy::Param(x), InferTy::Param(y)) => {
+                if x != y {
+                    self.forwards.insert(InferTy::Param(x), InferTy::Error);
+                    self.forwards.insert(InferTy::Param(y), InferTy::Error);
+                }
+            }
+            (InferTy::Var(var), b) => {
+                self.occurence_unify(var, b);
+            }
+            (
+                InferTy::Adt {
+                    def: def_a,
+                    args: args_a,
+                },
+                InferTy::Adt {
+                    def: def_b,
+                    args: args_b,
+                },
+            ) => {
+                if def_a != def_b {
+                    // We error both out
+                    println!("ERROR from != def");
+                    self.forwards.insert(
+                        InferTy::Adt {
+                            def: def_a,
+                            args: args_a,
+                        },
+                        InferTy::Error,
+                    );
+                    self.forwards.insert(
+                        InferTy::Adt {
+                            def: def_b,
+                            args: args_b,
+                        },
+                        InferTy::Error,
+                    );
+                } else {
+                    for (arg_a, arg_b) in args_a.clone().into_iter().zip(args_b.clone().into_iter())
+                    {
+                        self.unify(arg_a.clone(), arg_b.clone());
+                        if self.find(arg_a) == InferTy::Error {
+                            println!("ERROR bad arg");
+
+                            // error out if it contains an error
+                            self.forwards.insert(
+                                InferTy::Adt {
+                                    def: def_a,
+                                    args: args_a,
+                                },
+                                InferTy::Error,
+                            );
+                            self.forwards.insert(
+                                InferTy::Adt {
+                                    def: def_b,
+                                    args: args_b,
+                                },
+                                InferTy::Error,
+                            );
+                            break;
+                        }
+                    }
+                }
+            }
+            (InferTy::Deref(pointee), InferTy::Adt { def, args }) => {
+                let ptr_likes = [
+                    BuiltinTypeId::mut_ptr(self.db),
+                    BuiltinTypeId::ptr(self.db),
+                    BuiltinTypeId::mut_ref(self.db),
+                    BuiltinTypeId::ref_(self.db),
+                ];
+                for ptr_like in &ptr_likes {
+                    if def == TypeDefId::Builtin(*ptr_like) {
+                        self.unify(*pointee.clone(), args[0].clone());
+                        return;
+                    }
+                }
+                self.unify(InferTy::Deref(pointee), InferTy::Error);
+                self.unify(InferTy::Adt { def, args }, InferTy::Error);
+            }
+            (InferTy::Deref(pointee), _) => todo!(),
+            (a, b) => self.unify(b, a), // Switch the types
+        }
     }
 
     fn allocate_partial(&mut self, ty: PartialTypeRef) -> InferTy {
         match ty {
-            PartialTypeRef::Resolved(type_ref) => InferTy::Known(type_ref),
-            PartialTypeRef::WithHoles { .. } => todo!(),
+            PartialTypeRef::Resolved(type_ref) => self.allocate_ref(
+                type_ref,
+                &self
+                    .templates
+                    .iter()
+                    .copied()
+                    .map(|x| InferTy::Var(x))
+                    .collect::<Box<[_]>>(),
+            ),
+            PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
+                def,
+                args: args
+                    .into_iter()
+                    .map(|arg| match arg {
+                        PartialTypeArg::Known(type_ref) => {
+                            self.allocate_partial(PartialTypeRef::Resolved(type_ref))
+                        }
+                        PartialTypeArg::Partial(type_ref) => self.allocate_partial(*type_ref),
+                        PartialTypeArg::Infer => InferTy::Var(TyVarId::alloc()),
+                    })
+                    .collect(),
+            },
         }
     }
 
@@ -237,7 +395,7 @@ impl<'db> TyCtx<'db> {
                 let Some(Definition::Type(type_def_id)) =
                     resolve_in_module(self.db, name.interned(), module.interned())
                 else {
-                    panic!("todo")
+                    panic!("todo {}", name.display(self.db))
                 };
 
                 if args.is_empty() {
@@ -361,143 +519,28 @@ impl<'db> TyCtx<'db> {
         }
     }
 
-    fn equivalence_class(&self, ty: &InferTy) -> HashSet<InferTy> {
-        let mut res = HashSet::new();
-        for (a, b) in &self.type_eq_constrs {
-            if a == ty || b == ty {
-                res.insert(a.clone());
-                res.insert(b.clone());
-            }
-        }
-        res
-    }
-
-    fn equivalence_classes(&self) -> HashMap<InferTy, HashSet<InferTy>> {
-        let mut res: HashMap<InferTy, HashSet<InferTy>> = HashMap::new();
-        for (a, b) in &self.type_eq_constrs {
-            res.insert(a.clone(), self.equivalence_class(a));
-            res.insert(b.clone(), self.equivalence_class(b));
-        }
-        res
-    }
-
-    fn normalize_type(
-        &self,
-        ty: &InferTy,
-        equivalences: &HashMap<InferTy, HashSet<InferTy>>,
-    ) -> TypeRef {
-        self.normalize_type_aux(ty, equivalences, &mut HashSet::new())
-    }
-
-    fn normalize_type_aux(
-        &self,
-        ty: &InferTy,
-        equivalences: &HashMap<InferTy, HashSet<InferTy>>,
-        seen: &mut HashSet<InferTy>,
-    ) -> TypeRef {
-        if !seen.insert(ty.clone()) {
-            return TypeRef::Error;
-        }
+    fn solve(&self, ty: InferTy) -> TypeRef {
+        let ty = self.find(ty);
         match ty {
-            InferTy::Known(type_ref) => *type_ref,
-            InferTy::Ptr(mutability, pointee) => {
-                let mutable = matches!(mutability, Mutability::Mutable);
-                let normalized_pointee = self.normalize_type_aux(pointee, equivalences, seen);
-                if let TypeRef::Error = normalized_pointee {
-                    TypeRef::Error
-                } else {
-                    ptr_of(self.db, normalized_pointee, mutable).into()
-                }
+            InferTy::Adt { def, args } => {
+                let args = args
+                    .into_iter()
+                    .map(|arg| self.solve(arg))
+                    .collect::<Vec<_>>();
+                TypeRef::Concrete(TypeId::new(self.db, def, args))
             }
-            InferTy::Error => TypeRef::Error,
-            _ => {
-                let empty = &HashSet::new();
-                // Must look into the candidates
-                equivalences
-                    .get(ty)
-                    .unwrap_or(&empty)
-                    .iter()
-                    .filter_map(|infer_ty| {
-                        match self.normalize_type_aux(infer_ty, equivalences, seen) {
-                            TypeRef::Error => None,
-                            ty_ref => Some(ty_ref),
-                        }
-                    })
-                    .next()
-                    .unwrap_or(TypeRef::Error)
-            }
+            _ => TypeRef::Error,
         }
     }
 
-    fn print_equivalence_classes(&self, equivalence_classes: &HashMap<InferTy, HashSet<InferTy>>) {
-        println!(
-            "{}",
-            equivalence_classes
-                .iter()
-                .map(|(key, val)| {
-                    format!(
-                        "{}: {{{}}}",
-                        key.display(self.db),
-                        val.iter()
-                            .map(|ty| format!("{}", ty.display(self.db)))
-                            .collect::<Box<[String]>>()
-                            .join(", ")
-                    )
-                })
-                .collect::<Box<[String]>>()
-                .join("\n")
-        );
-    }
-
-    fn solve_infer_ty(
-        &self,
-        ty: InferTy,
-        equivalences: &HashMap<InferTy, HashSet<InferTy>>,
-    ) -> TypeRef {
-        let s = equivalences.get(&ty).unwrap();
-        let candidates = s
-            .iter()
-            .filter_map(
-                |infer_ty| match self.normalize_type(infer_ty, equivalences) {
-                    TypeRef::Error => None,
-                    it => Some(it),
-                },
-            )
-            .collect::<HashSet<_>>();
-        if candidates.len() == 0 {
-            println!(
-                "Could not find any candidates for infer type {}",
-                ty.display(self.db)
-            );
-            TypeRef::Error
-        } else if candidates.len() > 1 {
-            println!(
-                "Too many candidates for infer type {}: {{{}}}",
-                ty.display(self.db),
-                candidates
-                    .iter()
-                    .map(|ty| ty.display(self.db).to_string())
-                    .collect::<Box<[_]>>()
-                    .join(", ")
-            );
-            TypeRef::Error
-        } else {
-            candidates.into_iter().next().unwrap()
-        }
-    }
-
-    fn concretize_infos(
-        &self,
-        infos: InferCallInfos,
-        equivalences: &HashMap<InferTy, HashSet<InferTy>>,
-    ) -> CallInfos {
+    fn concretize_infos(&self, infos: InferCallInfos) -> CallInfos {
         CallInfos {
             expr_id: infos.expr_id,
             callee: infos.callee,
             substitution: infos
                 .substitution
                 .into_iter()
-                .map(|ty| self.normalize_type(&ty, equivalences))
+                .map(|ty| self.solve(ty))
                 .collect(),
             variadic: infos.variadic,
         }
@@ -505,13 +548,10 @@ impl<'db> TyCtx<'db> {
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
         // Solve constraints and populate result
-        let equivalences = self.equivalence_classes();
-        self.print_equivalence_classes(&equivalences);
-
         let drain = self.exprs.drain().collect::<Box<[_]>>();
         let node_types = drain
             .into_iter()
-            .map(|(id, infer_ty)| (id, self.solve_infer_ty(infer_ty, &equivalences)))
+            .map(|(id, infer_ty)| (id, self.solve(infer_ty)))
             .collect();
 
         let call_infos = self
@@ -519,42 +559,58 @@ impl<'db> TyCtx<'db> {
             .drain()
             .collect::<Box<[_]>>()
             .into_iter()
-            .map(|(id, infos)| (id, self.concretize_infos(infos, &equivalences)))
+            .map(|(id, infos)| (id, self.concretize_infos(infos)))
             .collect();
 
         TypeCheckResults::new(self.db, node_types, call_infos)
     }
 
     fn int_ty(&self) -> InferTy {
-        InferTy::IntVar(IntVarId::alloc())
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::int(self.db)),
+            args: vec![],
+        }
     }
 
     fn char_ty(&self) -> InferTy {
-        InferTy::Known(char_id(self.db).into())
-    }
-
-    fn str_ty(&self) -> InferTy {
-        InferTy::Known(str_id(self.db).into())
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::char(self.db)),
+            args: vec![],
+        }
     }
 
     fn bool_ty(&self) -> InferTy {
-        InferTy::Known(bool_id(self.db).into())
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::bool(self.db)),
+            args: vec![],
+        }
+    }
+
+    fn str_ty(&self) -> InferTy {
+        InferTy::Adt {
+            def: str_id(self.db).def(self.db),
+            args: vec![],
+        }
     }
 
     fn never_ty(&self) -> InferTy {
-        InferTy::Known(never_id(self.db).into())
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::never(self.db)),
+            args: vec![],
+        }
     }
 
     fn void_ty(&self) -> InferTy {
-        InferTy::Known(void_id(self.db).into())
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::void(self.db)),
+            args: vec![],
+        }
     }
 
     fn const_ptr_of(&self, ty: InferTy) -> InferTy {
-        match ty {
-            InferTy::Known(type_id) => {
-                InferTy::Known(ptr_of(self.db, type_id.into(), false).into())
-            }
-            ty => InferTy::Ptr(Mutability::Immutable, Box::new(ty)),
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::ptr(self.db)),
+            args: vec![ty],
         }
     }
 
@@ -567,9 +623,15 @@ impl<'db> TyCtx<'db> {
                 .unwrap_or(InferTy::Error),
             HirPlace::Field { base, field } => todo!(),
             HirPlace::TupleField { base, index } => todo!(),
-            HirPlace::Deref(hir_place) => todo!(),
+            HirPlace::Deref(hir_place) => {
+                let place_ty = self.type_check_place(hir_place);
+                let pointee = InferTy::Var(TyVarId::alloc());
+                let ptr_ty = InferTy::Deref(Box::new(pointee.clone()));
+                self.unify(place_ty, ptr_ty);
+                pointee
+            }
             HirPlace::Index { base, index } => todo!(),
-            HirPlace::Temporary(hir_expr) => todo!(),
+            HirPlace::Temporary(hir_expr) => self.type_check_expr(hir_expr),
         }
     }
 
@@ -578,11 +640,34 @@ impl<'db> TyCtx<'db> {
     }
 
     fn allocate_ref(&self, ty_ref: TypeRef, templates: &[InferTy]) -> InferTy {
-        match ty_ref {
-            TypeRef::Concrete(type_id) => InferTy::Known(type_id.into()),
-            TypeRef::Param(type_param_id) => templates[type_param_id.0].clone(),
-            TypeRef::Error => InferTy::Error,
+        fn _allocate_ref(
+            db: &dyn Db,
+            ty_ref: TypeRef,
+            templates: &[InferTy],
+            seen: &mut HashSet<TypeRef>,
+        ) -> InferTy {
+            if !seen.insert(ty_ref) {
+                return InferTy::Error;
+            }
+            match ty_ref {
+                TypeRef::Concrete(type_id) => {
+                    let def = type_id.def(db);
+                    let args = type_id.args(db);
+                    let allocated_args = args
+                        .iter()
+                        .copied()
+                        .map(|x| _allocate_ref(db, x, templates, seen))
+                        .collect::<_>();
+                    InferTy::Adt {
+                        def,
+                        args: allocated_args,
+                    }
+                }
+                TypeRef::Param(type_param_id) => templates[type_param_id.0].clone(),
+                TypeRef::Error => InferTy::Error,
+            }
         }
+        _allocate_ref(self.db, ty_ref, templates, &mut HashSet::new())
     }
 
     fn type_check_expr(&mut self, expr: &'db HirExpr) -> InferTy {
@@ -625,29 +710,302 @@ impl<'db> TyCtx<'db> {
                     .map(|ty| self.allocate_ref(ty, &infer_templates))
                     .collect::<Box<[_]>>();
 
-                infered_args.into_iter().zip(ast_args).for_each(|pair| {
-                    self.type_eq_constrs.push(pair);
+                infered_args.into_iter().zip(ast_args).for_each(|(a, b)| {
+                    self.unify(a, b);
                 });
 
                 let return_ty = InferTy::Var(TyVarId::alloc());
                 let computed_return_ty =
                     self.allocate_ref(target.ret_ty(self.db), &infer_templates);
 
-                self.type_eq_constrs
-                    .push((return_ty.clone(), computed_return_ty));
+                println!(
+                    "Computed return type is {}",
+                    computed_return_ty.display(self.db)
+                );
+
+                self.unify(return_ty.clone(), computed_return_ty);
 
                 let infos = InferCallInfos::new(ExprId(expr.id), target, infer_templates, false);
                 self.calls.insert(ExprId(expr.id), infos);
                 return_ty
             }
-            HirExprDesc::CallMethod { .. } => {
-                let l = expr.span.start();
-                println!("{:?}", l);
-                todo!()
+            HirExprDesc::CallMethod {
+                receiver,
+                method,
+                args,
+                interface_hint,
+            } => {
+                let inferred_args = args
+                    .iter()
+                    .map(|arg| self.type_check_expr(arg))
+                    .collect::<Vec<_>>();
+                let inferred_receiver = self.type_check_expr(receiver);
+                let candidates = find_method_for_partial_ref(
+                    self.db,
+                    inferred_receiver.clone(),
+                    *method,
+                    self.packages.clone(),
+                )
+                .into_iter()
+                .filter(|(id, _)| id.args(self.db).1.len() == args.len())
+                .collect::<Box<[_]>>();
+
+                for package in &self.packages {
+                    println!(
+                        "Package {}",
+                        package.root(self.db).name(self.db).display(self.db)
+                    );
+                }
+
+                if candidates.is_empty() {
+                    println!("No candidates found for method {}", method.display(self.db));
+                    return InferTy::Error;
+                }
+
+                if candidates.len() > 1 {
+                    println!(
+                        "Too many candidates found for method {}",
+                        method.display(self.db)
+                    );
+                    return InferTy::Error;
+                }
+
+                let (
+                    id,
+                    ImplMatchConstraints {
+                        substitution,
+                        constraints,
+                    },
+                ) = candidates.into_iter().next().unwrap();
+
+                for constraint in constraints {
+                    match constraint {
+                        ImplMatchConstraint::Unify(ty_a, ty_b) => {
+                            println!(
+                                "With constraints: Unifying {} and {}",
+                                ty_a.display(self.db),
+                                ty_b.display(self.db)
+                            );
+                            self.unify(ty_a, ty_b);
+                        }
+                        ImplMatchConstraint::Implements(infer_ty, interface_ref) => todo!(),
+                    }
+                }
+
+                let templates = get_templates_of_fun(self.db, id.interned());
+
+                let infer_templates = templates
+                    .iter()
+                    .map(|_| Self::fresh_var())
+                    .collect::<Vec<_>>();
+
+                for (template, infer_template) in substitution.iter().zip(infer_templates.iter()) {
+                    if let Some(infer) = template {
+                        self.unify(infer.clone(), infer_template.clone());
+                    }
+                }
+
+                let owning_module = owning_module(self.db, id.parent(self.db));
+
+                let (receiver, ast_args) = id.args(self.db);
+
+                if let Some(ty) = receiver
+                    .as_ref()
+                    .map(|ty| self.allocate_ref(*ty, &infer_templates))
+                {
+                    self.unify(inferred_receiver, ty);
+                }
+
+                println!("ast_args: {}", ast_args.len());
+
+                for (a, b) in inferred_args.into_iter().zip(
+                    ast_args
+                        .iter()
+                        .map(|arg| {
+                            match resolve_type_expr(
+                                self.db,
+                                &arg.ty,
+                                owning_module.interned(),
+                                &templates,
+                            ) {
+                                TypeResolution::Type(type_ref) => {
+                                    println!("Resolved arg type: {}", type_ref.display(self.db));
+                                    type_ref
+                                }
+                                _ => unreachable!(),
+                            }
+                        })
+                        .map(|ty| self.allocate_ref(ty, &infer_templates))
+                        .collect::<Box<[_]>>(),
+                ) {
+                    println!("Unifying method call args");
+                    self.unify(a, b);
+                }
+
+                let computed_return_ty = self.allocate_ref(id.ret_ty(self.db), &infer_templates);
+                computed_return_ty
             }
-            HirExprDesc::CallStatic { .. } => todo!(),
+            HirExprDesc::CallStatic { ty, method, args } => {
+                let partial = self.allocate_partial(ty.clone());
+                let candidates =
+                    find_method_for_partial_ref(self.db, partial, *method, self.packages.clone())
+                        .into_iter()
+                        .filter(|(id, _)| id.args(self.db).1.len() == args.len())
+                        .collect::<Box<[_]>>();
+
+                let inferred_args = args
+                    .iter()
+                    .map(|arg| self.type_check_expr(arg))
+                    .collect::<Vec<_>>();
+
+                if candidates.is_empty() {
+                    println!("No candidates found for method {}", method.display(self.db));
+                    return InferTy::Error;
+                }
+
+                if candidates.len() > 1 {
+                    println!(
+                        "Too many candidates found for method {}",
+                        method.display(self.db)
+                    );
+                    return InferTy::Error;
+                }
+
+                let (
+                    id,
+                    ImplMatchConstraints {
+                        substitution,
+                        constraints,
+                    },
+                ) = candidates.into_iter().next().unwrap();
+
+                for constraint in constraints {
+                    match constraint {
+                        ImplMatchConstraint::Unify(a, b) => {
+                            self.unify(a, b);
+                        }
+                        ImplMatchConstraint::Implements(infer_ty, interface_ref) => {
+                            todo!()
+                        }
+                    }
+                }
+
+                let templates = get_templates_of_fun(self.db, id.interned());
+
+                let infer_templates = templates
+                    .iter()
+                    .map(|_| Self::fresh_var())
+                    .collect::<Vec<_>>();
+
+                for (template, infer_template) in substitution.iter().zip(infer_templates.iter()) {
+                    println!(
+                        "Unifying template arg: {:?} with {}",
+                        template.as_ref().map(|x| x.display(self.db).to_string()),
+                        infer_template.display(self.db)
+                    );
+                    if let Some(infer) = template {
+                        println!("Unifying template args");
+                        self.unify(infer.clone(), infer_template.clone());
+                    }
+                }
+
+                let owning_module = owning_module(self.db, id.parent(self.db));
+
+                let (receiver, ast_args) = id.args(self.db);
+
+                for (a, b) in inferred_args.into_iter().zip(
+                    receiver
+                        .into_iter()
+                        .chain(ast_args.iter().map(|arg| {
+                            match resolve_type_expr(
+                                self.db,
+                                &arg.ty,
+                                owning_module.interned(),
+                                &templates,
+                            ) {
+                                TypeResolution::Type(type_ref) => type_ref,
+                                _ => unreachable!(),
+                            }
+                        }))
+                        .map(|ty| self.allocate_ref(ty, &infer_templates))
+                        .collect::<Box<[_]>>(),
+                ) {
+                    self.unify(a, b);
+                }
+
+                let computed_return_ty = self.allocate_ref(id.ret_ty(self.db), &infer_templates);
+                computed_return_ty
+            }
             HirExprDesc::BinOp { .. } => todo!(),
-            HirExprDesc::StructLit { .. } => todo!(),
+            HirExprDesc::StructLit { ty, fields } => {
+                let struct_def = match ty {
+                    PartialTypeRef::Resolved(type_ref) => match type_ref {
+                        TypeRef::Concrete(type_id) => match type_id.def(self.db) {
+                            TypeDefId::Struct(struct_id) => Some(struct_id),
+                            _ => None,
+                        },
+                        TypeRef::Param(type_param_id) => None,
+                        TypeRef::Error => None,
+                    },
+                    PartialTypeRef::WithHoles { def, args } => match def {
+                        TypeDefId::Struct(struct_id) => Some(*struct_id),
+                        _ => None,
+                    },
+                };
+                let mut inferred_exprs = vec![];
+                for (sym, expr) in fields {
+                    let expr_ty = self.type_check_expr(expr);
+                    inferred_exprs.push((*sym, expr_ty));
+                }
+                if let Some(struct_id) = struct_def {
+                    let struct_item = struct_item(self.db, struct_id.interned());
+                    let templates_inferred = struct_item
+                        .template_args
+                        .iter()
+                        .map(|_| InferTy::Var(TyVarId::alloc()))
+                        .collect::<Vec<_>>();
+
+                    let field_types: HashMap<_, _> =
+                        HashMap::from_iter(struct_item.fields.iter().map(
+                            |AstStructDefField { name, ty }| match resolve_type_expr(
+                                self.db,
+                                ty,
+                                struct_id.parent(self.db).interned(),
+                                &struct_item.template_args,
+                            ) {
+                                TypeResolution::Type(type_ref) => {
+                                    let allocated =
+                                        self.allocate_ref(type_ref, &templates_inferred);
+                                    (*name, allocated)
+                                }
+                                _ => (*name, InferTy::Error),
+                            },
+                        ));
+
+                    let mut seen_fields = HashSet::new();
+                    for (field_name, ty) in inferred_exprs {
+                        if !seen_fields.insert(field_name) {
+                            todo!("Same field in struct lit twice")
+                        }
+                        if let Some(field_ty) = field_types.get(&field_name) {
+                            self.unify(ty, field_ty.clone());
+                        } else {
+                            todo!(
+                                "No field named {} in struct {}",
+                                field_name.display(self.db),
+                                struct_id.display(self.db)
+                            )
+                        }
+                    }
+
+                    InferTy::Adt {
+                        def: TypeDefId::Struct(struct_id),
+                        args: templates_inferred,
+                    }
+                } else {
+                    todo!()
+                }
+            }
             HirExprDesc::Neg(_) => todo!(),
             HirExprDesc::Not(_) => todo!(),
             HirExprDesc::Tuple(_) => todo!(),
@@ -660,13 +1018,156 @@ impl<'db> TyCtx<'db> {
     }
 
     fn get_ret_ty(&self) -> InferTy {
-        InferTy::Known(self.function.ret_ty(self.db))
+        let ret = self.function.ret_ty(self.db);
+        self.allocate_ref(
+            ret,
+            &self
+                .templates
+                .iter()
+                .copied()
+                .map(InferTy::Var)
+                .collect::<Box<[_]>>(),
+        )
+    }
+
+    fn type_check_patt(&mut self, pattern: &'db HirPattern) -> InferTy {
+        match &pattern.data {
+            HirPatternDesc::Bind { id, name, mutable } => {
+                self.infer_locals.get(id).cloned().unwrap_or(InferTy::Error)
+            }
+            HirPatternDesc::Any => InferTy::Var(TyVarId::alloc()),
+            HirPatternDesc::Tuple(hir_patterns) => todo!(),
+            HirPatternDesc::DestructureBinding { resolution, fields } => todo!(),
+            HirPatternDesc::Constructor {
+                resolution,
+                name,
+                fields,
+            } => {
+                let enum_item = enum_item(self.db, resolution.interned());
+                let module = resolution.parent(self.db);
+                let inferred_templates = enum_item
+                    .template_args
+                    .iter()
+                    .map(|_| InferTy::Var(TyVarId::alloc()))
+                    .collect::<Vec<_>>();
+                let infer_ty = InferTy::Adt {
+                    def: TypeDefId::Enum(*resolution),
+                    args: inferred_templates.clone(),
+                };
+
+                if let Some(variant) = enum_item.variants.iter().find(|v| v.name == *name) {
+                    match fields {
+                        HirPatternConstructorArgs::None => {
+                            let AstEnumVariant {
+                                kind: AstEnumVariantKind::Unit,
+                                ..
+                            } = variant
+                            else {
+                                panic!(
+                                    "Expected unit variant for pattern constructor, found struct or tuple variant"
+                                )
+                            };
+                        }
+                        HirPatternConstructorArgs::StructFields(structs) => {
+                            let AstEnumVariant {
+                                kind: AstEnumVariantKind::StructLike(ast_structs),
+                                ..
+                            } = variant
+                            else {
+                                panic!(
+                                    "Expected unit variant for pattern constructor, found struct or tuple variant"
+                                )
+                            };
+                            todo!()
+                        }
+                        HirPatternConstructorArgs::TupleFields(pats) => {
+                            let AstEnumVariant {
+                                kind: AstEnumVariantKind::TupleLike(ast_pats),
+                                ..
+                            } = variant
+                            else {
+                                panic!(
+                                    "Expected unit variant for pattern constructor, found struct or tuple variant"
+                                )
+                            };
+
+                            assert!(pats.len() == ast_pats.len());
+
+                            for (pat, ast_pat) in pats.iter().zip(ast_pats) {
+                                match resolve_type_expr(
+                                    self.db,
+                                    ast_pat,
+                                    module.interned(),
+                                    &enum_item.template_args,
+                                ) {
+                                    TypeResolution::Type(type_ref) => {
+                                        let allocated =
+                                            self.allocate_ref(type_ref, &inferred_templates);
+                                        let pat_ty = self.type_check_patt(pat);
+                                        self.unify(pat_ty, allocated);
+                                    }
+                                    _ => todo!(),
+                                };
+                            }
+                        }
+                    };
+                    infer_ty
+                } else {
+                    InferTy::Error
+                }
+            }
+        }
     }
 
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
         match &stmt.kind {
-            HirStmtKind::Let { .. } => todo!(),
-            HirStmtKind::Match { .. } => todo!(),
+            HirStmtKind::Let {
+                pattern,
+                locals,
+                ty_annotation,
+                init,
+            } => {
+                for local in locals {
+                    self.infer_locals
+                        .insert(*local, InferTy::Var(TyVarId::alloc()));
+                }
+                let init_ty = self.type_check_expr(init);
+                let patt_ty = self.type_check_patt(pattern);
+                self.unify(init_ty, patt_ty.clone());
+                if let Some(annotation) = ty_annotation.as_ref()
+                    && let AstAnyTypeExprDesc::Known(desc) = &annotation.data
+                {
+                    let resolved = self.resolve_holed_desc(
+                        desc,
+                        owning_module(self.db, self.function.parent(self.db)),
+                    );
+                    let allocated = self.allocate_partial(resolved);
+                    self.unify(patt_ty, allocated);
+                }
+            }
+            HirStmtKind::Match {
+                scrutinee,
+                branches,
+            } => {
+                // TODO: Implement matching a ref with patterns where
+                // the fields are references as well
+                let scrut_ty = self.type_check_expr(scrutinee);
+                for HirMatchBranch {
+                    pattern,
+                    locals: _,
+                    guard,
+                    body,
+                } in branches
+                {
+                    let pattern_ty = self.type_check_patt(pattern);
+                    self.unify(pattern_ty, scrut_ty.clone());
+                    if let Some(guard_ty) = guard.as_ref().map(|expr| self.type_check_expr(expr)) {
+                        self.unify(guard_ty, self.bool_ty());
+                    }
+                    self.type_check_stmt(body);
+                }
+                // todo!()
+            }
             HirStmtKind::Assign { .. } => todo!(),
             HirStmtKind::Expr(expr) => {
                 self.type_check_expr(expr);
@@ -674,19 +1175,27 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Return(value) => {
                 let ty = value.as_ref().map(|expr| self.type_check_expr(expr));
                 if let Some(ty) = ty {
-                    self.type_eq_constrs.push((ty, self.get_ret_ty()));
+                    self.unify(ty, self.get_ret_ty());
                 } else {
-                    self.type_eq_constrs
-                        .push((self.void_ty(), self.get_ret_ty()));
+                    self.unify(self.void_ty(), self.get_ret_ty());
                 }
                 // self.type_eq_constrs.push((ty, self.never_ty()));
             }
             HirStmtKind::If { .. } => {
                 todo!()
             }
-            HirStmtKind::While { .. } => todo!(),
-            HirStmtKind::Block(_) => todo!(),
-            HirStmtKind::Defer(_) => todo!(),
+            HirStmtKind::While { cond, body } => {
+                let cond_ty = self.type_check_expr(cond);
+                self.unify(cond_ty, self.bool_ty());
+                self.type_check_stmt(body);
+            }
+            HirStmtKind::Block(block) => {
+                block.iter().for_each(|stmt| self.type_check_stmt(stmt));
+            }
+            HirStmtKind::Defer(deferred) => {
+                self.type_check_stmt(deferred);
+            }
+            HirStmtKind::Break => (),
         }
     }
 
@@ -702,14 +1211,20 @@ pub struct TypeCheckResults<'db> {
     pub call_infos: BTreeMap<ExprId, CallInfos>,
 }
 
-fn type_check_hir<'db>(db: &'db dyn Db, hir: HirBody<'db>) -> TypeCheckResults<'db> {
-    TyCtx::new(db, hir.owner(db), hir.locals(db), hir.params(db)).type_check(hir.stmts(db))
+fn type_check_hir<'db>(
+    db: &'db dyn Db,
+    hir: HirBody<'db>,
+    packages: Vec<Package<'db>>,
+) -> TypeCheckResults<'db> {
+    TyCtx::new(db, hir.owner(db), hir.locals(db), hir.params(db), packages)
+        .type_check(hir.stmts(db))
 }
 
 #[salsa::tracked]
 pub fn type_check_function<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
+    packages: Vec<Package<'db>>,
 ) -> Option<TypeCheckResults<'db>> {
-    hir_body(db, function).map(|hir| type_check_hir(db, hir))
+    hir_body(db, function).map(|hir| type_check_hir(db, hir, packages))
 }

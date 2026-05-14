@@ -10,7 +10,9 @@ use crate::{
     },
     name_resolve::{
         definition::{Definition, resolve_in_module},
-        interfaces::{core_int_iter_struct, core_into_iterator_interface, core_iter_interface},
+        interfaces::{
+            core_int_iter_struct, core_into_iterator_interface, core_iter_interface, core_opt_enum,
+        },
         type_expr::{templates_of_enum, templates_of_struct},
     },
     parse_tree::{
@@ -811,191 +813,7 @@ impl<'db> LowerFundef<'db> {
                     element,
                     iterator,
                     body,
-                } => {
-                    let iterator_span = iterator.span.clone();
-                    let iter_interface = core_iter_interface(self.db);
-                    let into_iter_interface = core_into_iterator_interface(self.db);
-
-                    let iterator_candidate = self.lower_expr(iterator, scope, self.module);
-
-                    let iterator = HirExpr {
-                        id: self.alloc.next(),
-                        data: HirExprDesc::CallMethod {
-                            receiver: Box::new(iterator_candidate),
-                            method: Symbol::new(self.db, "into_iter"),
-                            args: vec![],
-                            interface_hint: Some(into_iter_interface),
-                        },
-                        span: iterator_span.clone(),
-                    };
-
-                    let iterator_id = LocalId(self.next_local_id);
-                    self.next_local_id += 1;
-                    let iterator_var_name =
-                        Symbol::new(self.db, format!("@iterator_{}", iterator_id.0));
-                    self.locals.insert(
-                        iterator_id,
-                        LocalInfo {
-                            id: iterator_id,
-                            name: iterator_var_name,
-                            mutability: Mutability::Mutable,
-                            ty_annotation: None,
-                            span: iterator_span.clone(),
-                        },
-                    );
-
-                    let elem_id = LocalId(self.next_local_id);
-                    self.next_local_id += 1;
-                    let elem_var_name =
-                        Symbol::new(self.db, format!("@iterator_elem_{}", elem_id.0));
-                    self.locals.insert(
-                        elem_id,
-                        LocalInfo {
-                            id: elem_id,
-                            name: elem_var_name,
-                            mutability: Mutability::Mutable,
-                            ty_annotation: None,
-                            span: iterator_span.clone(),
-                        },
-                    );
-
-                    let mut stmts = vec![];
-
-                    stmts.push(HirStmt {
-                        id: self.alloc.next(),
-                        kind: HirStmtKind::Let {
-                            pattern: HirPattern {
-                                id: self.alloc.next(),
-                                data: HirPatternDesc::Bind {
-                                    id: iterator_id,
-                                    name: iterator_var_name,
-                                    mutable: true,
-                                },
-                                span: iterator_span.clone(),
-                            },
-                            locals: vec![iterator_id],
-                            ty_annotation: None,
-                            init: iterator,
-                        },
-                        span: iterator_span.clone(),
-                    });
-
-                    let elem_init = HirExpr {
-                        id: self.alloc.next(),
-                        data: HirExprDesc::CallMethod {
-                            receiver: Box::new(HirExpr {
-                                id: self.alloc.next(),
-                                data: HirExprDesc::Use(HirPlace::Local(iterator_id)),
-                                span: iterator_span.clone(),
-                            }),
-                            method: Symbol::new(self.db, "next"),
-                            args: vec![],
-                            interface_hint: Some(iter_interface),
-                        },
-                        span: iterator_span.clone(),
-                    };
-
-                    stmts.push(HirStmt {
-                        id: self.alloc.next(),
-                        kind: HirStmtKind::Let {
-                            pattern: HirPattern {
-                                id: self.alloc.next(),
-                                data: HirPatternDesc::Bind {
-                                    id: elem_id,
-                                    name: elem_var_name,
-                                    mutable: true,
-                                },
-                                span: iterator_span.clone(),
-                            },
-                            locals: vec![elem_id],
-                            ty_annotation: None,
-                            init: elem_init,
-                        },
-                        span: iterator_span.clone(),
-                    });
-
-                    let mut inner_scope = scope.clone();
-
-                    let (pat, locals) = self.lower_pattern(element, &mut inner_scope);
-
-                    stmts.push(HirStmt {
-                        id: self.alloc.next(),
-                        kind: HirStmtKind::While {
-                            cond: HirExpr {
-                                id: self.alloc.next(),
-                                data: HirExprDesc::CallMethod {
-                                    receiver: Box::new(HirExpr {
-                                        id: self.alloc.next(),
-                                        data: HirExprDesc::Use(HirPlace::Local(elem_id)),
-                                        span: iterator_span.clone(),
-                                    }),
-                                    method: Symbol::new(self.db, "is_some"),
-                                    args: vec![],
-                                    interface_hint: Some(iter_interface),
-                                },
-                                span: iterator_span.clone(),
-                            },
-                            body: Box::new(HirStmt {
-                                id: self.alloc.next(),
-                                kind: HirStmtKind::Block(vec![
-                                    HirStmt {
-                                        id: self.alloc.next(),
-                                        kind: HirStmtKind::Let {
-                                            pattern: pat,
-                                            locals,
-                                            ty_annotation: None,
-                                            init: HirExpr {
-                                                id: self.alloc.next(),
-                                                data: HirExprDesc::CallMethod {
-                                                    receiver: Box::new(HirExpr {
-                                                        id: self.alloc.next(),
-                                                        data: HirExprDesc::Use(HirPlace::Local(
-                                                            elem_id,
-                                                        )),
-                                                        span: iterator_span.clone(),
-                                                    }),
-                                                    method: Symbol::new(self.db, "unwrap"),
-                                                    args: vec![],
-                                                    interface_hint: None,
-                                                },
-                                                span: iterator_span.clone(),
-                                            },
-                                        },
-                                        span: element.span.clone(),
-                                    },
-                                    self.lower_stmt(body, &mut inner_scope),
-                                    HirStmt {
-                                        id: self.alloc.next(),
-                                        kind: HirStmtKind::Assign {
-                                            lhs: HirPlace::Local(elem_id),
-                                            rhs: HirExpr {
-                                                id: self.alloc.next(),
-                                                data: HirExprDesc::CallMethod {
-                                                    receiver: Box::new(HirExpr {
-                                                        id: self.alloc.next(),
-                                                        data: HirExprDesc::Use(HirPlace::Local(
-                                                            iterator_id,
-                                                        )),
-                                                        span: iterator_span.clone(),
-                                                    }),
-                                                    method: Symbol::new(self.db, "next"),
-                                                    args: vec![],
-                                                    interface_hint: Some(iter_interface),
-                                                },
-                                                span: iterator_span.clone(),
-                                            },
-                                        },
-                                        span: element.span.clone(),
-                                    },
-                                ]),
-                                span: iterator_span.clone(),
-                            }),
-                        },
-                        span: iterator_span.clone(),
-                    });
-
-                    HirStmtKind::Block(stmts)
-                }
+                } => self.desugar_for_loop(scope, element, iterator, body),
                 AstStmtDesc::LetDecl {
                     pat,
                     type_constraint,
@@ -1079,9 +897,149 @@ impl<'db> LowerFundef<'db> {
                 AstStmtDesc::Defer(stmt) => {
                     HirStmtKind::Defer(Box::new(self.lower_stmt(stmt, scope)))
                 }
+                AstStmtDesc::Break => HirStmtKind::Break,
             },
             span: stmt.span.clone(),
         }
+    }
+
+    fn desugar_for_loop(
+        &mut self,
+        scope: &mut Scope,
+        element: &AstPattern,
+        iterator: &AstExpr,
+        body: &AstStmt,
+    ) -> HirStmtKind {
+        // for pat in iterator {...}
+        // becomes
+        // let mut iterator = IntoIterator::into_iter(iterator);
+        // while true {
+        //     match iterator.next() {
+        //         Some(pat) => {...}
+        //         _ => { break; }
+        //     }
+        // }
+
+        let iterator_span = iterator.span.clone();
+        let iter_interface = core_iter_interface(self.db);
+        let into_iter_interface = core_into_iterator_interface(self.db);
+        let iterator_candidate = self.lower_expr(iterator, scope, self.module);
+        let iterator = HirExpr {
+            id: self.alloc.next(),
+            data: HirExprDesc::CallMethod {
+                receiver: Box::new(iterator_candidate),
+                method: Symbol::new(self.db, "into_iter"),
+                args: vec![],
+                interface_hint: Some(into_iter_interface),
+            },
+            span: iterator_span.clone(),
+        };
+        let iterator_id = LocalId(self.next_local_id);
+        self.next_local_id += 1;
+        let iterator_var_name = Symbol::new(self.db, format!("@iterator_{}", iterator_id.0));
+        self.locals.insert(
+            iterator_id,
+            LocalInfo {
+                id: iterator_id,
+                name: iterator_var_name,
+                mutability: Mutability::Mutable,
+                ty_annotation: None,
+                span: iterator_span.clone(),
+            },
+        );
+        let mut stmts = vec![];
+        stmts.push(HirStmt {
+            id: self.alloc.next(),
+            kind: HirStmtKind::Let {
+                pattern: HirPattern {
+                    id: self.alloc.next(),
+                    data: HirPatternDesc::Bind {
+                        id: iterator_id,
+                        name: iterator_var_name,
+                        mutable: true,
+                    },
+                    span: iterator_span.clone(),
+                },
+                locals: vec![iterator_id],
+                ty_annotation: None,
+                init: iterator,
+            },
+            span: iterator_span.clone(),
+        });
+
+        let next_expr = HirExpr {
+            id: self.alloc.next(),
+            data: HirExprDesc::CallMethod {
+                receiver: Box::new(HirExpr {
+                    id: self.alloc.next(),
+                    data: HirExprDesc::Use(HirPlace::Local(iterator_id)),
+                    span: iterator_span.clone(),
+                }),
+                method: Symbol::new(self.db, "next"),
+                args: vec![],
+                interface_hint: Some(iter_interface),
+            },
+            span: iterator_span.clone(),
+        };
+
+        let mut iterator_scope = scope.clone();
+
+        let (lowered_pat, locals) = self.lower_pattern(element, &mut iterator_scope);
+
+        let option_enum = core_opt_enum(self.db);
+
+        let some_pat = HirPattern {
+            id: self.alloc.next(),
+            data: HirPatternDesc::Constructor {
+                resolution: option_enum,
+                name: Symbol::new(self.db, "Some"),
+                fields: HirPatternConstructorArgs::TupleFields(vec![lowered_pat]),
+            },
+            span: element.span.clone(),
+        };
+
+        stmts.push(HirStmt {
+            id: self.alloc.next(),
+            kind: HirStmtKind::While {
+                cond: HirExpr {
+                    id: self.alloc.next(),
+                    data: HirExprDesc::BoolLit(true),
+                    span: iterator_span.clone(),
+                },
+                body: Box::new(HirStmt {
+                    id: self.alloc.next(),
+                    kind: HirStmtKind::Match {
+                        scrutinee: next_expr,
+                        branches: vec![
+                            HirMatchBranch {
+                                pattern: some_pat,
+                                locals,
+                                guard: None,
+                                body: Box::new(self.lower_stmt(body, &mut iterator_scope)),
+                            },
+                            HirMatchBranch {
+                                pattern: HirPattern {
+                                    id: self.alloc.next(),
+                                    data: HirPatternDesc::Any,
+                                    span: element.span.clone(),
+                                },
+                                locals: vec![],
+                                guard: None,
+                                body: Box::new(HirStmt {
+                                    id: self.alloc.next(),
+                                    kind: HirStmtKind::Break,
+                                    span: element.span.clone(),
+                                }),
+                            },
+                        ],
+                    },
+                    span: body.span.clone(),
+                }),
+            },
+            span: body.span.clone(),
+        });
+
+        HirStmtKind::Block(stmts)
     }
 
     fn collect_args(&mut self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {

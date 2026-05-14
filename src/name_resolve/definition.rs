@@ -1,7 +1,7 @@
 use crate::{
     Db,
     common::symbols::{InternedSymbol, Symbol},
-    name_resolve::{core_module, module_items, std_module},
+    name_resolve::{core_module, module_items, std_module, std_package},
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{
@@ -104,7 +104,7 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
             Symbol::new(db, "never"),
             Definition::Type(never_id(db).def(db)),
         ),
-        (Symbol::new(db, "str"), Definition::Type(str_id(db).def(db))),
+        // (Symbol::new(db, "str"), Definition::Type(str_id(db).def(db))),
     ]);
 
     if let Some(std_module) = std_module(db) {
@@ -112,6 +112,18 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
             Symbol::new(db, "std"),
             Definition::Module(std_module.into()),
         );
+        res.insert(Symbol::new(db, "str"), {
+            let io = std_module
+                .file_submodules(db)
+                .into_iter()
+                .find(|x| x.name(db) == Symbol::new(db, "io"))
+                .unwrap();
+            Definition::Type(TypeDefId::Struct(StructId::new(
+                db,
+                Symbol::new(db, "str"),
+                file_module_id(db, io, Some(std_module.into()), std_package(db).unwrap()),
+            )))
+        });
     }
     res.insert(
         Symbol::new(db, "core"),

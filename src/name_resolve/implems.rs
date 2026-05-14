@@ -61,6 +61,13 @@ pub fn resolve_type_expr_as_interface<'db>(
     }
 }
 
+// pub fn module_impls_asts<'db>(
+//     db: &'db dyn Db,
+//     module: InternedModuleId<'db>,
+// ) -> Vec<ImplSource<'db>> {
+//     todo!()
+// }
+
 #[salsa::tracked]
 pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<ImplSource<'db>> {
     let mut res = vec![];
@@ -96,6 +103,7 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                             db,
                             impl_id,
                             module.into(),
+                            item.template_args.clone(),
                             item.items.clone(),
                             item.span.clone(),
                         );
@@ -107,6 +115,7 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                             db,
                             impl_id,
                             module.into(),
+                            item.template_args.clone(),
                             item.items.clone(),
                             item.span.clone(),
                         );

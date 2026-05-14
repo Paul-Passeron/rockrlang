@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
 use crate::{
     Db,
     common::location::Span,
-    hir::{FunctionLikeAst, function_ast},
+    hir::{FunctionLikeAst, function_ast, impl_items, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items,
@@ -135,24 +137,24 @@ pub fn resolve_type_expr<'db>(
 }
 
 #[salsa::tracked]
-pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> AstStructDef {
+pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Arc<AstStructDef> {
     for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
         if let AstTopLevelItemDesc::StructDef(ast) = item.data
             && ast.name == struct_id.name(db)
         {
-            return ast;
+            return Arc::new(ast);
         }
     }
     unreachable!()
 }
 
 #[salsa::tracked]
-pub fn enum_item<'db>(db: &'db dyn Db, struct_id: InternedEnumId<'db>) -> AstEnumDef {
+pub fn enum_item<'db>(db: &'db dyn Db, struct_id: InternedEnumId<'db>) -> Arc<AstEnumDef> {
     for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
         if let AstTopLevelItemDesc::EnumDef(ast) = item.data
             && ast.name == struct_id.name(db)
         {
-            return ast;
+            return Arc::new(ast);
         }
     }
     unreachable!()
@@ -162,16 +164,16 @@ pub fn enum_item<'db>(db: &'db dyn Db, struct_id: InternedEnumId<'db>) -> AstEnu
 pub fn templates_of_struct<'db>(
     db: &'db dyn Db,
     struct_id: InternedStructId<'db>,
-) -> Vec<AstTemplateArg> {
-    struct_item(db, struct_id).template_args
+) -> Arc<Vec<AstTemplateArg>> {
+    Arc::new(struct_item(db, struct_id).template_args.clone())
 }
 
 #[salsa::tracked]
 pub fn templates_of_enum<'db>(
     db: &'db dyn Db,
     enum_id: InternedEnumId<'db>,
-) -> Vec<AstTemplateArg> {
-    enum_item(db, enum_id).template_args
+) -> Arc<Vec<AstTemplateArg>> {
+    Arc::new(enum_item(db, enum_id).template_args.clone())
 }
 
 #[salsa::tracked]
@@ -184,16 +186,17 @@ pub fn get_templates_of_fun<'db>(
         ScopeOwnerId::Module(_) => (),
         ScopeOwnerId::Impl(impl_id) => {
             // Add templates from the impl_id, maybe
-            todo!()
+            let sources = impl_sources(db, impl_id.interned());
+            res.extend(sources.into_iter().next().unwrap().templates(db));
         }
     }
     let ast = function_ast(db, function);
     match ast.inner(db) {
-        FunctionLikeAst::ExternDef(_, _) => (),
+        FunctionLikeAst::ExternDef(sig, _) => res.extend(sig.data.template_args.clone()),
         FunctionLikeAst::Fundef(def) => {
             res.extend(def.data.template_args.clone());
         }
-        FunctionLikeAst::Method(_) => todo!(),
+        FunctionLikeAst::Method(def) => res.extend(def.data.template_args.clone()),
     }
     res
 }

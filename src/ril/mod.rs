@@ -9,7 +9,7 @@ use crate::{
     Db, OwnedSourceFile, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
     name_resolve::type_expr::{templates_of_enum, templates_of_struct},
-    parse_tree::top_level::AstImplItem,
+    parse_tree::top_level::{AstImplItem, AstTemplateArg},
 };
 
 #[salsa::tracked]
@@ -138,6 +138,7 @@ pub enum TypeDefId {
 pub struct ImplSource<'db> {
     pub id: ImplId,
     pub module: ModuleId,
+    pub templates: Vec<AstTemplateArg>,
     pub items: Vec<AstImplItem>,
     pub span: Span,
 }

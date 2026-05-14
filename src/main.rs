@@ -114,7 +114,7 @@ fn print_module_tree<'db>(db: &'db dyn Db, module: FileModule<'db>, indent: usiz
     }
 }
 
-fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
+fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'db>>) -> bool {
     let defs = module_definitions(db, module.interned());
     let mut v = defs.values().copied().collect::<Vec<_>>();
     v.sort();
@@ -127,7 +127,9 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
                 if let Some(hir) = hir_body(db, function_id.interned()) {
                     println!("{}", hir.display(db));
                 }
-                if let Some(results) = type_check_function(db, function_id.interned()) {
+                if let Some(results) =
+                    type_check_function(db, function_id.interned(), packages.clone())
+                {
                     for (expr_id, ty) in &results.node_types(db) {
                         println!("{:?}: {}", expr_id, ty.display(db));
                     }
@@ -139,7 +141,12 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     false
 }
 
-fn check_file<'db>(db: &'db dyn Db, source: SourceFile<'db>, module_id: ModuleId) -> bool {
+fn check_file<'db>(
+    db: &'db dyn Db,
+    source: SourceFile<'db>,
+    module_id: ModuleId,
+    packages: Vec<Package<'db>>,
+) -> bool {
     let mut has_errors = false;
     let errors: Vec<&ParseError> = parse_file::accumulated::<ParseError>(db, source);
     for error in &errors {
@@ -147,7 +154,7 @@ fn check_file<'db>(db: &'db dyn Db, source: SourceFile<'db>, module_id: ModuleId
         eprintln!("{info}: {:?}", error.kind);
         has_errors = true;
     }
-    has_errors |= check_module(db, module_id);
+    has_errors |= check_module(db, module_id, packages);
     has_errors
 }
 
@@ -156,17 +163,18 @@ fn check_module_tree<'db>(
     file_module: FileModule<'db>,
     parent: Option<ModuleId>,
     package: Package<'db>,
+    packages: Vec<Package<'db>>,
 ) -> bool {
     let module_id = file_module_id(db, file_module, parent, package);
-    let mut has_errors = check_file(db, file_module.file(db), module_id);
+    let mut has_errors = check_file(db, file_module.file(db), module_id, packages.clone());
     for sub in file_module.submodules(db) {
-        has_errors |= check_module_tree(db, *sub, Some(module_id), package);
+        has_errors |= check_module_tree(db, *sub, Some(module_id), package, packages.clone());
     }
     has_errors
 }
 
-fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
-    let has_errors = check_module_tree(db, package.root(db), None, package);
+fn try_package<'db>(db: &'db dyn Db, package: Package<'db>, packages: Vec<Package<'db>>) -> bool {
+    let has_errors = check_module_tree(db, package.root(db), None, package, packages);
     has_errors
 }
 
@@ -195,8 +203,9 @@ fn main() -> Result<(), String> {
     println!();
 
     let mut has_errors = false;
+    let cloned = packages.clone();
     for package in &packages {
-        has_errors |= try_package(&db, *package);
+        has_errors |= try_package(&db, *package, cloned.clone());
     }
 
     if has_errors {

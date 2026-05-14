@@ -20,7 +20,7 @@ use crate::{
         type_expr::AstAnyTypeExpr,
     },
     ril::{
-        EnumId, FunctionId, InterfaceId, InternedFunctionId, InternedImplId, ModuleId,
+        EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId, ModuleId,
         ScopeOwnerId, StructId, TypeDefId, TypeRef,
     },
 };
@@ -236,6 +236,7 @@ pub enum HirStmtKind {
     },
     Block(Vec<HirStmt>),
     Defer(Box<HirStmt>),
+    Break,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -280,10 +281,16 @@ pub enum HirStructFieldPattern {
 }
 
 #[salsa::tracked]
-pub fn impl_items<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<AstImplItem> {
+pub fn impl_sources<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<ImplSource<'db>> {
     module_impls(db, impl_id.parent(db).interned())
         .into_iter()
         .filter(|impl_| impl_.id(db) == impl_id.into())
+        .collect()
+}
+#[salsa::tracked]
+pub fn impl_items<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<AstImplItem> {
+    impl_sources(db, impl_id)
+        .into_iter()
         .map(|impl_| impl_.items(db))
         .flatten()
         .collect()

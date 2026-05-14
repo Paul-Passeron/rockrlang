@@ -5,7 +5,7 @@ use crate::{
         core_module,
         definition::{Definition, resolve_in_module},
     },
-    ril::{InterfaceId, ModuleId, StructId, TypeDefId},
+    ril::{EnumId, InterfaceId, ModuleId, StructId, TypeDefId},
 };
 
 #[salsa::tracked]
@@ -34,6 +34,16 @@ pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
     let iter_module = resolve_in_module(db, InternedSymbol::new(db, "opt"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
+        _ => panic!("core::mem module not found"),
+    }
+}
+
+#[salsa::tracked]
+pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
+    let opt_module = core_opt_module(db);
+    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "opt"), opt_module.interned());
+    match iter_module {
+        Some(Definition::Type(TypeDefId::Enum(id))) => id,
         _ => panic!("core::mem module not found"),
     }
 }

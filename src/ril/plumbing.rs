@@ -1,4 +1,10 @@
+use nonempty::nonempty;
 use std::marker::PhantomData;
+
+use crate::name_resolve::{
+    definition::{Definition, Segments, resolve_path},
+    std_module,
+};
 
 use super::*;
 
@@ -272,10 +278,6 @@ impl BuiltinTypeId {
         Self::new(db, Symbol::new(db, "char"))
     }
 
-    pub fn str(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "str"))
-    }
-
     pub fn void(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "void"))
     }
@@ -341,7 +343,23 @@ pub fn char_id(db: &dyn crate::Db) -> TypeId {
 }
 
 pub fn str_id(db: &dyn crate::Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::str(db).into(), vec![])
+    // in std::io
+    let Definition::Type(def) = resolve_path(
+        db,
+        Segments::new(
+            db,
+            nonempty![
+                Symbol::new(db, "std"),
+                Symbol::new(db, "io"),
+                Symbol::new(db, "str")
+            ],
+        ),
+        std_module(db).unwrap(),
+    )
+    .unwrap() else {
+        panic!()
+    };
+    TypeId::new(db, def, vec![])
 }
 
 pub fn void_id(db: &dyn crate::Db) -> TypeId {

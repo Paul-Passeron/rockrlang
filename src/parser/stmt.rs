@@ -258,6 +258,14 @@ impl<'db> Parser<'db> {
             TokenKind::For => self.parse_for_stmt(),
             TokenKind::While => self.parse_while_stmt(),
             TokenKind::Match => self.parse_match_stmt(),
+            TokenKind::Break => {
+                let start = self.get_start();
+                self.consume();
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
+                let span = start.span(&self.get_end());
+                Ok(AstStmt::new(AstStmtDesc::Break, vec![], span))
+            }
             TokenKind::Defer => {
                 let start = self.get_start();
                 self.consume();

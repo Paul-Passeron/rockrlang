@@ -200,6 +200,9 @@ fn write_stmt(
             )?;
             write!(f, "defer {}", s.trim_start())
         }
+        HirStmtKind::Break => {
+            write!(f, "break;")
+        }
     }
 }
 
