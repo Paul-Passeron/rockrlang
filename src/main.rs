@@ -25,6 +25,7 @@ mod name_resolve;
 mod parse_tree;
 mod parser;
 mod ril;
+mod thir;
 
 mod tests;
 
