@@ -1,8 +1,0 @@
-interface A {}
-
-struct x {}
-
-impl A for char {}
-impl <T: inner_mod::A> A for T {}
-impl <T: A> A for T {}
-impl <T: inner_mod::A> A for T {}

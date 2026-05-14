@@ -1,8 +1,0 @@
-@include std::io
-
-fun main(args: [str]): int {
-    for arg in args {
-        arg.println();
-    }
-    return 0;
-}

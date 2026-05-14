@@ -1,9 +1,0 @@
-@include std::io
-
-fun main(): int {
-    printf("Hello, World !\n");
-    for i in 0..100 {
-        printf("i is %d\n".as_ptr(), i);
-    }
-    return 0;
-}

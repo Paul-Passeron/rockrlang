@@ -1,6 +1,0 @@
-@include std::io
-
-fun main(): int {
-    printf(c"Hello, World !");
-    return 0;
-}

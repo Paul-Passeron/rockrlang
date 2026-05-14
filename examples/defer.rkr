@@ -1,6 +1,0 @@
-@include std::io
-
-fun main(): int {
-    defer "Hello, World !".println();
-    return 0;
-}

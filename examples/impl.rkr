@@ -1,7 +1,0 @@
-interface MyInterface {}
-
-impl MyInterface<int, int> for int {
-    fun neg(self: int): int {
-        return -self;
-    }
-}

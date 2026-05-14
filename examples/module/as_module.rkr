@@ -1,5 +1,0 @@
-@include std::io
-
-fun baz(): void {
-    "baz".println();
-}

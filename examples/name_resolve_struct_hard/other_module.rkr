@@ -1,3 +1,0 @@
-struct my_struct3 {
-    field: int;
-}

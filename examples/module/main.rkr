@@ -1,9 +1,0 @@
-@include std::io
-@include other_one
-
-fun main(): int {
-    "Hello, World !".println();
-    foo();
-    as_module::baz();
-    return 0;
-}
