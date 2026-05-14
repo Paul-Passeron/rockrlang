@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
+    fmt,
     iter::once,
     sync::Arc,
 };
@@ -7,6 +8,7 @@ use std::{
 use itertools::Itertools;
 
 use crate::{
+    Db,
     common::symbols::Symbol,
     hir::{Mutability, impl_items, interface_items},
     name_resolve::{
@@ -16,7 +18,8 @@ use crate::{
     parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef, display::RilDisplay,
+        TypeDefId, TypeId, TypeRef,
+        display::{Display, RilDisplay},
     },
     thir::{
         ExprId, InferCallInfos,
@@ -330,23 +333,11 @@ impl<'db> InferenceCtx<'db> {
                             )
                             .unwrap();
 
-                            for t in templates_for_ctx.iter() {
-                                println!("template: {}", t.display(self.db))
-                            }
-                            println!("--------");
-                            for t in self.templates().iter() {
-                                println!("template: {}", t.display(self.db))
-                            }
                             let ret_ty = self
                                 .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
                                 .unwrap();
 
                             self.unify(InferTy::Var(ret_var), ret_ty).unwrap();
-
-                            println!(
-                                "ret_ty is {}",
-                                self.find(&InferTy::Var(ret_var)).display(self.db)
-                            );
 
                             let ref_arguments = sig
                                 .data
@@ -396,6 +387,7 @@ impl<'db> InferenceCtx<'db> {
                 .collect();
         }
         let possible_blocks = self.get_working_impls(possible_blocks);
+
         if possible_blocks.is_empty() {
             return ConstraintSolveResult::Pending;
         } else if possible_blocks.len() > 1 {
@@ -749,13 +741,21 @@ impl<'db> InferenceCtx<'db> {
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-        let constraints = self.current_constraints.clone();
-        if let Err(err) = self.try_solve_constraints() {
-            // roll-back constraints that were eaten during their resolution
-            self.current_constraints = constraints;
-            return Err(err);
+        loop {
+            let before = self.current_constraints.len();
+            let constraints = self.current_constraints.clone();
+            if let Err(err) = self.try_solve_constraints() {
+                // roll-back constraints that were eaten during their resolution
+                self.current_constraints = constraints;
+                return Err(err);
+            }
+            if self.current_constraints.len() == before {
+                break;
+            }
         }
         Ok(())
+
+        // Ok(())
     }
 
     pub fn finished_solving_constraints(&self) -> bool {
