@@ -556,9 +556,16 @@ impl<'db> InferenceCtx<'db> {
                 ));
             }
             let competing_impls = self.get_working_impls(competing_impls);
+
             let impl_ = if competing_impls.len() == 1 {
                 let (_, impl_) = competing_impls.into_iter().next().unwrap();
                 impl_
+            } else if competing_impls.is_empty() {
+                return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
+                    self.find(ty),
+                    interface_id,
+                    args.iter().cloned().collect(),
+                ));
             } else {
                 let mut iterator = competing_impls.iter();
                 let fst = iterator.next().unwrap();
