@@ -10,7 +10,7 @@ struct Vec<T> {
 impl<T> Vec<T> {
     fun new(): Self {
         return Self {
-            .contents: nullptr,
+            .contents: 0,
             .len: 0,
             .cap: 0,
         };
