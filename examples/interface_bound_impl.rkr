@@ -1,0 +1,18 @@
+struct Marie {
+    age: int;
+}
+
+interface Amoureuse {}
+
+impl Amoureuse for Marie {}
+
+impl <T: Amoureuse> T {
+    fun manie_manin(&self): void {
+        "Bibi !".println();
+    }
+}
+
+fun main(): int {
+    Marie {.age: 22}.manie_manin();
+    return 0;
+}

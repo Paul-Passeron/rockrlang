@@ -2,12 +2,15 @@ mod constraints;
 mod display;
 pub mod expr;
 mod implems;
+mod implicit;
+pub mod pattern;
 mod types;
 mod unify;
 mod var;
 
 use std::{
     collections::{HashMap, HashSet},
+    iter::empty,
     sync::Arc,
 };
 
@@ -15,9 +18,13 @@ use crate::{
     Db,
     common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef},
+    name_resolve::type_expr::get_templates_of_fun,
     parse_tree::top_level::AstTemplateArg,
-    ril::{FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef},
-    thir::{ExprId, InferCallInfos},
+    ril::{
+        FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
+        TypeRef,
+    },
+    thir::{ExprId, InferCallInfos, inference::implicit::ImplicitContext},
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use var::*;
@@ -30,6 +37,7 @@ pub enum InferTy {
         fields: Box<[InferTy]>,
     },
     Param(TypeParamId),
+    Zelf,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -44,7 +52,7 @@ pub struct InferenceCtx<'a> {
     db: &'a dyn Db,
     table: UnificationTable<InPlace<InferVar>>,
     local_map: HashMap<LocalId, InferVar>,
-    zelf: Option<InferTy>,
+    implicit_ctx: Arc<ImplicitContext>,
 
     current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
@@ -101,6 +109,7 @@ pub enum InferenceConstraintKind {
         method: Symbol,
         args: Box<[InferTy]>,
         interface_hint: Option<InterfaceId>,
+        is_static: bool,
     },
     Implements {
         ty: InferTy,
@@ -124,11 +133,31 @@ impl<'db> InferenceCtx<'db> {
     pub fn new(
         db: &'db dyn Db,
         locals: &[LocalId],
-        templates: Arc<[AstTemplateArg]>,
+        func: FunctionId,
         packages: Arc<[Package<'db>]>,
     ) -> Self {
         let mut table = UnificationTable::new();
         let local_map = Self::create_local_map(&mut table, locals);
+
+        let templates = get_templates_of_fun(db, func.interned());
+
+        let infer_templates = templates
+            .iter()
+            .enumerate()
+            .map(|(i, _)| InferTy::Param(TypeParamId(i)))
+            .collect();
+        let ctx = ImplicitContext::from_function(
+            db,
+            func,
+            infer_templates,
+            if let ScopeOwnerId::Module(_) = func.parent(db) {
+                None
+            } else {
+                Some(InferTy::Zelf)
+            },
+        )
+        .unwrap();
+
         Self {
             db,
             table,
@@ -141,22 +170,20 @@ impl<'db> InferenceCtx<'db> {
             call_infos: HashMap::new(),
             next_constraint_id: 0,
             implements: HashMap::new(),
-            zelf: None, // TODO
+            implicit_ctx: Arc::new(ctx),
         }
     }
 
     pub fn templates(&self) -> Arc<[InferTy]> {
-        Arc::from(
-            self.templates
-                .iter()
-                .enumerate()
-                .map(|(i, _)| InferTy::Param(TypeParamId(i)))
-                .collect::<Box<[_]>>(),
-        )
+        self.implicit_ctx.get_templates()
     }
 
-    pub fn zelf(&self) -> Option<&InferTy> {
-        self.zelf.as_ref()
+    pub fn zelf(&self) -> Option<InferTy> {
+        self.implicit_ctx().zelf().cloned()
+    }
+
+    pub fn implicit_ctx(&self) -> Arc<ImplicitContext> {
+        self.implicit_ctx.clone()
     }
 }
 
@@ -176,6 +203,7 @@ pub enum UnificationError {
     ArgCountMismatch(FunctionId, usize),
     StaticMethodCallOnReceiver(ExprId, FunctionId),
     NoImplemCandidateFor(InferTy, InterfaceId, Box<[InferTy]>),
+    ZelfConstraining,
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -209,6 +237,7 @@ impl<'db> InferenceCtx<'db> {
                     .collect::<Option<Vec<_>>>()?,
             ))),
             InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
+            InferTy::Zelf => self.zelf().map(|_| TypeRef::Zelf),
         }
     }
 }

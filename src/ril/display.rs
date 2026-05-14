@@ -127,6 +127,7 @@ impl fmt::Display for Display<'_, TypeRef> {
             TypeRef::Param(param_id) => write!(f, "{}", param_id.display(self.db)),
             TypeRef::Zelf => write!(f, "Self"),
             TypeRef::Error => write!(f, "{{ERROR}}"),
+            TypeRef::Associated(symbol) => todo!(),
         }
     }
 }

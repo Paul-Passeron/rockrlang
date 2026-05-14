@@ -213,3 +213,26 @@ pub fn get_templates_of_fun<'db>(
     }
     res.into()
 }
+
+pub fn templates_of_owner<'db>(
+    db: &'db dyn Db,
+    scope_owner: ScopeOwnerId,
+) -> Arc<[AstTemplateArg]> {
+    match scope_owner {
+        ScopeOwnerId::Module(_) => Arc::new([]),
+        ScopeOwnerId::Impl(impl_id) => impl_sources(db, impl_id.interned())
+            .into_iter()
+            .next()
+            .unwrap()
+            .templates(db)
+            .into_iter()
+            .collect::<Arc<[_]>>(),
+        ScopeOwnerId::Interface(interface_ref) => {
+            interface_item(db, interface_ref.def(db).interned())
+                .template_args
+                .iter()
+                .cloned()
+                .collect()
+        }
+    }
+}

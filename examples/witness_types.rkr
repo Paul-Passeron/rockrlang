@@ -1,0 +1,7 @@
+interface Bar {
+    fun baz(&self): int;
+}
+
+fun foo<T: Bar>(x: T): int {
+    return x.baz();
+}

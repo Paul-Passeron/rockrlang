@@ -7,7 +7,7 @@ impl InferTy {
         match self {
             InferTy::Var(this_var) => *this_var == var,
             InferTy::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
-            InferTy::Param(_) => false,
+            InferTy::Param(_) | InferTy::Zelf => false,
         }
     }
 
@@ -89,6 +89,7 @@ impl<'db> InferenceCtx<'db> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
+            (InferTy::Zelf, InferTy::Zelf) => Ok(()),
             (InferTy::Var(a), InferTy::Var(b)) => self.table.unify_var_var(*a, *b),
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
                 self.table.unify_var_value(*infer_var, Some(value.clone()))
@@ -129,6 +130,7 @@ impl<'db> InferenceCtx<'db> {
             (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
                 Err(UnificationError::TemplateConstraining(*p))
             }
+            (InferTy::Zelf, _) | (_, InferTy::Zelf) => Err(UnificationError::ZelfConstraining),
         }
     }
 
@@ -156,6 +158,7 @@ impl<'db> InferenceCtx<'db> {
                 fields: fields.iter().map(|ty| self.find(ty)).collect(),
             },
             InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
+            InferTy::Zelf => InferTy::Zelf,
         }
     }
 }

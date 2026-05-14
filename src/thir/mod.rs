@@ -93,7 +93,8 @@ impl<'db> TyCtx<'db> {
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned());
         let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
-        let inf_ctx = InferenceCtx::new(db, &local_ids, templates.clone(), packages.clone());
+        let inf_ctx = InferenceCtx::new(db, &local_ids, function, packages.clone());
+
         let mut this = Self {
             db,
             function,
@@ -115,13 +116,7 @@ impl<'db> TyCtx<'db> {
             {
                 let param_ty = this
                     .inf_ctx
-                    .allocate_ast_type_expr(
-                        desc,
-                        owning_module(this.db, this.function.parent(this.db)),
-                        this.templates.as_ref(),
-                        infer_templates.as_ref(),
-                        None,
-                    )
+                    .allocate_ast_type_expr(desc, this.inf_ctx.implicit_ctx().as_ref())
                     .unwrap();
                 let local_ty = this.inf_ctx.infer_local(local.id);
                 this.inf_ctx.unify(param_ty, local_ty).unwrap();
@@ -183,7 +178,7 @@ impl<'db> TyCtx<'db> {
     fn get_ret_ty(&self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
         self.inf_ctx
-            .allocate_type_ref(&ret, self.inf_ctx.templates().as_ref(), self.inf_ctx.zelf())
+            .allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
     }
 
     fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {
@@ -198,7 +193,41 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
         match &stmt.kind {
-            HirStmtKind::Let { .. } => todo!(),
+            HirStmtKind::Let {
+                pattern,
+                ty_annotation,
+                init,
+                ..
+            } => {
+                let (init_ty, err) = self.type_check_expr(init);
+                if let Some(err) = err {
+                    self.push_regular_diagnostic(err, init.span.clone());
+                }
+                match self.inf_ctx.infer_pattern(pattern, None) {
+                    Ok(pattern_ty) => match init_ty {
+                        TyRef::Inf(infer_ty) => {
+                            if let Err(err) = self.inf_ctx.unify(infer_ty.clone(), pattern_ty) {
+                                self.push_regular_diagnostic(err, stmt.span.clone());
+                            } else if let Some(annotation) = ty_annotation
+                                && let Some(annotation) = annotation.as_known()
+                                && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
+                                    &annotation.data,
+                                    self.inf_ctx.implicit_ctx().as_ref(),
+                                    // owning_module(self.db, self.function.parent(self.db)),
+                                    // &self.templates,
+                                    // &self.inf_ctx.templates(),
+                                    // self.inf_ctx.zelf(),
+                                )
+                                && let Err(err) = self.inf_ctx.unify(infer_ty, annotated)
+                            {
+                                self.push_regular_diagnostic(err, annotation.span.clone());
+                            }
+                        }
+                        TyRef::Error => (),
+                    },
+                    Err(err) => self.push_regular_diagnostic(err, pattern.span.clone()),
+                }
+            }
             HirStmtKind::Match { .. } => todo!(),
             HirStmtKind::Assign { lhs, rhs } => {
                 let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
@@ -246,11 +275,22 @@ impl<'db> TyCtx<'db> {
                         })
                     };
 
-                    if TyRef::Inf(ret_ty) != ty {
-                        self.diagnostics.push(Diagnostic {
-                            kind: DiagnosticKind::BadRetType(ty),
-                            span: stmt.span.clone(),
-                        });
+                    match ty {
+                        TyRef::Inf(infer_ty) => {
+                            if let Err(err) = self.inf_ctx.unify(ret_ty, infer_ty.clone()) {
+                                self.push_regular_diagnostic(err, stmt.span.clone());
+                                self.diagnostics.push(Diagnostic {
+                                    kind: DiagnosticKind::BadRetType(TyRef::Inf(infer_ty)),
+                                    span: stmt.span.clone(),
+                                });
+                            }
+                        }
+                        TyRef::Error => {
+                            self.diagnostics.push(Diagnostic {
+                                kind: DiagnosticKind::BadRetType(TyRef::Error),
+                                span: stmt.span.clone(),
+                            });
+                        }
                     }
                 } else {
                     let void_ty = self.inf_ctx.void_ty();
@@ -263,8 +303,19 @@ impl<'db> TyCtx<'db> {
                 }
             }
             HirStmtKind::If { .. } => todo!(),
-            HirStmtKind::While { .. } => todo!(),
-            HirStmtKind::Block(_) => todo!(),
+            HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
+                Ok(ty) => {
+                    if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                        self.push_regular_diagnostic(err, cond.span.clone());
+                        return;
+                    }
+                    self.type_check_stmt(body);
+                }
+                Err(err) => {
+                    self.push_regular_diagnostic(err, cond.span.clone());
+                }
+            },
+            HirStmtKind::Block(stmts) => stmts.iter().for_each(|stmt| self.type_check_stmt(stmt)),
             HirStmtKind::Defer(_) => todo!(),
             HirStmtKind::Break => todo!(),
         }

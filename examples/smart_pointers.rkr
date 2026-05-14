@@ -1,8 +1,9 @@
 @include core::mem
+@include std::io
 
 struct InnerRef<T> {
     data: T;
-    ref_count: u64;
+    ref_count: i32;
 }
 
 struct Ref<T> {
@@ -17,7 +18,7 @@ impl <T> Ref<T> {
         return Ref { .inner:  inner };
     }
 
-    fun count(&self): u64 {
+    fun count(&self): i32 {
         return self$.inner.ref_count;
     }
 }

@@ -1,0 +1,4 @@
+fun foo<T>(x: T): int {
+    x = 2;
+    return 5;
+}

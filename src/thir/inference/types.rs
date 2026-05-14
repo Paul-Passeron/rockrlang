@@ -1,12 +1,15 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::empty};
 
 use crate::{
     common::symbols::Symbol,
     hir::{PartialTypeArg, PartialTypeRef},
     name_resolve::type_expr::{TypeResolution, resolve_type_expr_desc, struct_item},
     parse_tree::{top_level::AstTemplateArg, type_expr::AstTypeExprDesc},
-    ril::{BuiltinTypeId, ModuleId, StructId, TypeDefId, TypeRef, str_def},
-    thir::inference::{InferTy, InferenceCtx},
+    ril::{BuiltinTypeId, ModuleId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
+    thir::inference::{
+        InferTy, InferenceCtx,
+        implicit::{AsAstImplCtx, ImplicitContext},
+    },
 };
 
 impl<'db> InferenceCtx<'db> {
@@ -125,43 +128,38 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_type_ref(
-        &self,
-        type_ref: &TypeRef,
-        templates: &[InferTy],
-        zelf: Option<&InferTy>,
-    ) -> InferTy {
+    pub fn allocate_type_ref(&self, type_ref: &TypeRef, ctx: &ImplicitContext) -> InferTy {
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
                 fields: type_id
                     .args(self.db)
                     .iter()
-                    .map(|ty| self.allocate_type_ref(ty, templates, zelf))
+                    .map(|ty| self.allocate_type_ref(ty, ctx))
                     .collect(),
             },
-            TypeRef::Param(type_param_id) => templates[type_param_id.0].clone(),
+            TypeRef::Param(type_param_id) => ctx.get_template(type_param_id.0).unwrap().clone(),
             TypeRef::Error => panic!(),
             TypeRef::Zelf => {
-                if let Some(zelf) = zelf {
+                if let Some(zelf) = ctx.zelf() {
                     zelf.clone()
                 } else {
                     unreachable!()
                 }
             }
+            TypeRef::Associated(symbol) => todo!(),
         }
     }
 
     pub fn allocate_partial_type_arg(
         &mut self,
         arg: &PartialTypeArg,
-        templates: &[InferTy],
-        zelf: Option<&InferTy>,
+        ctx: &ImplicitContext,
     ) -> InferTy {
         match arg {
-            PartialTypeArg::Known(type_ref) => self.allocate_type_ref(type_ref, templates, zelf),
+            PartialTypeArg::Known(type_ref) => self.allocate_type_ref(type_ref, ctx),
             PartialTypeArg::Partial(partial_type_ref) => {
-                self.allocate_partial_type_ref(partial_type_ref, templates, zelf)
+                self.allocate_partial_type_ref(partial_type_ref, ctx)
             }
             PartialTypeArg::Infer => InferTy::Var(self.fresh_var()),
         }
@@ -170,16 +168,15 @@ impl<'db> InferenceCtx<'db> {
     pub fn allocate_partial_type_ref(
         &mut self,
         type_ref: &PartialTypeRef,
-        templates: &[InferTy],
-        zelf: Option<&InferTy>,
+        ctx: &ImplicitContext,
     ) -> InferTy {
         match type_ref {
-            PartialTypeRef::Resolved(type_ref) => self.allocate_type_ref(type_ref, templates, zelf),
+            PartialTypeRef::Resolved(type_ref) => self.allocate_type_ref(type_ref, ctx),
             PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
                 def: *def,
                 fields: args
                     .iter()
-                    .map(|arg| self.allocate_partial_type_arg(arg, templates, zelf))
+                    .map(|arg| self.allocate_partial_type_arg(arg, ctx))
                     .collect(),
             },
         }
@@ -188,24 +185,10 @@ impl<'db> InferenceCtx<'db> {
     pub fn allocate_ast_type_expr(
         &self,
         type_expr: &AstTypeExprDesc,
-        module: ModuleId,
-        ast_template_args: &[AstTemplateArg],
-        templates: &[InferTy],
-        zelf: Option<&InferTy>,
+        ctx: &ImplicitContext,
     ) -> Option<InferTy> {
-        debug_assert_eq!(ast_template_args.len(), templates.len());
-        match resolve_type_expr_desc(
-            self.db,
-            type_expr,
-            module.interned(),
-            ast_template_args,
-            zelf.is_some(),
-        ) {
-            TypeResolution::Type(type_ref) => {
-                Some(self.allocate_type_ref(&type_ref, templates, zelf))
-            }
-            _ => None,
-        }
+        ctx.resolve(self.db, type_expr)
+            .map(|type_ref| self.allocate_type_ref(&type_ref, ctx))
     }
 
     pub fn is_struct(&mut self, ty: &InferTy) -> Option<(StructId, HashMap<Symbol, InferTy>)> {
@@ -215,18 +198,19 @@ impl<'db> InferenceCtx<'db> {
             let templates = fields;
             let ast = struct_item(self.db, struct_id.interned());
             let module = struct_id.parent(self.db);
-            let ast_template_args = &ast.template_args;
+            let ctx = ImplicitContext::new(
+                self.db,
+                ScopeOwnerId::Module(module),
+                empty(),
+                templates.iter().cloned().collect(),
+                None,
+            )
+            .unwrap();
             ast.fields
                 .iter()
                 .map(|field| {
-                    self.allocate_ast_type_expr(
-                        &field.ty.data,
-                        module,
-                        ast_template_args,
-                        templates,
-                        None,
-                    )
-                    .map(|ty| (field.name, ty))
+                    self.allocate_ast_type_expr(&field.ty.data, &ctx)
+                        .map(|ty| (field.name, ty))
                 })
                 .collect::<Option<_>>()
                 .map(|fields| (struct_id, fields))

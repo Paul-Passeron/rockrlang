@@ -391,6 +391,7 @@ impl<'db> LowerFundef<'db> {
                                                             }
                                                             TypeRef::Error => vec![],
                                                             TypeRef::Zelf => todo!(),
+                                                            TypeRef::Associated(symbol) => todo!(),
                                                         }
                                                     }
                                                     PartialTypeRef::WithHoles { args, .. } => args,

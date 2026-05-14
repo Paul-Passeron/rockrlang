@@ -4,6 +4,6 @@
 fun main(): int {
     "Hello, World !".println();
     foo();
-    as_module::bar();
+    as_module::baz();
     return 0;
 }

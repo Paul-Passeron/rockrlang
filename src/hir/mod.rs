@@ -367,14 +367,11 @@ pub fn function_ast<'db>(
         }
         ScopeOwnerId::Interface(interface_ref) => {
             for item in interface_items(db, interface_ref.def(db).interned()).iter() {
-                match item {
-                    AstInterfaceItem::Sig(sig) => {
-                        return InternedFunctionLikeAst::new(
-                            db,
-                            FunctionLikeAst::TraitMethod(sig.clone()),
-                        );
-                    }
-                    _ => (),
+                if let AstInterfaceItem::Sig(sig) = item {
+                    return InternedFunctionLikeAst::new(
+                        db,
+                        FunctionLikeAst::TraitMethod(sig.clone()),
+                    );
                 }
             }
         }

@@ -1,0 +1,43 @@
+@include core
+@include core::panic
+
+enum AorB {
+    A,
+    B
+}
+
+impl Default for AorB {
+    fun default(): AorB {
+        return AorB::A;
+    }
+}
+
+impl AorB {
+    fun is_a(&self): bool {
+        match self {
+            Self::A => { return true; }
+            Self::B => { return false; }
+        }
+    }
+}
+
+struct X {}
+
+impl X {
+    fun is_a(&self, what_to_ret: bool): bool {
+        return what_to_ret;
+    }
+}
+
+fun generator<T>(): T {
+    panic::panic("Not possible to implement !");
+}
+
+fun main(): int {
+    let def = AorB::default();
+    let is_a = def.is_a();
+    let g = generator();
+    let is_g_a = g.is_a(true);
+    g;
+    return 0;
+}

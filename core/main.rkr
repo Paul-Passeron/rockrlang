@@ -1,1 +1,5 @@
 // Rockr core lib entry point
+
+interface Default {
+    fun default(): Self;
+}

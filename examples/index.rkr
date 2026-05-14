@@ -1,19 +1,44 @@
 @include std::io
 
+struct Vec<T> {
+    contents: *mut T;
+    len: usize;
+    cap: usize;
+}
+
+impl<T> Vec<T> {
+    fun new(): Vec<T> {
+        return Vec {
+            .contents: 0,
+            .len: 0,
+            .cap: 0,
+        };
+    }
+
+    fun push(&mut self, value: T): void {
+        // todo
+    }
+
+    fun unsafe_idx(&self, idx: int): *T {
+        // todo
+    }
+}
+
+
 fun main(): int {
     let v = Vec<int>::new();
     for i in 0..150 {
         v.push(i * 2);
     }
-    let v_5 = v[5];
-    let y = v[5]@;
+    // let v_5 = v[5];
+    // let y = v[5]@;
 
-    let x = 2;
-    let ptr = x@;
+    // let x = 2;
+    // let ptr = x@;
 
-    let value = x$;
+    // let value = x$;
 
-    let typed: Result<Vec<Vec<int>>, void> = Ok(Vec::new());
+    // let typed: Result<Vec<Vec<int>>, void> = Ok(Vec::new());
 
     return 0;
 }

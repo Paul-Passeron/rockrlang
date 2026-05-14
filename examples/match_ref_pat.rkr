@@ -1,0 +1,27 @@
+enum Foo {
+    Bar(int),
+    Baz(str),
+}
+
+fun main(): int {
+    let f: Foo = Foo::Bar(6);
+    match f {
+        Foo::Bar(code) => {
+            return code;
+        }
+        Foo::Baz(string) => {
+            string.println();
+        }
+    }
+
+    match &f {
+        Foo::Bar(code) => {
+            let x: int = code$;
+            return code$;
+        }
+        Foo::Baz(string) => {
+            string$.println();
+        }
+    }
+    return 0;
+}

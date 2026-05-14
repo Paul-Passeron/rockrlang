@@ -1,3 +1,23 @@
-// struct Vec<T> {
-//     // TODO
-// }
+struct Vec<T> {
+    contents: *mut T;
+    len: usize;
+    cap: usize;
+}
+
+impl<T> Vec<T> {
+    fun new(): Vec<T> {
+        return Vec {
+            .contents: 0,
+            .len: 0,
+            .cap: 0,
+        };
+    }
+
+    fun push(&mut self, value: T): void {
+        // todo
+    }
+
+    fun unsafe_idx(&self, idx: int): *T {
+        // todo
+    }
+}

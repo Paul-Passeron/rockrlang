@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::empty, sync::Arc};
 
 use crate::{
     common::symbols::Symbol,
@@ -6,9 +6,11 @@ use crate::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
         PartialTypeArg, PartialTypeRef, function_ast, owning_module,
     },
-    name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
-    ril::{EnumId, FunctionId, InterfaceId, StructId, TypeDefId, TypeRef},
-    thir::ExprId,
+    name_resolve::type_expr::{
+        get_templates_of_fun, struct_item, templates_of_owner, templates_of_struct,
+    },
+    ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
+    thir::{ExprId, inference::implicit::ImplicitContext},
 };
 
 use super::{InferTy, InferenceCtx, UnificationError};
@@ -33,7 +35,9 @@ impl<'db> InferenceCtx<'db> {
                 args,
                 interface_hint,
             } => self.infer_method(ExprId(expr.id), receiver, *method, args, *interface_hint),
-            HirExprDesc::CallStatic { ty, method, args } => self.infer_static(ty, *method, args),
+            HirExprDesc::CallStatic { ty, method, args } => {
+                self.infer_static(ExprId(expr.id), ty, *method, args)
+            }
             HirExprDesc::BinOp { lhs, op, rhs } => self.infer_binop(lhs, *op, rhs),
             HirExprDesc::StructLit { ty, fields } => self.infer_struct_lit(ty, fields),
             HirExprDesc::Neg(hir_expr) => {
@@ -136,11 +140,8 @@ impl<'db> InferenceCtx<'db> {
                             .iter()
                             .zip(args.iter())
                             .try_for_each(|(infer_ty, t_ref)| {
-                                let t_ref = this.allocate_type_ref(
-                                    t_ref,
-                                    this.templates().as_ref(),
-                                    this.zelf.as_ref(),
-                                );
+                                let t_ref =
+                                    this.allocate_type_ref(t_ref, this.implicit_ctx().as_ref());
                                 this.unify(infer_ty.clone(), t_ref)
                             })
                     })
@@ -163,11 +164,7 @@ impl<'db> InferenceCtx<'db> {
                 self.snapshot(|this| {
                     args.iter()
                         .map(|arg| {
-                            this.allocate_partial_type_arg(
-                                arg,
-                                this.templates().as_ref(),
-                                this.zelf.clone().as_ref(),
-                            )
+                            this.allocate_partial_type_arg(arg, this.implicit_ctx().as_ref())
                         })
                         .collect::<Box<[_]>>()
                         .into_iter()
@@ -206,21 +203,21 @@ impl<'db> InferenceCtx<'db> {
             }
 
             let module = struct_id.parent(self.db);
-            let ast_template_args = &ast.template_args;
             let zelf = self.fresh_var();
+
+            let ctx = ImplicitContext::new(
+                self.db,
+                ScopeOwnerId::Module(module),
+                empty(),
+                templates.iter().cloned().collect(),
+                Some(InferTy::Var(zelf)),
+            )
+            .unwrap();
 
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
                     let ty = inferred_fields.get(&ast.name).unwrap().clone();
-                    let resolved = this
-                        .allocate_ast_type_expr(
-                            &ast.ty.data,
-                            module,
-                            ast_template_args,
-                            &templates,
-                            Some(&InferTy::Var(zelf)),
-                        )
-                        .unwrap();
+                    let resolved = this.allocate_ast_type_expr(&ast.ty.data, &ctx).unwrap();
                     this.unify(ty, resolved)
                 })
             })?;
@@ -249,12 +246,20 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn infer_static(
-        &self,
-        _ty: &PartialTypeRef,
-        _method: Symbol,
-        _args: &[HirExpr],
+        &mut self,
+        id: ExprId,
+        ty: &PartialTypeRef,
+        method: Symbol,
+        args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
-        todo!()
+        let receiver_ty = self.allocate_partial_type_ref(ty, &self.implicit_ctx().as_ref());
+        let inferred_args = args
+            .iter()
+            .map(|arg| self.infer_expr(arg))
+            .collect::<Result<Box<[_]>, _>>()?;
+        let res_var =
+            self.emit_method_constraint(id, receiver_ty, method, inferred_args, None, true);
+        Ok(InferTy::Var(res_var))
     }
 
     fn infer_method(
@@ -270,8 +275,14 @@ impl<'db> InferenceCtx<'db> {
             .iter()
             .map(|arg| self.infer_expr(arg))
             .collect::<Result<Box<[_]>, _>>()?;
-        let res_var =
-            self.emit_method_constraint(id, receiver_ty, method, inferred_args, interface_hint);
+        let res_var = self.emit_method_constraint(
+            id,
+            receiver_ty,
+            method,
+            inferred_args,
+            interface_hint,
+            false,
+        );
         Ok(InferTy::Var(res_var))
     }
 
@@ -307,16 +318,16 @@ impl<'db> InferenceCtx<'db> {
             FunctionLikeAst::Method(def) => &def.data.return_type,
             FunctionLikeAst::TraitMethod(sig) => &sig.data.return_type,
         };
-        let module = owning_module(self.db, target.parent(self.db));
-        let ast_template_args = get_templates_of_fun(self.db, target.interned());
-        self.allocate_ast_type_expr(
-            &ast_ret_ty.data,
-            module,
-            ast_template_args.as_ref(),
-            templates,
-            zelf,
+
+        let ctx = ImplicitContext::from_function(
+            self.db,
+            target,
+            templates.iter().cloned().collect(),
+            zelf.cloned(),
         )
-        .unwrap()
+        .unwrap();
+
+        self.allocate_ast_type_expr(&ast_ret_ty.data, &ctx).unwrap()
     }
 
     fn infer_direct(
@@ -331,20 +342,14 @@ impl<'db> InferenceCtx<'db> {
         let inferred_templates = templates
             .iter()
             .map(|_| InferTy::Var(self.fresh_var()))
-            .collect::<Box<[_]>>();
-        let module = owning_module(self.db, target.parent(self.db));
+            .collect::<Arc<[_]>>();
+
+        let ctx = ImplicitContext::from_function(self.db, target, inferred_templates.clone(), None)
+            .unwrap();
+
         let inferred_ast_args = ast_args
             .iter()
-            .map(|arg| {
-                self.allocate_ast_type_expr(
-                    &arg.ty.data,
-                    module,
-                    &templates,
-                    &inferred_templates,
-                    None, // TODO: handle if receiver can be Some
-                )
-                .unwrap()
-            })
+            .map(|arg| self.allocate_ast_type_expr(&arg.ty.data, &ctx).unwrap())
             .collect::<Box<[_]>>();
         let inferred_args = args
             .iter()

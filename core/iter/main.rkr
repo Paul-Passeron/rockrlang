@@ -26,3 +26,10 @@ interface IntoIterator {
     type Out: Iter;
     fun into_iter(self): Out;
 }
+
+impl IntoIterator for IntIter {
+    type Out = IntIter;
+    fun into_iter(self): IntIter {
+        return self;
+    }
+}

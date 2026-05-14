@@ -70,6 +70,12 @@ pub enum AstReceiver {
     MutPtrZelf, // *mut self
 }
 
+impl AstReceiver {
+    pub fn is_static(&self) -> bool {
+        matches!(self, AstReceiver::None)
+    }
+}
+
 pub type AstFunsig = Spanned<AstFunsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

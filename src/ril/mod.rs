@@ -86,6 +86,7 @@ pub struct TypeParam {
 pub enum TypeRef {
     Concrete(TypeId),
     Param(TypeParamId),
+    Associated(Symbol),
     Zelf,
     Error,
 }

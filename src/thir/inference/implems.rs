@@ -3,7 +3,11 @@ use std::{
     iter::{self, once},
 };
 
-use crate::{name_resolve::implems::impls_in_package, ril::ImplSource};
+use crate::{
+    name_resolve::implems::impls_in_package,
+    ril::{ImplSource, ScopeOwnerId},
+    thir::inference::implicit::ImplicitContext,
+};
 
 use super::*;
 
@@ -18,11 +22,11 @@ impl<'a> InferenceCtx<'a> {
         &mut self,
         ty: &InferTy,
         matcher: TypeRef,
-        templates: &[InferTy],
+        ctx: &ImplicitContext,
     ) -> Option<HashSet<InferenceConstraintKind>> {
         match ty {
             InferTy::Var(infer_var) => {
-                let allocated = self.allocate_type_ref(&matcher, templates, None); // Self not allowed here
+                let allocated = self.allocate_type_ref(&matcher, ctx); // Self not allowed here
                 Some(HashSet::from_iter(once(InferenceConstraintKind::Unify {
                     a: InferTy::Var(*infer_var),
                     b: allocated,
@@ -43,7 +47,7 @@ impl<'a> InferenceCtx<'a> {
                         .iter()
                         .zip(other_fields)
                         .try_for_each(|(infer_ty, matcher)| {
-                            let extension = self.matches_ty(infer_ty, matcher, templates)?;
+                            let extension = self.matches_ty(infer_ty, matcher, ctx)?;
                             constraints.extend(extension);
                             Some(())
                         })?;
@@ -52,12 +56,12 @@ impl<'a> InferenceCtx<'a> {
                 TypeRef::Param(id) => Some(HashSet::from_iter(iter::once(
                     InferenceConstraintKind::Unify {
                         a: ty.clone(),
-                        b: templates[id.0].clone(),
+                        b: ctx.get_template(id.0)?.clone(),
                     },
                 ))),
                 TypeRef::Error => None,
-                TypeRef::Zelf => {
-                    // A Self type should not have been encountered here
+                TypeRef::Associated(_) | TypeRef::Zelf => {
+                    // A Self or associated type should not have been encountered here
                     None
                 }
             },
@@ -65,6 +69,7 @@ impl<'a> InferenceCtx<'a> {
                 // TODO: I think that this should not be allowed
                 None
             }
+            InferTy::Zelf => todo!(),
         }
     }
 
@@ -84,6 +89,14 @@ impl<'a> InferenceCtx<'a> {
             .map(|var| InferTy::Var(*var))
             .collect::<Box<[_]>>();
 
+        let ctx = ImplicitContext::new(
+            self.db,
+            ScopeOwnerId::Impl(source.id(self.db)),
+            empty(), // TODO: check this is right
+            mapped_templates.iter().cloned().collect(),
+            Some(ty.clone()),
+        )?;
+
         infer_templates
             .iter()
             .zip(templates.iter())
@@ -93,7 +106,7 @@ impl<'a> InferenceCtx<'a> {
                     let args = interface_ref
                         .args(self.db)
                         .iter()
-                        .map(|arg| self.allocate_type_ref(arg, &mapped_templates, Some(ty)))
+                        .map(|arg| self.allocate_type_ref(arg, &ctx))
                         .collect::<Box<[_]>>();
                     constraints.insert(InferenceConstraintKind::Implements {
                         ty: InferTy::Var(*infer_ty),
@@ -103,11 +116,7 @@ impl<'a> InferenceCtx<'a> {
                 }
             });
 
-        constraints.extend(self.matches_ty(
-            ty,
-            source.id(self.db).implemented(self.db),
-            &mapped_templates,
-        )?);
+        constraints.extend(self.matches_ty(ty, source.id(self.db).implemented(self.db), &ctx)?);
 
         Some(PotentialBlockRes {
             templates: infer_templates,
