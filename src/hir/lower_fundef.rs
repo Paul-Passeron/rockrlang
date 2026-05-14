@@ -448,7 +448,7 @@ impl<'db> LowerFundef<'db> {
                                     }
                                 }
                             },
-                            _ => todo!(),
+                            unhandled => todo!("{:?}", unhandled),
                         },
                         _ => todo!(
                             "error: badly name-resolved item ({})",
