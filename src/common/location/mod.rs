@@ -1,6 +1,6 @@
 use std::{fmt::Display, path::PathBuf};
 
-use crate::SourceFile;
+use crate::{SourceFile, get_source_file, ril::ModuleId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Location {
@@ -51,6 +51,14 @@ pub struct LocationInfo {
     pub line: usize,
     pub column: usize,
     pub offset: usize,
+}
+
+impl Location {
+    pub fn loc_info(&self, db: &dyn crate::Db, module: ModuleId) -> Option<LocationInfo> {
+        let package = module.owning_package(db)?;
+        let sf = get_source_file(db, self.file.as_path(), &[package])?;
+        Some(get_loc_info(db, sf, self.offset))
+    }
 }
 
 #[salsa::tracked]

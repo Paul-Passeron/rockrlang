@@ -54,6 +54,11 @@ impl ModuleId {
     pub fn package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
         self.interned().package(db)
     }
+
+    pub fn owning_package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
+        self.package(db)
+            .or_else(|| self.parent(db).and_then(|parent| parent.owning_package(db)))
+    }
 }
 
 impl<'db> From<InternedFunctionId<'db>> for FunctionId {
