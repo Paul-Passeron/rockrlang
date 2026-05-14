@@ -258,7 +258,17 @@ impl<'db> Parser<'db> {
             TokenKind::For => self.parse_for_stmt(),
             TokenKind::While => self.parse_while_stmt(),
             TokenKind::Match => self.parse_match_stmt(),
-
+            TokenKind::Defer => {
+                let start = self.get_start();
+                self.consume();
+                let stmt = self.parse_stmt()?;
+                let span = start.span(&stmt.span.end());
+                Ok(AstStmt::new(
+                    AstStmtDesc::Defer(Box::new(stmt)),
+                    vec![],
+                    span,
+                ))
+            }
             _ => {
                 if let Some(assignement) = self.try_parse_assign() {
                     Ok(assignement)

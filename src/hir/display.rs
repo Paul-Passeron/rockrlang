@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Formatter, FormattingOptions};
 
 use crate::{
     Db,
@@ -189,6 +189,16 @@ fn write_stmt(
             }
             write_indent(f, depth)?;
             writeln!(f, "}}")
+        }
+        HirStmtKind::Defer(hir_stmt) => {
+            let mut s = String::new();
+            write_stmt(
+                &mut Formatter::new(&mut s, FormattingOptions::default()),
+                hir_stmt,
+                db,
+                depth,
+            )?;
+            write!(f, "defer {}", s.trim_start())
         }
     }
 }

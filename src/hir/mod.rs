@@ -228,6 +228,7 @@ pub enum HirStmtKind {
         body: Box<HirStmt>,
     },
     Block(Vec<HirStmt>),
+    Defer(Box<HirStmt>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

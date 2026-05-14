@@ -1,3 +1,5 @@
+#![feature(formatting_options)]
+
 use clap::Parser;
 use clap_derive::Parser;
 use std::{path::PathBuf, sync::Arc};

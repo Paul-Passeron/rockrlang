@@ -76,4 +76,5 @@ pub enum AstStmtDesc {
         branches: Vec<AstMatchBranch>,
     },
     Expr(AstExpr),
+    Defer(Box<AstStmt>),
 }

@@ -24,7 +24,6 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
-        display::RilDisplay,
     },
 };
 
@@ -362,11 +361,6 @@ impl<'db> LowerFundef<'db> {
                                     .collect();
                                 HirExprDesc::CallStatic { ty, method, args }
                             }
-                            AstExprDesc::Name(name) => {
-                                let ty = self.instantiate_holed(type_def_id);
-                                todo!()
-                                // HirExprDesc::Constructor { ty, name: *name }
-                            }
                             AstExprDesc::StructLit {
                                 ty,
                                 variant,
@@ -657,14 +651,6 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
-    fn lower_expr_as_constructor_args(
-        &mut self,
-        expr: &AstExpr,
-        scope: &Scope,
-    ) -> Vec<(Symbol, HirConstructorArgs)> {
-        todo!()
-    }
-
     fn lower_pattern(&mut self, pat: &AstPattern, scope: &mut Scope) -> (HirPattern, Vec<LocalId>) {
         fn _lower(
             this: &mut LowerFundef<'_>,
@@ -698,35 +684,6 @@ impl<'db> LowerFundef<'db> {
                         let resolution =
                             resolve_in_module(this.db, name.interned(), module.interned());
                         match (resolution, args) {
-                            (
-                                Some(Definition::Type(TypeDefId::Enum(enum_id))),
-                                AstConstructFields::TupleFields(fields),
-                            ) => {
-                                let hir_fields: Vec<_> = fields
-                                    .iter()
-                                    .map(|f| _lower(this, f, scope, locals, module))
-                                    .collect();
-                                HirPattern {
-                                    id: this.alloc.next(),
-                                    data: HirPatternDesc::Constructor {
-                                        resolution: enum_id,
-                                        name: todo!(),
-                                        fields: todo!(),
-                                    },
-                                    span: pat.span.clone(),
-                                }
-                            }
-                            (Some(Definition::Type(type_def_id)), AstConstructFields::None) => {
-                                HirPattern {
-                                    id: this.alloc.next(),
-                                    data: HirPatternDesc::Constructor {
-                                        name: todo!(),
-                                        fields: todo!(),
-                                        resolution: todo!(),
-                                    },
-                                    span: pat.span.clone(),
-                                }
-                            }
                             (
                                 Some(Definition::Type(_type_def_id)),
                                 AstConstructFields::StructFields(_fields),
@@ -1121,6 +1078,9 @@ impl<'db> LowerFundef<'db> {
                         scrutinee,
                         branches,
                     }
+                }
+                AstStmtDesc::Defer(stmt) => {
+                    HirStmtKind::Defer(Box::new(self.lower_stmt(stmt, scope)))
                 }
             },
             span: stmt.span.clone(),
