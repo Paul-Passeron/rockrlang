@@ -1,4 +1,4 @@
-use std::fmt::{self, Formatter, FormattingOptions};
+use std::fmt::{self, Formatter};
 
 use crate::{
     Db,
@@ -32,7 +32,7 @@ impl<'db> HirBody<'db> {
 }
 
 impl fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             BinaryOperator::Plus => write!(f, "+"),
             BinaryOperator::Minus => write!(f, "-"),
@@ -55,7 +55,7 @@ impl fmt::Display for BinaryOperator {
 }
 
 impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "fn {} {{", self.value.owner(self.db).display(self.db))?;
         writeln!(
             f,
@@ -93,19 +93,14 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
     }
 }
 
-fn write_indent(f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+fn write_indent(f: &mut impl fmt::Write, depth: usize) -> fmt::Result {
     for _ in 0..depth {
         write!(f, "    ")?;
     }
     Ok(())
 }
 
-fn write_stmt(
-    f: &mut fmt::Formatter<'_>,
-    stmt: &HirStmt,
-    db: &dyn Db,
-    depth: usize,
-) -> fmt::Result {
+fn write_stmt(f: &mut impl fmt::Write, stmt: &HirStmt, db: &dyn Db, depth: usize) -> fmt::Result {
     write_indent(f, depth)?;
     match &stmt.kind {
         HirStmtKind::Let {
@@ -192,12 +187,7 @@ fn write_stmt(
         }
         HirStmtKind::Defer(hir_stmt) => {
             let mut s = String::new();
-            write_stmt(
-                &mut Formatter::new(&mut s, FormattingOptions::default()),
-                hir_stmt,
-                db,
-                depth,
-            )?;
+            write_stmt(&mut s, hir_stmt, db, depth)?;
             write!(f, "defer {}", s.trim_start())
         }
         HirStmtKind::Break => {
@@ -207,7 +197,7 @@ fn write_stmt(
 }
 
 fn write_pattern(
-    f: &mut fmt::Formatter<'_>,
+    f: &mut impl fmt::Write,
     pat: &HirPattern,
     db: &dyn Db,
     depth: usize,
@@ -272,7 +262,7 @@ fn write_pattern(
     }
 }
 
-fn write_place(f: &mut fmt::Formatter<'_>, place: &HirPlace, db: &dyn Db) -> fmt::Result {
+fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
     match place {
         HirPlace::Local(id) => write!(f, "_{}", id.0),
         HirPlace::Field { base, field } => {
@@ -301,7 +291,7 @@ fn write_place(f: &mut fmt::Formatter<'_>, place: &HirPlace, db: &dyn Db) -> fmt
     }
 }
 
-fn write_expr(f: &mut fmt::Formatter<'_>, expr: &HirExpr, db: &dyn Db) -> fmt::Result {
+fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Result {
     match &expr.data {
         HirExprDesc::IntLit(n) => write!(f, "{}", n),
         HirExprDesc::CharLit(c) => write!(f, "'{}'", c),
@@ -478,7 +468,7 @@ fn write_expr(f: &mut fmt::Formatter<'_>, expr: &HirExpr, db: &dyn Db) -> fmt::R
     }
 }
 
-fn write_partial_type(f: &mut fmt::Formatter<'_>, ty: &PartialTypeRef, db: &dyn Db) -> fmt::Result {
+fn write_partial_type(f: &mut impl fmt::Write, ty: &PartialTypeRef, db: &dyn Db) -> fmt::Result {
     match ty {
         PartialTypeRef::Resolved(tref) => write!(f, "{}", tref.display(db)),
         PartialTypeRef::WithHoles { def, args } => {
