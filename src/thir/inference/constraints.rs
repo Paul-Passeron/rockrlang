@@ -8,22 +8,82 @@ use itertools::Itertools;
 
 use crate::{
     common::symbols::Symbol,
-    hir::{Mutability, impl_items},
-    parse_tree::top_level::AstImplItem,
+    hir::{Mutability, impl_items, interface_items},
+    name_resolve::{
+        implems::resolve_type_expr_as_interface,
+        type_expr::{get_templates_of_fun, templates_of_owner},
+    },
+    parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
     ril::{
-        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId, TypeDefId,
-        display::RilDisplay,
+        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
+        TypeDefId, TypeId, TypeRef, display::RilDisplay,
     },
     thir::{
         ExprId, InferCallInfos,
         inference::{
-            InferenceConstraint, InferenceConstraintId, InferenceConstraintKind, InferenceCtx,
-            InterfaceImplem, UnificationError, implicit::ImplicitContext, var::InferVar,
+            InferenceCtx, InterfaceImplem, UnificationError, implicit::ImplicitContext,
+            var::InferVar,
         },
     },
 };
 
 use super::{InferTy, implems::PotentialBlockRes};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct InferenceConstraintId(usize);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InferenceConstraint {
+    pub id: InferenceConstraintId,
+    pub kind: InferenceConstraintKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
+pub enum InferenceConstraintKind {
+    Deref {
+        var: InferVar,
+        target: InferTy,
+    },
+    BindsLike {
+        ty: InferVar,
+        inner: InferTy,
+        like: InferVar,
+    },
+    IndexedBy {
+        elem_var: InferVar,
+        base_ty: InferTy,
+        index_ty: InferTy,
+    },
+    Tuple {
+        elem_var: InferVar,
+        tuple_ty: InferTy,
+        has_index: u32,
+    },
+    StructField {
+        elem_var: InferVar,
+        struct_ty: InferTy,
+        field: Symbol,
+    },
+    Method {
+        ret_var: InferVar,
+        ty: InferTy,
+        id: ExprId,
+        method: Symbol,
+        args: Box<[InferTy]>,
+        interface_hint: Option<InterfaceId>,
+        is_static: bool,
+    },
+    Implements {
+        ty: InferTy,
+        id: InterfaceId,
+        args: Box<[InferTy]>,
+    },
+    Unify {
+        a: InferTy,
+        b: InferTy,
+    },
+}
 
 enum ConstraintSolveResult {
     Solved,
@@ -172,6 +232,50 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn infer_to_ref(&mut self, ty: &InferTy) -> TypeRef {
+        let ty = self.find(ty);
+        match ty {
+            InferTy::Var(_) => TypeRef::Error,
+            InferTy::Adt { def, fields } => {
+                let args = fields
+                    .into_iter()
+                    .map(|f| self.infer_to_ref(&f))
+                    .collect::<Vec<_>>();
+                for arg in &args {
+                    if matches!(arg, TypeRef::Error) {
+                        return TypeRef::Error;
+                    }
+                }
+                TypeRef::Concrete(TypeId::new(self.db, def, args))
+            }
+            InferTy::Param(type_param_id) => TypeRef::Param(type_param_id),
+            InferTy::Zelf => TypeRef::Zelf,
+        }
+    }
+
+    pub fn allocate_template(&mut self, arg: &AstTemplateArg) -> InferTy {
+        let var = self.fresh_var();
+
+        for constraint in &arg.constraints {
+            let resolved = resolve_type_expr_as_interface(
+                self.db,
+                &constraint,
+                self.implicit_ctx().owner_module(self.db).interned(),
+                self.templates.as_ref(),
+                false,
+            )
+            .unwrap();
+            let interface_id = resolved.def(self.db);
+            let interface_args = resolved
+                .args(self.db)
+                .iter()
+                .map(|t_ref| self.allocate_type_ref(t_ref, self.implicit_ctx().as_ref()))
+                .collect::<Box<[_]>>();
+            self.emit_implements_constraint(InferTy::Var(var), interface_id, interface_args);
+        }
+        InferTy::Var(var)
+    }
+
     fn solve_method_constraint(
         &mut self,
         ret_var: InferVar,
@@ -182,6 +286,87 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> ConstraintSolveResult {
+        // Look for already resolved implementations
+        let found = self.find(receiver);
+        // TODO: Do not clone it
+        for (interface_id, s) in self.implements.clone() {
+            if let Some(hint) = &interface_hint
+                && *hint != interface_id
+            {
+                continue;
+            }
+            for int_implem in s {
+                let implem_ty = self.find(&int_implem.ty);
+                if implem_ty == found {
+                    for item in interface_items(self.db, interface_id.interned()).iter() {
+                        if let AstInterfaceItem::Sig(sig) = item
+                            && sig.data.name == method
+                        {
+                            let ref_args = int_implem
+                                .templates
+                                .iter()
+                                .map(|a| self.infer_to_ref(a))
+                                .collect::<Vec<_>>();
+                            for arg in &ref_args {
+                                if matches!(arg, TypeRef::Error) {
+                                    todo!("Not yet done I guess")
+                                }
+                            }
+                            let interface_ref = InterfaceRef::new(self.db, interface_id, ref_args);
+
+                            let interface_templates = int_implem.templates.clone();
+
+                            let templates_for_ctx = interface_templates
+                                .into_iter()
+                                .chain(args.iter().cloned())
+                                .collect::<Arc<[_]>>();
+
+                            let ctx = ImplicitContext::new(
+                                self.db,
+                                ScopeOwnerId::Interface(interface_ref),
+                                Arc::new([]),
+                                templates_for_ctx.clone(),
+                                Some(implem_ty.clone()),
+                            )
+                            .unwrap();
+
+                            for t in templates_for_ctx.iter() {
+                                println!("template: {}", t.display(self.db))
+                            }
+                            println!("--------");
+                            for t in self.templates().iter() {
+                                println!("template: {}", t.display(self.db))
+                            }
+                            let ret_ty = self
+                                .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
+                                .unwrap();
+
+                            self.unify(InferTy::Var(ret_var), ret_ty).unwrap();
+
+                            println!(
+                                "ret_ty is {}",
+                                self.find(&InferTy::Var(ret_var)).display(self.db)
+                            );
+
+                            let ref_arguments = sig
+                                .data
+                                .args
+                                .iter()
+                                .map(|arg| self.allocate_ast_type_expr(&arg.ty.data, &ctx).unwrap())
+                                .collect::<Box<[_]>>();
+
+                            ref_arguments
+                                .into_iter()
+                                .zip_eq(args)
+                                .for_each(|(a, b)| self.unify(a, b.clone()).unwrap());
+
+                            return ConstraintSolveResult::Solved;
+                        }
+                    }
+                }
+            }
+        }
+
         let mut possible_blocks = self
             .get_potential_blocks(receiver)
             .into_iter()
@@ -211,9 +396,8 @@ impl<'db> InferenceCtx<'db> {
                 .collect();
         }
         let possible_blocks = self.get_working_impls(possible_blocks);
-
         if possible_blocks.is_empty() {
-            todo!()
+            return ConstraintSolveResult::Pending;
         } else if possible_blocks.len() > 1 {
             for possible in possible_blocks {
                 let src = possible.0;
@@ -429,7 +613,12 @@ impl<'db> InferenceCtx<'db> {
         false
     }
 
-    fn add_implementation(&mut self, id: InterfaceId, ty: InferTy, templates: &[InferTy]) {
+    pub(super) fn add_implementation(
+        &mut self,
+        id: InterfaceId,
+        ty: InferTy,
+        templates: &[InferTy],
+    ) {
         let ty = self.find(&ty);
         let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if let Entry::Vacant(e) = self.implements.entry(id) {
@@ -547,7 +736,9 @@ impl<'db> InferenceCtx<'db> {
                 ConstraintSolveResult::Error(error) => return Err((constraint, error)),
             }
             // Solving the constraints might have generated more constraints so we insert them on the worklist
-            worklist.extend_front(std::mem::take(&mut self.current_constraints));
+            std::mem::take(&mut self.current_constraints)
+                .into_iter()
+                .for_each(|elem| worklist.push_front(elem));
             len = worklist.len();
         }
         self.current_constraints.extend(worklist);
@@ -565,6 +756,10 @@ impl<'db> InferenceCtx<'db> {
             return Err(err);
         }
         Ok(())
+    }
+
+    pub fn finished_solving_constraints(&self) -> bool {
+        self.current_constraints.is_empty()
     }
 
     fn fresh_constraint(&mut self, constraint: InferenceConstraintKind) -> InferenceConstraint {

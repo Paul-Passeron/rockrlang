@@ -1,11 +1,11 @@
-use std::{collections::HashMap, iter::empty};
+use std::{collections::HashMap, iter::empty, sync::Arc};
 
 use crate::{
     common::symbols::Symbol,
     hir::{PartialTypeArg, PartialTypeRef},
-    name_resolve::type_expr::{TypeResolution, resolve_type_expr_desc, struct_item},
-    parse_tree::{top_level::AstTemplateArg, type_expr::AstTypeExprDesc},
-    ril::{BuiltinTypeId, ModuleId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
+    name_resolve::type_expr::struct_item,
+    parse_tree::type_expr::AstTypeExprDesc,
+    ril::{BuiltinTypeId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
     thir::inference::{
         InferTy, InferenceCtx,
         implicit::{AsAstImplCtx, ImplicitContext},
@@ -201,7 +201,7 @@ impl<'db> InferenceCtx<'db> {
             let ctx = ImplicitContext::new(
                 self.db,
                 ScopeOwnerId::Module(module),
-                empty(),
+                Arc::new([]),
                 templates.iter().cloned().collect(),
                 None,
             )

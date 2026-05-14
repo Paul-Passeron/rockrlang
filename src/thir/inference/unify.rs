@@ -105,7 +105,6 @@ impl<'db> InferenceCtx<'db> {
                 },
             ) => {
                 if def_a != def_b {
-                    println!("{} != {}", def_a.display(self.db), def_b.display(self.db));
                     Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
                 } else if let (len_a, len_b) = (fields_a.len(), fields_b.len())
                     && len_a != len_b

@@ -6,7 +6,7 @@ use std::{
 use crate::{
     name_resolve::implems::impls_in_package,
     ril::{ImplSource, ScopeOwnerId},
-    thir::inference::implicit::ImplicitContext,
+    thir::inference::{constraints::InferenceConstraintKind, implicit::ImplicitContext},
 };
 
 use super::*;
@@ -92,7 +92,7 @@ impl<'a> InferenceCtx<'a> {
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Impl(source.id(self.db)),
-            empty(), // TODO: check this is right
+            Arc::new([]), // TODO: check this is right
             mapped_templates.iter().cloned().collect(),
             Some(ty.clone()),
         )?;

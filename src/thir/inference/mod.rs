@@ -1,32 +1,38 @@
-mod constraints;
+pub mod constraints;
 mod display;
 pub mod expr;
 mod implems;
-mod implicit;
+pub mod implicit;
 pub mod pattern;
 mod types;
 mod unify;
-mod var;
+pub mod var;
 
 use std::{
     collections::{HashMap, HashSet},
-    iter::empty,
     sync::Arc,
 };
 
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{LocalId, PartialTypeRef},
-    name_resolve::type_expr::get_templates_of_fun,
+    hir::{LocalId, PartialTypeRef, function_ast},
+    name_resolve::{implems::resolve_type_expr_as_interface, type_expr::get_templates_of_fun},
     parse_tree::top_level::AstTemplateArg,
     ril::{
         FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
         TypeRef,
     },
-    thir::{ExprId, InferCallInfos, inference::implicit::ImplicitContext},
+    thir::{
+        ExprId, InferCallInfos,
+        inference::{
+            constraints::{InferenceConstraint, InferenceConstraintId},
+            implicit::{AsAstImplCtx, ImplicitContext},
+        },
+    },
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
+use itertools::Itertools;
 use var::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -54,6 +60,8 @@ pub struct InferenceCtx<'a> {
     local_map: HashMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
+    func: FunctionId,
+
     current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
     solved_constraints: HashSet<InferenceConstraintId>,
@@ -64,62 +72,6 @@ pub struct InferenceCtx<'a> {
     packages: Arc<[Package<'a>]>,
     call_infos: HashMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InferenceConstraintId(usize);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InferenceConstraint {
-    pub id: InferenceConstraintId,
-    pub kind: InferenceConstraintKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
-pub enum InferenceConstraintKind {
-    Deref {
-        var: InferVar,
-        target: InferTy,
-    },
-    BindsLike {
-        ty: InferVar,
-        inner: InferTy,
-        like: InferVar,
-    },
-    IndexedBy {
-        elem_var: InferVar,
-        base_ty: InferTy,
-        index_ty: InferTy,
-    },
-    Tuple {
-        elem_var: InferVar,
-        tuple_ty: InferTy,
-        has_index: u32,
-    },
-    StructField {
-        elem_var: InferVar,
-        struct_ty: InferTy,
-        field: Symbol,
-    },
-    Method {
-        ret_var: InferVar,
-        ty: InferTy,
-        id: ExprId,
-        method: Symbol,
-        args: Box<[InferTy]>,
-        interface_hint: Option<InterfaceId>,
-        is_static: bool,
-    },
-    Implements {
-        ty: InferTy,
-        id: InterfaceId,
-        args: Box<[InferTy]>,
-    },
-    Unify {
-        a: InferTy,
-        b: InferTy,
-    },
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -134,6 +86,7 @@ impl<'db> InferenceCtx<'db> {
         db: &'db dyn Db,
         locals: &[LocalId],
         func: FunctionId,
+        params: &'db [LocalId],
         packages: Arc<[Package<'db>]>,
     ) -> Self {
         let mut table = UnificationTable::new();
@@ -141,15 +94,16 @@ impl<'db> InferenceCtx<'db> {
 
         let templates = get_templates_of_fun(db, func.interned());
 
-        let infer_templates = templates
+        let infer_templates: Arc<[InferTy]> = templates
             .iter()
             .enumerate()
             .map(|(i, _)| InferTy::Param(TypeParamId(i)))
             .collect();
+
         let ctx = ImplicitContext::from_function(
             db,
             func,
-            infer_templates,
+            infer_templates.clone(),
             if let ScopeOwnerId::Module(_) = func.parent(db) {
                 None
             } else {
@@ -158,20 +112,56 @@ impl<'db> InferenceCtx<'db> {
         )
         .unwrap();
 
-        Self {
+        let mut this = Self {
             db,
             table,
             local_map,
+            func,
             current_constraints: Vec::new(),
             all_constraints: HashMap::new(),
             solved_constraints: HashSet::new(),
-            templates,
+            templates: templates.clone(),
             packages,
             call_infos: HashMap::new(),
             next_constraint_id: 0,
             implements: HashMap::new(),
             implicit_ctx: Arc::new(ctx),
+        };
+
+        let ast = function_ast(this.db, func.interned()).inner(this.db);
+        let args = ast.get_args();
+        for (local, ast) in params.iter().zip_eq(args) {
+            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).unwrap();
+            let ty = this.allocate_type_ref(&ty, &this.implicit_ctx());
+            let local_ty = this.infer_local(*local);
+            this.unify(local_ty, ty).unwrap();
         }
+
+        infer_templates
+            .iter()
+            .zip(templates.as_ref())
+            .for_each(|(infer_ty, ast)| {
+                let constraints = &ast.constraints;
+                for cons in constraints {
+                    let resolved = resolve_type_expr_as_interface(
+                        this.db,
+                        &cons,
+                        this.implicit_ctx().owner_module(this.db).interned(),
+                        templates.as_ref(),
+                        false,
+                    )
+                    .unwrap();
+                    let interface_id = resolved.def(this.db);
+                    let interface_args = resolved
+                        .args(this.db)
+                        .iter()
+                        .map(|t_ref| this.allocate_type_ref(t_ref, this.implicit_ctx().as_ref()))
+                        .collect::<Box<[_]>>();
+                    this.add_implementation(interface_id, infer_ty.clone(), &interface_args);
+                }
+            });
+
+        this
     }
 
     pub fn templates(&self) -> Arc<[InferTy]> {

@@ -1,16 +1,19 @@
-use std::{collections::HashMap, iter::empty, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     common::symbols::Symbol,
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
-        PartialTypeArg, PartialTypeRef, function_ast, owning_module,
+        PartialTypeArg, PartialTypeRef, function_ast,
     },
     name_resolve::type_expr::{
-        get_templates_of_fun, struct_item, templates_of_owner, templates_of_struct,
+        get_templates_of_fun, struct_item, templates_of_enum, templates_of_struct,
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
-    thir::{ExprId, inference::implicit::ImplicitContext},
+    thir::{
+        ExprId,
+        inference::{implicit::ImplicitContext, var::InferVar},
+    },
 };
 
 use super::{InferTy, InferenceCtx, UnificationError};
@@ -114,12 +117,72 @@ impl<'db> InferenceCtx<'db> {
         self.snapshot(|this| this._infer_expr(expr))
     }
 
+    pub fn local_var(&mut self, local_id: LocalId) -> InferVar {
+        self.local_map[&local_id]
+    }
+
     pub fn infer_local(&mut self, local_id: LocalId) -> InferTy {
-        InferTy::Var(self.local_map[&local_id])
+        InferTy::Var(self.local_var(local_id))
     }
 
     pub fn some_ptr_to(&mut self, pointee: InferTy) -> InferTy {
         InferTy::Var(self.emit_deref_constraint(pointee))
+    }
+
+    pub fn allocate_enum_partial_ref(
+        &mut self,
+        type_ref: &PartialTypeRef,
+    ) -> Option<(EnumId, Box<[InferTy]>)> {
+        match type_ref {
+            PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => match type_id.def(self.db) {
+                TypeDefId::Enum(enum_id) => {
+                    let templates = templates_of_enum(self.db, enum_id.interned());
+                    let templates = templates
+                        .iter()
+                        .map(|_| InferTy::Var(self.fresh_var()))
+                        .collect::<Box<[_]>>();
+                    let args = type_id.args(self.db);
+                    self.snapshot(|this| {
+                        templates
+                            .iter()
+                            .zip(args.iter())
+                            .try_for_each(|(infer_ty, t_ref)| {
+                                let t_ref =
+                                    this.allocate_type_ref(t_ref, this.implicit_ctx().as_ref());
+                                this.unify(infer_ty.clone(), t_ref)
+                            })
+                    })
+                    .ok()?;
+                    Some((enum_id, templates))
+                }
+                _ => None,
+            },
+            PartialTypeRef::WithHoles {
+                def: TypeDefId::Enum(enum_id),
+                args,
+            } => {
+                let enum_id = *enum_id;
+                let templates = templates_of_enum(self.db, enum_id.interned());
+                let templates = templates
+                    .iter()
+                    .map(|_| InferTy::Var(self.fresh_var()))
+                    .collect::<Box<[_]>>();
+
+                self.snapshot(|this| {
+                    args.iter()
+                        .map(|arg| {
+                            this.allocate_partial_type_arg(arg, this.implicit_ctx().as_ref())
+                        })
+                        .collect::<Box<[_]>>()
+                        .into_iter()
+                        .zip(templates.iter())
+                        .try_for_each(|(t_ref, infer_ty)| this.unify(infer_ty.clone(), t_ref))
+                })
+                .ok()?;
+                Some((enum_id, templates))
+            }
+            _ => None,
+        }
     }
 
     fn allocate_struct_partial_ref(
@@ -208,7 +271,7 @@ impl<'db> InferenceCtx<'db> {
             let ctx = ImplicitContext::new(
                 self.db,
                 ScopeOwnerId::Module(module),
-                empty(),
+                Arc::new([]),
                 templates.iter().cloned().collect(),
                 Some(InferTy::Var(zelf)),
             )

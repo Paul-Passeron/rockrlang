@@ -105,6 +105,19 @@ impl fmt::Display for Display<'_, TypeId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let def = self.value.def(self.db);
         let args = self.value.args(self.db);
+
+        if def == TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)) {
+            write!(f, "(")?;
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", arg.display(self.db))?;
+            }
+            write!(f, ")")?;
+            return Ok(());
+        }
+
         write!(f, "{}", def.display(self.db))?;
         if !args.is_empty() {
             write!(f, "<")?;

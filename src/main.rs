@@ -1,5 +1,3 @@
-#![feature(formatting_options, deque_extend_front)]
-
 use clap::Parser;
 use clap_derive::Parser;
 use std::{
@@ -10,14 +8,14 @@ use std::{
 use crate::{
     common::location::get_loc_info,
     driver::load_package,
-    hir::{FunctionLikeAst, function_ast, hir_body},
+    hir::{function_ast, hir_body, FunctionLikeAst},
     name_resolve::{
         core_package,
-        definition::{Definition, module_definitions},
+        definition::{module_definitions, Definition},
         file_module_id, std_package,
     },
-    parser::{ParseError, parse_file},
-    ril::{FileModule, ModuleId, Package, display::RilDisplay},
+    parser::{parse_file, ParseError},
+    ril::{display::RilDisplay, FileModule, ModuleId, Package},
     thir::type_check_function,
 };
 

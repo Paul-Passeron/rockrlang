@@ -32,7 +32,7 @@ impl AstImplicitContext {
     pub fn new(
         db: &dyn Db,
         owner: ScopeOwnerId,
-        other_templates: impl IntoIterator<Item = AstTemplateArg>,
+        other_templates: Arc<[AstTemplateArg]>,
     ) -> Option<Self> {
         let template_asts = templates_of_owner(db, owner);
 
@@ -47,8 +47,8 @@ impl AstImplicitContext {
             owner,
             template_asts: template_asts
                 .iter()
+                .chain(other_templates.iter())
                 .cloned()
-                .chain(other_templates)
                 .collect(),
         })
     }
@@ -58,7 +58,7 @@ impl AstImplicitContext {
         templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
     ) -> Option<ImplicitContext> {
-        if self.template_asts.len() != templates.len() {
+        if &self.template_asts.len() != &templates.len() {
             dbg!("Bad template length");
             return None;
         }
@@ -80,15 +80,14 @@ pub struct ImplicitContext {
 }
 
 impl ImplicitContext {
-    pub fn new(
+    pub fn new<'a>(
         db: &dyn Db,
         owner: ScopeOwnerId,
-        other_templates: impl IntoIterator<Item = AstTemplateArg>,
+        other_templates: Arc<[AstTemplateArg]>,
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
     ) -> Option<Self> {
         let ast_impl = AstImplicitContext::new(db, owner, other_templates)?;
-        println!("Generated ast implicit context");
         ast_impl.into_implicit(infer_templates, zelf)
     }
 
@@ -103,7 +102,8 @@ impl ImplicitContext {
         let other_templates = full_templates
             .into_iter()
             .skip(templates_of_owner(db, owner).len())
-            .cloned();
+            .cloned()
+            .collect();
         Self::new(db, owner, other_templates, infer_templates, zelf)
     }
 }
@@ -272,8 +272,12 @@ impl ImplicitContext {
         }
     }
 
-    pub fn owner(&self, db: &dyn Db) -> ModuleId {
+    pub fn owner_module(&self, db: &dyn Db) -> ModuleId {
         owning_module(db, self.owner)
+    }
+
+    pub fn get_owner(&self) -> ScopeOwnerId {
+        self.owner
     }
 }
 
