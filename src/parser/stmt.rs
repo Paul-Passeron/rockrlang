@@ -1,6 +1,6 @@
 use crate::{
     lexer::TokenKind,
-    parse_tree::stmt::{AstStmt, AstStmtDesc, CompoundAssignOp},
+    parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
     parser::{ParseError, Parser},
 };
 
@@ -179,6 +179,50 @@ impl<'db> Parser<'db> {
         Some(AstStmt::new(desc, vec![], start.span(&end)))
     }
 
+    fn parse_match_stmt(&mut self) -> Result<AstStmt, ParseError> {
+        let start = self.get_start();
+        self.expect(TokenKind::Match)?;
+        self.consume();
+        let scrutinee = self.parse_expr()?;
+        self.expect(TokenKind::OpenBra)?;
+        self.consume();
+        let mut branches = Vec::new();
+        while self
+            .peek_n(0)
+            .map_or(false, |t| !matches!(t.kind, TokenKind::CloseBra))
+        {
+            let pat = self.parse_pattern()?;
+            let guard = if self
+                .peek_n(0)
+                .map_or(false, |t| matches!(t.kind, TokenKind::If))
+            {
+                self.consume();
+                Some(self.parse_expr()?)
+            } else {
+                None
+            };
+            self.expect(TokenKind::BigArrow)?;
+            self.consume();
+            let body = self.parse_block_as_stmt()?;
+            branches.push(AstMatchBranch {
+                pat,
+                guard,
+                body: Box::new(body),
+            });
+        }
+        self.expect(TokenKind::CloseBra)?;
+        self.consume();
+
+        Ok(AstStmt::new(
+            AstStmtDesc::Match {
+                scrutinee,
+                branches,
+            },
+            vec![],
+            start.span(&self.get_end()),
+        ))
+    }
+
     fn parse_if_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::If)?;
@@ -213,6 +257,7 @@ impl<'db> Parser<'db> {
             TokenKind::If => self.parse_if_stmt(),
             TokenKind::For => self.parse_for_stmt(),
             TokenKind::While => self.parse_while_stmt(),
+            TokenKind::Match => self.parse_match_stmt(),
 
             _ => {
                 if let Some(assignement) = self.try_parse_assign() {

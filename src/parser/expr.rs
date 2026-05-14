@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        location::{self},
+        location::{self, Span},
         symbols::Symbol,
     },
     lexer::TokenKind,
@@ -253,11 +253,109 @@ impl<'db> Parser<'db> {
                     );
                 }
 
+                Some(TokenKind::Lt) => {
+                    // Try to parse as `expr<T>::method(...)` or `expr<T>::Variant`.
+                    // This handles qualified paths like `a::b::c<T>::Variant { ... }`
+                    // where `a::b::c` has already been built up as a NameResolved expr.
+                    let start = expr.span.start();
+                    if let Some(static_call) = self.try_parse_static_call(&expr, start.clone()) {
+                        expr = static_call;
+                    } else if let Some(qualified_cons) =
+                        self.try_parse_qualified_cons(&expr, start.clone())
+                    {
+                        expr = qualified_cons;
+                    } else {
+                        // Not a static call or qualified cons — `<` is a comparison operator.
+                        break;
+                    }
+                }
+
+                Some(TokenKind::OpenBra) => {
+                    // Only parse as struct literal if the expression can be
+                    // reinterpreted as a type (e.g. a name or qualified path)
+                    // AND the brace content starts with '.' (struct field syntax).
+                    // This avoids conflicts with `match expr { ... }` and other
+                    // brace-delimited constructs.
+                    let is_type_like = matches!(
+                        &expr.data,
+                        AstExprDesc::Name(_)
+                            | AstExprDesc::NameResolved { .. }
+                            | AstExprDesc::QualifiedPath { .. }
+                    );
+                    let has_field_syntax = self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Dot);
+
+                    if is_type_like && has_field_syntax {
+                        self.consume();
+                        let fields = self.parse_struct_fields()?;
+                        self.expect(TokenKind::CloseBra)?;
+                        self.consume();
+
+                        let end = self.get_end();
+                        let span = expr.span.start().span(&end);
+
+                        let (ty, variant) = match expr.data.clone() {
+                            AstExprDesc::QualifiedPath { ty, name } => (ty, Some(name)),
+
+                            AstExprDesc::NameResolved { from, ref to }
+                                if matches!(to.data, AstExprDesc::Name(_)) =>
+                            {
+                                let AstExprDesc::Name(variant_name) = to.data else {
+                                    unreachable!()
+                                };
+                                let base_expr = AstExpr::new(
+                                    AstExprDesc::Name(from),
+                                    vec![],
+                                    expr.span.clone(),
+                                );
+                                (self.reinterpret_expr_as_ty(base_expr)?, Some(variant_name))
+                            }
+
+                            _ => (self.reinterpret_expr_as_ty(expr)?, None),
+                        };
+
+                        expr = AstExpr::new(
+                            AstExprDesc::StructLit {
+                                ty,
+                                variant,
+                                fields,
+                            },
+                            vec![],
+                            span,
+                        );
+                    } else {
+                        break;
+                    }
+                }
                 _ => break,
             }
         }
 
         Ok(expr)
+    }
+
+    fn reinterpret_expr_as_ty(&mut self, e: AstExpr) -> Result<AstTypeExpr, ParseError> {
+        let Spanned {
+            data,
+            annotations,
+            span,
+        } = e;
+
+        let data = match data {
+            AstExprDesc::Name(symbol) => AstTypeExprDesc::Named {
+                name: symbol,
+                args: vec![],
+            },
+            AstExprDesc::NameResolved { from, to } => {
+                let to = self.reinterpret_expr_as_ty(*to)?;
+                AstTypeExprDesc::NameResolved {
+                    from,
+                    to: Box::new(to),
+                }
+            }
+            _ => unreachable!(),
+        };
+
+        Ok(Spanned::new(data, annotations, span))
     }
 
     pub(super) fn parse_int_lit(&mut self) -> Result<Spanned<usize>, ParseError> {
@@ -385,23 +483,6 @@ impl<'db> Parser<'db> {
                         ))
                     }
 
-                    Some(TokenKind::Lt) => {
-                        if let Some(static_call) = self.try_parse_static_call(name, start.clone()) {
-                            Ok(static_call)
-                        } else if let Some(qualified_cons) =
-                            self.try_parse_qualified_cons(name, start.clone())
-                        {
-                            Ok(qualified_cons)
-                        } else {
-                            let end = self.get_end();
-                            Ok(Spanned::new(
-                                AstExprDesc::Name(name),
-                                vec![],
-                                start.span(&end),
-                            ))
-                        }
-                    }
-
                     Some(TokenKind::OpenBra) => {
                         if self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Dot) {
                             self.consume();
@@ -416,7 +497,11 @@ impl<'db> Parser<'db> {
                                 ty_span,
                             );
                             Ok(Spanned::new(
-                                AstExprDesc::StructLit { ty, fields },
+                                AstExprDesc::StructLit {
+                                    ty,
+                                    variant: None,
+                                    fields,
+                                },
                                 vec![],
                                 start.span(&end),
                             ))
@@ -430,6 +515,12 @@ impl<'db> Parser<'db> {
                         }
                     }
 
+                    // `<` is not handled here — just return the Name and let
+                    // parse_postfix handle it for static calls / qualified paths.
+                    // This way `a::b::c<T>::Variant` works correctly: `a::b::c`
+                    // is built up as NameResolved through the Access arm, then
+                    // postfix sees `<` and tries static_call / qualified_cons
+                    // with the full expression (not just the last identifier).
                     _ => {
                         let end = self.get_end();
                         Ok(Spanned::new(
@@ -448,10 +539,12 @@ impl<'db> Parser<'db> {
 
     fn parse_static_call(
         &mut self,
-        type_name: Symbol,
+        lhs: AstExpr,
         start: location::Location,
     ) -> Result<AstExpr, ParseError> {
-        self.consume();
+        let lhs_ty = self.reinterpret_expr_as_ty(lhs)?;
+
+        self.consume(); // consume `<`
 
         let mut type_args: Vec<AstAnyTypeExpr> = vec![];
 
@@ -468,7 +561,6 @@ impl<'db> Parser<'db> {
                 break;
             }
         }
-        // todo!();
 
         self.expect(TokenKind::Gt)?;
         self.consume();
@@ -477,14 +569,7 @@ impl<'db> Parser<'db> {
         self.consume();
 
         let ty_span = start.span(&self.get_end());
-        let ty: AstTypeExpr = Spanned::new(
-            AstTypeExprDesc::Named {
-                name: type_name,
-                args: type_args,
-            },
-            vec![],
-            ty_span,
-        );
+        let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
 
         let method_sym = self.parse_symbol()?;
 
@@ -508,11 +593,11 @@ impl<'db> Parser<'db> {
 
     fn try_parse_static_call(
         &mut self,
-        type_name: Symbol,
+        lhs: &AstExpr,
         start: location::Location,
     ) -> Option<AstExpr> {
         let saved = self.position;
-        if let Ok(res) = self.parse_static_call(type_name, start) {
+        if let Ok(res) = self.parse_static_call(lhs.clone(), start) {
             return Some(res);
         }
         self.position = saved;
@@ -521,10 +606,12 @@ impl<'db> Parser<'db> {
 
     fn parse_qualified_cons(
         &mut self,
-        type_name: Symbol,
+        lhs: AstExpr,
         start: location::Location,
     ) -> Result<AstExpr, ParseError> {
-        self.consume();
+        let lhs_ty = self.reinterpret_expr_as_ty(lhs)?;
+
+        self.consume(); // consume `<`
 
         let mut type_args: Vec<AstAnyTypeExpr> = vec![];
 
@@ -547,40 +634,95 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::Access)?;
         self.consume();
 
-        let ty_span = start.span(&self.get_end());
-        let ty: AstTypeExpr = Spanned::new(
-            AstTypeExprDesc::Named {
-                name: type_name,
-                args: type_args,
-            },
-            vec![],
-            ty_span,
-        );
-
+        // Parse variant name first — it's part of the qualified path,
+        // not part of a struct literal. This gives us:
+        //   (Type<Args>::Variant) { .fields }
+        // instead of:
+        //   Type<Args>::(Variant { .fields })
         let variant_sym = self.parse_symbol()?;
 
-        let end = self.get_end();
-        Ok(Spanned::new(
-            AstExprDesc::QualifiedPath {
-                ty,
-                name: variant_sym.data,
-            },
-            vec![],
-            start.span(&end),
-        ))
+        let ty_span = start.span(&self.get_end());
+        let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
+
+        if self
+            .peek_n(0)
+            .map_or(false, |t| matches!(t.kind, TokenKind::OpenBra))
+        {
+            self.consume();
+            let fields = self.parse_struct_fields()?;
+            self.expect(TokenKind::CloseBra)?;
+            self.consume();
+            let end = self.get_end();
+            Ok(Spanned::new(
+                AstExprDesc::StructLit {
+                    ty,
+                    variant: Some(variant_sym.data),
+                    fields,
+                },
+                vec![],
+                start.span(&end),
+            ))
+        } else if self
+            .peek_n(0)
+            .map_or(false, |t| matches!(t.kind, TokenKind::OpenPar))
+        {
+            self.consume();
+            let args = self.parse_expr_args()?;
+            self.expect(TokenKind::ClosePar)?;
+            self.consume();
+            let end = self.get_end();
+            Ok(Spanned::new(
+                AstExprDesc::StaticCall {
+                    ty,
+                    method: variant_sym.data,
+                    args,
+                },
+                vec![],
+                start.span(&end),
+            ))
+        } else {
+            let end = self.get_end();
+            Ok(Spanned::new(
+                AstExprDesc::QualifiedPath {
+                    ty,
+                    name: variant_sym.data,
+                },
+                vec![],
+                start.span(&end),
+            ))
+        }
     }
 
     fn try_parse_qualified_cons(
         &mut self,
-        type_name: Symbol,
+        lhs: &AstExpr,
         start: location::Location,
     ) -> Option<AstExpr> {
         let saved = self.position;
-        if let Ok(expr) = self.parse_qualified_cons(type_name, start) {
+        if let Ok(expr) = self.parse_qualified_cons(lhs.clone(), start) {
             return Some(expr);
         }
         self.position = saved;
         None
+    }
+
+    /// Given a base type expression and newly parsed type args, produce the
+    /// final type expression. For a `Named` type this fills in the args; for
+    /// other shapes it errors.
+    fn apply_type_args(
+        &self,
+        base: AstTypeExpr,
+        args: Vec<AstAnyTypeExpr>,
+        span: Span,
+    ) -> Result<AstTypeExpr, ParseError> {
+        match base.data {
+            AstTypeExprDesc::Named { name, args: _ } => Ok(Spanned::new(
+                AstTypeExprDesc::Named { name, args },
+                vec![],
+                span,
+            )),
+            _ => Err(self.parse_error(ParseErrorKind::ExpectedSymbol("type name".to_string()))),
+        }
     }
 
     fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {
@@ -592,7 +734,7 @@ impl<'db> Parser<'db> {
                     self.consume(); // consume '.'
                     let name = self.parse_symbol()?;
                     self.expect(TokenKind::Colon)?;
-                    self.consume(); // consume '='
+                    self.consume(); // consume ':'
                     let value = self.parse_expr()?;
                     fields.push(AstStructField {
                         name: name.data,

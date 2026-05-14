@@ -133,6 +133,7 @@ impl<'db> Parser<'db> {
 
     fn parse_error(&self, kind: ParseErrorKind) -> ParseError {
         let s = self.last_span();
+        // panic!("{}:{} {kind:?}", s.file.display(), s.start);
         ParseError {
             kind,
             file: s.file,

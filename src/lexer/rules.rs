@@ -95,6 +95,7 @@ pub fn get_token_rules<'db>() -> Vec<(
                         "mod" => TokenKind::Module,
                         "impl" => TokenKind::Impl,
                         "if" => TokenKind::If,
+                        "match" => TokenKind::Match,
                         "else" => TokenKind::Else,
                         "type" => TokenKind::Type,
                         "while" => TokenKind::While,

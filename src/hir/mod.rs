@@ -14,8 +14,8 @@ use crate::{
         type_expr::AstAnyTypeExpr,
     },
     ril::{
-        FunctionId, InterfaceId, InternedFunctionId, InternedImplId, ScopeOwnerId, TypeDefId,
-        TypeRef,
+        EnumId, FunctionId, InterfaceId, InternedFunctionId, InternedImplId, ScopeOwnerId,
+        StructId, TypeDefId, TypeRef,
     },
 };
 
@@ -57,9 +57,14 @@ pub enum HirPatternDesc {
     },
     Any,
     Tuple(Vec<HirPattern>),
+    DestructureBinding {
+        resolution: StructId,
+        fields: Vec<(Symbol, Option<HirPattern>)>,
+    },
     Constructor {
-        resolution: Option<TypeDefId>,
-        fields: Vec<HirPattern>,
+        resolution: EnumId,
+        name: Symbol,
+        fields: HirPatternConstructorArgs,
     },
 }
 
@@ -157,8 +162,10 @@ pub enum HirExprDesc {
     SliceLit(Vec<HirExpr>),
     SizeOf(PartialTypeRef),
     Constructor {
-        ty: PartialTypeRef,
+        enum_def: EnumId,
         name: Symbol,
+        args: HirConstructorArgs,
+        template_hints: Vec<PartialTypeArg>,
     },
 }
 
@@ -186,6 +193,14 @@ pub struct HirStmt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HirMatchBranch {
+    pub pattern: HirPattern,
+    pub locals: Vec<LocalId>,
+    pub guard: Option<HirExpr>,
+    pub body: Box<HirStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirStmtKind {
     Let {
         pattern: HirPattern,
@@ -193,7 +208,10 @@ pub enum HirStmtKind {
         ty_annotation: Option<AstAnyTypeExpr>,
         init: HirExpr,
     },
-
+    Match {
+        scrutinee: HirExpr,
+        branches: Vec<HirMatchBranch>,
+    },
     Assign {
         lhs: HirPlace,
         rhs: HirExpr,
@@ -227,6 +245,26 @@ pub struct HirBody {
     pub params: Vec<LocalId>,
     pub locals: Vec<LocalInfo>,
     pub stmts: Vec<HirStmt>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HirConstructorArgs {
+    TupleLike(Vec<HirExpr>),
+    StructLike { fields: Vec<(Symbol, HirExpr)> },
+    None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HirPatternConstructorArgs {
+    None,
+    StructFields(Vec<HirStructFieldPattern>),
+    TupleFields(Vec<HirPattern>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum HirStructFieldPattern {
+    Rebind { name: Symbol, pattern: HirPattern },
+    Name { id: LocalId, name: Symbol },
 }
 
 impl HirBody {

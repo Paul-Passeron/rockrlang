@@ -4,8 +4,9 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::{
-        HirBody, HirExpr, HirExprDesc, HirIdAlloc, HirPattern, HirPatternDesc, HirPlace, HirStmt,
-        HirStmtKind, LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef,
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc, HirMatchBranch, HirPattern,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind,
+        HirStructFieldPattern, LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef,
     },
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -13,14 +14,17 @@ use crate::{
         type_expr::{templates_of_enum, templates_of_struct},
     },
     parse_tree::{
-        expr::{AstExpr, AstExprDesc},
-        pattern::{AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc},
-        stmt::{AstStmt, AstStmtDesc},
+        expr::{AstExpr, AstExprDesc, AstStructField},
+        pattern::{
+            AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc, StructFieldPattern,
+        },
+        stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
         top_level::{AstFundef, AstFundefArg, AstTemplateArg},
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        display::RilDisplay,
     },
 };
 
@@ -360,12 +364,54 @@ impl<'db> LowerFundef<'db> {
                             }
                             AstExprDesc::Name(name) => {
                                 let ty = self.instantiate_holed(type_def_id);
-                                HirExprDesc::Constructor { ty, name: *name }
+                                todo!()
+                                // HirExprDesc::Constructor { ty, name: *name }
                             }
-                            _ => todo!(
-                                "NameResolved to type but not a call: {}",
-                                from.interned().contents(self.db)
-                            ),
+                            AstExprDesc::StructLit {
+                                ty,
+                                variant,
+                                fields,
+                            } => match type_def_id {
+                                TypeDefId::Builtin(_builtin_type_id) => todo!(),
+                                TypeDefId::Struct(_struct_id) => todo!(),
+                                TypeDefId::Enum(enum_def) => {
+                                    let variant_name = if let Some(v) = variant {
+                                        *v
+                                    } else {
+                                        match &ty.data {
+                                            AstTypeExprDesc::Named { name, args }
+                                                if args.is_empty() =>
+                                            {
+                                                *name
+                                            }
+                                            _ => unreachable!(
+                                                "NameResolved+StructLit with no variant and complex ty"
+                                            ),
+                                        }
+                                    };
+                                    let mut lowered_fields = vec![];
+                                    for AstStructField { name, value } in fields {
+                                        let expr = self.lower_expr(value, scope, self.module);
+                                        lowered_fields.push((*name, expr));
+                                    }
+                                    let args = HirConstructorArgs::StructLike {
+                                        fields: lowered_fields,
+                                    };
+                                    let mut template_hints = vec![];
+                                    for _ in
+                                        0..templates_of_enum(self.db, enum_def.interned()).len()
+                                    {
+                                        template_hints.push(PartialTypeArg::Infer);
+                                    }
+                                    HirExprDesc::Constructor {
+                                        enum_def,
+                                        name: variant_name,
+                                        args,
+                                        template_hints,
+                                    }
+                                }
+                            },
+                            _ => todo!(),
                         },
                         _ => todo!(
                             "error: badly name-resolved item ({})",
@@ -494,18 +540,70 @@ impl<'db> LowerFundef<'db> {
                     interface_hint: None,
                 },
 
-                AstExprDesc::StructLit { ty, fields } => HirExprDesc::StructLit {
-                    ty: self.resolve_holed(ty),
-                    fields: fields
-                        .iter()
-                        .map(|field| {
-                            (
-                                field.name,
-                                self.lower_expr(&field.value, scope, self.module),
-                            )
-                        })
-                        .collect(),
-                },
+                AstExprDesc::StructLit {
+                    ty,
+                    variant,
+                    fields,
+                } => {
+                    if let Some(variant_name) = variant {
+                        let partial_ty = self.resolve_holed(ty);
+                        let enum_def = match &partial_ty {
+                            PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => {
+                                match type_id.def(self.db) {
+                                    TypeDefId::Enum(e) => e,
+                                    _ => panic!("StructLit with variant on non-enum type"),
+                                }
+                            }
+                            PartialTypeRef::WithHoles { def, .. } => match def {
+                                TypeDefId::Enum(e) => *e,
+                                _ => panic!("StructLit with variant on non-enum type"),
+                            },
+                            _ => panic!("StructLit with variant: could not resolve enum type"),
+                        };
+                        let template_hints = match &partial_ty {
+                            PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => type_id
+                                .args(self.db)
+                                .iter()
+                                .map(|a| PartialTypeArg::Known(*a))
+                                .collect(),
+                            PartialTypeRef::WithHoles { args, .. } => args.clone(),
+                            _ => {
+                                let n = templates_of_enum(self.db, enum_def.interned()).len();
+                                iter::repeat_n(PartialTypeArg::Infer, n).collect()
+                            }
+                        };
+                        let lowered_fields: Vec<(Symbol, HirExpr)> = fields
+                            .iter()
+                            .map(|field| {
+                                (
+                                    field.name,
+                                    self.lower_expr(&field.value, scope, self.module),
+                                )
+                            })
+                            .collect();
+                        HirExprDesc::Constructor {
+                            enum_def,
+                            name: *variant_name,
+                            args: HirConstructorArgs::StructLike {
+                                fields: lowered_fields,
+                            },
+                            template_hints,
+                        }
+                    } else {
+                        HirExprDesc::StructLit {
+                            ty: self.resolve_holed(ty),
+                            fields: fields
+                                .iter()
+                                .map(|field| {
+                                    (
+                                        field.name,
+                                        self.lower_expr(&field.value, scope, self.module),
+                                    )
+                                })
+                                .collect(),
+                        }
+                    }
+                }
                 AstExprDesc::Tuple(exprs) => HirExprDesc::Tuple(
                     exprs
                         .iter()
@@ -520,14 +618,51 @@ impl<'db> LowerFundef<'db> {
                 ),
                 AstExprDesc::SizeOf(ty) => HirExprDesc::SizeOf(self.resolve_holed(ty)),
                 AstExprDesc::QualifiedPath { ty, name } => {
-                    // This is a constructor. Might be an associated type as well but we'll see later
-                    let ty = self.resolve_holed(ty);
-                    HirExprDesc::Constructor { ty, name: *name }
+                    let partial_ty = self.resolve_holed(ty);
+                    let enum_def = match &partial_ty {
+                        PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => {
+                            match type_id.def(self.db) {
+                                TypeDefId::Enum(e) => e,
+                                _ => panic!("QualifiedPath on non-enum type"),
+                            }
+                        }
+                        PartialTypeRef::WithHoles { def, .. } => match def {
+                            TypeDefId::Enum(e) => *e,
+                            _ => panic!("QualifiedPath on non-enum type"),
+                        },
+                        _ => panic!("QualifiedPath: could not resolve enum type"),
+                    };
+                    let template_hints = match &partial_ty {
+                        PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => type_id
+                            .args(self.db)
+                            .iter()
+                            .map(|a| PartialTypeArg::Known(*a))
+                            .collect(),
+                        PartialTypeRef::WithHoles { args, .. } => args.clone(),
+                        _ => {
+                            let n = templates_of_enum(self.db, enum_def.interned()).len();
+                            iter::repeat_n(PartialTypeArg::Infer, n).collect()
+                        }
+                    };
+                    HirExprDesc::Constructor {
+                        enum_def,
+                        name: *name,
+                        args: HirConstructorArgs::None,
+                        template_hints,
+                    }
                 }
                 _ => HirExprDesc::Use(self.expr_as_place(expr, scope, module)),
             },
             span: expr.span.clone(),
         }
+    }
+
+    fn lower_expr_as_constructor_args(
+        &mut self,
+        expr: &AstExpr,
+        scope: &Scope,
+    ) -> Vec<(Symbol, HirConstructorArgs)> {
+        todo!()
     }
 
     fn lower_pattern(&mut self, pat: &AstPattern, scope: &mut Scope) -> (HirPattern, Vec<LocalId>) {
@@ -564,29 +699,30 @@ impl<'db> LowerFundef<'db> {
                             resolve_in_module(this.db, name.interned(), module.interned());
                         match (resolution, args) {
                             (
-                                Some(Definition::Type(type_def_id)),
+                                Some(Definition::Type(TypeDefId::Enum(enum_id))),
                                 AstConstructFields::TupleFields(fields),
                             ) => {
-                                let hir_fields = fields
+                                let hir_fields: Vec<_> = fields
                                     .iter()
                                     .map(|f| _lower(this, f, scope, locals, module))
                                     .collect();
                                 HirPattern {
                                     id: this.alloc.next(),
                                     data: HirPatternDesc::Constructor {
-                                        resolution: Some(type_def_id),
-                                        fields: hir_fields,
+                                        resolution: enum_id,
+                                        name: todo!(),
+                                        fields: todo!(),
                                     },
                                     span: pat.span.clone(),
                                 }
                             }
-                            // Known type with no fields → constructor that binds the whole value
                             (Some(Definition::Type(type_def_id)), AstConstructFields::None) => {
                                 HirPattern {
                                     id: this.alloc.next(),
                                     data: HirPatternDesc::Constructor {
-                                        resolution: Some(type_def_id),
-                                        fields: vec![],
+                                        name: todo!(),
+                                        fields: todo!(),
+                                        resolution: todo!(),
                                     },
                                     span: pat.span.clone(),
                                 }
@@ -634,6 +770,24 @@ impl<'db> LowerFundef<'db> {
                                 );
                                 _lower(this, &inner_pat, scope, locals, id)
                             }
+                            Some(Definition::Type(TypeDefId::Enum(resolution))) => {
+                                let (name, fields) = this.lower_pattern_as_constructor_args(
+                                    to.as_ref(),
+                                    pat.span.clone(),
+                                    scope,
+                                    locals,
+                                );
+
+                                HirPattern {
+                                    id: this.alloc.next(),
+                                    data: HirPatternDesc::Constructor {
+                                        resolution,
+                                        name,
+                                        fields,
+                                    },
+                                    span: pat.span.clone(),
+                                }
+                            }
                             Some(_) => todo!(
                                 "error: `{}` in pattern is not a module",
                                 from.interned().contents(this.db)
@@ -667,10 +821,6 @@ impl<'db> LowerFundef<'db> {
         let pat = _lower(self, pat, scope, &mut v, self.module);
         (pat, v)
     }
-
-    // -----------------------------------------------------------------------
-    // Statement lowering
-    // -----------------------------------------------------------------------
 
     fn lower_stmt(&mut self, stmt: &AstStmt, scope: &mut Scope) -> HirStmt {
         HirStmt {
@@ -943,6 +1093,35 @@ impl<'db> LowerFundef<'db> {
                     let expr = self.lower_expr(expr, scope, self.module);
                     HirStmtKind::Expr(expr)
                 }
+                AstStmtDesc::Match {
+                    scrutinee,
+                    branches,
+                } => {
+                    let scrutinee = self.lower_expr(scrutinee, scope, self.module);
+
+                    let branches = branches
+                        .iter()
+                        .map(|AstMatchBranch { pat, guard, body }| {
+                            let mut branch_scope = scope.clone();
+                            let (pattern, locals) = self.lower_pattern(pat, &mut branch_scope);
+                            println!("Locals: {:?}", locals);
+                            let guard = guard
+                                .as_ref()
+                                .map(|expr| self.lower_expr(expr, &branch_scope, self.module));
+                            let body = self.lower_stmt(body, &mut branch_scope);
+                            HirMatchBranch {
+                                pattern,
+                                locals,
+                                guard,
+                                body: Box::new(body),
+                            }
+                        })
+                        .collect();
+                    HirStmtKind::Match {
+                        scrutinee,
+                        branches,
+                    }
+                }
             },
             span: stmt.span.clone(),
         }
@@ -977,6 +1156,68 @@ impl<'db> LowerFundef<'db> {
             self.locals.drain().map(|(_, x)| x).collect::<Vec<_>>(),
             stmts,
         )
+    }
+
+    fn lower_pattern_as_constructor_args(
+        &mut self,
+        pat: &AstNamedPattern,
+        span: Span,
+        scope: &mut Scope,
+        locals: &mut Vec<LocalId>,
+    ) -> (Symbol, HirPatternConstructorArgs) {
+        match pat {
+            AstNamedPattern::Constructor { name, args } => {
+                let args = match args {
+                    AstConstructFields::TupleFields(pats) => {
+                        let mut lowered_pats = vec![];
+                        for pat in pats {
+                            let (pat, new_locals) = self.lower_pattern(pat, scope);
+                            lowered_pats.push(pat);
+                            locals.extend(new_locals);
+                        }
+                        HirPatternConstructorArgs::TupleFields(lowered_pats)
+                    }
+                    AstConstructFields::StructFields(pats) => {
+                        let mut lowered_pats = vec![];
+                        for pat in pats {
+                            let pat = match pat {
+                                StructFieldPattern::Rebind { name, pattern } => {
+                                    let (pat, new_locals) = self.lower_pattern(pattern, scope);
+                                    locals.extend(new_locals);
+                                    HirStructFieldPattern::Rebind {
+                                        name: *name,
+                                        pattern: pat,
+                                    }
+                                }
+                                StructFieldPattern::Name(symbol) => {
+                                    let new_local = self.allocate_local(
+                                        scope,
+                                        *symbol,
+                                        Mutability::Immutable,
+                                        None,
+                                        span.clone(),
+                                    );
+                                    locals.push(new_local);
+                                    HirStructFieldPattern::Name {
+                                        name: *symbol,
+                                        id: new_local,
+                                    }
+                                }
+                            };
+                            lowered_pats.push(pat);
+                        }
+                        HirPatternConstructorArgs::StructFields(lowered_pats)
+                    }
+                    AstConstructFields::None => HirPatternConstructorArgs::None,
+                };
+                (*name, args)
+            }
+            AstNamedPattern::NameResolved { .. } => todo!(),
+            AstNamedPattern::Tuple { .. } => {
+                unreachable!()
+            }
+            AstNamedPattern::Mut { .. } => unreachable!(),
+        }
     }
 }
 

@@ -29,6 +29,13 @@ impl CompoundAssignOp {
 pub type AstStmt = Spanned<AstStmtDesc>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AstMatchBranch {
+    pub pat: AstPattern,
+    pub guard: Option<AstExpr>,
+    pub body: Box<AstStmt>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstStmtDesc {
     Return {
         value: Option<AstExpr>,
@@ -63,6 +70,10 @@ pub enum AstStmtDesc {
         lhs: AstExpr,
         op: CompoundAssignOp,
         rhs: AstExpr,
+    },
+    Match {
+        scrutinee: AstExpr,
+        branches: Vec<AstMatchBranch>,
     },
     Expr(AstExpr),
 }

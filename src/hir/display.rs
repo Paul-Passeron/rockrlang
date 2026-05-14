@@ -4,8 +4,9 @@ use crate::{
     Db,
     common::symbols::{StrLit, Symbol},
     hir::{
-        HirBody, HirExpr, HirExprDesc, HirPattern, HirPatternDesc, HirPlace, HirStmt, HirStmtKind,
-        Mutability, PartialTypeArg, PartialTypeRef,
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern, HirPatternConstructorArgs,
+        HirPatternDesc, HirPlace, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
+        PartialTypeArg, PartialTypeRef,
     },
     parse_tree::expr::BinaryOperator,
     ril::display::{Display, RilDisplay},
@@ -114,7 +115,7 @@ fn write_stmt(
             init,
         } => {
             write!(f, "let ")?;
-            write_pattern(f, pattern, db)?;
+            write_pattern(f, pattern, db, depth)?;
             if ty_annotation.is_some() {
                 write!(f, ": <type>")?;
             }
@@ -169,10 +170,35 @@ fn write_stmt(
             write_indent(f, depth)?;
             writeln!(f, "}}")
         }
+        HirStmtKind::Match {
+            scrutinee,
+            branches,
+        } => {
+            write!(f, "match ")?;
+            write_expr(f, scrutinee, db)?;
+            writeln!(f, " {{")?;
+            for branch in branches {
+                write_indent(f, depth + 1)?;
+                write_pattern(f, &branch.pattern, db, depth)?;
+                if let Some(guard) = &branch.guard {
+                    write!(f, " if ")?;
+                    write_expr(f, guard, db)?;
+                }
+                writeln!(f, " =>")?;
+                write_stmt(f, &branch.body, db, depth + 1)?;
+            }
+            write_indent(f, depth)?;
+            writeln!(f, "}}")
+        }
     }
 }
 
-fn write_pattern(f: &mut fmt::Formatter<'_>, pat: &HirPattern, db: &dyn Db) -> fmt::Result {
+fn write_pattern(
+    f: &mut fmt::Formatter<'_>,
+    pat: &HirPattern,
+    db: &dyn Db,
+    depth: usize,
+) -> fmt::Result {
     match &pat.data {
         HirPatternDesc::Bind { id, name, mutable } => {
             if *mutable {
@@ -187,25 +213,49 @@ fn write_pattern(f: &mut fmt::Formatter<'_>, pat: &HirPattern, db: &dyn Db) -> f
                 if i > 0 {
                     write!(f, ", ")?;
                 }
-                write_pattern(f, p, db)?;
+                write_pattern(f, p, db, depth)?;
             }
             write!(f, ")")
         }
-        HirPatternDesc::Constructor { resolution, fields } => {
-            if let Some(def) = resolution {
-                write!(f, "{}", def.display(db))?;
-            } else {
-                write!(f, "<?>")?;
-            }
-            write!(f, "(")?;
-            for (i, p) in fields.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
+        HirPatternDesc::Constructor {
+            resolution,
+            name,
+            fields,
+        } => {
+            write!(f, "{}::{}", resolution.display(db), name.display(db))?;
+            match fields {
+                HirPatternConstructorArgs::None => Ok(()),
+                HirPatternConstructorArgs::StructFields(hir_struct_field_patterns) => {
+                    writeln!(f, "{{")?;
+                    for p in hir_struct_field_patterns.iter() {
+                        write_indent(f, depth + 2)?;
+                        match p {
+                            HirStructFieldPattern::Rebind { name, pattern } => {
+                                write!(f, "{}: ", name.display(db))?;
+                                write_pattern(f, pattern, db, depth + 2)?;
+                            }
+                            HirStructFieldPattern::Name { id, name } => {
+                                write!(f, "{}/*_{}*/", name.display(db), id.0)?;
+                            }
+                        }
+                        writeln!(f, ", ")?;
+                    }
+                    write_indent(f, depth + 1)?;
+                    write!(f, "}}")
                 }
-                write_pattern(f, p, db)?;
+                HirPatternConstructorArgs::TupleFields(hir_patterns) => {
+                    write!(f, "(")?;
+                    for (i, p) in hir_patterns.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write_pattern(f, p, db, depth)?;
+                    }
+                    write!(f, ")")
+                }
             }
-            write!(f, ")")
         }
+        HirPatternDesc::DestructureBinding { .. } => todo!(),
     }
 }
 
@@ -364,9 +414,52 @@ fn write_expr(f: &mut fmt::Formatter<'_>, expr: &HirExpr, db: &dyn Db) -> fmt::R
             write_partial_type(f, ty, db)?;
             write!(f, ")")
         }
-        HirExprDesc::Constructor { ty, name } => {
-            write_partial_type(f, ty, db)?;
-            write!(f, "::{}", name.display(db))
+        HirExprDesc::Constructor {
+            name,
+            enum_def,
+            args,
+            template_hints,
+        } => {
+            write!(f, "{}", enum_def.name(db).display(db))?;
+            if !template_hints.is_empty() {
+                write!(f, "<")?;
+                for (i, hint) in template_hints.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match hint {
+                        PartialTypeArg::Known(tref) => write!(f, "{}", tref.display(db))?,
+                        PartialTypeArg::Partial(p) => write_partial_type(f, p, db)?,
+                        PartialTypeArg::Infer => write!(f, "_")?,
+                    }
+                }
+                write!(f, ">")?;
+            }
+            write!(f, "::{}", name.display(db))?;
+            match args {
+                HirConstructorArgs::TupleLike(hir_exprs) => {
+                    write!(f, "(")?;
+                    for (i, expr) in hir_exprs.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write_expr(f, expr, db)?;
+                    }
+                    write!(f, ")")
+                }
+                HirConstructorArgs::StructLike { fields } => {
+                    write!(f, "{{")?;
+                    for (i, (name, expr)) in fields.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, ".{}: ", name.display(db))?;
+                        write_expr(f, expr, db)?;
+                    }
+                    write!(f, "}}")
+                }
+                HirConstructorArgs::None => Ok(()),
+            }
         }
     }
 }

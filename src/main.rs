@@ -8,13 +8,11 @@ use crate::{
     hir::hir_body,
     name_resolve::{
         core_package,
-        definition::{Definition, get_module_pretty_name, module_definitions},
-        file_module_id,
-        implems::impls_in_package,
-        module_to_file, std_package,
+        definition::{Definition, module_definitions},
+        file_module_id, std_package,
     },
     parser::{ParseError, parse_file},
-    ril::{FileModule, ModuleId, Package, display::RilDisplay},
+    ril::{FileModule, ModuleId, Package},
 };
 
 mod common;
@@ -114,19 +112,6 @@ fn print_module_tree<'db>(db: &'db dyn Db, module: FileModule<'db>, indent: usiz
 
 fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     let defs = module_definitions(db, module.interned());
-    println!("***************************************************");
-    println!(
-        "Checking module {}:",
-        get_module_pretty_name(db, module.interned())
-    );
-
-    println!("Module definitions:");
-    for (name, def) in &defs {
-        println!("  {} => {}", name.interned().contents(db), def.display(db));
-    }
-
-    // let impls = module_impls(db, module.interned());
-
     let mut v = defs.values().copied().collect::<Vec<_>>();
     v.sort();
     for def in v {
@@ -138,21 +123,6 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             _ => (),
         }
     }
-
-    // println!("Implementations:");
-    // for impl_ in impls {
-    //     let start = impl_.span(db).start();
-    //     let source_file = module_to_file(db, impl_.module(db).interned());
-    //     let loc_infos = get_loc_info(db, source_file, start.offset);
-    //     println!(
-    //         "    {}: {} ({:?})",
-    //         loc_infos,
-    //         impl_.id(db).display(db),
-    //         impl_.id(db)
-    //     );
-    // }
-
-    println!("***************************************************");
     false
 }
 
@@ -214,21 +184,6 @@ fn main() -> Result<(), String> {
     let mut has_errors = false;
     for package in &packages {
         has_errors |= try_package(&db, *package);
-    }
-
-    println!("ALL IMPLEMENTATIONS:");
-    for package in &packages {
-        for impl_ in impls_in_package(&db, *package) {
-            let start = impl_.span(&db).start();
-            let source_file = module_to_file(&db, impl_.module(&db).interned());
-            let loc_infos = get_loc_info(&db, source_file, start.offset);
-            println!(
-                "    {}: {} ({:?})",
-                loc_infos,
-                impl_.id(&db).display(&db),
-                impl_.id(&db)
-            );
-        }
     }
 
     if has_errors {

@@ -75,6 +75,7 @@ pub enum AstExprDesc {
 
     StructLit {
         ty: AstTypeExpr,
+        variant: Option<Symbol>,
         fields: Vec<AstStructField>,
     },
 

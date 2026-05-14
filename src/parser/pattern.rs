@@ -3,7 +3,9 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        pattern::{AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc},
+        pattern::{
+            AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc, StructFieldPattern,
+        },
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -81,7 +83,40 @@ impl<'db> Parser<'db> {
             }
 
             Some(TokenKind::OpenBra) => {
-                todo!("parse struct fields in pattern")
+                self.consume();
+                let mut fields = vec![];
+
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::CloseBra)
+                {
+                    let name = self.parse_symbol()?.data;
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Colon)
+                    {
+                        self.consume();
+                        let associated = self.parse_pattern()?;
+                        fields.push(StructFieldPattern::Rebind {
+                            name,
+                            pattern: associated,
+                        })
+                    } else {
+                        fields.push(StructFieldPattern::Name(name));
+                    }
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Comma)
+                    {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::CloseBra)?;
+                self.consume();
+                
+
+                let args = AstConstructFields::StructFields(fields);
+
+                Ok(AstNamedPattern::Constructor { name, args })
             }
 
             _ => Ok(AstNamedPattern::Constructor {
