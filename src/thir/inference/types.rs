@@ -233,43 +233,54 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_struct(&mut self, ty: &InferTy) -> Option<(StructId, HashMap<Symbol, InferTy>)> {
-        if let InferTy::Adt { def, fields } = &ty
-            && let TypeDefId::Struct(struct_id) = *def
-        {
-            let templates = fields;
-            let ast = struct_item(self.db, struct_id.interned());
-            let templates = if templates.len() != ast.template_args.len() {
-                ast.template_args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| {
-                        templates
-                            .get(i)
-                            .cloned()
-                            .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
-                    })
-                    .collect::<Arc<_>>()
-            } else {
-                templates.iter().cloned().collect::<Arc<_>>()
-            };
-            let module = struct_id.parent(self.db);
-            let ctx = ImplicitContext::new(
-                self.db,
-                ScopeOwnerId::Module(module),
-                ast.template_args.iter().cloned().collect::<Arc<_>>(),
-                templates,
-                None,
-            )
-            .inspect_err(|err| println!("{err:#?}"))
-            .ok()?;
-            ast.fields
-                .iter()
-                .map(|field| {
-                    self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                        .map(|ty| (field.name, ty))
-                })
-                .collect::<Option<_>>()
-                .map(|fields| (struct_id, fields))
+        if let InferTy::Adt { def, fields } = &ty {
+            match *def {
+                TypeDefId::Struct(struct_id) => {
+                    let templates = fields;
+                    let ast = struct_item(self.db, struct_id.interned());
+                    let templates = if templates.len() != ast.template_args.len() {
+                        ast.template_args
+                            .iter()
+                            .enumerate()
+                            .map(|(i, _)| {
+                                templates
+                                    .get(i)
+                                    .cloned()
+                                    .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
+                            })
+                            .collect::<Arc<_>>()
+                    } else {
+                        templates.iter().cloned().collect::<Arc<_>>()
+                    };
+                    let module = struct_id.parent(self.db);
+                    let ctx = ImplicitContext::new(
+                        self.db,
+                        ScopeOwnerId::Module(module),
+                        ast.template_args.iter().cloned().collect::<Arc<_>>(),
+                        templates,
+                        None,
+                    )
+                    .inspect_err(|err| println!("{err:#?}"))
+                    .ok()?;
+                    ast.fields
+                        .iter()
+                        .map(|field| {
+                            self.allocate_ast_type_expr(&field.ty.data, &ctx)
+                                .map(|ty| (field.name, ty))
+                        })
+                        .collect::<Option<_>>()
+                        .map(|fields| (struct_id, fields))
+                }
+                TypeDefId::Builtin(id) => {
+                    if id == BuiltinTypeId::mut_ref(self.db) || id == BuiltinTypeId::ref_(self.db) {
+                        // Auto-deref for ref to struct
+                        self.is_struct(&fields[0])
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
         } else {
             None
         }
