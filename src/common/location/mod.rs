@@ -84,6 +84,8 @@ pub fn get_loc_info<'db>(
 
 impl Display for LocationInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}:{}", self.file.display(), self.line, self.column)
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let path = pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
+        write!(f, "{}:{}:{}", path.display(), self.line, self.column)
     }
 }
