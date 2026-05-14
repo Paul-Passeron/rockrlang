@@ -1,0 +1,7 @@
+struct my_struct {
+    x: int;
+}
+
+fun uses_my_struct(s: my_struct): my_struct {
+    return s;
+}
