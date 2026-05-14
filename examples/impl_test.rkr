@@ -1,0 +1,14 @@
+struct a {
+    x: int;
+}
+
+impl a {
+    fun new(x: int): a {
+        return a { .x: x };
+    }
+}
+
+fun main(): int {
+    let x = a::new(52);
+    return 0;
+}

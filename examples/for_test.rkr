@@ -1,0 +1,6 @@
+fun main(): int {
+    for i in 0..15 {
+        let x = i;
+    }
+    return 0;
+}

@@ -1,0 +1,26 @@
+struct a {
+    x: inner;
+}
+
+impl a {
+    fun new(): a {
+        return a { .x: 69 };
+    }
+}
+
+// impl a {
+//     fun new(x: int): a {
+//         return a {.x: x};
+//     }
+// }
+
+// impl <T> T {
+//     fun new(): T {
+//         // TODO
+//     }
+// }
+
+fun main(): int {
+    let x = a::new();
+    return 0;
+}

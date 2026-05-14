@@ -1,0 +1,18 @@
+@include std::io
+
+// fun print_my_string(x: str): FunDef {
+//     return @item {
+//         fun printer(): void {
+//             #x.println();
+//         }
+//     };
+// }
+
+// @quote {
+//     print_my_string("Hello, World !\n");
+// }
+
+fun main(): int {
+    // printer();
+    return 0;
+}
