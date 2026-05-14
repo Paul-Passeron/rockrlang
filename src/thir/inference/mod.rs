@@ -1,3 +1,4 @@
+pub mod canon;
 pub mod constraints;
 mod display;
 pub mod expr;
