@@ -800,7 +800,26 @@ impl<'db> InferenceCtx<'db> {
                 rhs_ty,
                 op,
             } => self.solve_binop_constraint(*res_ty, lhs_ty, rhs_ty, *op),
-            InferenceConstraintKind::IntLike { res_ty } => todo!(),
+            InferenceConstraintKind::IntLike { res_ty } => {
+                let t = self.find(&InferTy::Var(*res_ty));
+                match t {
+                    InferTy::Var(_) => ConstraintSolveResult::Pending,
+                    InferTy::Adt { def, .. } => {
+                        if def.is_int_like(self.db).is_some() {
+                            ConstraintSolveResult::Solved
+                        } else {
+                            todo!("Not an int like type")
+                        }
+                    }
+                    InferTy::Param(type_param_id) => {
+                        todo!(
+                            "Trying to constraint param `T{}` to int like type",
+                            type_param_id.0
+                        )
+                    }
+                    InferTy::Zelf => todo!("Trying to constraint `Self` to int like type"),
+                }
+            }
         }
     }
 
@@ -1274,7 +1293,9 @@ impl InferenceConstraintKind {
                 .chain(rhs_ty.listeners())
                 .chain(ctx.find(&InferTy::Var(*res_ty)).listeners())
                 .collect(),
-            InferenceConstraintKind::IntLike { res_ty } => todo!(),
+            InferenceConstraintKind::IntLike { res_ty } => {
+                ctx.find(&InferTy::Var(*res_ty)).listeners()
+            }
         }
     }
 }

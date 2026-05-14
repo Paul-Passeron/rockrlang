@@ -30,7 +30,7 @@ use super::{InferTy, InferenceCtx, UnificationError};
 impl<'db> InferenceCtx<'db> {
     fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         match &expr.data {
-            HirExprDesc::IntLit(_) => Ok(self.int_ty()),
+            HirExprDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
             HirExprDesc::CharLit(_) => Ok(self.char_ty()),
             HirExprDesc::StrLit(_) => Ok(self.str_ty()),
             HirExprDesc::CStrLit(_) => Ok(self.cstr_ty()),
