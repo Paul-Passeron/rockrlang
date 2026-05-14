@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::empty, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     common::symbols::Symbol,
@@ -147,7 +147,7 @@ impl<'db> InferenceCtx<'db> {
                     unreachable!()
                 }
             }
-            TypeRef::Associated(symbol) => todo!(),
+            TypeRef::Associated(_symbol) => todo!(),
         }
     }
 

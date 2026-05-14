@@ -1,4 +1,4 @@
-use crate::{ril::display::RilDisplay, thir::inference::InferenceCtx};
+use crate::thir::inference::InferenceCtx;
 
 use super::{InferTy, InferVar, UnificationError, UnifyValue};
 

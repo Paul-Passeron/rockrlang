@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    iter::empty,
     panic,
     sync::Arc,
 };
@@ -11,25 +10,20 @@ use crate::{
     common::location::Span,
     hir::{
         self, HirBody, HirExpr, HirId, HirPattern, HirPatternDesc, HirStmt, HirStmtKind, LocalId,
-        LocalInfo, PartialTypeRef, hir_body, owning_module,
+        LocalInfo, hir_body,
     },
     name_resolve::type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
-    parse_tree::{
-        top_level::{AstEnumVariantKind, AstTemplateArg},
-        type_expr::AstAnyTypeExprDesc,
-    },
+    parse_tree::top_level::{AstEnumVariantKind, AstTemplateArg},
     ril::{self, FunctionId, InternedFunctionId, Package, TypeDefId, TypeRef},
     thir::inference::{
-        InferTy, InferenceCtx, UnificationError,
-        implicit::{AsAstImplCtx, ImplicitContext},
-        var::InferVar,
+        InferTy, InferenceCtx, UnificationError, implicit::ImplicitContext, var::InferVar,
     },
 };
 
 pub mod inference;
 
 #[derive(Clone)]
-struct InferCallInfos {
+pub(super) struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
     substitution: Box<[InferTy]>,
@@ -209,8 +203,8 @@ impl<'db> TyCtx<'db> {
                 InferTy::Var(*loc_inners.get(id).unwrap())
             }
             HirPatternDesc::Any => InferTy::Var(self.inf_ctx.fresh_var()),
-            HirPatternDesc::Tuple(hir_patterns) => todo!(),
-            HirPatternDesc::DestructureBinding { resolution, fields } => todo!(),
+            HirPatternDesc::Tuple(_hir_patterns) => todo!(),
+            HirPatternDesc::DestructureBinding { .. } => todo!(),
             HirPatternDesc::Constructor {
                 resolution,
                 name,
@@ -247,8 +241,8 @@ impl<'db> TyCtx<'db> {
                 match (fields, &variant.kind) {
                     (hir::HirPatternConstructorArgs::None, AstEnumVariantKind::Unit) => (),
                     (
-                        hir::HirPatternConstructorArgs::StructFields(hir_fields),
-                        AstEnumVariantKind::StructLike(ast_fields),
+                        hir::HirPatternConstructorArgs::StructFields(_hir_fields),
+                        AstEnumVariantKind::StructLike(_ast_fields),
                     ) => todo!(),
                     (
                         hir::HirPatternConstructorArgs::TupleFields(hir_patterns),

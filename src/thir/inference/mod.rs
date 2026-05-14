@@ -164,9 +164,9 @@ impl<'db> InferenceCtx<'db> {
     //     self.implicit_ctx.get_templates()
     // }
 
-    pub fn get_call_infos(&self) -> &HashMap<ExprId, InferCallInfos> {
-        &self.call_infos
-    }
+    // pub fn get_call_infos(&self) -> &HashMap<ExprId, InferCallInfos> {
+    //     &self.call_infos
+    // }
 
     pub fn drain_call_infos(&mut self) -> HashMap<ExprId, InferCallInfos> {
         mem::take(&mut self.call_infos)

@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
     fmt,
-    iter::{empty, once},
+    iter::once,
     sync::Arc,
 };
 
@@ -11,16 +11,10 @@ use crate::{
     Db,
     common::symbols::Symbol,
     hir::{Mutability, impl_items, interface_items},
-    name_resolve::{
-        implems::resolve_type_expr_as_interface,
-        type_expr::{get_templates_of_fun, templates_of_owner},
-    },
-    parse_tree::top_level::{
-        AstFunsig, AstImplItem, AstInterfaceItem, AstMethodsig, AstTemplateArg,
-    },
+    parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstMethodsig},
     ril::{
-        BuiltinTypeId, FunctionId, ImplId, ImplSource, InterfaceId, InterfaceRef, PtrKind,
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef,
+        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
+        TypeDefId, TypeId, TypeRef,
         display::{Display, RilDisplay},
     },
     thir::{
@@ -30,6 +24,7 @@ use crate::{
             var::InferVar,
         },
     },
+    unused,
 };
 
 use super::{InferTy, implems::PotentialBlockRes};
@@ -260,33 +255,6 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    // pub fn allocate_template(
-    //     &mut self,
-    //     arg: &AstTemplateArg,
-    //     template_args: &[AstTemplateArg],
-    // ) -> InferTy {
-    //     let var = self.fresh_var();
-
-    //     for constraint in &arg.constraints {
-    //         let resolved = resolve_type_expr_as_interface(
-    //             self.db,
-    //             &constraint,
-    //             self.implicit_ctx().owner_module(self.db).interned(),
-    //             template_args,
-    //             false,
-    //         )
-    //         .unwrap();
-    //         let interface_id = resolved.def(self.db);
-    //         let interface_args = resolved
-    //             .args(self.db)
-    //             .iter()
-    //             .map(|t_ref| self.allocate_type_ref(t_ref, self.implicit_ctx().as_ref()))
-    //             .collect::<Box<[_]>>();
-    //         self.emit_implements_constraint(InferTy::Var(var), interface_id, interface_args);
-    //     }
-    //     InferTy::Var(var)
-    // }
-
     fn try_resolve_via_known_impl(
         &mut self,
         ret_var: InferVar,
@@ -297,6 +265,7 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> Option<ConstraintSolveResult> {
+        unused!(id);
         for (iface_id, implem, sig) in
             self.known_impls_providing(receiver, method, args.len(), interface_hint, is_static)
         {
@@ -819,10 +788,6 @@ impl<'db> InferenceCtx<'db> {
 
         // Ok(())
     }
-
-    // pub fn finished_solving_constraints(&self) -> bool {
-    //     self.current_constraints.is_empty()
-    // }
 
     fn fresh_constraint(&mut self, constraint: InferenceConstraintKind) -> InferenceConstraint {
         let res = InferenceConstraint {

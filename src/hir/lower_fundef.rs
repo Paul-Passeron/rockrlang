@@ -1,12 +1,8 @@
 use std::{collections::HashMap, iter};
 
 use crate::{
-    Db, SourceFile,
-    common::{
-        location::{Span, get_loc_info},
-        symbols::Symbol,
-    },
-    get_source_file,
+    Db,
+    common::{location::Span, symbols::Symbol},
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc, HirMatchBranch, HirPattern,
         HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind,
@@ -399,7 +395,7 @@ impl<'db> LowerFundef<'db> {
                                                             }
                                                             TypeRef::Error => vec![],
                                                             TypeRef::Zelf => todo!(),
-                                                            TypeRef::Associated(symbol) => todo!(),
+                                                            TypeRef::Associated(_symbol) => todo!(),
                                                         }
                                                     }
                                                     PartialTypeRef::WithHoles { args, .. } => args,

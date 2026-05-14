@@ -6,10 +6,9 @@ use std::{collections::HashSet, sync::Arc};
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{impl_items, impl_sources, interface_items, owning_module},
+    hir::{impl_items, interface_items, owning_module},
     name_resolve::{
         definition::{Definition, resolve_in_module},
-        interfaces::interface_item,
         type_expr::{get_templates_of_fun, templates_of_owner},
     },
     parse_tree::{
@@ -21,6 +20,7 @@ use crate::{
         const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
     },
     thir::inference::InferTy,
+    unused,
 };
 
 pub struct AstImplicitContext {
@@ -420,6 +420,8 @@ impl AsAstImplCtx for ImplicitContext {
         db: &'a dyn Db,
         associated: Symbol,
     ) -> Option<AstTypeExpr> {
+        unused!(db);
+        unused!(associated);
         todo!()
     }
 
@@ -428,6 +430,8 @@ impl AsAstImplCtx for ImplicitContext {
         db: &'a dyn Db,
         associated: Symbol,
     ) -> Option<AstTemplateArg> {
+        unused!(db);
+        unused!(associated);
         todo!()
     }
 }

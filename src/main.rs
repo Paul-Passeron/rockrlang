@@ -34,6 +34,15 @@ mod thir;
 
 mod tests;
 
+#[macro_export]
+macro_rules! unused {
+    ($x:expr) => {
+        match &($x) {
+            _ => (),
+        }
+    };
+}
+
 #[derive(Debug, Parser)]
 pub struct CliArgs {
     file: Option<PathBuf>,
