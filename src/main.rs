@@ -163,7 +163,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     }
     println!("Implementations:");
     for impl_ in impls {
-        println!("    {}", impl_.display(db));
+        println!("    {} ({:?})", impl_.display(db), impl_);
     }
 
     println!("***************************************************");

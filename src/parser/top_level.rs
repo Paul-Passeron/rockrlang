@@ -125,6 +125,7 @@ impl<'db> Parser<'db> {
             while let Some(t) = self.peek_n(0)
                 && matches!(t.kind, TokenKind::Plus)
             {
+                self.consume();
                 cs.push(self.parse_type_expr()?);
             }
             cs
