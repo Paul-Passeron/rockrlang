@@ -24,7 +24,7 @@ use crate::{
         TypeRef, display::Display,
     },
     thir::{
-        ExprId, InferCallInfos,
+        Diagnostic, ExprId, InferCallInfos,
         inference::{
             constraints::{InferenceConstraint, InferenceConstraintId},
             implicit::{AsAstImplCtx, ImplicitContext},
@@ -69,6 +69,8 @@ pub struct InferenceCtx<'a> {
     call_infos: HashMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
     impl_depth: usize,
+
+    pub(super) diagnostics: Vec<Diagnostic>,
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -107,7 +109,7 @@ impl<'db> InferenceCtx<'db> {
                 Some(InferTy::Zelf)
             },
         )
-        .unwrap();
+        .expect("Could not create implicit context for inference context. This should not fail");
 
         let mut this = Self {
             db,
@@ -122,15 +124,20 @@ impl<'db> InferenceCtx<'db> {
             implements: HashMap::new(),
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
+            diagnostics: Vec::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
         let args = ast.get_args();
         for (local, ast) in params.iter().zip_eq(args) {
-            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).unwrap();
+            let ty = this
+                .implicit_ctx()
+                .resolve(this.db, &ast.ty.data)
+                .expect("Top level items should already have valid and resolved types");
             let ty = this.allocate_type_ref(&ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
-            this.unify(local_ty, ty).unwrap();
+            this.unify(local_ty, ty)
+                .expect("First local type unification should not fail");
         }
 
         infer_templates
@@ -146,7 +153,7 @@ impl<'db> InferenceCtx<'db> {
                         templates.as_ref(),
                         false,
                     )
-                    .unwrap();
+                    .expect("Top level template argument constraints should already be resolved to interfaces");
                     let interface_id = resolved.def(this.db);
                     let interface_args = resolved
                         .args(this.db)
@@ -202,6 +209,8 @@ pub enum UnificationError {
     StaticMethodCallOnReceiver(ExprId, FunctionId),
     NoImplemCandidateFor(InferTy, InterfaceId, Box<[InferTy]>),
     ZelfConstraining,
+    InvalidStructField { id: StructId, invalid: Symbol },
+    AlreadyDiagnosed,
 }
 
 impl UnificationError {
@@ -258,6 +267,15 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 id.name(self.db).display(self.db),
                 missing.display(self.db)
             ),
+            UnificationError::InvalidStructField { id, invalid } => {
+                write!(
+                    f,
+                    "Invalid field in struct lit: {} (invalid: {})",
+                    id.name(self.db).display(self.db),
+                    invalid.display(self.db)
+                )
+            }
+
             UnificationError::NonStructForStructLit(partial_type_ref) => {
                 write!(f, "Non struct for struct-lit: {:?}", partial_type_ref)
             }
@@ -298,6 +316,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
             UnificationError::ZelfConstraining => {
                 write!(f, "Constraining self type")
             }
+            UnificationError::AlreadyDiagnosed => Ok(()),
         }
     }
 }

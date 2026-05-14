@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    panic,
+    mem, panic,
     sync::Arc,
 };
 
@@ -52,6 +52,7 @@ pub enum DiagnosticKind {
     },
     BadRetType(TyRef),
     BadAssignement(UnificationError),
+    Custom(String),
 }
 
 #[derive(Clone)]
@@ -163,7 +164,11 @@ impl<'db> TyCtx<'db> {
             .into_iter()
             .map(|(id, infos)| (id, self.concretize_infos(infos)))
             .collect();
-        let diagnostics = self.diagnostics.drain(..).collect::<Vec<_>>();
+        let diagnostics = self
+            .diagnostics
+            .drain(..)
+            .chain(mem::take(&mut self.inf_ctx.diagnostics))
+            .collect::<Vec<_>>();
         TypeCheckResults::new(self.db, node_types, call_infos, diagnostics)
     }
 
@@ -176,7 +181,7 @@ impl<'db> TyCtx<'db> {
         (ty, err)
     }
 
-    fn get_ret_ty(&self) -> InferTy {
+    fn get_ret_ty(&mut self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
         self.inf_ctx
             .allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
@@ -200,7 +205,11 @@ impl<'db> TyCtx<'db> {
         match &pattern.data {
             HirPatternDesc::Bind { id, .. } => {
                 // TODO: is this right ?
-                InferTy::Var(*loc_inners.get(id).unwrap())
+                InferTy::Var(
+                    *loc_inners
+                        .get(id)
+                        .expect("Internal error: local referenced in hir but not found"),
+                )
             }
             HirPatternDesc::Any => InferTy::Var(self.inf_ctx.fresh_var()),
             HirPatternDesc::Tuple(_hir_patterns) => todo!(),
@@ -221,14 +230,23 @@ impl<'db> TyCtx<'db> {
                     .copied()
                     .map(InferTy::Var)
                     .collect();
-                let ctx = ImplicitContext::new(
+                let Some(ctx) = ImplicitContext::new(
                     self.db,
                     ril::ScopeOwnerId::Module(resolution.parent(self.db)),
                     item.template_args.iter().cloned().collect(),
                     infer_templates.clone(),
                     None, // TODO: Is this right ?
-                )
-                .unwrap();
+                ) else {
+                    self.diagnostics.push(Diagnostic {
+                        kind: DiagnosticKind::Custom(format!(
+                            "Could not create ctx for some reason at {}:{}",
+                            file!(),
+                            line!()
+                        )),
+                        span: pattern.span.clone(),
+                    });
+                    return InferTy::Var(self.inf_ctx.fresh_var());
+                };
                 let t_ref = InferTy::Adt {
                     def: TypeDefId::Enum(*resolution),
                     fields: infer_templates.iter().cloned().collect(),
@@ -253,10 +271,19 @@ impl<'db> TyCtx<'db> {
                             hir_patterns.iter().zip(ast_patterns.iter())
                         {
                             let pat_ty = self.typeof_pattern(hir_pattern, loc_inners);
-                            let ast_ty = self
-                                .inf_ctx
-                                .allocate_ast_type_expr(&ast_pattern.data, &ctx)
-                                .unwrap();
+                            let Some(ast_ty) =
+                                self.inf_ctx.allocate_ast_type_expr(&ast_pattern.data, &ctx)
+                            else {
+                                self.diagnostics.push(Diagnostic {
+                                    kind: DiagnosticKind::Custom(format!(
+                                        "Could not allocate ast_type_expr for some reason at {}:{}",
+                                        file!(),
+                                        line!()
+                                    )),
+                                    span: pattern.span.clone(),
+                                });
+                                return InferTy::Var(self.inf_ctx.fresh_var());
+                            };
                             self.inf_ctx
                                 .emit_constraint(InferenceConstraintKind::Unify {
                                     a: pat_ty,
