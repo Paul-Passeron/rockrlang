@@ -1,3 +1,5 @@
+@include std::mem
+
 struct InnerRef<T> {
     data: T;
     ref_count: u64;
