@@ -354,18 +354,35 @@ impl<'db> LowerFundef<'db> {
                 }
 
                 AstExprDesc::NameResolved { from, to } => {
-                    match resolve_in_module(self.db, from.interned(), module.interned()) {
-                        Some(Definition::Module(module_id)) => {
-                            self.lower_expr(to, scope, module_id).data
+                    if *from == Symbol::new(self.db, "Self") {
+                        // TODO: we're losing template info here
+                        let zelf = self
+                            .function
+                            .parent(self.db)
+                            .get_canonical_zelf(self.db)
+                            .expect("TODO: report that");
+                        match zelf {
+                            TypeRef::Concrete(type_id) => self.lower_name_resolved_expr_from_type(
+                                scope,
+                                module,
+                                to,
+                                type_id.def(self.db),
+                            ),
+                            _ => todo!("Handle bad cases"),
                         }
-                        Some(Definition::Type(type_def_id)) => {
-                            self.lower_name_resolved_expr_from_type(scope, module, to, type_def_id)
+                    } else {
+                        match resolve_in_module(self.db, from.interned(), module.interned()) {
+                            Some(Definition::Module(module_id)) => {
+                                self.lower_expr(to, scope, module_id).data
+                            }
+                            Some(Definition::Type(type_def_id)) => self
+                                .lower_name_resolved_expr_from_type(scope, module, to, type_def_id),
+                            _ => todo!(
+                                "error: {}, badly name-resolved item ({})",
+                                to.span.start().loc_info(self.db, self.module).unwrap(),
+                                from.interned().contents(self.db)
+                            ),
                         }
-                        _ => todo!(
-                            "error: {}, badly name-resolved item ({})",
-                            to.span.start().loc_info(self.db, self.module).unwrap(),
-                            from.interned().contents(self.db)
-                        ),
                     }
                 }
 
