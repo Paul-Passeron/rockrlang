@@ -306,13 +306,10 @@ impl<'db> InferenceCtx<'db> {
             ast.fields.iter().map(|f| f.name).collect::<HashSet<_>>(),
         );
         if field_sets.0 != field_sets.1 {
-            let all_fields = field_sets
-                .0
-                .union(&field_sets.1)
-                .copied()
-                .collect::<HashSet<_>>();
+            println!("Field sets mismatch");
+
             // For ast fields not in inferred fields
-            for field in field_sets.1.difference(&all_fields) {
+            for field in field_sets.1.difference(&field_sets.0) {
                 self.diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::UniError {
                         err: UnificationError::IncompleteStructLit {
@@ -323,9 +320,13 @@ impl<'db> InferenceCtx<'db> {
                     },
                     span: span.clone(),
                 });
+                println!(
+                    "[Info]: Missing field in struct lit: {}",
+                    field.display(self.db)
+                );
             }
             // For inferred fields not in ast fields
-            for field in field_sets.0.difference(&all_fields) {
+            for field in field_sets.0.difference(&field_sets.1) {
                 self.diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::UniError {
                         err: UnificationError::InvalidStructField {
@@ -342,10 +343,15 @@ impl<'db> InferenceCtx<'db> {
                         .span
                         .clone(),
                 });
+                println!(
+                    "[Info]: Invalid field in struct lit: {}",
+                    field.display(self.db)
+                );
             }
-            return Err(UnificationError::AlreadyDiagnosed);
+            Err(UnificationError::AlreadyDiagnosed)
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn infer_constructor(
