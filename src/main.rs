@@ -1,6 +1,5 @@
 use clap::Parser;
 use clap_derive::Parser;
-use salsa::Database as Db;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::{
@@ -29,12 +28,41 @@ mod tests;
 #[derive(Debug, Parser)]
 pub struct CliArgs {
     file: Option<PathBuf>,
+    #[clap(long, default_value_t = false)]
+    no_std: bool,
+}
+
+#[derive(Clone)]
+pub struct CompilerConfig {
+    pub no_std: bool,
 }
 
 #[salsa::db]
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct RockrDb {
     storage: salsa::Storage<Self>,
+    config: CompilerConfig,
+}
+
+#[salsa::db]
+pub trait Db: salsa::Database {
+    fn config(&self) -> &CompilerConfig;
+}
+
+#[salsa::db]
+impl Db for RockrDb {
+    fn config(&self) -> &CompilerConfig {
+        &self.config
+    }
+}
+
+impl RockrDb {
+    fn new(config: CompilerConfig) -> Self {
+        Self {
+            storage: salsa::Storage::default(),
+            config,
+        }
+    }
 }
 
 #[salsa::db]
@@ -165,8 +193,11 @@ fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
 }
 
 fn main() -> Result<(), String> {
-    let db = RockrDb::default();
     let args = CliArgs::parse();
+    let cfg = CompilerConfig {
+        no_std: args.no_std,
+    };
+    let db = RockrDb::new(cfg);
 
     let current_dir = std::env::current_dir().unwrap();
     let root_path = args.file.as_deref().unwrap_or(&current_dir);
@@ -176,7 +207,9 @@ fn main() -> Result<(), String> {
 
     let mut has_errors = false;
     has_errors |= try_package(&db, package);
-    has_errors |= try_package(&db, std_package(&db).unwrap());
+    if !db.config.no_std {
+        has_errors |= try_package(&db, std_package(&db).unwrap());
+    }
 
     if has_errors {
         Err("Compiled with some errors".to_string())

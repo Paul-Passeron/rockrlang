@@ -3,10 +3,12 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::{RockrDb, check_module_tree, driver::load_package, print_module_tree};
+    use crate::{
+        CompilerConfig, RockrDb, check_module_tree, driver::load_package, print_module_tree,
+    };
 
     fn parse_path(path: &str) -> bool {
-        let db = RockrDb::default();
+        let db = RockrDb::new(CompilerConfig { no_std: false });
 
         let root_path = PathBuf::from(path);
 

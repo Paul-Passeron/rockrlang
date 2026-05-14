@@ -118,9 +118,13 @@ pub fn module_items<'db>(
 
 #[salsa::tracked]
 pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
-    let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
-    let std_root = std::path::Path::new(&std_path);
-    load_package(db, std_root)
+    if db.config().no_std {
+        None
+    } else {
+        let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
+        let std_root = std::path::Path::new(&std_path);
+        load_package(db, std_root)
+    }
 }
 
 #[salsa::tracked]
