@@ -4,8 +4,9 @@ interface C {}
 
 struct a<T> {}
 
-impl <T: A + B + C> a<T> {}
-impl <T: B + A + C> a<T> {}
-impl <T: B + C + A> a<T> {}
-impl <T: B + B> a<T> {}
-impl <T: B> a<T> {}
+impl <T: A + B + C> a<T> {} // Should all have the same Impl Id
+impl <T: B + A + C> a<T> {} // Should all have the same Impl Id
+impl <T: B + C + A> a<T> {} // Should all have the same Impl Id
+
+impl <T: B + B> a<T> {}     // Those two as well
+impl <T: B> a<T> {}         // Those two as well
