@@ -1,6 +1,8 @@
 // Rockr Intermediate Language
 // #![allow(dead_code)]
 
+pub mod display;
+
 use std::marker::PhantomData;
 
 use crate::{OwnedSourceFile, SourceFile, common::symbols::Symbol};
@@ -79,13 +81,19 @@ pub enum TypeRef {
 pub struct InternedImplId {
     pub parent: ModuleId,
     pub implemented: TypeRef,
-    pub interface: Option<InterfaceId>,
+    pub interface: Option<InterfaceRef>,
 }
 
 #[salsa::interned]
 pub struct InternedInterfaceId {
     pub name: Symbol,
     pub parent: ModuleId,
+}
+
+#[salsa::interned]
+pub struct InternedInterfaceRef {
+    pub def: InterfaceId,
+    pub args: Vec<TypeRef>,
 }
 
 #[salsa::interned]
@@ -108,7 +116,6 @@ pub enum ScopeOwnerId {
 pub enum TypeDefId {
     Builtin(BuiltinTypeId),
     Struct(StructId),
-    Interface(InterfaceId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -131,6 +138,9 @@ pub struct TypeId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BuiltinTypeId(salsa::Id);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InterfaceRef(salsa::Id);
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
     fn from(v: InternedModuleId<'db>) -> Self {
@@ -256,7 +266,7 @@ impl ImplId {
         db: &dyn crate::Db,
         parent: ModuleId,
         implemented: TypeRef,
-        interface: Option<InterfaceId>,
+        interface: Option<InterfaceRef>,
     ) -> Self {
         InternedImplId::new(db, parent, implemented, interface).into()
     }
@@ -273,7 +283,7 @@ impl ImplId {
         self.interned().implemented(db)
     }
 
-    pub fn interface(self, db: &dyn crate::Db) -> Option<InterfaceId> {
+    pub fn interface(self, db: &dyn crate::Db) -> Option<InterfaceRef> {
         self.interned().interface(db)
     }
 }
@@ -418,4 +428,34 @@ pub fn str_id(db: &dyn crate::Db) -> TypeId {
 
 pub fn void_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
+}
+
+impl<'db> From<InternedInterfaceRef<'db>> for InterfaceRef {
+    fn from(v: InternedInterfaceRef<'db>) -> Self {
+        Self(v.0)
+    }
+}
+
+impl<'db> From<InterfaceRef> for InternedInterfaceRef<'db> {
+    fn from(v: InterfaceRef) -> Self {
+        Self(v.0, PhantomData)
+    }
+}
+
+impl InterfaceRef {
+    pub fn new(db: &dyn crate::Db, def: InterfaceId, args: Vec<TypeRef>) -> Self {
+        InternedInterfaceRef::new(db, def, args).into()
+    }
+
+    pub fn interned(self) -> InternedInterfaceRef<'static> {
+        InternedInterfaceRef(self.0, PhantomData)
+    }
+
+    pub fn def(self, db: &dyn crate::Db) -> InterfaceId {
+        self.interned().def(db)
+    }
+
+    pub fn args(self, db: &dyn crate::Db) -> Vec<TypeRef> {
+        self.interned().args(db)
+    }
 }

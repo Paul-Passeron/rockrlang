@@ -6,14 +6,16 @@ use crate::{
     parser::parse_file,
     ril::{
         FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
-        StructId, TypeDefId, char_id, int_id, str_id, void_id,
+        StructId, TypeDefId, char_id,
+        display::{Display, RilDisplay},
+        int_id, str_id, void_id,
     },
 };
 use nonempty::NonEmpty;
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::{collections::HashMap, fmt};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Definition {
     Function(FunctionId),
     Interface(InterfaceId),
@@ -26,7 +28,6 @@ impl TypeDefId {
         match self {
             TypeDefId::Builtin(builtin) => builtin.name(db),
             TypeDefId::Struct(struct_id) => struct_id.name(db),
-            TypeDefId::Interface(interface_id) => interface_id.name(db),
         }
     }
 }
@@ -38,7 +39,6 @@ impl Definition {
             Definition::Type(def) => def.name(db),
             Definition::Interface(iface) => iface.name(db),
             Definition::Module(module) => module.name(db),
-            // ... TODO
         }
     }
 }
@@ -175,15 +175,28 @@ pub fn module_definitions<'db>(
 
 #[salsa::tracked]
 pub fn module_includes<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<Segments<'db>> {
-    let mut res = vec![];
-    if let Some(file) = module.file(db) {
-        let ast = parse_file(db, file.to_source_file(db));
-        for include in ast.includes(db) {
-            let segments = Segments::new(db, include.data.to_segments());
-            res.push(segments);
-        }
+    let Some(file) = module.file(db) else {
+        return vec![];
+    };
+    let ast = parse_file(db, file.to_source_file(db));
+    ast.includes(db)
+        .iter()
+        .map(|include| Segments::new(db, include.data.to_segments()))
+        .collect()
+}
+
+fn find_module_in_chain<'db>(
+    db: &'db dyn Db,
+    name: Symbol,
+    module: InternedModuleId<'db>,
+) -> Option<ModuleId> {
+    let defs = module_definitions(db, module);
+    if let Some(Definition::Module(m)) = defs.get(&name) {
+        return Some(*m);
     }
-    res
+    module
+        .parent(db)
+        .and_then(|parent| find_module_in_chain(db, name, parent.interned()))
 }
 
 #[salsa::tracked]
@@ -192,17 +205,13 @@ pub fn resolve_include_path<'db>(
     segments: Segments<'db>,
     current: InternedModuleId<'db>,
 ) -> Option<ModuleId> {
-    let self_defs = module_definitions(db, current);
     let v = segments.segments(db);
     let (hd, tl) = v.split_first();
-    if let Some(Definition::Module(res)) = self_defs.get(hd) {
-        NonEmpty::from_slice(tl).map_or(Some(*res), |segs| {
-            let segs = Segments::new(db, segs);
-            resolve_include_path(db, segs, res.interned())
-        })
-    } else {
-        None
-    }
+    let head_module = find_module_in_chain(db, *hd, current)?;
+    NonEmpty::from_slice(tl).map_or(Some(head_module), |segs| {
+        let segs = Segments::new(db, segs);
+        resolve_include_path(db, segs, head_module.interned())
+    })
 }
 
 #[salsa::tracked]
@@ -215,8 +224,8 @@ pub fn resolve_in_module<'db>(
     if let Some(def) = defs.get(&Symbol::from(name)) {
         return Some(def.clone());
     }
+    // Check includes declared on this module
     let includes = module_includes(db, module);
-
     for included_module in includes {
         if let Some(included_id) = resolve_include_path(db, included_module, module) {
             if let Some(def) =
@@ -226,6 +235,9 @@ pub fn resolve_in_module<'db>(
             }
         }
     }
+
+    // Walk up to parent — this is where parent includes get checked too,
+    // since the parent will run its own module_includes when we recurse into it
     module
         .parent(db)
         .and_then(|parent| resolve_in_module(db, name, parent.interned()))
@@ -264,4 +276,16 @@ pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -
         format!("")
     };
     Arc::new(format!("{}{}", prefix, id.name(db).interned().contents(db)))
+}
+
+impl RilDisplay for Definition {}
+
+impl fmt::Display for Display<'_, Definition> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.value.name(self.db).interned().contents(self.db)
+        )
+    }
 }

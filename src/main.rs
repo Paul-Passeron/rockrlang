@@ -7,12 +7,14 @@ use crate::{
     driver::load_package,
     name_resolve::{
         definition::{get_module_pretty_name, module_definitions},
-        file_module_id, module_items, std_package,
+        file_module_id,
+        implems::module_impls,
+        module_items, std_package,
         type_expr::resolve_type_expr,
     },
     parse_tree::top_level::AstTopLevelItemDesc,
     parser::{ParseError, parse_file},
-    ril::{FileModule, ModuleId, Package},
+    ril::{FileModule, ModuleId, Package, display::RilDisplay},
 };
 
 mod common;
@@ -119,7 +121,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
 
     println!("Module definitions:");
     for (name, def) in &defs {
-        println!("  {} => {:?}", name.interned().contents(db), def);
+        println!("  {} => {}", name.interned().contents(db), def.display(db));
     }
 
     let Some(items) = module_items(db, module.interned()) else {
@@ -127,6 +129,8 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
         println!("------------------------------------------------");
         return false;
     };
+
+    let impls = module_impls(db, module.interned());
 
     println!("Function signatures:");
     let mut has_errors = false;
@@ -137,10 +141,14 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             println!("  fn {}:", fd.name.interned().contents(db));
             for arg in &fd.args {
                 let resolved = resolve_type_expr(db, &arg.ty, module.interned(), &fd.template_args);
-                println!("    {} : {:?}", arg.name.interned().contents(db), resolved);
+                println!(
+                    "    {} : {}",
+                    arg.name.interned().contents(db),
+                    resolved.display(db)
+                );
             }
             let ret = resolve_type_expr(db, &fd.return_type, module.interned(), &fd.template_args);
-            println!("    -> {:?}", ret);
+            println!("    -> {}", ret.display(db));
         } else if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
             let child_id = ModuleId::new(
                 db,
@@ -153,6 +161,11 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             has_errors |= check_module(db, child_id);
         }
     }
+    println!("Implementations:");
+    for impl_ in impls {
+        println!("    {}", impl_.display(db));
+    }
+
     println!("***************************************************");
 
     has_errors

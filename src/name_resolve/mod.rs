@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub mod definition;
+pub mod implems;
 pub mod type_expr;
 
 #[salsa::tracked]
