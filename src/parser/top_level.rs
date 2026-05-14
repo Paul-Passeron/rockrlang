@@ -8,8 +8,9 @@ use crate::{
         top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundef, AstFundefArg, AstFundefDesc,
             AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
-            AstMethodDef, AstMethodDefDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
-            AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
+            AstMethodDef, AstMethodDefDesc, AstMethodsig, AstMethodsigDesc, AstModule,
+            AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField, AstTemplateArg,
+            AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -204,6 +205,35 @@ impl<'db> Parser<'db> {
         Ok(self.parse_any_funsig(false)?.0)
     }
 
+    fn parse_methodsig(&mut self) -> Result<AstMethodsig, ParseError> {
+        let (
+            AstFunsig {
+                data:
+                    AstFunsigDesc {
+                        name,
+                        args,
+                        template_args,
+                        return_type,
+                    },
+                annotations,
+                span,
+            },
+            receiver,
+        ) = self.parse_any_funsig(true)?;
+        let receiver = receiver.unwrap();
+        Ok(AstMethodsig::new(
+            AstMethodsigDesc {
+                name,
+                receiver,
+                args,
+                template_args,
+                return_type,
+            },
+            annotations,
+            span,
+        ))
+    }
+
     fn parse_any_funsig(
         &mut self,
         accept_receiver: bool,
@@ -277,22 +307,19 @@ impl<'db> Parser<'db> {
     fn parse_methoddef(&mut self) -> Result<AstMethodDef, ParseError> {
         self.expect(TokenKind::Fun)?;
         self.consume();
-        let (
-            AstFunsig {
-                data:
-                    AstFunsigDesc {
-                        name,
-                        args,
-                        template_args,
-                        return_type,
-                    },
-                annotations,
-                span,
-            },
-            receiver,
-        ) = self.parse_any_funsig(true)?;
+        let AstMethodsig {
+            data:
+                AstMethodsigDesc {
+                    name,
+                    receiver,
+                    args,
+                    template_args,
+                    return_type,
+                },
+            annotations,
+            span,
+        } = self.parse_methodsig()?;
 
-        let receiver = receiver.unwrap();
         let body = self.parse_block()?;
 
         let span = span.start().span(&self.get_end());
@@ -416,7 +443,7 @@ impl<'db> Parser<'db> {
                 Ok(AstImplItem::Type { name, ty })
             }
             TokenKind::Fun => {
-                let mut fdef = self.parse_fundef()?;
+                let mut fdef = self.parse_methoddef()?;
                 fdef.annotations = annotations;
                 Ok(AstImplItem::Fundef(fdef))
             }

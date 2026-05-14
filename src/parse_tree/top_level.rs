@@ -78,6 +78,17 @@ pub struct AstFunsigDesc {
     pub return_type: AstTypeExpr,
 }
 
+pub type AstMethodsig = Spanned<AstMethodsigDesc>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstMethodsigDesc {
+    pub name: Symbol,
+    pub receiver: AstReceiver,
+    pub args: Vec<AstFundefArg>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub return_type: AstTypeExpr,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstTemplateArg {
     pub name: Symbol,
@@ -100,7 +111,7 @@ pub struct AstInterface {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstInterfaceItem {
     Type(AstTemplateArg),
-    Sig(AstFunsig),
+    Sig(AstMethodsig),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -123,7 +134,7 @@ pub struct AstImplBlock {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
     Type { name: Symbol, ty: AstTypeExpr },
-    Fundef(AstFundef),
+    Fundef(AstMethodDef),
 }
 
 #[salsa::tracked]
