@@ -64,4 +64,14 @@ mod tests {
     fn example_smart_pointers() {
         assert!(dbg!(parse_path("examples/smart_pointers.rkr")).is_empty());
     }
+
+    #[test]
+    fn example_slices() {
+        assert!(dbg!(parse_path("examples/slices.rkr")).is_empty());
+    }
+
+    #[test]
+    fn example_tuples() {
+        assert!(dbg!(parse_path("examples/tuples.rkr")).is_empty());
+    }
 }
