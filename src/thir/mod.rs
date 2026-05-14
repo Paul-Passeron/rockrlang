@@ -32,6 +32,7 @@ use crate::{
     thir::methods::{ImplMatchConstraint, ImplMatchConstraints, find_method_for_partial_ref},
 };
 
+pub mod inference;
 pub mod methods;
 
 #[derive(Clone)]
