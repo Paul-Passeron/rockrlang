@@ -7,7 +7,7 @@ impl <T> opt<T> {
     fun unwrap(self): T {
         match self {
             opt::None => {
-                panic("opt::unwrap called on opt::None");
+                panic::panic("opt::unwrap called on opt::None");
             }
             opt::Some(value) => {
                 return value;
