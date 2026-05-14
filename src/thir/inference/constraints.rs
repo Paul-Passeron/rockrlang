@@ -11,7 +11,10 @@ use crate::{
     Db,
     common::symbols::Symbol,
     hir::{Mutability, impl_items, interface_items},
-    parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstMethodsig},
+    parse_tree::{
+        expr::BinaryOperator,
+        top_level::{AstImplItem, AstInterfaceItem, AstMethodsig},
+    },
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
@@ -84,6 +87,12 @@ pub enum InferenceConstraintKind {
     Unify {
         a: InferTy,
         b: InferTy,
+    },
+    Binop {
+        res_ty: InferVar,
+        lhs_ty: InferTy,
+        rhs_ty: InferTy,
+        op: BinaryOperator,
     },
 }
 
@@ -751,6 +760,12 @@ impl<'db> InferenceCtx<'db> {
                 self.solve_implements_constraint(constraint.id, ty, *id, args)
             }
             InferenceConstraintKind::Unify { a, b } => self.solve_unify_constraint(a, b),
+            InferenceConstraintKind::Binop {
+                res_ty,
+                lhs_ty,
+                rhs_ty,
+                op,
+            } => todo!("{op:#?}"),
         }
     }
 
@@ -867,6 +882,22 @@ impl<'db> InferenceCtx<'db> {
     ) {
         self.emit_constraint(InferenceConstraintKind::Implements { ty, id, args });
     }
+
+    pub fn emit_binop_constraint(
+        &mut self,
+        lhs_ty: InferTy,
+        rhs_ty: InferTy,
+        op: BinaryOperator,
+    ) -> InferVar {
+        let res_ty = self.fresh_var();
+        self.emit_constraint(InferenceConstraintKind::Binop {
+            res_ty,
+            lhs_ty,
+            rhs_ty,
+            op,
+        });
+        res_ty
+    }
 }
 
 impl InferenceConstraintKind {
@@ -973,6 +1004,12 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                     b.display(self.db),
                 )
             }
+            InferenceConstraintKind::Binop {
+                res_ty,
+                lhs_ty,
+                rhs_ty,
+                op,
+            } => todo!(),
         }
     }
 }
@@ -1061,6 +1098,17 @@ impl InferenceConstraintKind {
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(b).listeners())
+                .collect(),
+            InferenceConstraintKind::Binop {
+                res_ty,
+                lhs_ty,
+                rhs_ty,
+                ..
+            } => lhs_ty
+                .listeners()
+                .into_iter()
+                .chain(rhs_ty.listeners())
+                .chain(ctx.find(&InferTy::Var(*res_ty)).listeners())
                 .collect(),
         }
     }

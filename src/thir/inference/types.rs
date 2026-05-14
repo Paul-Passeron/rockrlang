@@ -236,7 +236,9 @@ impl<'db> InferenceCtx<'db> {
                 ast.template_args.iter().cloned().collect::<Arc<_>>(),
                 templates,
                 None,
-            )?;
+            )
+            .inspect_err(|err| println!("{err:#?}"))
+            .ok()?;
             ast.fields
                 .iter()
                 .map(|field| {

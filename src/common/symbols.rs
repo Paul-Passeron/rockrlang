@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::Db;
+
 #[salsa::interned]
 pub struct InternedSymbol {
     pub contents: String,
@@ -15,12 +17,16 @@ impl<'db> From<InternedSymbol<'db>> for Symbol {
 }
 
 impl Symbol {
-    pub fn new(db: &dyn crate::Db, s: impl ToString) -> Self {
+    pub fn new(db: &dyn Db, s: impl ToString) -> Self {
         Self::from(InternedSymbol::new(db, s.to_string()))
     }
 
     pub fn interned(&self) -> InternedSymbol<'_> {
         InternedSymbol(self.0, PhantomData)
+    }
+
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        self.display(db).to_string()
     }
 }
 
@@ -40,7 +46,7 @@ impl<'db> From<InternedStrLit<'db>> for StrLit {
 }
 
 impl StrLit {
-    pub fn new(db: &dyn crate::Db, s: impl ToString) -> Self {
+    pub fn new(db: &dyn Db, s: impl ToString) -> Self {
         Self::from(InternedStrLit::new(db, s.to_string()))
     }
 

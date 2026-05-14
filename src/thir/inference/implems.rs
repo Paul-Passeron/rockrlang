@@ -80,7 +80,9 @@ impl<'a> InferenceCtx<'a> {
             Arc::new([]),
             mapped_templates.iter().cloned().collect(),
             Some(ty.clone()),
-        )?;
+        )
+        .inspect_err(|err| println!("{err:#?}"))
+        .ok()?;
 
         let mut constraints = self.matches_ty(ty, source.id(self.db).implemented(self.db), &ctx)?;
 

@@ -278,6 +278,10 @@ impl BuiltinTypeId {
         Self::new(db, Symbol::new(db, "int"))
     }
 
+    pub fn usize(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "usize"))
+    }
+
     pub fn bool(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "bool"))
     }
@@ -368,6 +372,10 @@ pub fn tuple_of(db: &dyn crate::Db, tys: Vec<TypeRef>) -> TypeId {
 
 pub fn int_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::int(db).into(), vec![])
+}
+
+pub fn usize_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::usize(db).into(), vec![])
 }
 
 pub fn char_id(db: &dyn crate::Db) -> TypeId {

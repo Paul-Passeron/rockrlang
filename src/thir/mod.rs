@@ -226,7 +226,7 @@ impl<'db> TyCtx<'db> {
                     .copied()
                     .map(InferTy::Var)
                     .collect();
-                let Some(ctx) = ImplicitContext::new(
+                let Ok(ctx) = ImplicitContext::new(
                     self.db,
                     ril::ScopeOwnerId::Module(resolution.parent(self.db)),
                     item.template_args.iter().cloned().collect(),
@@ -454,7 +454,17 @@ impl<'db> TyCtx<'db> {
                     }
                 }
             }
-            HirStmtKind::If { .. } => todo!(),
+            HirStmtKind::If { cond, then, else_ } => {
+                match self.inf_ctx.infer_expr(cond) {
+                    Ok(ty) => match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                        Ok(()) => (),
+                        Err(err) => self.push_regular_diagnostic(err, cond.span.clone()),
+                    },
+                    Err(err) => self.push_regular_diagnostic(err, cond.span.clone()),
+                }
+                self.type_check_stmt(then);
+                else_.as_ref().inspect(|else_| self.type_check_stmt(else_));
+            }
             HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
                 Ok(ty) => {
                     if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {

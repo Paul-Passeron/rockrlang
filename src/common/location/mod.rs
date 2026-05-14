@@ -1,6 +1,50 @@
-use std::{fmt::Display, path::PathBuf, sync::Arc};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use crate::{Db, get_source_file, ril::ModuleId};
+use crate::{
+    Db,
+    ril::{FileModule, ModuleId, Package},
+};
+
+fn get_source_file_in_submodule<'db>(
+    db: &'db dyn Db,
+    file: impl AsRef<Path>,
+    submodule: FileModule<'db>,
+) -> Option<SourceFile<'db>> {
+    if submodule.file(db).path(db).as_path() == file.as_ref() {
+        return Some(submodule.file(db));
+    }
+    for submodule in submodule.submodules(db) {
+        if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
+            return Some(res);
+        }
+    }
+    None
+}
+
+fn get_source_file<'db>(
+    db: &'db dyn Db,
+    file: impl AsRef<Path>,
+    packages: &[Package<'db>],
+) -> Option<SourceFile<'db>> {
+    for package in packages {
+        let source_file = package.root(db).file(db);
+        if source_file.path(db) == file.as_ref() {
+            return Some(source_file);
+        }
+    }
+    for package in packages {
+        for submodule in package.root(db).submodules(db) {
+            if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
+                return Some(res);
+            }
+        }
+    }
+    None
+}
 
 #[salsa::interned]
 pub struct SourceFile {

@@ -135,9 +135,9 @@ pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
 
 #[salsa::tracked]
 pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
-    let std_path = std::env::var("ROCKR_CORE").unwrap_or_default();
-    let std_root = std::path::Path::new(&std_path);
-    load_package(db, std_root).unwrap()
+    let core_path = std::env::var("ROCKR_CORE").unwrap_or_default();
+    let core_root = std::path::Path::new(&core_path);
+    load_package(db, core_root).unwrap()
 }
 
 #[salsa::tracked]
@@ -192,6 +192,7 @@ fn collect_modules_in_items<'db>(
 #[salsa::tracked]
 pub fn modules_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ModuleId> {
     let root_id = file_module_id(db, package.root(db), None, package);
+
     let mut set = Set::new();
     collect_modules_in_file_module(db, package.root(db), root_id, package, &mut set);
     set

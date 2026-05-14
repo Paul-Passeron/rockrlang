@@ -8,7 +8,7 @@ use crate::{
         EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
         ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
         display::{Display, RilDisplay},
-        int_id, never_id, void_id,
+        int_id, never_id, usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -95,6 +95,10 @@ fn definition_of_item<'db>(
 #[salsa::tracked]
 pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition> {
     let mut res = BTreeMap::from([
+        (
+            Symbol::new(db, "usize"),
+            Definition::Type(int_id(db).def(db)),
+        ), // TODO: make int and usize different types when casting is introduced
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
         (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), // i32 is an alias for int. Might want to switch this around
         (

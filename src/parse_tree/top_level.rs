@@ -1,10 +1,19 @@
+use std::fmt::{self, write};
+
+use itertools::Itertools;
 use nonempty::NonEmpty;
 
 use crate::{
+    Db,
     common::{location::Span, symbols::Symbol},
     parse_tree::{
-        Spanned, expr::AstExpr, pattern::AstPattern, stmt::AstStmt, type_expr::AstTypeExpr,
+        Spanned,
+        expr::AstExpr,
+        pattern::AstPattern,
+        stmt::AstStmt,
+        type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
+    ril::display::Display,
 };
 
 pub type AstTopLevelItem = Spanned<AstTopLevelItemDesc>;
@@ -76,6 +85,19 @@ impl AstReceiver {
     }
 }
 
+impl fmt::Display for AstReceiver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AstReceiver::None => Ok(()),
+            AstReceiver::Zelf(_) => write!(f, "self"),
+            AstReceiver::RefZelf(_) => write!(f, "&self"),
+            AstReceiver::MutRefZelf(_) => write!(f, "&mut self"),
+            AstReceiver::PtrZelf(_) => write!(f, "*self"),
+            AstReceiver::MutPtrZelf(_) => write!(f, "*mut self"),
+        }
+    }
+}
+
 pub type AstFunsig = Spanned<AstFunsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -109,6 +131,96 @@ pub struct AstFundefArg {
     pub name: Symbol,
     pub ty: AstTypeExpr,
     pub span: Span,
+}
+
+impl AstFundefArg {
+    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
+        Display { value: self, db }
+    }
+}
+
+impl AstTypeExprDesc {
+    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
+        Display { value: self, db }
+    }
+}
+
+impl<'a, 'b> fmt::Display for Display<'b, &'a AstFundefArg> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}",
+            self.value.name.display(self.db),
+            self.value.ty.data.display(self.db)
+        )
+    }
+}
+
+impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.value {
+            AstTypeExprDesc::Named { name, args } => {
+                write!(f, "{}", name.display(self.db))?;
+                if !args.is_empty() {
+                    write!(
+                        f,
+                        "<{}>",
+                        args.iter()
+                            .map(|arg| {
+                                arg.as_known().map_or(String::from("_"), |ty| {
+                                    ty.data.display(self.db).to_string()
+                                })
+                            })
+                            .collect_vec()
+                            .join(", ")
+                    )?;
+                }
+                Ok(())
+            }
+            AstTypeExprDesc::NameResolved { from, to } => {
+                write!(f, "{}::{}", from.display(self.db), to.data.display(self.db))
+            }
+            AstTypeExprDesc::Ref { mutable, pointee } => {
+                write!(
+                    f,
+                    "&{}{}",
+                    if *mutable { "mut " } else { "" },
+                    pointee.data.display(self.db)
+                )
+            }
+            AstTypeExprDesc::Pointer { mutable, pointee } => {
+                write!(
+                    f,
+                    "*{}{}",
+                    if *mutable { "mut " } else { "" },
+                    pointee.data.display(self.db)
+                )
+            }
+            AstTypeExprDesc::Slice { ty, len } => {
+                write!(
+                    f,
+                    "[{}{}]",
+                    ty.data.display(self.db),
+                    if let Some(len) = len {
+                        format!("; {len}")
+                    } else {
+                        String::new()
+                    }
+                )
+            }
+            AstTypeExprDesc::Tuple(spanneds) => {
+                write!(
+                    f,
+                    "({})",
+                    spanneds
+                        .iter()
+                        .map(|ty| ty.data.display(self.db).to_string())
+                        .collect_vec()
+                        .join(", ")
+                )
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

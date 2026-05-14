@@ -19,9 +19,9 @@ use crate::{
         expr::BinaryOperator,
         top_level::{
             AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstInterfaceItem, AstMethodDef,
-            AstMethodsig, AstTopLevelItemDesc,
+            AstMethodsig, AstReceiver, AstTopLevelItemDesc,
         },
-        type_expr::AstAnyTypeExpr,
+        type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },
     ril::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
@@ -333,6 +333,24 @@ impl FunctionLikeAst {
             FunctionLikeAst::TraitMethod(spanned) => &spanned.data.args,
         }
     }
+
+    pub fn receiver(&self) -> Option<AstReceiver> {
+        match self {
+            FunctionLikeAst::ExternDef(_, _) => None,
+            FunctionLikeAst::Fundef(_) => None,
+            FunctionLikeAst::Method(spanned) => Some(spanned.data.receiver.clone()),
+            FunctionLikeAst::TraitMethod(spanned) => Some(spanned.data.receiver.clone()),
+        }
+    }
+
+    pub fn get_ret(&self) -> &AstTypeExpr {
+        match self {
+            FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.return_type,
+            FunctionLikeAst::Fundef(spanned) => &spanned.data.return_type,
+            FunctionLikeAst::Method(spanned) => &spanned.data.return_type,
+            FunctionLikeAst::TraitMethod(spanned) => &spanned.data.return_type,
+        }
+    }
 }
 
 #[salsa::tracked]
@@ -431,7 +449,11 @@ impl FunctionId {
             has_zelf,
         ) {
             crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => type_ref,
-            _ => panic!("Unresolved type in function {}", self.name(db).display(db)),
+            _ => panic!(
+                "{}: Unresolved type in function {}",
+                type_expr.span.start().loc_info(db, owning_module).unwrap(),
+                self.name(db).display(db)
+            ),
         }
     }
 

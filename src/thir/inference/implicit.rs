@@ -33,17 +33,17 @@ impl AstImplicitContext {
         db: &dyn Db,
         owner: ScopeOwnerId,
         other_templates: Arc<[AstTemplateArg]>,
-    ) -> Option<Self> {
+    ) -> ImplResult<Self> {
         let template_asts = templates_of_owner(db, owner);
 
         let mut template_names = HashSet::new();
         for ast in template_asts.as_ref() {
             if !template_names.insert(ast.name) {
-                return None;
+                return Err(ImplicitCtxCreationError::DuplicateTemplateName(ast.name));
             }
         }
 
-        Some(Self {
+        Ok(Self {
             owner,
             template_asts: template_asts
                 .iter()
@@ -57,15 +57,14 @@ impl AstImplicitContext {
         self,
         templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
-    ) -> Option<ImplicitContext> {
+    ) -> ImplResult<ImplicitContext> {
         if &self.template_asts.len() != &templates.len() {
-            println!("Backtrace:");
-            println!("{}", std::backtrace::Backtrace::force_capture());
-            // dbg!("Bad template length");
-            return None;
+            dbg!(&self.template_asts);
+            dbg!(&templates);
+            return Err(ImplicitCtxCreationError::TemplateLenMismatch);
         }
 
-        Some(ImplicitContext {
+        Ok(ImplicitContext {
             owner: self.owner,
             template_asts: self.template_asts,
             infer_templates: templates,
@@ -81,6 +80,14 @@ pub struct ImplicitContext {
     zelf: Option<InferTy>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ImplicitCtxCreationError {
+    TemplateLenMismatch,
+    DuplicateTemplateName(Symbol),
+}
+
+pub type ImplResult<T> = Result<T, ImplicitCtxCreationError>;
+
 impl ImplicitContext {
     pub fn new<'a>(
         db: &dyn Db,
@@ -88,7 +95,7 @@ impl ImplicitContext {
         other_templates: Arc<[AstTemplateArg]>,
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
-    ) -> Option<Self> {
+    ) -> ImplResult<Self> {
         let ast_impl = AstImplicitContext::new(db, owner, other_templates)?;
         ast_impl.into_implicit(infer_templates, zelf)
     }
@@ -98,7 +105,7 @@ impl ImplicitContext {
         func: FunctionId,
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
-    ) -> Option<Self> {
+    ) -> ImplResult<Self> {
         let owner = func.parent(db);
         let full_templates = get_templates_of_fun(db, func.interned());
         let other_templates = full_templates

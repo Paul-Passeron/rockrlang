@@ -4,13 +4,16 @@ use std::{
 };
 
 use crate::{
-    common::{location::Span, symbols::Symbol},
+    common::{
+        location::{Span, get_loc_info},
+        symbols::Symbol,
+    },
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
         PartialTypeArg, PartialTypeRef, function_ast,
     },
-    name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
-    parse_tree::top_level::AstStructDef,
+    name_resolve::type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_struct},
+    parse_tree::{expr::BinaryOperator, top_level::AstStructDef},
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     thir::{
         Diagnostic, DiagnosticKind, ExprId,
@@ -258,7 +261,13 @@ impl<'db> InferenceCtx<'db> {
                 .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
-            self.diagnose_bad_struct_fields(fields, span, &ast, &inferred_fields, struct_id)?;
+            self.diagnose_bad_struct_fields(
+                fields,
+                span.clone(),
+                &ast,
+                &inferred_fields,
+                struct_id,
+            )?;
 
             let module = struct_id.parent(self.db);
             let zelf = self.fresh_var();
@@ -266,10 +275,17 @@ impl<'db> InferenceCtx<'db> {
             let ctx = ImplicitContext::new(
                 self.db,
                 ScopeOwnerId::Module(module),
-                Arc::new([]),
+                templates_of_struct(self.db, struct_id.interned())
+                    .iter()
+                    .cloned()
+                    .collect(),
                 templates.iter().cloned().collect(),
                 Some(InferTy::Var(zelf)),
             )
+            .inspect_err(|err| {
+                let loc_info = span.start().loc_info(self.db, module).unwrap();
+                println!("{loc_info}: {err:#?}")
+            })
             .unwrap();
 
             self.snapshot(|this| {
@@ -354,11 +370,23 @@ impl<'db> InferenceCtx<'db> {
 
     fn infer_constructor(
         &mut self,
-        _enum_def: EnumId,
-        _name: Symbol,
-        _args: &HirConstructorArgs,
-        _template_hints: &[PartialTypeArg],
+        enum_def: EnumId,
+        name: Symbol,
+        args: &HirConstructorArgs,
+        template_hints: &[PartialTypeArg],
     ) -> Result<InferTy, UnificationError> {
+        let Some(variant) = enum_item(self.db, enum_def.interned())
+            .variants
+            .iter()
+            .find(|variant| variant.name == name)
+        else {
+            todo!(
+                "report unknown variant `{}` in type `{}`",
+                name.display(self.db),
+                enum_def.name(self.db).display(self.db)
+            )
+        };
+
         todo!()
     }
 
@@ -485,11 +513,14 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn infer_binop(
-        &self,
-        _lhs: &crate::hir::HirExpr,
-        _op: crate::parse_tree::expr::BinaryOperator,
-        _rhs: &crate::hir::HirExpr,
+        &mut self,
+        lhs: &HirExpr,
+        op: BinaryOperator,
+        rhs: &HirExpr,
     ) -> Result<InferTy, UnificationError> {
-        todo!()
+        let lhs_ty = self.infer_expr(lhs)?;
+        let rhs_ty = self.infer_expr(rhs)?;
+        let res = self.emit_binop_constraint(lhs_ty, rhs_ty, op);
+        Ok(InferTy::Var(res))
     }
 }
