@@ -7,8 +7,9 @@ use crate::{
     common::location::get_loc_info,
     driver::load_package,
     name_resolve::{
-        definition::{get_module_pretty_name, module_definitions, resolve_type_expr},
-        file_module_id, module_items,
+        definition::{get_module_pretty_name, module_definitions},
+        file_module_id, module_items, std_package,
+        type_expr::resolve_type_expr,
     },
     parse_tree::top_level::AstTopLevelItemDesc,
     parser::{ParseError, parse_file},
@@ -67,7 +68,7 @@ impl<'db> SourceFile<'db> {
     }
 }
 
-fn print_module_tree<'db>(db: &'db RockrDb, module: FileModule<'db>, indent: usize) {
+fn print_module_tree<'db>(db: &'db dyn Db, module: FileModule<'db>, indent: usize) {
     let prefix = "  ".repeat(indent);
     println!(
         "{}[{}] {}",
@@ -129,7 +130,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     has_errors
 }
 
-fn check_file<'db>(db: &'db RockrDb, source: SourceFile<'db>, module_id: ModuleId) -> bool {
+fn check_file<'db>(db: &'db dyn Db, source: SourceFile<'db>, module_id: ModuleId) -> bool {
     let mut has_errors = false;
     let errors: Vec<&ParseError> = parse_file::accumulated::<ParseError>(db, source);
     for error in &errors {
@@ -142,7 +143,7 @@ fn check_file<'db>(db: &'db RockrDb, source: SourceFile<'db>, module_id: ModuleI
 }
 
 fn check_module_tree<'db>(
-    db: &'db RockrDb,
+    db: &'db dyn Db,
     file_module: FileModule<'db>,
     parent: Option<ModuleId>,
     package: Package<'db>,
@@ -152,6 +153,14 @@ fn check_module_tree<'db>(
     for sub in file_module.submodules(db) {
         has_errors |= check_module_tree(db, *sub, Some(module_id), package);
     }
+    has_errors
+}
+
+fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
+    println!("Package structure:");
+    print_module_tree(db, package.root(db), 0);
+    println!();
+    let has_errors = check_module_tree(db, package.root(db), None, package);
     has_errors
 }
 
@@ -165,11 +174,9 @@ fn main() -> Result<(), String> {
     let package = load_package(&db, root_path)
         .ok_or_else(|| format!("No package found at `{}`", root_path.display()))?;
 
-    println!("Package structure:");
-    print_module_tree(&db, package.root(&db), 0);
-    println!();
-
-    let has_errors = check_module_tree(&db, package.root(&db), None, package);
+    let mut has_errors = false;
+    has_errors |= try_package(&db, package);
+    has_errors |= try_package(&db, std_package(&db).unwrap());
 
     if has_errors {
         Err("Compiled with some errors".to_string())

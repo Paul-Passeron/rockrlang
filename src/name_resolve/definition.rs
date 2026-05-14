@@ -1,25 +1,17 @@
+use crate::{
+    Db,
+    common::symbols::{InternedSymbol, Symbol},
+    name_resolve::{module_items, std_module},
+    parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
+    parser::parse_file,
+    ril::{
+        FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
+        StructId, TypeDefId, char_id, int_id, str_id, void_id,
+    },
+};
+use nonempty::NonEmpty;
 use std::collections::HashMap;
 use std::sync::Arc;
-
-use nonempty::NonEmpty;
-
-use crate::Db;
-
-use crate::common::location::Span;
-use crate::common::symbols::{InternedSymbol, Symbol};
-use crate::name_resolve::{builtin_module, module_items};
-use crate::parse_tree::top_level::{
-    AstIncludePathDesc, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
-};
-use crate::parse_tree::type_expr::{
-    AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
-};
-use crate::parser::parse_file;
-use crate::ril::{
-    FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
-    StructId, TypeDefId, TypeId, TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id,
-    tuple_of, void_id,
-};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Definition {
@@ -88,7 +80,7 @@ fn definition_of_item<'db>(
 
 #[salsa::tracked]
 pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> {
-    HashMap::from([
+    let mut res = HashMap::from([
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
         (
             Symbol::new(db, "void"),
@@ -99,7 +91,16 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
             Definition::Type(char_id(db).def(db)),
         ),
         (Symbol::new(db, "str"), Definition::Type(str_id(db).def(db))),
-    ])
+    ]);
+
+    if let Some(std_module) = std_module(db) {
+        res.insert(
+            Symbol::new(db, "std"),
+            Definition::Module(std_module.into()),
+        );
+    }
+
+    res
 }
 
 #[salsa::tracked]
@@ -115,26 +116,9 @@ pub fn file_module_id<'db>(
         parent,
         Some(fm.file(db).to_owned(db)),
         fm.submodules(db).clone(),
-        package,
+        Some(package),
     )
 }
-
-// #[salsa::tracked]
-// pub fn file_module_definitions<'db>(
-//     db: &'db dyn Db,
-//     file_module: FileModule<'db>,
-//     parent: Option<ModuleId>,
-//     package: Package<'db>,
-// ) -> HashMap<Symbol, Definition> {
-//     let module_id = file_module_id(db, file_module, parent, package);
-//     let mut defs = HashMap::new();
-//     for sub in file_module.submodules(db) {
-//         let sub_id = file_module_id(db, *sub, Some(module_id), package);
-//         defs.insert(sub.name(db), Definition::Module(sub_id));
-//     }
-//     defs.extend(module_definitions(db, module_id.interned()));
-//     defs
-// }
 
 impl AstIncludePathDesc {
     pub fn to_segments(&self) -> NonEmpty<Symbol> {
@@ -166,12 +150,12 @@ pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
 ) -> HashMap<Symbol, Definition> {
-    if module == builtin_module(db, module.package(db)).interned() {
+    if module.package(db).is_none() {
         builtin_definitions(db)
     } else {
         let mut res = HashMap::new();
         for sub in module.file_submodules(db) {
-            let id = file_module_id(db, sub, Some(module.into()), module.package(db));
+            let id = file_module_id(db, sub, Some(module.into()), module.package(db).unwrap());
             res.insert(id.name(db), Definition::Module(id));
         }
         let items = module_items(db, module);
@@ -234,9 +218,12 @@ pub fn resolve_in_module<'db>(
     let includes = module_includes(db, module);
 
     for included_module in includes {
-        let included_id = resolve_include_path(db, included_module, module)?;
-        if let Some(def) = module_definitions(db, included_id.interned()).get(&Symbol::from(name)) {
-            return Some(def.clone());
+        if let Some(included_id) = resolve_include_path(db, included_module, module) {
+            if let Some(def) =
+                module_definitions(db, included_id.interned()).get(&Symbol::from(name))
+            {
+                return Some(def.clone());
+            }
         }
     }
     module
@@ -267,113 +254,6 @@ pub fn resolve_path<'db>(
             }
         },
     )
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TypeResolution {
-    Error,
-    Infer,
-    Type(TypeRef),
-}
-
-pub fn resolve_any_type_expr<'db>(
-    db: &'db dyn Db,
-    any_type_expr: &'db AstAnyTypeExpr,
-    module: InternedModuleId<'db>,
-    template_args: &'db [AstTemplateArg], // From the enclosing item
-) -> TypeResolution {
-    match &any_type_expr.data {
-        AstAnyTypeExprDesc::Any => TypeResolution::Infer,
-        AstAnyTypeExprDesc::Known(desc) => {
-            resolve_spanned_type_expr_desc(db, desc, &any_type_expr.span, module, template_args)
-        }
-    }
-}
-
-pub fn resolve_spanned_type_expr_desc<'db>(
-    db: &'db dyn Db,
-    type_expr: &'db AstTypeExprDesc,
-    _span: &'db Span,
-    module: InternedModuleId<'db>,
-    template_args: &'db [AstTemplateArg], // From the enclosing item
-) -> TypeResolution {
-    match type_expr {
-        AstTypeExprDesc::Named { name, args } => {
-            if args.is_empty()
-                && let Some(idx) = template_args.iter().position(|p| p.name == *name)
-            {
-                return TypeResolution::Type(TypeRef::Param(TypeParamId(idx)));
-            }
-
-            resolve_in_module(db, name.interned(), module).map_or(TypeResolution::Error, |def| {
-                if let Definition::Type(type_def_id) = def {
-                    let resolved_args = args
-                        .iter()
-                        .map(
-                            |arg| match resolve_any_type_expr(db, arg, module, template_args) {
-                                TypeResolution::Type(type_ref) => Some(type_ref),
-                                _ => None,
-                            },
-                        )
-                        .collect::<Option<Vec<_>>>();
-                    match resolved_args {
-                        Some(resolved_args) => {
-                            TypeResolution::Type(TypeId::new(db, type_def_id, resolved_args).into())
-                        }
-                        None => TypeResolution::Error,
-                    }
-                } else {
-                    TypeResolution::Error
-                }
-            })
-        }
-        AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
-            {
-                resolve_type_expr(db, &**to, module.interned(), template_args)
-            } else {
-                TypeResolution::Error
-            }
-        }
-        AstTypeExprDesc::Pointer(pointee) => {
-            match resolve_type_expr(db, &*pointee, module, template_args) {
-                TypeResolution::Type(pointee) => TypeResolution::Type(ptr_of(db, pointee).into()),
-                _ => TypeResolution::Error,
-            }
-        }
-        AstTypeExprDesc::Slice { ty, len } => {
-            assert!(len.is_none(), "TODO: handle non value-type");
-            match resolve_type_expr(db, &*ty, module, template_args) {
-                TypeResolution::Type(elem) => TypeResolution::Type(slice_of(db, elem).into()),
-                _ => TypeResolution::Infer,
-            }
-        }
-        AstTypeExprDesc::Tuple(tys) => {
-            let types = tys
-                .iter()
-                .map(
-                    |ty| match resolve_type_expr(db, ty, module, template_args) {
-                        TypeResolution::Type(type_ref) => Some(type_ref),
-                        _ => None,
-                    },
-                )
-                .collect::<Option<_>>();
-            match types {
-                Some(tys) => TypeResolution::Type(tuple_of(db, tys).into()),
-                None => TypeResolution::Error,
-            }
-        }
-    }
-}
-
-#[inline(always)]
-pub fn resolve_type_expr<'db>(
-    db: &'db dyn Db,
-    type_expr: &'db AstTypeExpr,
-    module: InternedModuleId<'db>,
-    template_args: &'db [AstTemplateArg], // From the enclosing item
-) -> TypeResolution {
-    resolve_spanned_type_expr_desc(db, &type_expr.data, &type_expr.span, module, template_args)
 }
 
 #[salsa::tracked]

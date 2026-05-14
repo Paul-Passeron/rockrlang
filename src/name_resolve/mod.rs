@@ -1,12 +1,14 @@
 use crate::{
     Db, SourceFile,
     common::symbols::Symbol,
+    driver::load_package,
     parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{FileModule, InternedModuleId, ModuleId, Package},
 };
 
 pub mod definition;
+pub mod type_expr;
 
 #[salsa::tracked]
 pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> SourceFile<'db> {
@@ -17,8 +19,8 @@ pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> So
 }
 
 #[salsa::tracked]
-pub fn builtin_module<'db>(db: &'db dyn Db, package: Package<'db>) -> ModuleId {
-    ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![], package)
+pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
+    ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![], None)
 }
 
 /// Build the ModuleId hierarchy for a FileModule tree rooted at a package root.
@@ -30,14 +32,14 @@ pub fn file_module_id<'db>(
     parent: Option<ModuleId>,
     package: Package<'db>,
 ) -> ModuleId {
-    let actual_parent = parent.unwrap_or_else(|| builtin_module(db, package));
+    let actual_parent = parent.unwrap_or_else(|| builtin_module(db));
     let id = ModuleId::new(
         db,
         file_module.name(db),
         Some(actual_parent),
         Some(file_module.file(db).to_owned(db)),
         file_module.submodules(db).clone(),
-        package,
+        Some(package),
     );
     // Eagerly register submodules so their ModuleIds exist with the right parent
     for sub in file_module.submodules(db) {
@@ -75,10 +77,10 @@ pub fn root_module<'db>(
     ModuleId::new(
         db,
         name,
-        Some(builtin_module(db, package)),
+        Some(builtin_module(db)),
         Some(file.to_owned(db)),
         file_module.submodules(db).clone(),
-        package,
+        Some(package),
     )
 }
 
@@ -112,4 +114,18 @@ pub fn module_items<'db>(
             }
         })
         .flatten()
+}
+
+#[salsa::tracked]
+pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
+    let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
+    let std_root = std::path::Path::new(&std_path);
+    load_package(db, std_root)
+}
+
+#[salsa::tracked]
+pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
+    let package = std_package(db)?;
+    let file_module = package.root(db);
+    Some(file_module_id(db, file_module, Some(builtin_module(db)), package).interned())
 }
