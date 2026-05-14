@@ -1,0 +1,21 @@
+interface Clone {
+    // TODO
+}
+
+interface Copy {
+    // TODO
+}
+
+interface Drop {
+    // TODO
+}
+
+@[orthogonal(Drop)]
+interface NoDrop {
+    // TODO
+}
+
+
+interface AsRef {
+    // TODO
+}
