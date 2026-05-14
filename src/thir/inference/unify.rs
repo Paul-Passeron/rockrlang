@@ -7,6 +7,7 @@ impl InferTy {
         match self {
             InferTy::Var(this_var) => *this_var == var,
             InferTy::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
+            InferTy::Param(_) => false,
         }
     }
 
@@ -51,6 +52,19 @@ impl InferTy {
                             fields: fields.clone(),
                         })
                     }
+                }
+                (InferTy::Param(p), InferTy::Var(_)) | (InferTy::Var(_), InferTy::Param(p)) => {
+                    Ok(InferTy::Param(*p))
+                }
+                (InferTy::Param(pa), InferTy::Param(pb)) => {
+                    if pa == pb {
+                        Ok(InferTy::Param(*pa))
+                    } else {
+                        Err(UnificationError::TemplateConstraining(*pa))
+                    }
+                }
+                (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
+                    Err(UnificationError::TemplateConstraining(*p))
                 }
                 _ if !flag => _unify(b, a, true),
                 _ => panic!(
@@ -102,6 +116,16 @@ impl<'db> InferenceCtx<'db> {
                         })
                 }
             }
+            (InferTy::Param(pa), InferTy::Param(pb)) => {
+                if pa == pb {
+                    Ok(())
+                } else {
+                    Err(UnificationError::TemplateConstraining(*pa))
+                }
+            }
+            (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
+                Err(UnificationError::TemplateConstraining(*p))
+            }
         }
     }
 
@@ -125,6 +149,7 @@ impl<'db> InferenceCtx<'db> {
                 def: *def,
                 fields: fields.iter().map(|ty| self.find(ty)).collect(),
             },
+            InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
         }
     }
 }

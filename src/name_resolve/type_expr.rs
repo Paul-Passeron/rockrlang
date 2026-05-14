@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::{
     Db,
-    common::location::Span,
     hir::{FunctionLikeAst, function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -34,16 +33,13 @@ pub fn resolve_any_type_expr<'db>(
 ) -> TypeResolution {
     match &any_type_expr.data {
         AstAnyTypeExprDesc::Any => TypeResolution::Infer,
-        AstAnyTypeExprDesc::Known(desc) => {
-            resolve_spanned_type_expr_desc(db, desc, &any_type_expr.span, module, template_args)
-        }
+        AstAnyTypeExprDesc::Known(desc) => resolve_type_expr_desc(db, desc, module, template_args),
     }
 }
 
-pub fn resolve_spanned_type_expr_desc<'db>(
+pub fn resolve_type_expr_desc<'db>(
     db: &'db dyn Db,
     type_expr: &'db AstTypeExprDesc,
-    _span: &'db Span,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
 ) -> TypeResolution {
@@ -133,7 +129,7 @@ pub fn resolve_type_expr<'db>(
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
 ) -> TypeResolution {
-    resolve_spanned_type_expr_desc(db, &type_expr.data, &type_expr.span, module, template_args)
+    resolve_type_expr_desc(db, &type_expr.data, module, template_args)
 }
 
 #[salsa::tracked]
@@ -180,7 +176,7 @@ pub fn templates_of_enum<'db>(
 pub fn get_templates_of_fun<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-) -> Vec<AstTemplateArg> {
+) -> Arc<[AstTemplateArg]> {
     let mut res = vec![];
     match function.parent(db) {
         ScopeOwnerId::Module(_) => (),
@@ -198,5 +194,5 @@ pub fn get_templates_of_fun<'db>(
         }
         FunctionLikeAst::Method(def) => res.extend(def.data.template_args.clone()),
     }
-    res
+    res.into()
 }

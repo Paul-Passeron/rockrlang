@@ -75,6 +75,7 @@ impl fmt::Display for Display<'_, &InferTy> {
                     Ok(())
                 }
             },
+            InferTy::Param(type_param_id) => write!(f, "T{}", type_param_id.0),
         }
     }
 }

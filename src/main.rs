@@ -126,8 +126,11 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
             if let Some(hir) = hir_body(db, function_id.interned()) {
                 println!("{}", hir.display(db));
             }
-            if let Some(results) = type_check_function(db, function_id.interned(), packages.clone())
-            {
+            if let Some(results) = type_check_function(
+                db,
+                function_id.interned(),
+                packages.clone().into_boxed_slice(),
+            ) {
                 for (expr_id, ty) in &results.node_types(db) {
                     println!("{:?}: {}", expr_id, ty.display(db));
                 }

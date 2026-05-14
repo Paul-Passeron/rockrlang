@@ -3,13 +3,20 @@ use std::collections::HashMap;
 use crate::{
     common::symbols::Symbol,
     hir::{PartialTypeArg, PartialTypeRef},
-    name_resolve::type_expr::{TypeResolution, resolve_type_expr, struct_item},
-    parse_tree::{top_level::AstTemplateArg, type_expr::AstTypeExpr},
+    name_resolve::type_expr::{TypeResolution, resolve_type_expr_desc, struct_item},
+    parse_tree::{top_level::AstTemplateArg, type_expr::AstTypeExprDesc},
     ril::{BuiltinTypeId, ModuleId, StructId, TypeDefId, TypeRef, str_def},
     thir::inference::{InferTy, InferenceCtx},
 };
 
 impl<'db> InferenceCtx<'db> {
+    pub fn void_ty(&self) -> InferTy {
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::void(self.db)),
+            fields: Box::new([]),
+        }
+    }
+
     pub fn int_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::int(self.db)),
@@ -166,13 +173,13 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn allocate_ast_type_expr(
         &self,
-        type_expr: &AstTypeExpr,
+        type_expr: &AstTypeExprDesc,
         module: ModuleId,
         ast_template_args: &[AstTemplateArg],
         templates: &[InferTy],
     ) -> Option<InferTy> {
         debug_assert_eq!(ast_template_args.len(), templates.len());
-        match resolve_type_expr(self.db, type_expr, module.interned(), ast_template_args) {
+        match resolve_type_expr_desc(self.db, type_expr, module.interned(), ast_template_args) {
             TypeResolution::Type(type_ref) => Some(self.allocate_type_ref(&type_ref, templates)),
             _ => None,
         }
@@ -189,8 +196,13 @@ impl<'db> InferenceCtx<'db> {
             ast.fields
                 .iter()
                 .map(|field| {
-                    self.allocate_ast_type_expr(&field.ty, module, ast_template_args, templates)
-                        .map(|ty| (field.name, ty))
+                    self.allocate_ast_type_expr(
+                        &field.ty.data,
+                        module,
+                        ast_template_args,
+                        templates,
+                    )
+                    .map(|ty| (field.name, ty))
                 })
                 .collect::<Option<_>>()
                 .map(|fields| (struct_id, fields))

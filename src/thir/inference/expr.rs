@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use crate::{
     common::symbols::Symbol,
     hir::{
-        HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId, PartialTypeArg, PartialTypeRef,
+        FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
+        PartialTypeArg, PartialTypeRef, function_ast, owning_module,
     },
-    name_resolve::type_expr::{struct_item, templates_of_struct},
+    name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     ril::{EnumId, FunctionId, InterfaceId, StructId, TypeDefId, TypeRef},
+    thir::ExprId,
 };
 
 use super::{InferTy, InferenceCtx, UnificationError};
@@ -30,7 +32,7 @@ impl<'db> InferenceCtx<'db> {
                 method,
                 args,
                 interface_hint,
-            } => self.infer_method(receiver, *method, args, *interface_hint),
+            } => self.infer_method(ExprId(expr.id), receiver, *method, args, *interface_hint),
             HirExprDesc::CallStatic { ty, method, args } => self.infer_static(ty, *method, args),
             HirExprDesc::BinOp { lhs, op, rhs } => self.infer_binop(lhs, *op, rhs),
             HirExprDesc::StructLit { ty, fields } => self.infer_struct_lit(ty, fields),
@@ -108,7 +110,7 @@ impl<'db> InferenceCtx<'db> {
         self.snapshot(|this| this._infer_expr(expr))
     }
 
-    fn infer_local(&mut self, local_id: LocalId) -> InferTy {
+    pub fn infer_local(&mut self, local_id: LocalId) -> InferTy {
         InferTy::Var(self.local_map[&local_id])
     }
 
@@ -185,7 +187,7 @@ impl<'db> InferenceCtx<'db> {
                 let missing = ast
                     .fields
                     .iter()
-                    .find(|field| inferred_fields.get(&field.name).is_none())
+                    .find(|field| !inferred_fields.contains_key(&field.name))
                     .unwrap()
                     .name;
                 return Err(UnificationError::IncompleteStructLit {
@@ -201,7 +203,7 @@ impl<'db> InferenceCtx<'db> {
                 ast.fields.iter().try_for_each(|ast| {
                     let ty = inferred_fields.get(&ast.name).unwrap().clone();
                     let resolved = this
-                        .allocate_ast_type_expr(&ast.ty, module, ast_template_args, &templates)
+                        .allocate_ast_type_expr(&ast.ty.data, module, ast_template_args, &templates)
                         .unwrap();
                     this.unify(ty, resolved)
                 })
@@ -236,21 +238,90 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn infer_method(
-        &self,
-        _receiver: &HirExpr,
-        _method: Symbol,
-        _args: &[HirExpr],
-        _interface_hint: Option<InterfaceId>,
+        &mut self,
+        id: ExprId,
+        receiver: &HirExpr,
+        method: Symbol,
+        args: &[HirExpr],
+        interface_hint: Option<InterfaceId>,
     ) -> Result<InferTy, UnificationError> {
-        todo!()
+        let receiver_ty = self.infer_expr(receiver)?;
+        let inferred_args = args
+            .iter()
+            .map(|arg| self.infer_expr(arg))
+            .collect::<Result<Box<[_]>, _>>()?;
+        let res_var =
+            self.emit_method_constraint(id, receiver_ty, method, inferred_args, interface_hint);
+        Ok(InferTy::Var(res_var))
+    }
+
+    fn check_args_count(
+        &self,
+        target: FunctionId,
+        arg_count: usize,
+    ) -> Result<(), UnificationError> {
+        let ast = function_ast(self.db, target.interned()).inner(self.db);
+        let (_, args) = target.args(self.db);
+        if args.len() == arg_count {
+            Ok(())
+        } else if let FunctionLikeAst::ExternDef(_, variadic) = ast
+            && *variadic
+            && args.len() <= arg_count
+        {
+            Ok(())
+        } else {
+            Err(UnificationError::ArgCountMismatch(target, arg_count))
+        }
+    }
+
+    fn get_ret_ty(&mut self, target: FunctionId, templates: &[InferTy]) -> InferTy {
+        let ast = function_ast(self.db, target.interned()).inner(self.db);
+        let ast_ret_ty = match ast {
+            FunctionLikeAst::ExternDef(sig, _) => &sig.data.return_type,
+            FunctionLikeAst::Fundef(def) => &def.data.return_type,
+            FunctionLikeAst::Method(def) => &def.data.return_type,
+        };
+        let module = owning_module(self.db, target.parent(self.db));
+        let ast_template_args = get_templates_of_fun(self.db, target.interned());
+        self.allocate_ast_type_expr(
+            &ast_ret_ty.data,
+            module,
+            ast_template_args.as_ref(),
+            templates,
+        )
+        .unwrap()
     }
 
     fn infer_direct(
-        &self,
-        _target: FunctionId,
-        _args: &[HirExpr],
+        &mut self,
+        target: FunctionId,
+        args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
-        todo!()
+        self.check_args_count(target, args.len())?;
+        let (_, ast_args) = target.args(self.db);
+        let templates = get_templates_of_fun(self.db, target.interned());
+        let inferred_templates = templates
+            .iter()
+            .map(|_| InferTy::Var(self.fresh_var()))
+            .collect::<Box<[_]>>();
+        let module = owning_module(self.db, target.parent(self.db));
+        let inferred_ast_args = ast_args
+            .iter()
+            .map(|arg| {
+                self.allocate_ast_type_expr(&arg.ty.data, module, &templates, &inferred_templates)
+                    .unwrap()
+            })
+            .collect::<Box<[_]>>();
+        let inferred_args = args
+            .iter()
+            .map(|arg| self.infer_expr(arg))
+            .collect::<Result<Box<[_]>, _>>()?;
+        inferred_ast_args
+            .into_iter()
+            .zip(inferred_args)
+            .try_for_each(|(a, b)| self.unify(a, b))?;
+
+        Ok(self.get_ret_ty(target, &inferred_templates))
     }
 
     fn infer_binop(

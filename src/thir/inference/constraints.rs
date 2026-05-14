@@ -2,12 +2,16 @@ use std::collections::VecDeque;
 
 use crate::{
     common::symbols::Symbol,
-    hir::Mutability,
-    ril::{BuiltinTypeId, PtrKind, TypeDefId},
-    thir::inference::{InferenceConstraint, InferenceCtx, UnificationError, var::InferVar},
+    hir::{Mutability, impl_items},
+    parse_tree::top_level::{self, AstImplItem},
+    ril::{BuiltinTypeId, FunctionId, InterfaceId, PtrKind, ScopeOwnerId, TypeDefId},
+    thir::{
+        ExprId,
+        inference::{InferenceConstraint, InferenceCtx, UnificationError, var::InferVar},
+    },
 };
 
-use super::InferTy;
+use super::{InferTy, implems::PotentialBlockRes};
 
 enum ConstraintSolveResult {
     Solved,
@@ -30,6 +34,9 @@ impl<'db> InferenceCtx<'db> {
                         return ConstraintSolveResult::Error(err);
                     }
                     ConstraintSolveResult::Solved
+                }
+                InferTy::Param(id) => {
+                    ConstraintSolveResult::Error(UnificationError::TemplateDereferencing(id))
                 }
             }
         } else {
@@ -151,6 +158,157 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn solve_method_constraint(
+        &mut self,
+        ret_var: InferVar,
+        receiver: InferTy,
+        id: ExprId,
+        method: Symbol,
+        args: &[InferTy],
+        interface_hint: Option<InterfaceId>,
+    ) -> ConstraintSolveResult {
+        let mut possible_blocks = self.get_potential_blocks(&receiver);
+        if let Some(id) = interface_hint {
+            possible_blocks = possible_blocks
+                .into_iter()
+                .filter(|(src, _)| {
+                    src.id(self.db)
+                        .interface(self.db)
+                        .is_some_and(|impl_interface_id| impl_interface_id.def(self.db) == id)
+                })
+                .filter(|(src, _)| {
+                    let items = impl_items(self.db, src.id(self.db).interned());
+                    for item in items {
+                        match item {
+                            AstImplItem::Fundef(def) => {
+                                if def.data.name == method {
+                                    return true;
+                                }
+                            }
+                            _ => (),
+                        }
+                    }
+                    false
+                })
+                .collect();
+        }
+        if possible_blocks.is_empty() {
+            todo!()
+        } else if possible_blocks.len() > 1 {
+            todo!()
+        }
+        let (
+            src,
+            PotentialBlockRes {
+                templates,
+                constraints,
+                ..
+            },
+        ) = possible_blocks.into_iter().next().unwrap();
+        constraints
+            .into_iter()
+            .for_each(|constraint| self.emit_constraint(constraint));
+        if let Err(err) = self.solve_constraints() {
+            todo!("{:?}", err)
+        }
+
+        let module = src.id(self.db).parent(self.db);
+
+        let method_id = FunctionId::new(self.db, method, ScopeOwnerId::Impl(src.id(self.db)));
+
+        let ast = impl_items(self.db, src.id(self.db).interned())
+            .into_iter()
+            .find_map(|item| match item {
+                AstImplItem::Fundef(def) if def.data.name == method => Some(def),
+                _ => None,
+            })
+            .unwrap();
+
+        match ast.data.receiver {
+            top_level::AstReceiver::None => {
+                return ConstraintSolveResult::Error(UnificationError::StaticMethodCallOnReceiver(
+                    id, method_id,
+                ));
+            }
+            _ => (),
+        }
+
+        if ast.data.args.len() != args.len() {
+            return ConstraintSolveResult::Error(UnificationError::ArgCountMismatch(
+                method_id,
+                args.len(),
+            ));
+        }
+
+        let method_templates = templates
+            .iter()
+            .map(|var| InferTy::Var(*var))
+            .chain(ast.data.template_args.iter().map(|ast_template| {
+                if !ast_template.constraints.is_empty() {
+                    todo!()
+                }
+                InferTy::Var(self.fresh_var())
+            }))
+            .collect::<Box<[_]>>();
+
+        let ast_method_templates = src
+            .templates(self.db)
+            .into_iter()
+            .chain(ast.data.template_args.clone())
+            .collect::<Box<[_]>>();
+
+        if let Err(err) = args
+            .iter()
+            .zip(&ast.data.args)
+            .try_for_each(|(arg, ast_ty)| {
+                let arg_ty = self
+                    .allocate_ast_type_expr(
+                        &ast_ty.ty.data,
+                        module,
+                        &ast_method_templates,
+                        &method_templates,
+                    )
+                    .unwrap();
+                self.unify(arg.clone(), arg_ty)
+            })
+        {
+            return ConstraintSolveResult::Error(err);
+        }
+
+        let ast_ret_ty = &ast.data.return_type;
+        let ret_ty = self
+            .allocate_ast_type_expr(
+                &ast_ret_ty.data,
+                module,
+                &ast_method_templates,
+                &method_templates,
+            )
+            .unwrap();
+
+        if let Err(err) = self.unify(InferTy::Var(ret_var), ret_ty) {
+            return ConstraintSolveResult::Error(err);
+        }
+
+        ConstraintSolveResult::Solved
+    }
+
+    fn solve_implements_constraint(
+        &mut self,
+        _ty: InferTy,
+        _id: InterfaceId,
+        _args: &[InferTy],
+    ) -> ConstraintSolveResult {
+        todo!()
+    }
+
+    fn solve_unify_constraint(&mut self, a: InferTy, b: InferTy) -> ConstraintSolveResult {
+        if let Err(err) = self.unify(a, b) {
+            ConstraintSolveResult::Error(err)
+        } else {
+            ConstraintSolveResult::Solved
+        }
+    }
+
     fn try_solve_constraint(&mut self, constraint: InferenceConstraint) -> ConstraintSolveResult {
         match constraint {
             InferenceConstraint::Deref { var, target } => self.solve_deref_constraint(var, target),
@@ -172,6 +330,18 @@ impl<'db> InferenceCtx<'db> {
                 struct_ty,
                 field,
             } => self.solve_struct_field_constraint(elem_var, struct_ty, field),
+            InferenceConstraint::Method {
+                ret_var,
+                ty,
+                id,
+                method,
+                args,
+                interface_hint,
+            } => self.solve_method_constraint(ret_var, ty, id, method, &args, interface_hint),
+            InferenceConstraint::Implements { ty, id, args } => {
+                self.solve_implements_constraint(ty, id, &args)
+            }
+            InferenceConstraint::Unify { a, b } => self.solve_unify_constraint(a, b),
         }
     }
 
@@ -257,5 +427,35 @@ impl<'db> InferenceCtx<'db> {
             field,
         });
         elem_var
+    }
+
+    pub fn emit_method_constraint(
+        &mut self,
+        id: ExprId, // Used to populate the call infos
+        ty: InferTy,
+        method: Symbol,
+        args: Box<[InferTy]>,
+        interface_hint: Option<InterfaceId>,
+    ) -> InferVar {
+        let ret_var = self.fresh_var();
+        self.constraints.push(InferenceConstraint::Method {
+            ret_var,
+            ty,
+            id,
+            method,
+            args,
+            interface_hint,
+        });
+        ret_var
+    }
+
+    pub fn emit_implements_constraint(
+        &mut self,
+        ty: InferTy,
+        id: InterfaceId,
+        args: Box<[InferTy]>,
+    ) {
+        self.constraints
+            .push(InferenceConstraint::Implements { ty, id, args });
     }
 }
