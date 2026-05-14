@@ -215,12 +215,26 @@ impl<'db> InferenceCtx<'db> {
         {
             let templates = fields;
             let ast = struct_item(self.db, struct_id.interned());
+            let templates = if templates.len() != ast.template_args.len() {
+                ast.template_args
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| {
+                        templates
+                            .get(i)
+                            .cloned()
+                            .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
+                    })
+                    .collect::<Arc<_>>()
+            } else {
+                templates.iter().cloned().collect::<Arc<_>>()
+            };
             let module = struct_id.parent(self.db);
             let ctx = ImplicitContext::new(
                 self.db,
                 ScopeOwnerId::Module(module),
-                Arc::new([]),
-                templates.iter().cloned().collect(),
+                ast.template_args.iter().cloned().collect::<Arc<_>>(),
+                templates,
                 None,
             )?;
             ast.fields

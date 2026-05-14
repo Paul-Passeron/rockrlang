@@ -116,7 +116,7 @@ impl<'db> InferenceCtx<'db> {
                 let root = self.table.find(*infer_var);
                 if let Some(listeners) = self.listeners.remove(&root) {
                     for l in listeners {
-                        if !self.solved_constraints.contains(&l) && !self.ready_set.insert(l) {
+                        if self.ready_set.insert(l) {
                             self.ready.push_back(l);
                         }
                     }
@@ -163,15 +163,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn unify(&mut self, a: InferTy, b: InferTy) -> Result<(), UnificationError> {
-        self.snapshot(|this| {
-            this.try_unify(&a, &b)
-            //         .map_err(|(inference_constraint, unification_error)| {
-            //             UnificationError::UnmetConstraint(
-            //                 inference_constraint,
-            //                 Box::new(unification_error),
-            //             )
-            //         })
-        })
+        self.snapshot(|this| this.try_unify(&a, &b))
     }
 
     pub fn find(&mut self, ty: &InferTy) -> InferTy {

@@ -87,6 +87,7 @@ pub enum InferenceConstraintKind {
     },
 }
 
+#[derive(Debug)]
 enum ConstraintSolveResult {
     Solved,
     Pending,
@@ -371,6 +372,10 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> ConstraintSolveResult {
+        if self.call_infos.contains_key(&id) {
+            return ConstraintSolveResult::Solved;
+        }
+
         if let Some(result) = self.try_resolve_via_known_impl(
             ret_var,
             receiver,
@@ -414,7 +419,12 @@ impl<'db> InferenceCtx<'db> {
         let possible_blocks = self.get_working_impls(possible_blocks);
 
         if possible_blocks.is_empty() {
-            return ConstraintSolveResult::Pending;
+            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+                "Could not find an implementation for {} with arity {} on {}",
+                method.display(self.db),
+                args.len(),
+                self.find(receiver).display(self.db)
+            )));
         } else if possible_blocks.len() > 1 {
             for possible in possible_blocks {
                 let src = possible.0;
@@ -433,12 +443,6 @@ impl<'db> InferenceCtx<'db> {
         constraints
             .into_iter()
             .for_each(|constraint| self.emit_constraint(constraint));
-        if let Err((inference_constraint, unification_error)) = self.solve_constraints() {
-            return ConstraintSolveResult::Error(UnificationError::UnmetConstraint(
-                inference_constraint,
-                Box::new(unification_error),
-            ));
-        }
 
         let method_id = FunctionId::new(self.db, method, ScopeOwnerId::Impl(src.id(self.db)));
 
@@ -500,7 +504,7 @@ impl<'db> InferenceCtx<'db> {
             .allocate_ast_type_expr(&ast_ret_ty.data, &method_ctx)
             .unwrap();
 
-        if let Err(err) = self.unify(InferTy::Var(ret_var), ret_ty) {
+        if let Err(err) = self.unify(InferTy::Var(ret_var), ret_ty.clone()) {
             return ConstraintSolveResult::Error(err);
         }
 
@@ -512,7 +516,6 @@ impl<'db> InferenceCtx<'db> {
         };
 
         self.call_infos.insert(id, call_infos);
-
         ConstraintSolveResult::Solved
     }
 
@@ -523,6 +526,12 @@ impl<'db> InferenceCtx<'db> {
         interface_id: InterfaceId,
         args: &[InferTy],
     ) -> ConstraintSolveResult {
+        let key = (interface_id, self.canonize(ty));
+        if self.in_flight_impls.contains(&key) {
+            return ConstraintSolveResult::Pending; // assume it'll work; break the cycle
+        }
+        self.in_flight_impls.insert(key.clone());
+
         if self.impl_depth >= MAX_IMPL_DEPTH {
             return ConstraintSolveResult::Pending;
         }
@@ -535,8 +544,8 @@ impl<'db> InferenceCtx<'db> {
                 return ConstraintSolveResult::Solved;
             }
 
-            self.add_implementation(interface_id, ty.clone(), args);
             // TODO: remove implementation when erroring out, maybe
+            self.add_implementation(interface_id, ty.clone(), args);
 
             let impls = self.get_potential_blocks(ty);
 
@@ -567,22 +576,7 @@ impl<'db> InferenceCtx<'db> {
                     args.iter().cloned().collect(),
                 ));
             } else {
-                let mut iterator = competing_impls.iter();
-                let fst = iterator.next().unwrap();
-                let snd = iterator.next().unwrap();
-                todo!(
-                    "Ambiguous implems: \n    {}\n    {}",
-                    fst.0
-                        .span(self.db)
-                        .start()
-                        .loc_info(self.db, fst.0.module(self.db))
-                        .unwrap(),
-                    snd.0
-                        .span(self.db)
-                        .start()
-                        .loc_info(self.db, fst.0.module(self.db))
-                        .unwrap()
-                )
+                return ConstraintSolveResult::Pending;
             };
             for constraint in impl_.constraints {
                 self.emit_constraint(constraint.clone());
@@ -597,6 +591,7 @@ impl<'db> InferenceCtx<'db> {
             ConstraintSolveResult::Solved
         };
         let result = result_fun();
+        self.in_flight_impls.remove(&key);
         self.impl_depth -= 1;
         result
     }
@@ -607,8 +602,6 @@ impl<'db> InferenceCtx<'db> {
     ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
         let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
         if competing_impls.len() > 1 {
-            let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
-
             let mut possibles = HashSet::new();
             for (i, (_, impl_)) in competing_impls.iter().enumerate() {
                 let mut this = self.clone();
@@ -761,55 +754,9 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    // fn try_solve_constraints(
-    //     &mut self,
-    // ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-    //     let mut len = 0;
-    //     let mut worklist = VecDeque::from(std::mem::take(&mut self.current_constraints));
-
-    //     while len != worklist.len()
-    //         && let Some(constraint) = worklist.pop_front()
-    //     {
-    //         match self.try_solve_constraint(constraint.as_ref()) {
-    //             // The constraint has been solved, no need to push it back in the worklist
-    //             ConstraintSolveResult::Solved => {
-    //                 self.solved_constraints.insert(constraint.id);
-    //             }
-
-    //             // The constraint could not be solved but there were no errors, we push it back onto
-    //             // the worklist
-    //             ConstraintSolveResult::Pending => worklist.push_back(constraint),
-
-    //             // An error was encountered, we return the constraint which caused the error
-    //             ConstraintSolveResult::Error(error) => return Err((constraint, error)),
-    //         }
-    //         // Solving the constraints might have generated more constraints so we insert them on the worklist
-    //         std::mem::take(&mut self.current_constraints)
-    //             .into_iter()
-    //             .for_each(|elem| worklist.push_front(elem));
-    //         len = worklist.len();
-    //     }
-    //     self.current_constraints.extend(worklist);
-    //     Ok(())
-    // }
-
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-        // loop {
-        //     let before = self.current_constraints.len();
-        //     let constraints = self.current_constraints.clone();
-        //     if let Err(err) = self.try_solve_constraints() {
-        //         // roll-back constraints that were eaten during their resolution
-        //         self.current_constraints = constraints;
-        //         return Err(err);
-        //     }
-        //     if self.current_constraints.len() == before {
-        //         break;
-        //     }
-        // }
-        // Ok(())
-
         while let Some(id) = self.ready.pop_front() {
             let constraint = self.all_constraints[&id].clone();
             match self.try_solve_constraint(&constraint) {
@@ -980,7 +927,7 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             } => {
                 write!(
                     f,
-                    "IndexedBy {{elem_var: {}, struct_ty: {}, field: {}}}",
+                    "StructField {{elem_var: {}, struct_ty: {}, field: {}}}",
                     InferTy::Var(*elem_var).display(self.db),
                     struct_ty.display(self.db),
                     field.display(self.db)

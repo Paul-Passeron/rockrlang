@@ -27,6 +27,7 @@ use crate::{
     thir::{
         Diagnostic, ExprId, InferCallInfos,
         inference::{
+            canon::CanonTy,
             constraints::{InferenceConstraint, InferenceConstraintId},
             implicit::{AsAstImplCtx, ImplicitContext},
         },
@@ -75,6 +76,7 @@ pub struct InferenceCtx<'a> {
     impl_depth: usize,
 
     pub(super) diagnostics: Vec<Diagnostic>,
+    in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -132,6 +134,7 @@ impl<'db> InferenceCtx<'db> {
             listeners: HashMap::new(),
             ready: VecDeque::new(),
             ready_set: HashSet::new(),
+            in_flight_impls: HashSet::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
@@ -223,6 +226,7 @@ pub enum UnificationError {
     ZelfConstraining,
     InvalidStructField { id: StructId, invalid: Symbol },
     AlreadyDiagnosed,
+    Custom(String),
 }
 
 impl UnificationError {
@@ -329,6 +333,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 write!(f, "Constraining self type")
             }
             UnificationError::AlreadyDiagnosed => Ok(()),
+            UnificationError::Custom(s) => write!(f, "Custom : {s}"),
         }
     }
 }

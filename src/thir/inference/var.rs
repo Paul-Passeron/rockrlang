@@ -5,7 +5,7 @@ use ena::unify::UnifyKey;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InferVar(usize);
+pub struct InferVar(pub usize);
 
 impl fmt::Display for InferVar {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

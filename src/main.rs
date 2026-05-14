@@ -8,7 +8,7 @@ use std::{
 use crate::{
     common::location::get_loc_info,
     driver::load_package,
-    hir::{FunctionLikeAst, function_ast, hir_body},
+    hir::hir_body,
     name_resolve::{
         core_package,
         definition::{Definition, module_definitions},
@@ -194,10 +194,6 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
                         let loc_info = get_loc_info(db, source_file, loc.start);
                         println!("{}: {:?}", loc_info, diagnostic.kind);
                     }
-                } else if let FunctionLikeAst::Fundef(_) =
-                    function_ast(db, function_id.interned()).inner(db)
-                {
-                    panic!("No type check results !")
                 }
             }
             _ => (),
@@ -213,6 +209,20 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
                         FunctionId::new(db, spanned.data.name, ScopeOwnerId::Impl(implem.id(db)));
                     if let Some(hir) = hir_body(db, id.interned()) {
                         println!("{}", hir.display(db));
+                    }
+
+                    if let Some(results) =
+                        type_check_function(db, id.interned(), packages.clone().into_boxed_slice())
+                    {
+                        for (expr_id, ty) in &results.node_types(db) {
+                            println!("{:?}: {}", expr_id, ty.display(db));
+                        }
+                        for diagnostic in &results.diagnostics(db) {
+                            let loc = &diagnostic.span;
+                            let source_file = get_source_file(db, &loc.file, &packages).unwrap();
+                            let loc_info = get_loc_info(db, source_file, loc.start);
+                            println!("{}: {:?}", loc_info, diagnostic.kind);
+                        }
                     }
                 }
             }

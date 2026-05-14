@@ -59,7 +59,9 @@ impl AstImplicitContext {
         zelf: Option<InferTy>,
     ) -> Option<ImplicitContext> {
         if &self.template_asts.len() != &templates.len() {
-            dbg!("Bad template length");
+            println!("Backtrace:");
+            println!("{}", std::backtrace::Backtrace::force_capture());
+            // dbg!("Bad template length");
             return None;
         }
 
