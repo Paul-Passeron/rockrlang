@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
+    Db,
     common::symbols::Symbol,
     hir::{PartialTypeArg, PartialTypeRef},
     name_resolve::type_expr::struct_item,
@@ -128,6 +129,28 @@ impl<'db> InferenceCtx<'db> {
             Some(fields)
         } else {
             None
+        }
+    }
+
+    pub fn static_allocate_type_ref(
+        db: &dyn Db,
+        type_ref: &TypeRef,
+        ctx: &ImplicitContext,
+    ) -> Option<InferTy> {
+        match type_ref {
+            TypeRef::Concrete(type_id) => Some(InferTy::Adt {
+                def: type_id.def(db),
+                fields: type_id
+                    .args(db)
+                    .iter()
+                    .map(|ty| Self::static_allocate_type_ref(db, ty, ctx))
+                    .collect::<Option<_>>()?,
+            }),
+            TypeRef::Param(type_param_id) => ctx.get_template(type_param_id.0),
+            TypeRef::Error => None,
+            TypeRef::Zelf => ctx.zelf().cloned(),
+            TypeRef::Associated(_symbol) => todo!(),
+            TypeRef::Unknown => None,
         }
     }
 
