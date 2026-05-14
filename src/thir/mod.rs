@@ -368,18 +368,15 @@ impl<'db> TyCtx<'db> {
                         loc_inners.insert(*local, inner_var);
                     }
 
-                    // Now, each local has a binding mode
-                    // We may want to try and have a substitution map
-                    // for the inner types and check the patterns
-                    // against them instead of the raw local vars
                     let typeof_pattern = self.typeof_pattern(&branch.pattern, &loc_inners);
+                    let var = self.inf_ctx.fresh_var();
                     self.inf_ctx
-                        .emit_constraint(InferenceConstraintKind::Unify {
-                            a: typeof_pattern,
-                            b: InferTy::Var(typeof_scrut_var),
+                        .emit_constraint(InferenceConstraintKind::BindsLike {
+                            inner: typeof_pattern,
+                            like: typeof_scrut_var,
+                            ty: var,
                         });
                 }
-                // todo!()
             }
             HirStmtKind::Assign { lhs, rhs } => {
                 let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
