@@ -48,11 +48,14 @@ pub struct CliArgs {
     file: Option<PathBuf>,
     #[clap(long, default_value_t = false)]
     no_std: bool,
+    #[clap(long, default_value_t = false)]
+    skip_core: bool,
 }
 
 #[derive(Clone)]
 pub struct CompilerConfig {
     pub no_std: bool,
+    pub skip_core: bool,
 }
 
 #[salsa::db]
@@ -252,6 +255,9 @@ fn check_module_tree<'db>(
 }
 
 fn try_package<'db>(db: &'db dyn Db, package: Package<'db>, packages: Vec<Package<'db>>) -> bool {
+    if db.config().skip_core && package == core_package(db) {
+        return false; // Skip core package errors
+    }
     check_module_tree(db, package.root(db), None, package, packages)
 }
 
@@ -259,6 +265,7 @@ fn main() -> Result<(), String> {
     let args = CliArgs::parse();
     let cfg = CompilerConfig {
         no_std: args.no_std,
+        skip_core: args.skip_core,
     };
     let db = RockrDb::new(cfg);
 

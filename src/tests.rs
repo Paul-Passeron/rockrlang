@@ -11,7 +11,10 @@ mod tests {
     };
 
     fn parse_path(path: &str) -> bool {
-        let db = RockrDb::new(CompilerConfig { no_std: false });
+        let db = RockrDb::new(CompilerConfig {
+            no_std: false,
+            skip_core: false,
+        });
         let root_path = PathBuf::from(path);
         let package = load_package(&db, &root_path)
             .ok_or_else(|| format!("No package found at `{}`", root_path.display()))

@@ -4,6 +4,7 @@ use std::marker::PhantomData;
 use crate::{
     hir::Mutability,
     name_resolve::{
+        core_module,
         definition::{Definition, Segments, resolve_path},
         std_module,
     },
@@ -382,12 +383,12 @@ pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
         Segments::new(
             db,
             nonempty![
-                Symbol::new(db, "std"),
+                Symbol::new(db, "core"),
                 Symbol::new(db, "io"),
                 Symbol::new(db, "str")
             ],
         ),
-        std_module(db).unwrap(),
+        core_module(db),
     )
     .unwrap() else {
         panic!()

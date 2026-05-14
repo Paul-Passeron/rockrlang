@@ -17,7 +17,7 @@ use std::{
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{LocalId, PartialTypeRef, function_ast},
+    hir::{LocalId, PartialTypeRef, function_ast, owning_module},
     name_resolve::{implems::resolve_type_expr_as_interface, type_expr::get_templates_of_fun},
     ril::{
         FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
@@ -130,10 +130,17 @@ impl<'db> InferenceCtx<'db> {
         let ast = function_ast(this.db, func.interned()).inner(this.db);
         let args = ast.get_args();
         for (local, ast) in params.iter().zip_eq(args) {
-            let ty = this
-                .implicit_ctx()
-                .resolve(this.db, &ast.ty.data)
-                .expect("Top level items should already have valid and resolved types");
+            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).expect(
+                format!(
+                    "Top level items should already have valid and resolved types ({})",
+                    ast.ty
+                        .span
+                        .start()
+                        .loc_info(db, owning_module(db, func.parent(db)))
+                        .unwrap()
+                )
+                .as_str(),
+            );
             let ty = this.allocate_type_ref(&ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
             this.unify(local_ty, ty)
