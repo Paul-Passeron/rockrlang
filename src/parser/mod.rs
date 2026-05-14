@@ -70,7 +70,7 @@ impl<'db> Parser<'db> {
     }
 
     pub fn last_span(&self) -> Span {
-        let (start, end) = if self.tokens.len() == 0 || self.position >= self.tokens.len() {
+        let (start, end) = if self.tokens.is_empty() || self.position >= self.tokens.len() {
             (0, 0)
         } else {
             let span = &self.tokens[self.position].location;
@@ -159,7 +159,7 @@ impl<'db> Parser<'db> {
         if self.current_token()?.kind != kind {
             Err(self.parse_error(ParseErrorKind::ExpectedToken {
                 expected: kind,
-                found: self.current_token()?.kind.clone(),
+                found: self.current_token()?.kind,
             }))
         } else {
             Ok(())

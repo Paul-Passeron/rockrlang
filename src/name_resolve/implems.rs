@@ -27,7 +27,7 @@ pub fn resolve_type_expr_as_interface<'db>(
                 return None;
             }
 
-            resolve_in_module(db, name.interned(), module).map_or(None, |def| {
+            resolve_in_module(db, name.interned(), module).and_then(|def| {
                 if let Definition::Interface(interface_id) = def {
                     let resolved_args = args
                         .iter()
@@ -38,12 +38,7 @@ pub fn resolve_type_expr_as_interface<'db>(
                             },
                         )
                         .collect::<Option<Vec<_>>>();
-                    match resolved_args {
-                        Some(resolved_args) => {
-                            Some(InterfaceRef::new(db, interface_id, resolved_args))
-                        }
-                        None => None,
-                    }
+                    resolved_args.map(|args| InterfaceRef::new(db, interface_id, args))
                 } else {
                     None
                 }
@@ -52,7 +47,7 @@ pub fn resolve_type_expr_as_interface<'db>(
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr_as_interface(db, &**to, module.interned(), template_args)
+                resolve_type_expr_as_interface(db, to, module.interned(), template_args)
             } else {
                 None
             }
@@ -60,13 +55,6 @@ pub fn resolve_type_expr_as_interface<'db>(
         _ => None,
     }
 }
-
-// pub fn module_impls_asts<'db>(
-//     db: &'db dyn Db,
-//     module: InternedModuleId<'db>,
-// ) -> Vec<ImplSource<'db>> {
-//     todo!()
-// }
 
 #[salsa::tracked]
 pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<ImplSource<'db>> {
@@ -124,7 +112,6 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                     Some(None) => {
                         // TODO: report error
                         println!("Error: Could not resolve implementation because of interface");
-                        ()
                     }
                 }
             } else {
@@ -140,7 +127,6 @@ pub fn impls_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<Impl
     Set::from_iter(
         modules_in_package(db, package)
             .into_iter()
-            .map(|module| module_impls(db, module.interned()))
-            .flatten(),
+            .flat_map(|module| module_impls(db, module.interned())),
     )
 }

@@ -11,7 +11,7 @@ use crate::common::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     Identifier(Symbol),
-    IntLit(i32),
+    IntLit(i64),
     CharLit(char),
     StrLit(StrLit),
     CStrLit(StrLit),

@@ -66,14 +66,12 @@ pub fn root_module<'db>(
             .to_string_lossy()
             .to_string()
     } else {
-        let full_name = file
-            .path(db)
+        file.path(db)
             .with_extension("")
             .file_name()
             .unwrap()
             .to_string_lossy()
-            .to_string();
-        full_name
+            .to_string()
     };
     let name = Symbol::new(db, full_name);
     ModuleId::new(
@@ -98,7 +96,7 @@ pub fn module_items<'db>(
     }
     module
         .parent(db)
-        .map(|parent| match module_items(db, parent.interned()) {
+        .and_then(|parent| match module_items(db, parent.interned()) {
             Some(parent_ast) => parent_ast.iter().find_map(|item| match &item.data {
                 AstTopLevelItemDesc::Module(module_ast) => {
                     if module_ast.data.name == module.name(db) {
@@ -115,7 +113,6 @@ pub fn module_items<'db>(
                 Some(ast.items(db).clone())
             }
         })
-        .flatten()
 }
 
 #[salsa::tracked]

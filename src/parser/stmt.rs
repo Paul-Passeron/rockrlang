@@ -138,7 +138,7 @@ impl<'db> Parser<'db> {
         };
 
         // Match directly on the dedicated compound-assign tokens or plain `=`
-        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind.clone()) {
+        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind) {
             Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
             Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
             Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
@@ -147,7 +147,7 @@ impl<'db> Parser<'db> {
             _ => None,
         };
 
-        let is_plain_assign = self.peek_n(0).map(|t| t.kind.clone()) == Some(TokenKind::Eq);
+        let is_plain_assign = self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
 
         if compound_op.is_none() && !is_plain_assign {
             self.position = saved_pos;
@@ -189,12 +189,12 @@ impl<'db> Parser<'db> {
         let mut branches = Vec::new();
         while self
             .peek_n(0)
-            .map_or(false, |t| !matches!(t.kind, TokenKind::CloseBra))
+            .is_some_and(|t| !matches!(t.kind, TokenKind::CloseBra))
         {
             let pat = self.parse_pattern()?;
             let guard = if self
                 .peek_n(0)
-                .map_or(false, |t| matches!(t.kind, TokenKind::If))
+                .is_some_and(|t| matches!(t.kind, TokenKind::If))
             {
                 self.consume();
                 Some(self.parse_expr()?)

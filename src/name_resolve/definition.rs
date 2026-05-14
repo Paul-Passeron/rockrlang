@@ -1,14 +1,14 @@
 use crate::{
     Db,
     common::symbols::{InternedSymbol, Symbol},
-    name_resolve::{core_module, module_items, std_module, std_package},
+    name_resolve::{builtin_module, core_module, module_items, std_module, std_package},
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{
         EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
         ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
         display::{Display, RilDisplay},
-        int_id, never_id, str_id, void_id,
+        int_id, never_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -29,6 +29,14 @@ impl TypeDefId {
             TypeDefId::Builtin(builtin) => builtin.name(db),
             TypeDefId::Struct(struct_id) => struct_id.name(db),
             TypeDefId::Enum(enum_id) => enum_id.name(db),
+        }
+    }
+
+    pub fn parent(&self, db: &dyn crate::Db) -> ModuleId {
+        match self {
+            TypeDefId::Builtin(_) => builtin_module(db),
+            TypeDefId::Struct(struct_id) => struct_id.parent(db),
+            TypeDefId::Enum(enum_id) => enum_id.parent(db),
         }
     }
 }
@@ -71,10 +79,10 @@ fn definition_of_item<'db>(
         ))),
         AstTopLevelItemDesc::Impl(_) => None,
         AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(TypeDefId::Struct(
-            StructId::new(db, struct_def.name, m_id.into()),
+            StructId::new(db, struct_def.name, m_id),
         ))),
         AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
-            EnumId::new(db, ast_enum_def.name, m_id.into()),
+            EnumId::new(db, ast_enum_def.name, m_id),
         ))),
         AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(FunctionId::new(
             db,
@@ -88,6 +96,7 @@ fn definition_of_item<'db>(
 pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> {
     let mut res = HashMap::from([
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
+        (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), // i32 is an alias for int. Might want to switch this around
         (
             Symbol::new(db, "void"),
             Definition::Type(void_id(db).def(db)),
@@ -252,17 +261,16 @@ pub fn resolve_in_module<'db>(
 ) -> Option<Definition> {
     let defs = module_definitions(db, module);
     if let Some(def) = defs.get(&Symbol::from(name)) {
-        return Some(def.clone());
+        return Some(*def);
     }
     // Check includes declared on this module
     let includes = module_includes(db, module);
     for included_module in includes {
-        if let Some(included_id) = resolve_include_path(db, included_module, module) {
-            if let Some(def) =
+        if let Some(included_id) = resolve_include_path(db, included_module, module)
+            && let Some(def) =
                 module_definitions(db, included_id.interned()).get(&Symbol::from(name))
-            {
-                return Some(def.clone());
-            }
+        {
+            return Some(*def);
         }
     }
 
@@ -303,7 +311,7 @@ pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -
     let prefix = if let Some(parent) = id.parent(db) {
         format!("{}::", get_module_pretty_name(db, parent.interned()))
     } else {
-        format!("")
+        String::new()
     };
     Arc::new(format!("{}{}", prefix, id.name(db).interned().contents(db)))
 }

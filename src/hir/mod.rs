@@ -105,8 +105,8 @@ pub struct HirExpr {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Mutability {
+    Const,
     Mutable,
-    Immutable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -291,8 +291,7 @@ pub fn impl_sources<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<I
 pub fn impl_items<'db>(db: &'db dyn Db, impl_id: InternedImplId<'db>) -> Vec<AstImplItem> {
     impl_sources(db, impl_id)
         .into_iter()
-        .map(|impl_| impl_.items(db))
-        .flatten()
+        .flat_map(|impl_| impl_.items(db))
         .collect()
 }
 
@@ -359,7 +358,7 @@ pub fn hir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Opti
     }
 }
 
-pub fn owning_module<'db>(db: &'db dyn Db, owner: ScopeOwnerId) -> ModuleId {
+pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
     match owner {
         ScopeOwnerId::Module(module_id) => module_id,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),

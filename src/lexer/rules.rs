@@ -4,6 +4,7 @@ use super::TokenKind;
 use crate::common::location::Span;
 use crate::common::symbols::StrLit;
 use crate::common::symbols::Symbol;
+use crate::lexer::TokenPattern;
 use regex::Regex;
 
 macro_rules! get_simple_rule {
@@ -29,10 +30,7 @@ pub fn get_skip_rules() -> Vec<Regex> {
     ]
 }
 
-pub fn get_token_rules<'db>() -> Vec<(
-    Regex,
-    fn(&'db dyn crate::Db, &str, Span) -> Result<Token, LexError>,
-)> {
+pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
     vec![
         (
             Regex::new(r#"c"(\\.|[^"\\])*""#).unwrap(),
@@ -165,7 +163,7 @@ pub fn get_token_rules<'db>() -> Vec<(
             |_, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
-                    kind: TokenKind::IntLit(i64::from_str_radix(lexeme, 10).unwrap() as i32),
+                    kind: TokenKind::IntLit(lexeme.parse::<i64>().unwrap()),
                 })
             },
         ),

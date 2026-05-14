@@ -8,7 +8,7 @@ pub type AstExpr = Spanned<AstExprDesc>;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstExprDesc {
     // Literals
-    IntLit(i32),
+    IntLit(i64),
     CharLit(char),
     StrLit(StrLit),
     CStrLit(StrLit),
@@ -85,6 +85,7 @@ pub enum AstExprDesc {
     SliceLit(Vec<AstExpr>),
 
     SizeOf(AstTypeExpr),
+    Ref(bool, Box<AstExpr>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

@@ -12,7 +12,7 @@ impl<'db> Parser<'db> {
     pub(super) fn parse_type_expr(&mut self) -> Result<AstTypeExpr, ParseError> {
         let start = self.get_start();
 
-        match self.current_token()?.kind.clone() {
+        match self.current_token()?.kind {
             TokenKind::Mult | TokenKind::BitAnd => {
                 let is_ptr = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mult)
@@ -53,7 +53,7 @@ impl<'db> Parser<'db> {
             TokenKind::OpenSqr => {
                 self.consume();
                 let ty = self.parse_type_expr()?;
-                let len = if self.peek_n(0).map(|t| t.kind.clone()) == Some(TokenKind::Semicolon) {
+                let len = if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Semicolon) {
                     self.consume();
                     Some(self.parse_int_lit()?.data)
                 } else {
@@ -105,7 +105,7 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(name) => {
                 self.consume();
 
-                match self.peek_n(0).map(|t| t.kind.clone()) {
+                match self.peek_n(0).map(|t| t.kind) {
                     Some(TokenKind::Access) => {
                         self.consume();
                         let rhs = self.parse_type_expr()?;
@@ -153,16 +153,16 @@ impl<'db> Parser<'db> {
     pub(super) fn parse_any_type_expr(&mut self) -> Result<AstAnyTypeExpr, ParseError> {
         let start = self.get_start();
 
-        if let TokenKind::Identifier(name) = self.current_token()?.kind {
-            if name == Symbol::new(self.db, "_") {
-                self.consume();
-                let end = self.get_end();
-                return Ok(Spanned::new(
-                    AstAnyTypeExprDesc::Any,
-                    vec![],
-                    start.span(&end),
-                ));
-            }
+        if let TokenKind::Identifier(name) = self.current_token()?.kind
+            && name == Symbol::new(self.db, "_")
+        {
+            self.consume();
+            let end = self.get_end();
+            return Ok(Spanned::new(
+                AstAnyTypeExprDesc::Any,
+                vec![],
+                start.span(&end),
+            ));
         }
 
         let ty = self.parse_type_expr()?;

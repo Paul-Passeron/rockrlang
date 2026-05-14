@@ -22,15 +22,17 @@ pub struct LexError {
     pub offset: usize,
 }
 
+pub type TokenPattern<'db, T> = (
+    Regex,
+    fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>,
+);
+
 pub struct Lexer<'db, T> {
     pub db: &'db dyn crate::Db,
     pub file: PathBuf,
     pub contents: Arc<String>,
     pub offset: usize,
-    pub token_patterns: Vec<(
-        Regex,
-        fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>,
-    )>,
+    pub token_patterns: Vec<TokenPattern<'db, T>>,
     pub skip_patterns: Vec<Regex>,
 }
 
@@ -60,7 +62,7 @@ impl<'db, T> Lexer<'db, T> {
     }
 
     pub fn is_done(&mut self) -> bool {
-        self.offset as usize >= self.contents.len()
+        self.offset >= self.contents.len()
     }
 
     fn skip(&mut self) {
@@ -72,12 +74,12 @@ impl<'db, T> Lexer<'db, T> {
             let mut could_skip = false;
             for regex in &self.skip_patterns {
                 let to_match: &str = &self.contents[self.offset..];
-                if let Some(mat) = regex.find(to_match) {
-                    if mat.start() == 0 {
-                        could_skip = true;
-                        skip_count += mat.len();
-                        break;
-                    }
+                if let Some(mat) = regex.find(to_match)
+                    && mat.start() == 0
+                {
+                    could_skip = true;
+                    skip_count += mat.len();
+                    break;
                 }
             }
             if !could_skip {
@@ -90,17 +92,14 @@ impl<'db, T> Lexer<'db, T> {
     pub fn new_blank(
         source: SourceFile<'db>,
         db: &'db dyn crate::Db,
-        token_patterns: Vec<(
-            Regex,
-            fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>,
-        )>,
+        token_patterns: Vec<TokenPattern<'db, T>>,
         skip_patterns: Vec<Regex>,
     ) -> Lexer<'db, T> {
         let contents = source.content(db);
         Self {
             db,
             offset: 0,
-            contents: contents,
+            contents,
             file: source.path(db),
             token_patterns,
             skip_patterns,
@@ -134,18 +133,18 @@ impl<'db, T> Lexer<'db, T> {
                 let start = self.offset;
                 let to_match = &contents[self.offset..];
                 let (ref regex, func) = self.token_patterns[i];
-                if let Some(mat) = regex.find(to_match) {
-                    if mat.start() == 0 {
-                        token_length = mat.end();
-                        let token_string: &str = &to_match[..token_length];
-                        let mut end = self.offset;
-                        for _ in 0..token_length {
-                            end += 1;
-                        }
-                        let span = Span::new(start, end, self.file.clone());
-                        res = func(self.db, token_string, span);
-                        break;
+                if let Some(mat) = regex.find(to_match)
+                    && mat.start() == 0
+                {
+                    token_length = mat.end();
+                    let token_string: &str = &to_match[..token_length];
+                    let mut end = self.offset;
+                    for _ in 0..token_length {
+                        end += 1;
                     }
+                    let span = Span::new(start, end, self.file.clone());
+                    res = func(self.db, token_string, span);
+                    break;
                 }
             }
             self.advance_n(token_length);

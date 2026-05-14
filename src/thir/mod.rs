@@ -9,9 +9,9 @@ use std::{
 use crate::{
     Db,
     hir::{
-        HirBody, HirExpr, HirExprDesc, HirId, HirMatchBranch, HirPattern,
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch, HirPattern,
         HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind, LocalId,
-        LocalInfo, PartialTypeArg, PartialTypeRef, hir_body, owning_module,
+        LocalInfo, Mutability, PartialTypeArg, PartialTypeRef, hir_body, owning_module,
     },
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -20,12 +20,14 @@ use crate::{
         },
     },
     parse_tree::{
+        expr::BinaryOperator,
         top_level::{AstEnumVariant, AstEnumVariantKind, AstStructDefField},
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
-        BuiltinTypeId, FunctionId, InternedFunctionId, ModuleId, Package, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::RilDisplay, get_template_param_count, str_id,
+        BuiltinTypeId, FunctionId, InternedFunctionId, ModuleId, Package, ScopeOwnerId, TypeDefId,
+        TypeId, TypeParamId, TypeRef, display::RilDisplay, get_template_param_count, ref_of,
+        str_id,
     },
     thir::methods::{ImplMatchConstraint, ImplMatchConstraints, find_method_for_partial_ref},
 };
@@ -33,11 +35,11 @@ use crate::{
 pub mod methods;
 
 #[derive(Clone)]
-pub(self) struct InferCallInfos {
-    pub(self) expr_id: ExprId,
-    pub(self) callee: FunctionId,
-    pub(self) substitution: Vec<InferTy>,
-    pub(self) variadic: bool,
+struct InferCallInfos {
+    expr_id: ExprId,
+    callee: FunctionId,
+    substitution: Vec<InferTy>,
+    variadic: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -64,6 +66,12 @@ impl InferCallInfos {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum BindingModeKind {
+    ByRef,
+    ByValue,
+}
+
 #[derive(Clone)]
 struct TyCtx<'db> {
     db: &'db dyn Db,
@@ -74,8 +82,14 @@ struct TyCtx<'db> {
 
     // Inference
     templates: Vec<TyVarId>,
+
     forwards: HashMap<InferTy, InferTy>,
-    // type_eq_constrs: Vec<(InferTy, InferTy)>,
+
+    // BindingModes
+    binding_modes_mut: HashMap<BindingModeVar, Option<Mutability>>,
+    binding_modes_by_ref: HashMap<BindingModeVar, Option<BindingModeKind>>,
+    binding_modes_forwards: HashMap<BindingModeVar, BindingModeVar>,
+
     calls: HashMap<ExprId, InferCallInfos>,
     exprs: HashMap<ExprId, InferTy>,
     infer_locals: HashMap<LocalId, InferTy>,
@@ -93,11 +107,13 @@ pub struct PatternId(HirId);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 struct TyVarId(usize);
 
-// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-// struct IntVarId(usize);
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct BindingModeVar(usize);
 
-// #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-// struct FloatVarId(usize);
+enum BindingMode {
+    ByValue,
+    ByRef(Mutability),
+}
 
 impl TyVarId {
     pub fn alloc() -> Self {
@@ -108,8 +124,17 @@ impl TyVarId {
     }
 }
 
+impl BindingModeVar {
+    pub fn alloc() -> Self {
+        static NEXT: Mutex<usize> = Mutex::new(0);
+        let res = Self(*NEXT.lock().unwrap());
+        *NEXT.lock().unwrap() += 1;
+        res
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub(self) enum InferTy {
+enum InferTy {
     Param(TypeParamId),
     Var(TyVarId),
     Adt {
@@ -117,10 +142,9 @@ pub(self) enum InferTy {
         args: Vec<InferTy>,
     },
     Deref(Box<InferTy>),
-    RefOrDerefLike {
-        base: Box<InferTy>, // Let's call this T
-        like: Box<InferTy>, // if this is not a ref: T,
-                            // if this is &mut ... => &mut T and if &... => &T
+    DeferBinding {
+        bind: BindingModeVar,
+        inner: TyVarId,
     },
     Error,
 }
@@ -157,13 +181,8 @@ impl<'a> fmt::Display for InferTyDisplay<'a> {
                 Ok(())
             }
             InferTy::Deref(infer_ty) => write!(f, "Deref{{{}}}", infer_ty.display(self.db)),
-            InferTy::RefOrDerefLike { base, like } => {
-                write!(
-                    f,
-                    "RefOrDerefLike({} as {})",
-                    base.display(self.db),
-                    like.display(self.db)
-                )
+            InferTy::DeferBinding { bind, inner } => {
+                write!(f, "DeferBinding('BM{}, '{})", bind.0, inner.0)
             }
         }
     }
@@ -189,21 +208,25 @@ impl<'db> TyCtx<'db> {
             templates,
             packages,
             forwards: HashMap::new(),
+            binding_modes_mut: HashMap::new(),
+            binding_modes_by_ref: HashMap::new(),
+            binding_modes_forwards: HashMap::new(),
             calls: HashMap::new(),
             exprs: HashMap::new(),
             infer_locals: HashMap::new(),
         };
 
-        for local in locals {
+        for param in params {
+            let local = locals.iter().find(|x| &x.id == param).unwrap();
             let var_id = TyVarId::alloc();
-            this.infer_locals
-                .insert(local.id.clone(), InferTy::Var(var_id));
+            this.infer_locals.insert(local.id, InferTy::Var(var_id));
             if let Some(annotation) = local.ty_annotation.as_ref()
                 && let AstAnyTypeExprDesc::Known(desc) = &annotation.data
             {
                 let partially_resolved =
                     this.resolve_holed_desc(desc, owning_module(db, function.parent(db)));
-                let inferred_annotation = this.allocate_partial(partially_resolved);
+                let inferred_annotation =
+                    this.allocate_partial(partially_resolved, &this.get_templates());
                 this.unify(InferTy::Var(var_id), inferred_annotation);
             }
         }
@@ -241,6 +264,70 @@ impl<'db> TyCtx<'db> {
         }
     }
 
+    fn find_bm(&self, bm: BindingModeVar) -> BindingModeVar {
+        match self.binding_modes_forwards.get(&bm) {
+            Some(bm) => self.find_bm(*bm),
+            None => bm,
+        }
+    }
+
+    fn unify_bm(&mut self, a: BindingModeVar, b: BindingModeVar) {
+        let a = self.find_bm(a);
+        let b = self.find_bm(b);
+        if a == b {
+            return;
+        }
+        match (self.binding_modes_by_ref[&a], self.binding_modes_by_ref[&b]) {
+            (None, None) => {
+                self.binding_modes_forwards.insert(a, b);
+            }
+            (Some(BindingModeKind::ByRef), Some(BindingModeKind::ByRef))
+            | (Some(BindingModeKind::ByValue), Some(BindingModeKind::ByValue)) => {
+                // Everything is alright !
+                self.binding_modes_forwards.insert(a, b);
+            }
+            (Some(_), Some(_)) => {
+                // No big deal, we turn &mut into &
+
+                self.binding_modes_mut.insert(a, Some(Mutability::Const));
+                self.binding_modes_mut.insert(b, Some(Mutability::Const));
+                self.binding_modes_forwards.insert(a, b);
+            }
+            (Some(mode), None) | (None, Some(mode)) => {
+                self.binding_modes_by_ref.insert(b, Some(mode));
+                self.binding_modes_forwards.insert(a, b);
+            }
+        }
+    }
+
+    fn bm_as_concrete(&self, bm: BindingModeVar, arg: TyVarId) -> Option<InferTy> {
+        let bm = self.find_bm(bm);
+        if let Some(as_ref) = self.binding_modes_by_ref[&bm]
+            && let Some(mutability) = self.binding_modes_mut[&bm]
+        {
+            match as_ref {
+                BindingModeKind::ByRef => Some(match mutability {
+                    Mutability::Const => self.const_ptr_of(InferTy::Var(arg)),
+                    Mutability::Mutable => self.mut_ptr_of(InferTy::Var(arg)),
+                }),
+                BindingModeKind::ByValue => {
+                    println!(
+                        "Found by value for this one: {}",
+                        InferTy::DeferBinding {
+                            bind: bm,
+                            inner: arg
+                        }
+                        .display(self.db)
+                    );
+
+                    Some(InferTy::Var(arg))
+                }
+            }
+        } else {
+            None
+        }
+    }
+
     fn unify(&mut self, ty_a: InferTy, ty_b: InferTy) {
         let ty_a = self.find(ty_a);
         let ty_b = self.find(ty_b);
@@ -254,6 +341,8 @@ impl<'db> TyCtx<'db> {
                 self.forwards.insert(b, InferTy::Error);
             }
             (InferTy::Param(x), InferTy::Param(y)) => {
+                dbg!("Unifying template parameters");
+
                 if x != y {
                     self.forwards.insert(InferTy::Param(x), InferTy::Error);
                     self.forwards.insert(InferTy::Param(y), InferTy::Error);
@@ -329,34 +418,102 @@ impl<'db> TyCtx<'db> {
                         return;
                     }
                 }
+
                 self.unify(InferTy::Deref(pointee), InferTy::Error);
                 self.unify(InferTy::Adt { def, args }, InferTy::Error);
             }
-            (InferTy::Deref(pointee), _) => todo!(),
+            (InferTy::DeferBinding { bind, inner }, b) => match b {
+                InferTy::Param(_) => todo!(),
+                InferTy::Var(ty_var_id) => {
+                    self.forwards.insert(
+                        InferTy::Var(ty_var_id),
+                        InferTy::DeferBinding { bind, inner },
+                    );
+                }
+                InferTy::Adt { def, args } => {
+                    let r = BuiltinTypeId::mut_ref(self.db);
+                    let mut_r = BuiltinTypeId::ref_(self.db);
+                    let is_ref = if let TypeDefId::Builtin(builtin) = def {
+                        if builtin == r {
+                            Some(Mutability::Const)
+                        } else if builtin == mut_r {
+                            Some(Mutability::Mutable)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+                    match is_ref {
+                        Some(Mutability::Const) => todo!(),
+                        Some(Mutability::Mutable) => todo!(),
+                        None => {
+                            let resolved_bm = BindingModeVar::alloc();
+                            self.binding_modes_by_ref
+                                .insert(resolved_bm, Some(BindingModeKind::ByValue));
+                            self.binding_modes_mut.insert(resolved_bm, None);
+                            self.unify_bm(bind, resolved_bm);
+                            self.forwards.insert(
+                                InferTy::DeferBinding { bind, inner },
+                                InferTy::Adt { def, args },
+                            );
+                        }
+                    }
+                }
+                InferTy::Deref(infer_ty) => {
+                    let resolved_bm = BindingModeVar::alloc();
+                    self.binding_modes_by_ref
+                        .insert(resolved_bm, Some(BindingModeKind::ByRef));
+                    self.unify_bm(bind, resolved_bm);
+                    self.unify(InferTy::Var(inner), *infer_ty.clone());
+                    self.forwards.insert(
+                        InferTy::DeferBinding { bind, inner },
+                        InferTy::Deref(infer_ty),
+                    );
+                }
+                InferTy::DeferBinding {
+                    bind: bind_b,
+                    inner: inner_b,
+                } => {
+                    self.unify(InferTy::Var(inner), InferTy::Var(inner_b));
+                    self.unify_bm(bind, bind_b);
+                }
+                InferTy::Error => todo!(),
+            },
+            (InferTy::Deref(pointee), b) => {
+                // a should deref into pointee
+                // So b should be unified with Binding
+                match b {
+                    InferTy::Error => {
+                        self.forwards
+                            .insert(InferTy::Deref(pointee), InferTy::Error);
+                    }
+                    InferTy::Deref(infer_ty) => {
+                        self.unify(*pointee, *infer_ty);
+                    }
+                    InferTy::DeferBinding { .. } => todo!(),
+
+                    _ => todo!(),
+                }
+            }
             (a, b) => self.unify(b, a), // Switch the types
         }
     }
 
-    fn allocate_partial(&mut self, ty: PartialTypeRef) -> InferTy {
+    fn allocate_partial(&mut self, ty: PartialTypeRef, templates: &[InferTy]) -> InferTy {
         match ty {
-            PartialTypeRef::Resolved(type_ref) => self.allocate_ref(
-                type_ref,
-                &self
-                    .templates
-                    .iter()
-                    .copied()
-                    .map(|x| InferTy::Var(x))
-                    .collect::<Box<[_]>>(),
-            ),
+            PartialTypeRef::Resolved(type_ref) => self.allocate_ref(type_ref, templates),
             PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
                 def,
                 args: args
                     .into_iter()
                     .map(|arg| match arg {
                         PartialTypeArg::Known(type_ref) => {
-                            self.allocate_partial(PartialTypeRef::Resolved(type_ref))
+                            self.allocate_partial(PartialTypeRef::Resolved(type_ref), templates)
                         }
-                        PartialTypeArg::Partial(type_ref) => self.allocate_partial(*type_ref),
+                        PartialTypeArg::Partial(type_ref) => {
+                            self.allocate_partial(*type_ref, templates)
+                        }
                         PartialTypeArg::Infer => InferTy::Var(TyVarId::alloc()),
                     })
                     .collect(),
@@ -383,13 +540,12 @@ impl<'db> TyCtx<'db> {
     fn resolve_holed_desc(&self, desc: &AstTypeExprDesc, module: ModuleId) -> PartialTypeRef {
         match desc {
             AstTypeExprDesc::Named { name, args } => {
-                if args.is_empty() {
-                    if let Some(idx) = get_templates_of_fun(self.db, self.function.interned())
+                if args.is_empty()
+                    && let Some(idx) = get_templates_of_fun(self.db, self.function.interned())
                         .iter()
                         .position(|p| p.name == *name)
-                    {
-                        return PartialTypeRef::Resolved(TypeRef::Param(TypeParamId(idx)));
-                    }
+                {
+                    return PartialTypeRef::Resolved(TypeRef::Param(TypeParamId(idx)));
                 }
 
                 let Some(Definition::Type(type_def_id)) =
@@ -529,6 +685,32 @@ impl<'db> TyCtx<'db> {
                     .collect::<Vec<_>>();
                 TypeRef::Concrete(TypeId::new(self.db, def, args))
             }
+            InferTy::DeferBinding { bind, inner } => {
+                let inner_solved = self.solve(InferTy::Var(inner));
+                let bind = self.find_bm(bind);
+                match &self.binding_modes_by_ref[&bind] {
+                    Some(kind) => match kind {
+                        BindingModeKind::ByRef => {
+                            let mutability = self
+                                .binding_modes_mut
+                                .get(&bind)
+                                .copied()
+                                .unwrap_or(Some(Mutability::Const))
+                                .unwrap_or(Mutability::Const);
+                            match mutability {
+                                Mutability::Const => {
+                                    TypeRef::Concrete(ref_of(self.db, inner_solved, false))
+                                }
+                                Mutability::Mutable => {
+                                    TypeRef::Concrete(ref_of(self.db, inner_solved, true))
+                                }
+                            }
+                        }
+                        BindingModeKind::ByValue => inner_solved,
+                    },
+                    None => TypeRef::Error,
+                }
+            }
             _ => TypeRef::Error,
         }
     }
@@ -614,15 +796,30 @@ impl<'db> TyCtx<'db> {
         }
     }
 
+    fn mut_ptr_of(&self, ty: InferTy) -> InferTy {
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::mut_ptr(self.db)),
+            args: vec![ty],
+        }
+    }
+
     fn type_check_place(&mut self, place: &'db HirPlace) -> InferTy {
         match place {
-            HirPlace::Local(local_id) => self
-                .infer_locals
-                .get(local_id)
-                .cloned()
-                .unwrap_or(InferTy::Error),
-            HirPlace::Field { base, field } => todo!(),
-            HirPlace::TupleField { base, index } => todo!(),
+            HirPlace::Local(local_id) => self.infer_locals.get(local_id).cloned().unwrap(),
+            HirPlace::Field { .. } => todo!(),
+            HirPlace::TupleField { base, index } => {
+                let base_ty = self.type_check_place(base);
+                let base_ty = self.find(base_ty);
+                match base_ty {
+                    InferTy::Adt { def, args }
+                        if def == TypeDefId::Builtin(BuiltinTypeId::tuple(self.db))
+                            && args.len() > *index as usize =>
+                    {
+                        args[*index as usize].clone()
+                    }
+                    got => todo!("Expected tuple type but found {}", got.display(self.db)),
+                }
+            }
             HirPlace::Deref(hir_place) => {
                 let place_ty = self.type_check_place(hir_place);
                 let pointee = InferTy::Var(TyVarId::alloc());
@@ -630,7 +827,24 @@ impl<'db> TyCtx<'db> {
                 self.unify(place_ty, ptr_ty);
                 pointee
             }
-            HirPlace::Index { base, index } => todo!(),
+            HirPlace::Index { base, index } => {
+                let place_ty = self.type_check_place(base);
+                let place_ty = self.find(place_ty);
+
+                // TODO: use an index trait instead
+                let index_ty = self.type_check_expr(index);
+                self.unify(index_ty, self.int_ty());
+
+                match place_ty {
+                    InferTy::Adt { def, args }
+                        if def == TypeDefId::Builtin(BuiltinTypeId::slice(self.db)) =>
+                    {
+                        assert_eq!(args.len(), 1);
+                        args.into_iter().next().unwrap()
+                    }
+                    _ => todo!(),
+                }
+            }
             HirPlace::Temporary(hir_expr) => self.type_check_expr(hir_expr),
         }
     }
@@ -647,6 +861,7 @@ impl<'db> TyCtx<'db> {
             seen: &mut HashSet<TypeRef>,
         ) -> InferTy {
             if !seen.insert(ty_ref) {
+                println!("Recursive type def");
                 return InferTy::Error;
             }
             match ty_ref {
@@ -670,7 +885,30 @@ impl<'db> TyCtx<'db> {
         _allocate_ref(self.db, ty_ref, templates, &mut HashSet::new())
     }
 
+    fn get_templates(&self) -> Box<[InferTy]> {
+        self.templates
+            .iter()
+            .map(|var| InferTy::Var(*var))
+            .collect()
+    }
+
+    fn get_as_much_info(&self, ty: InferTy) -> InferTy {
+        let ty = self.find(ty);
+        match ty {
+            InferTy::DeferBinding { bind, inner } => {
+                let bind = self.find_bm(bind);
+                if let Some(res) = self.bm_as_concrete(bind, inner) {
+                    res
+                } else {
+                    InferTy::DeferBinding { bind, inner }
+                }
+            }
+            ty => ty,
+        }
+    }
+
     fn type_check_expr(&mut self, expr: &'db HirExpr) -> InferTy {
+        println!("ID IS {}", expr.id.0);
         let ty = match &expr.data {
             HirExprDesc::IntLit(_) => self.int_ty(),
             HirExprDesc::CharLit(_) => self.char_ty(),
@@ -679,7 +917,19 @@ impl<'db> TyCtx<'db> {
             HirExprDesc::BoolLit(_) => self.bool_ty(),
             HirExprDesc::Use(place) => self.type_check_place(place),
             HirExprDesc::AddressOf { .. } => todo!(),
-            HirExprDesc::Ref { .. } => todo!(),
+            HirExprDesc::Ref { place, mutability } => {
+                let mode_id = BindingModeVar::alloc();
+                self.binding_modes_mut.insert(mode_id, Some(*mutability));
+                self.binding_modes_by_ref
+                    .insert(mode_id, Some(BindingModeKind::ByRef));
+                let place_ty = self.type_check_place(place);
+                let var = TyVarId::alloc();
+                self.unify(InferTy::Var(var), place_ty);
+                InferTy::DeferBinding {
+                    bind: mode_id,
+                    inner: var,
+                }
+            }
             HirExprDesc::CallDirect { target, args } => {
                 let target = *target;
                 let owning_module = owning_module(self.db, target.parent(self.db));
@@ -740,9 +990,9 @@ impl<'db> TyCtx<'db> {
                     .map(|arg| self.type_check_expr(arg))
                     .collect::<Vec<_>>();
                 let inferred_receiver = self.type_check_expr(receiver);
-                let candidates = find_method_for_partial_ref(
+                let mut candidates = find_method_for_partial_ref(
                     self.db,
-                    inferred_receiver.clone(),
+                    self.get_as_much_info(inferred_receiver.clone()),
                     *method,
                     self.packages.clone(),
                 )
@@ -750,11 +1000,20 @@ impl<'db> TyCtx<'db> {
                 .filter(|(id, _)| id.args(self.db).1.len() == args.len())
                 .collect::<Box<[_]>>();
 
-                for package in &self.packages {
-                    println!(
-                        "Package {}",
-                        package.root(self.db).name(self.db).display(self.db)
-                    );
+                if let Some(hint) = interface_hint {
+                    candidates = candidates
+                        .into_iter()
+                        .filter(|(id, _)| {
+                            let ScopeOwnerId::Impl(impl_id) = id.parent(self.db) else {
+                                unreachable!()
+                            };
+
+                            impl_id
+                                .interface(self.db)
+                                .map(|interface| interface.def(self.db) == *hint)
+                                .unwrap_or(false)
+                        })
+                        .collect::<Box<[_]>>();
                 }
 
                 if candidates.is_empty() {
@@ -788,7 +1047,14 @@ impl<'db> TyCtx<'db> {
                             );
                             self.unify(ty_a, ty_b);
                         }
-                        ImplMatchConstraint::Implements(infer_ty, interface_ref) => todo!(),
+                        ImplMatchConstraint::Implements(_, _) => todo!(),
+                        ImplMatchConstraint::IsValue(binding_mode_var) => {
+                            let new_bm = BindingModeVar::alloc();
+                            self.binding_modes_by_ref
+                                .insert(new_bm, Some(BindingModeKind::ByValue));
+                            self.binding_modes_mut.insert(new_bm, None);
+                            self.unify_bm(binding_mode_var, new_bm);
+                        }
                     }
                 }
 
@@ -842,16 +1108,19 @@ impl<'db> TyCtx<'db> {
                     self.unify(a, b);
                 }
 
-                let computed_return_ty = self.allocate_ref(id.ret_ty(self.db), &infer_templates);
-                computed_return_ty
+                self.allocate_ref(id.ret_ty(self.db), &infer_templates)
             }
             HirExprDesc::CallStatic { ty, method, args } => {
-                let partial = self.allocate_partial(ty.clone());
-                let candidates =
-                    find_method_for_partial_ref(self.db, partial, *method, self.packages.clone())
-                        .into_iter()
-                        .filter(|(id, _)| id.args(self.db).1.len() == args.len())
-                        .collect::<Box<[_]>>();
+                let partial = self.allocate_partial(ty.clone(), &self.get_templates());
+                let candidates = find_method_for_partial_ref(
+                    self.db,
+                    self.get_as_much_info(partial),
+                    *method,
+                    self.packages.clone(),
+                )
+                .into_iter()
+                .filter(|(id, _)| id.args(self.db).1.len() == args.len())
+                .collect::<Box<[_]>>();
 
                 let inferred_args = args
                     .iter()
@@ -884,8 +1153,15 @@ impl<'db> TyCtx<'db> {
                         ImplMatchConstraint::Unify(a, b) => {
                             self.unify(a, b);
                         }
-                        ImplMatchConstraint::Implements(infer_ty, interface_ref) => {
+                        ImplMatchConstraint::Implements(_, _) => {
                             todo!()
+                        }
+                        ImplMatchConstraint::IsValue(binding_mode_var) => {
+                            let new_bm = BindingModeVar::alloc();
+                            self.binding_modes_by_ref
+                                .insert(new_bm, Some(BindingModeKind::ByValue));
+                            self.binding_modes_mut.insert(new_bm, None);
+                            self.unify_bm(binding_mode_var, new_bm);
                         }
                     }
                 }
@@ -933,10 +1209,44 @@ impl<'db> TyCtx<'db> {
                     self.unify(a, b);
                 }
 
-                let computed_return_ty = self.allocate_ref(id.ret_ty(self.db), &infer_templates);
-                computed_return_ty
+                self.allocate_ref(id.ret_ty(self.db), &infer_templates)
             }
-            HirExprDesc::BinOp { .. } => todo!(),
+            HirExprDesc::BinOp { lhs, op, rhs } => {
+                let lhs_ty = self.type_check_expr(lhs);
+                let rhs_ty = self.type_check_expr(rhs);
+                self.unify(lhs_ty.clone(), rhs_ty.clone());
+
+                // TODO (URGENT): Handle bin ops through interfaces
+                match op {
+                    BinaryOperator::Minus
+                    | BinaryOperator::Times
+                    | BinaryOperator::Div
+                    | BinaryOperator::Modulo
+                    | BinaryOperator::Plus => {
+                        let int_ty = self.int_ty();
+                        self.unify(lhs_ty, int_ty.clone());
+                        self.unify(rhs_ty, int_ty.clone());
+                        int_ty
+                    }
+                    BinaryOperator::Eq
+                    | BinaryOperator::Diff
+                    | BinaryOperator::Lt
+                    | BinaryOperator::Leq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::Geq => {
+                        // For the moment we ask that the operands are integers
+                        let int_ty = self.int_ty();
+                        self.unify(lhs_ty, int_ty.clone());
+                        self.unify(rhs_ty, int_ty.clone());
+                        self.bool_ty()
+                    }
+                    BinaryOperator::And => todo!(),
+                    BinaryOperator::Or => todo!(),
+                    BinaryOperator::BitAnd => todo!(),
+                    BinaryOperator::BitOr => todo!(),
+                    BinaryOperator::BitXor => todo!(),
+                }
+            }
             HirExprDesc::StructLit { ty, fields } => {
                 let struct_def = match ty {
                     PartialTypeRef::Resolved(type_ref) => match type_ref {
@@ -944,10 +1254,9 @@ impl<'db> TyCtx<'db> {
                             TypeDefId::Struct(struct_id) => Some(struct_id),
                             _ => None,
                         },
-                        TypeRef::Param(type_param_id) => None,
-                        TypeRef::Error => None,
+                        _ => None,
                     },
-                    PartialTypeRef::WithHoles { def, args } => match def {
+                    PartialTypeRef::WithHoles { def, .. } => match def {
                         TypeDefId::Struct(struct_id) => Some(*struct_id),
                         _ => None,
                     },
@@ -1008,10 +1317,100 @@ impl<'db> TyCtx<'db> {
             }
             HirExprDesc::Neg(_) => todo!(),
             HirExprDesc::Not(_) => todo!(),
-            HirExprDesc::Tuple(_) => todo!(),
-            HirExprDesc::SliceLit(_) => todo!(),
+            HirExprDesc::Tuple(tys) => {
+                let checkeds = tys
+                    .iter()
+                    .map(|ty| self.type_check_expr(ty))
+                    .collect::<Vec<_>>();
+                InferTy::Adt {
+                    def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
+                    args: checkeds,
+                }
+            }
+            HirExprDesc::SliceLit(args) => {
+                let var = TyVarId::alloc();
+                args.iter()
+                    .map(|arg| self.type_check_expr(arg))
+                    .collect::<Box<[_]>>()
+                    .into_iter()
+                    .for_each(|arg_ty| self.unify(InferTy::Var(var), arg_ty));
+                let inner_ty = InferTy::Var(var);
+                InferTy::Adt {
+                    def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db)),
+                    args: vec![inner_ty],
+                }
+            }
             HirExprDesc::SizeOf(_) => todo!(),
-            HirExprDesc::Constructor { .. } => todo!(),
+            HirExprDesc::Constructor {
+                enum_def,
+                name,
+                args,
+                template_hints,
+            } => {
+                let enum_item = enum_item(self.db, enum_def.interned());
+                let variant = enum_item
+                    .variants
+                    .iter()
+                    .find(|variant| variant.name == *name)
+                    .unwrap();
+
+                let templates = enum_item
+                    .template_args
+                    .iter()
+                    .map(|_| InferTy::Var(TyVarId::alloc()))
+                    .collect::<Box<[_]>>();
+
+                let self_templates = self.get_templates();
+
+                let template_hints = template_hints
+                    .iter()
+                    .zip(&templates)
+                    .map(|(hint, truth)| {
+                        let infer_hint = match hint {
+                            PartialTypeArg::Known(type_ref) => {
+                                self.allocate_ref(*type_ref, &self_templates)
+                            }
+                            PartialTypeArg::Partial(type_ref) => {
+                                self.allocate_partial(*type_ref.clone(), &self_templates)
+                            }
+                            PartialTypeArg::Infer => InferTy::Var(TyVarId::alloc()),
+                        };
+                        self.unify(infer_hint.clone(), truth.clone());
+                        infer_hint
+                    })
+                    .collect();
+
+                let constructor_ty = InferTy::Adt {
+                    def: TypeDefId::Enum(*enum_def),
+                    args: template_hints,
+                };
+
+                match args {
+                    HirConstructorArgs::TupleLike(hir_exprs) => {
+                        let AstEnumVariantKind::TupleLike(ast_tys) = &variant.kind else {
+                            unreachable!()
+                        };
+                        assert!(hir_exprs.len() == ast_tys.len());
+                        for (expr, ast) in hir_exprs.iter().zip(ast_tys) {
+                            let expr_ty = self.type_check_expr(expr);
+                            let TypeResolution::Type(resolved) = resolve_type_expr(
+                                self.db,
+                                ast,
+                                enum_def.parent(self.db).interned(),
+                                &enum_item.template_args,
+                            ) else {
+                                unreachable!()
+                            };
+                            let allocated = self.allocate_ref(resolved, &templates);
+                            self.unify(expr_ty, allocated);
+                        }
+                    }
+                    HirConstructorArgs::StructLike { .. } => todo!(),
+                    HirConstructorArgs::None => todo!(),
+                }
+
+                constructor_ty
+            }
         };
         self.exprs.insert(ExprId(expr.id), ty.clone());
         ty
@@ -1032,12 +1431,23 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_patt(&mut self, pattern: &'db HirPattern) -> InferTy {
         match &pattern.data {
-            HirPatternDesc::Bind { id, name, mutable } => {
-                self.infer_locals.get(id).cloned().unwrap_or(InferTy::Error)
+            HirPatternDesc::Bind { id, .. } => {
+                let res = self.infer_locals.get(id).cloned().unwrap();
+                println!("Binding is {}", res.display(self.db));
+                res
             }
             HirPatternDesc::Any => InferTy::Var(TyVarId::alloc()),
-            HirPatternDesc::Tuple(hir_patterns) => todo!(),
-            HirPatternDesc::DestructureBinding { resolution, fields } => todo!(),
+            HirPatternDesc::Tuple(hir_patterns) => {
+                let tys = hir_patterns
+                    .iter()
+                    .map(|pat| self.type_check_patt(pat))
+                    .collect::<Vec<_>>();
+                InferTy::Adt {
+                    def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
+                    args: tys,
+                }
+            }
+            HirPatternDesc::DestructureBinding { .. } => todo!(),
             HirPatternDesc::Constructor {
                 resolution,
                 name,
@@ -1050,9 +1460,20 @@ impl<'db> TyCtx<'db> {
                     .iter()
                     .map(|_| InferTy::Var(TyVarId::alloc()))
                     .collect::<Vec<_>>();
-                let infer_ty = InferTy::Adt {
+                let inner_infer_ty = InferTy::Adt {
                     def: TypeDefId::Enum(*resolution),
                     args: inferred_templates.clone(),
+                };
+
+                let inner_var = TyVarId::alloc();
+                self.unify(InferTy::Var(inner_var), inner_infer_ty);
+                let mode_var_id = BindingModeVar::alloc();
+                self.binding_modes_by_ref.insert(mode_var_id, None);
+                self.binding_modes_mut.insert(mode_var_id, None);
+
+                let infer_ty = InferTy::DeferBinding {
+                    bind: mode_var_id,
+                    inner: inner_var,
                 };
 
                 if let Some(variant) = enum_item.variants.iter().find(|v| v.name == *name) {
@@ -1068,14 +1489,14 @@ impl<'db> TyCtx<'db> {
                                 )
                             };
                         }
-                        HirPatternConstructorArgs::StructFields(structs) => {
+                        HirPatternConstructorArgs::StructFields(_) => {
                             let AstEnumVariant {
-                                kind: AstEnumVariantKind::StructLike(ast_structs),
+                                kind: AstEnumVariantKind::StructLike(_),
                                 ..
                             } = variant
                             else {
                                 panic!(
-                                    "Expected unit variant for pattern constructor, found struct or tuple variant"
+                                    "Expected struct variant for pattern constructor, found unit or tuple variant"
                                 )
                             };
                             todo!()
@@ -1087,7 +1508,7 @@ impl<'db> TyCtx<'db> {
                             } = variant
                             else {
                                 panic!(
-                                    "Expected unit variant for pattern constructor, found struct or tuple variant"
+                                    "Expected tuple variant for pattern constructor, found struct or unit variant"
                                 )
                             };
 
@@ -1103,16 +1524,29 @@ impl<'db> TyCtx<'db> {
                                     TypeResolution::Type(type_ref) => {
                                         let allocated =
                                             self.allocate_ref(type_ref, &inferred_templates);
+                                        let inner_var = TyVarId::alloc();
+                                        self.unify(allocated, InferTy::Var(inner_var));
+                                        let infer_ty = InferTy::DeferBinding {
+                                            bind: mode_var_id,
+                                            inner: inner_var,
+                                        };
                                         let pat_ty = self.type_check_patt(pat);
-                                        self.unify(pat_ty, allocated);
+                                        println!(
+                                            "IN CONSTRUCTOR: UNIFYING {} AND {}",
+                                            self.find(pat_ty.clone()).display(self.db),
+                                            self.find(infer_ty.clone()).display(self.db),
+                                        );
+                                        self.unify(pat_ty, infer_ty);
                                     }
                                     _ => todo!(),
                                 };
                             }
                         }
                     };
+                    println!("Returning variant as {}", infer_ty.display(self.db));
                     infer_ty
                 } else {
+                    dbg!("We are returning an error here !");
                     InferTy::Error
                 }
             }
@@ -1141,7 +1575,7 @@ impl<'db> TyCtx<'db> {
                         desc,
                         owning_module(self.db, self.function.parent(self.db)),
                     );
-                    let allocated = self.allocate_partial(resolved);
+                    let allocated = self.allocate_partial(resolved, &self.get_templates());
                     self.unify(patt_ty, allocated);
                 }
             }
@@ -1151,15 +1585,40 @@ impl<'db> TyCtx<'db> {
             } => {
                 // TODO: Implement matching a ref with patterns where
                 // the fields are references as well
+                let bm_id = BindingModeVar::alloc();
+                self.binding_modes_by_ref.insert(bm_id, None);
+                self.binding_modes_mut.insert(bm_id, None);
                 let scrut_ty = self.type_check_expr(scrutinee);
+                let scrut_var = TyVarId::alloc();
+                self.unify(
+                    scrut_ty.clone(),
+                    InferTy::DeferBinding {
+                        bind: bm_id,
+                        inner: scrut_var,
+                    },
+                );
+
                 for HirMatchBranch {
                     pattern,
-                    locals: _,
+                    locals,
                     guard,
                     body,
                 } in branches
                 {
+                    for local in locals {
+                        let var = TyVarId::alloc();
+                        self.infer_locals.insert(
+                            *local,
+                            InferTy::DeferBinding {
+                                bind: bm_id,
+                                inner: var,
+                            },
+                        );
+                    }
+
                     let pattern_ty = self.type_check_patt(pattern);
+                    println!("[SCRUT] {}", self.find(scrut_ty.clone()).display(self.db));
+                    println!("[PAT] {}", self.find(pattern_ty.clone()).display(self.db));
                     self.unify(pattern_ty, scrut_ty.clone());
                     if let Some(guard_ty) = guard.as_ref().map(|expr| self.type_check_expr(expr)) {
                         self.unify(guard_ty, self.bool_ty());
@@ -1168,7 +1627,16 @@ impl<'db> TyCtx<'db> {
                 }
                 // todo!()
             }
-            HirStmtKind::Assign { .. } => todo!(),
+            HirStmtKind::Assign { lhs, rhs } => {
+                let lhs_ty = self.type_check_place(lhs);
+                let rhs_ty = self.type_check_expr(rhs);
+                self.unify(lhs_ty, rhs_ty);
+                // todo!(
+                //     "{} = {}",
+                //     self.find(lhs_ty).display(self.db),
+                //     self.find(rhs_ty).display(self.db)
+                // )
+            }
             HirStmtKind::Expr(expr) => {
                 self.type_check_expr(expr);
             }

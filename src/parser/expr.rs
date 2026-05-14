@@ -71,12 +71,7 @@ impl<'db> Parser<'db> {
     fn parse_binop(&mut self, min_bp: u8) -> Result<AstExpr, ParseError> {
         let mut lhs = self.parse_unary()?;
 
-        loop {
-            let tok_kind = match self.peek_n(0) {
-                Some(t) => t.kind.clone(),
-                None => break,
-            };
-
+        while let Some(tok_kind) = self.peek_n(0).map(|t| t.kind) {
             if tok_kind == TokenKind::DotDot {
                 let lbp: u8 = 4;
                 let rbp: u8 = 4;
@@ -101,7 +96,7 @@ impl<'db> Parser<'db> {
                 if lbp <= min_bp {
                     break;
                 }
-                let op_kind = tok_kind.clone();
+                let op_kind = tok_kind;
                 self.consume();
 
                 if let Some(op) = token_to_binop(&op_kind) {
@@ -128,7 +123,7 @@ impl<'db> Parser<'db> {
 
     fn parse_unary(&mut self) -> Result<AstExpr, ParseError> {
         let start = self.get_start();
-        match self.current_token()?.kind.clone() {
+        match self.current_token()?.kind {
             TokenKind::Minus => {
                 self.consume();
                 let operand = self.parse_unary()?;
@@ -149,6 +144,25 @@ impl<'db> Parser<'db> {
                     start.span(&end),
                 ))
             }
+            TokenKind::BitAnd => {
+                self.consume();
+                let mutable = if self
+                    .peek_n(0)
+                    .is_some_and(|t| matches!(&t.kind, TokenKind::Mut))
+                {
+                    self.consume();
+                    true
+                } else {
+                    false
+                };
+                let operand = self.parse_unary()?;
+                let end = self.get_end();
+                Ok(Spanned::new(
+                    AstExprDesc::Ref(mutable, Box::new(operand)),
+                    vec![],
+                    start.span(&end),
+                ))
+            }
             _ => self.parse_postfix(),
         }
     }
@@ -157,7 +171,7 @@ impl<'db> Parser<'db> {
         let mut expr = self.parse_primary()?;
 
         loop {
-            match self.peek_n(0).map(|t| t.kind.clone()) {
+            match self.peek_n(0).map(|t| t.kind) {
                 Some(TokenKind::AddressOf) => {
                     self.consume();
                     let end = self.get_end();
@@ -174,7 +188,7 @@ impl<'db> Parser<'db> {
 
                 Some(TokenKind::Dot) => {
                     self.consume();
-                    if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind.clone()) {
+                    if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind) {
                         self.consume();
                         let end = self.get_end();
                         let span = expr.span.start().span(&end);
@@ -472,7 +486,7 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(name) => {
                 self.consume();
 
-                match self.peek_n(0).map(|t| t.kind.clone()) {
+                match self.peek_n(0).map(|t| t.kind) {
                     Some(TokenKind::Access) => {
                         self.consume();
                         let rhs = self.parse_postfix()?;
@@ -650,7 +664,7 @@ impl<'db> Parser<'db> {
 
         if self
             .peek_n(0)
-            .map_or(false, |t| matches!(t.kind, TokenKind::OpenBra))
+            .is_some_and(|t| matches!(t.kind, TokenKind::OpenBra))
         {
             self.consume();
             let fields = self.parse_struct_fields()?;
@@ -668,7 +682,7 @@ impl<'db> Parser<'db> {
             ))
         } else if self
             .peek_n(0)
-            .map_or(false, |t| matches!(t.kind, TokenKind::OpenPar))
+            .is_some_and(|t| matches!(t.kind, TokenKind::OpenPar))
         {
             self.consume();
             let args = self.parse_expr_args()?;
@@ -732,7 +746,7 @@ impl<'db> Parser<'db> {
     fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {
         let mut fields = vec![];
         loop {
-            match self.peek_n(0).map(|t| t.kind.clone()) {
+            match self.peek_n(0).map(|t| t.kind) {
                 Some(TokenKind::CloseBra) | None => break,
                 Some(TokenKind::Dot) => {
                     self.consume(); // consume '.'
@@ -744,7 +758,7 @@ impl<'db> Parser<'db> {
                         name: name.data,
                         value,
                     });
-                    match self.peek_n(0).map(|t| t.kind.clone()) {
+                    match self.peek_n(0).map(|t| t.kind) {
                         Some(TokenKind::Comma) => {
                             self.consume();
                         }

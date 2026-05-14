@@ -1,9 +1,12 @@
 use nonempty::nonempty;
 use std::marker::PhantomData;
 
-use crate::name_resolve::{
-    definition::{Definition, Segments, resolve_path},
-    std_module,
+use crate::{
+    hir::Mutability,
+    name_resolve::{
+        definition::{Definition, Segments, resolve_path},
+        std_module,
+    },
 };
 
 use super::*;
@@ -128,8 +131,8 @@ impl<'db> From<ImplId> for InternedImplId<'db> {
 
 #[allow(dead_code)]
 impl ImplId {
-    pub fn new<'db>(
-        db: &'db dyn crate::Db,
+    pub fn new(
+        db: &dyn crate::Db,
         parent: ModuleId,
         implemented: TypeRef,
         interface: Option<InterfaceRef>,
@@ -292,6 +295,30 @@ impl BuiltinTypeId {
             _ => 0,
         }
     }
+
+    pub fn is_ptr_like(self, db: &dyn crate::Db) -> Option<PtrKind> {
+        match self.name(db).interned().contents(db).as_str() {
+            "*mut" => Some(PtrKind::RawPtr(Mutability::Mutable)),
+            "*" => Some(PtrKind::RawPtr(Mutability::Const)),
+            "&mut" => Some(PtrKind::Ref(Mutability::Mutable)),
+            "&" => Some(PtrKind::Ref(Mutability::Const)),
+            _ => None,
+        }
+    }
+}
+
+impl TypeDefId {
+    pub fn is_ptr_like(self, db: &dyn crate::Db) -> Option<PtrKind> {
+        match self {
+            TypeDefId::Builtin(ty) => ty.is_ptr_like(db),
+            _ => None,
+        }
+    }
+}
+
+pub enum PtrKind {
+    Ref(Mutability),
+    RawPtr(Mutability),
 }
 
 pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
@@ -342,7 +369,8 @@ pub fn char_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::char(db).into(), vec![])
 }
 
-pub fn str_id(db: &dyn crate::Db) -> TypeId {
+#[salsa::tracked]
+pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
     // in std::io
     let Definition::Type(def) = resolve_path(
         db,
@@ -359,7 +387,12 @@ pub fn str_id(db: &dyn crate::Db) -> TypeId {
     .unwrap() else {
         panic!()
     };
-    TypeId::new(db, def, vec![])
+    def
+}
+
+#[salsa::tracked]
+pub fn str_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, str_def(db), vec![])
 }
 
 pub fn void_id(db: &dyn crate::Db) -> TypeId {

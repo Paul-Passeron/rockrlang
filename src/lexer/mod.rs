@@ -1,10 +1,10 @@
-pub mod lexer;
+mod lexer_impl;
 mod rules;
 pub mod token;
-pub use lexer::LexError;
+pub use lexer_impl::*;
 pub use token::{Token, TokenKind};
 
-use crate::{SourceFile, lexer::lexer::Lexer};
+use crate::SourceFile;
 
 pub fn lex_file<'db>(
     db: &'db dyn crate::Db,

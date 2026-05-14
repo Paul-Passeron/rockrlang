@@ -75,7 +75,7 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
         for local in &sorted_locals {
             let mutstr = match local.mutability {
                 Mutability::Mutable => "mut ",
-                Mutability::Immutable => "",
+                Mutability::Const => "",
             };
             writeln!(
                 f,
@@ -185,7 +185,7 @@ fn write_stmt(
                     write_expr(f, guard, db)?;
                 }
                 writeln!(f, " =>")?;
-                write_stmt(f, &branch.body, db, depth + 1)?;
+                write_stmt(f, &branch.body, db, depth + 2)?;
             }
             write_indent(f, depth)?;
             writeln!(f, "}}")
@@ -201,7 +201,7 @@ fn write_stmt(
             write!(f, "defer {}", s.trim_start())
         }
         HirStmtKind::Break => {
-            write!(f, "break;")
+            writeln!(f, "break;")
         }
     }
 }
@@ -313,14 +313,14 @@ fn write_expr(f: &mut fmt::Formatter<'_>, expr: &HirExpr, db: &dyn Db) -> fmt::R
         HirExprDesc::AddressOf { place, mutability } => {
             match mutability {
                 Mutability::Mutable => write!(f, "&mut ")?,
-                Mutability::Immutable => write!(f, "&")?,
+                Mutability::Const => write!(f, "&")?,
             }
             write_place(f, place, db)
         }
         HirExprDesc::Ref { place, mutability } => {
             match mutability {
                 Mutability::Mutable => write!(f, "ref mut ")?,
-                Mutability::Immutable => write!(f, "ref ")?,
+                Mutability::Const => write!(f, "ref ")?,
             }
             write_place(f, place, db)
         }

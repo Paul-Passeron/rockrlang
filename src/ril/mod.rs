@@ -170,7 +170,7 @@ pub struct BuiltinTypeId(salsa::Id);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceRef(salsa::Id);
 
-pub fn get_template_param_count<'db>(db: &'db dyn Db, ty: TypeDefId) -> usize {
+pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
     match ty {
         TypeDefId::Builtin(builtin_type_id) => builtin_type_id.template_count(db),
         TypeDefId::Struct(struct_id) => templates_of_struct(db, struct_id.interned()).len(),

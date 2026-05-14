@@ -54,7 +54,7 @@ impl<T> Frozen<T> {
         *self.next_bucket_idx.borrow_mut() += 1;
     }
 
-    pub fn get<'a>(&'a self, idx: usize) -> Option<&'a T> {
+    pub fn get(&self, idx: usize) -> Option<&T> {
         if self.is_empty() {
             return None;
         }
@@ -78,7 +78,7 @@ impl<T> Frozen<T> {
         })
     }
 
-    pub fn get_mut<'a>(&'a mut self, idx: usize) -> Option<&'a mut T> {
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
         let bucket_idx = idx / BUCKET_SIZE;
         let data = self.data.borrow();
         let next_bucket_idx = *self.next_bucket_idx.borrow();
@@ -184,7 +184,7 @@ impl<'a, T> Iterator for FrozenIterMut<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let res = unsafe {
-            transmute(
+            transmute::<Option<&mut T>, Option<&'a mut T>>(
                 self.frozen
                     .get_mut(self.item_idx + self.bucket_idx * BUCKET_SIZE),
             )
@@ -382,7 +382,7 @@ impl<T> Frozen<T> {
                 right = mid;
             }
         }
-        (left < l && self.get(left).map(|x| cmp(x)) == Some(value))
+        (left < l && self.get(left).map(cmp) == Some(value))
             .then_some(left)
             .ok_or(left)
     }
@@ -397,7 +397,7 @@ impl<T: Ord> Frozen<T> {
         let this = mem::take(self);
         let mut v = this.into_iter().collect::<Vec<_>>();
         v.sort();
-        *self = Frozen::from_iter(v.into_iter());
+        *self = Frozen::from_iter(v);
     }
 
     pub fn into_sorted(self) -> Self {

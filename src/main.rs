@@ -1,4 +1,4 @@
-#![feature(formatting_options)]
+#![feature(formatting_options, deque_extend_front)]
 
 use clap::Parser;
 use clap_derive::Parser;
@@ -119,23 +119,19 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
     let mut v = defs.values().copied().collect::<Vec<_>>();
     v.sort();
     for def in v {
-        match def {
-            Definition::Function(function_id) => {
-                println!("---------------------------------");
-                println!("{}", function_id.display(db));
-                println!("---------------------------------");
-                if let Some(hir) = hir_body(db, function_id.interned()) {
-                    println!("{}", hir.display(db));
-                }
-                if let Some(results) =
-                    type_check_function(db, function_id.interned(), packages.clone())
-                {
-                    for (expr_id, ty) in &results.node_types(db) {
-                        println!("{:?}: {}", expr_id, ty.display(db));
-                    }
+        if let Definition::Function(function_id) = def {
+            println!("---------------------------------");
+            println!("{}", function_id.display(db));
+            println!("---------------------------------");
+            if let Some(hir) = hir_body(db, function_id.interned()) {
+                println!("{}", hir.display(db));
+            }
+            if let Some(results) = type_check_function(db, function_id.interned(), packages.clone())
+            {
+                for (expr_id, ty) in &results.node_types(db) {
+                    println!("{:?}: {}", expr_id, ty.display(db));
                 }
             }
-            _ => (),
         }
     }
     false
@@ -174,8 +170,7 @@ fn check_module_tree<'db>(
 }
 
 fn try_package<'db>(db: &'db dyn Db, package: Package<'db>, packages: Vec<Package<'db>>) -> bool {
-    let has_errors = check_module_tree(db, package.root(db), None, package, packages);
-    has_errors
+    check_module_tree(db, package.root(db), None, package, packages)
 }
 
 fn main() -> Result<(), String> {

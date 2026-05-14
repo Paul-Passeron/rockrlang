@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     Db,
     common::location::Span,
-    hir::{FunctionLikeAst, function_ast, impl_items, impl_sources},
+    hir::{FunctionLikeAst, function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items,
@@ -13,8 +13,8 @@ use crate::{
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
-        FunctionId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
-        ScopeOwnerId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of,
+        InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId, ScopeOwnerId,
+        TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of,
     },
 };
 
@@ -80,13 +80,13 @@ pub fn resolve_spanned_type_expr_desc<'db>(
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr(db, &**to, module.interned(), template_args)
+                resolve_type_expr(db, to, module.interned(), template_args)
             } else {
                 TypeResolution::Error
             }
         }
         AstTypeExprDesc::Pointer { mutable, pointee } => {
-            match resolve_type_expr(db, &*pointee, module, template_args) {
+            match resolve_type_expr(db, pointee, module, template_args) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
                 }
@@ -94,7 +94,7 @@ pub fn resolve_spanned_type_expr_desc<'db>(
             }
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
-            match resolve_type_expr(db, &*pointee, module, template_args) {
+            match resolve_type_expr(db, pointee, module, template_args) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ref_of(db, pointee, *mutable).into())
                 }
@@ -103,7 +103,7 @@ pub fn resolve_spanned_type_expr_desc<'db>(
         }
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
-            match resolve_type_expr(db, &*ty, module, template_args) {
+            match resolve_type_expr(db, ty, module, template_args) {
                 TypeResolution::Type(elem) => TypeResolution::Type(slice_of(db, elem).into()),
                 _ => TypeResolution::Infer,
             }
@@ -149,10 +149,10 @@ pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Ar
 }
 
 #[salsa::tracked]
-pub fn enum_item<'db>(db: &'db dyn Db, struct_id: InternedEnumId<'db>) -> Arc<AstEnumDef> {
-    for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
+pub fn enum_item<'db>(db: &'db dyn Db, enum_id: InternedEnumId<'db>) -> Arc<AstEnumDef> {
+    for item in module_items(db, enum_id.parent(db).interned()).unwrap_or_default() {
         if let AstTopLevelItemDesc::EnumDef(ast) = item.data
-            && ast.name == struct_id.name(db)
+            && ast.name == enum_id.name(db)
         {
             return Arc::new(ast);
         }

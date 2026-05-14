@@ -35,6 +35,7 @@ pub enum AstAnyTypeExprDesc {
     Known(AstTypeExprDesc),
 }
 
+#[allow(dead_code)]
 impl AstAnyTypeExpr {
     pub fn as_known(&self) -> Option<AstTypeExpr> {
         if let AstAnyTypeExprDesc::Known(ty) = &self.data {

@@ -10,11 +10,10 @@ use crate::{
     name_resolve::implems::impls_in_package,
     parse_tree::top_level::AstImplItem,
     ril::{
-        FunctionId, ImplId, InterfaceRef, Package, ScopeOwnerId, TypeDefId, TypeId, TypeParamId,
-        TypeRef,
+        FunctionId, InterfaceRef, Package, ScopeOwnerId, TypeId, TypeRef,
         display::{Display, RilDisplay},
     },
-    thir::{InferTy, TyVarId},
+    thir::{BindingModeVar, InferTy, TyVarId},
 };
 
 impl PartialTypeRef {
@@ -73,8 +72,7 @@ pub fn find_method_for_partial_ref<'db>(
     let mut res = vec![];
     for implem in packages
         .iter()
-        .map(|package| impls_in_package(db, *package))
-        .flatten()
+        .flat_map(|package| impls_in_package(db, *package))
     {
         let matcher = implem.id(db).implemented(db);
         let templates = implem
@@ -83,32 +81,29 @@ pub fn find_method_for_partial_ref<'db>(
             .into_iter()
             .map(|x| x.into_iter().collect())
             .collect::<Box<[_]>>();
-        if let Some(constraints) = partial_ty_pattern_matches(db, &ty, matcher, &templates) {
-            let items = impl_items(db, implem.id(db).interned());
-            for item in items {
-                match item {
-                    AstImplItem::Fundef(fundef) => {
-                        if fundef.data.name == method {
-                            let id = FunctionId::new(db, method, ScopeOwnerId::Impl(implem.id(db)));
-                            res.push((id, constraints.clone()));
-                        }
-                    }
-                    _ => (),
-                }
-            }
+        if let Some(constraints) = partial_ty_pattern_matches(db, &ty, matcher, &templates)
+            && impl_items(db, implem.id(db).interned()).iter().any(|item| {
+                matches!(item,
+                    AstImplItem::Fundef(fundef) if fundef.data.name == method,
+                )
+            })
+        {
+            let id = FunctionId::new(db, method, ScopeOwnerId::Impl(implem.id(db)));
+            res.push((id, constraints.clone()));
         }
     }
     res
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub enum ImplMatchConstraint {
+pub(super) enum ImplMatchConstraint {
+    IsValue(BindingModeVar),
     Unify(InferTy, InferTy),
     Implements(InferTy, InterfaceRef),
 }
 
 #[derive(Clone, PartialEq, Eq)]
-pub struct ImplMatchConstraints {
+pub(super) struct ImplMatchConstraints {
     pub substitution: Vec<Option<InferTy>>,
     pub constraints: HashSet<ImplMatchConstraint>,
 }
@@ -125,7 +120,7 @@ impl ImplMatchConstraints {
     }
 }
 
-pub fn allocate_type_id(db: &dyn Db, ty: TypeId) -> InferTy {
+pub(super) fn allocate_type_id(db: &dyn Db, ty: TypeId) -> InferTy {
     let args = ty
         .args(db)
         .into_iter()
@@ -140,7 +135,7 @@ pub fn allocate_type_id(db: &dyn Db, ty: TypeId) -> InferTy {
     }
 }
 
-pub(self) fn partial_ty_pattern_matches(
+fn partial_ty_pattern_matches(
     db: &dyn Db,
     ty: &InferTy,
     matcher: TypeRef,
@@ -198,7 +193,10 @@ pub(self) fn partial_ty_pattern_matches(
                 }
                 true
             }
-            (InferTy::RefOrDerefLike { .. }, _) => todo!(),
+            (InferTy::DeferBinding { bind, inner }, x) => {
+                constraints.insert(ImplMatchConstraint::IsValue(*bind));
+                _aux(db, &InferTy::Var(*inner), x, constraints, subst)
+            }
             (InferTy::Deref(_), _) => todo!(),
         }
     }

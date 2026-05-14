@@ -292,10 +292,8 @@ impl<'db> Parser<'db> {
                 && matches!(t.kind, TokenKind::Comma)
             {
                 self.consume();
-            } else {
-                if r != AstReceiver::None {
-                    has_args = false;
-                }
+            } else if r != AstReceiver::None {
+                has_args = false;
             }
             Some(r)
         } else {
