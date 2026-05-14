@@ -165,6 +165,7 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
             TypeRef::Associated(_symbol) => todo!(),
+            TypeRef::Unknown => InferTy::Var(self.fresh_var()),
         }
     }
 

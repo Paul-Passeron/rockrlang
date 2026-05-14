@@ -89,6 +89,7 @@ pub enum TypeRef {
     Associated(Symbol),
     Zelf,
     Error,
+    Unknown,
 }
 
 #[salsa::interned]

@@ -59,7 +59,7 @@ impl<'a> InferenceCtx<'a> {
                         b: ctx.get_template(id.0)?.clone(),
                     },
                 ))),
-                TypeRef::Error => None,
+                TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => {
                     // A Self or associated type should not have been encountered here
                     None

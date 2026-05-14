@@ -393,7 +393,9 @@ impl<'db> LowerFundef<'db> {
                                                             TypeRef::Param(_) => {
                                                                 unreachable!()
                                                             }
-                                                            TypeRef::Error => vec![],
+                                                            TypeRef::Unknown | TypeRef::Error => {
+                                                                vec![]
+                                                            }
                                                             TypeRef::Zelf => todo!(),
                                                             TypeRef::Associated(_symbol) => todo!(),
                                                         }

@@ -151,24 +151,27 @@ impl<'db> TyCtx<'db> {
                     id,
                     match infer_ty {
                         TyRef::Inf(infer_ty) => {
-                            self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Error)
+                            self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)
                         }
                         TyRef::Error => TypeRef::Error,
                     },
                 )
             })
             .collect::<BTreeMap<_, _>>();
+
         let call_infos = self
             .inf_ctx
             .drain_call_infos()
             .into_iter()
             .map(|(id, infos)| (id, self.concretize_infos(infos)))
             .collect();
+
         let diagnostics = self
             .diagnostics
             .drain(..)
             .chain(mem::take(&mut self.inf_ctx.diagnostics))
             .collect::<Vec<_>>();
+
         TypeCheckResults::new(self.db, node_types, call_infos, diagnostics)
     }
 
