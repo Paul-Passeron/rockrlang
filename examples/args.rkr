@@ -1,0 +1,8 @@
+@include std::io
+
+let main(args: [str]): int => {
+    for arg in args {
+        arg.println();
+    }
+    return 0;
+}
