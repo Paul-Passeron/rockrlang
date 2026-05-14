@@ -135,12 +135,6 @@ pub struct AstFundefArg {
     pub span: Span,
 }
 
-impl AstFundefArg {
-    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
-        Display { value: self, db }
-    }
-}
-
 impl AstTypeExprDesc {
     pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
         Display { value: self, db }
