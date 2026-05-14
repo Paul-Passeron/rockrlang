@@ -1,0 +1,11 @@
+interface A {}
+interface B {}
+interface C {}
+
+struct a<T> {}
+
+impl <T: A + B + C> a<T> {}
+impl <T: B + A + C> a<T> {}
+impl <T: B + C + A> a<T> {}
+impl <T: B + B> a<T> {}
+impl <T: B> a<T> {}
