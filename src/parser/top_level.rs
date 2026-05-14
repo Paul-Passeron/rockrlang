@@ -330,6 +330,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_impl_block(&mut self) -> Result<AstImplBlock, ParseError> {
+        let start = self.get_start();
         self.expect(TokenKind::Impl)?;
         self.consume();
         let template_args = self.parse_optional_template_args()?;
@@ -356,11 +357,14 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::CloseBra)?;
         self.consume();
 
+        let span = start.span(&self.get_end());
+
         Ok(AstImplBlock {
             template_args,
             interface,
             implemented,
             items,
+            span,
         })
     }
 

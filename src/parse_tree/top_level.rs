@@ -1,7 +1,7 @@
 use nonempty::NonEmpty;
 
 use crate::{
-    common::symbols::Symbol,
+    common::{location::Span, symbols::Symbol},
     parse_tree::{
         Spanned, expr::AstExpr, pattern::AstPattern, stmt::AstStmt, type_expr::AstTypeExpr,
     },
@@ -95,6 +95,7 @@ pub struct AstImplBlock {
     pub interface: Option<AstTypeExpr>, // Interface being implemented
     pub implemented: AstTypeExpr,       // Type being implemented for
     pub items: Vec<AstImplItem>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

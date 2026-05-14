@@ -10,7 +10,7 @@ use crate::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, InterfaceRef, InternedModuleId},
+    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId},
 };
 
 pub fn resolve_type_expr_as_interface<'db>(
@@ -62,7 +62,7 @@ pub fn resolve_type_expr_as_interface<'db>(
 }
 
 #[salsa::tracked]
-pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<ImplId> {
+pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<ImplSource<'db>> {
     let mut res = vec![];
     if let Some(items) = module_items(db, module) {
         for item in items.iter().filter_map(|item| match &item.data {
@@ -92,11 +92,25 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                     Some(Some(value)) => {
                         let impl_id =
                             ImplId::new(db, module.into(), implemented, Some(value), templates);
-                        res.push(impl_id);
+                        let src = ImplSource::new(
+                            db,
+                            impl_id,
+                            module.into(),
+                            item.items.clone(),
+                            item.span.clone(),
+                        );
+                        res.push(src);
                     }
                     None => {
                         let impl_id = ImplId::new(db, module.into(), implemented, None, templates);
-                        res.push(impl_id);
+                        let src = ImplSource::new(
+                            db,
+                            impl_id,
+                            module.into(),
+                            item.items.clone(),
+                            item.span.clone(),
+                        );
+                        res.push(src);
                     }
                     Some(None) => {
                         // TODO: report error

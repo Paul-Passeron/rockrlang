@@ -9,7 +9,7 @@ use crate::{
         definition::{get_module_pretty_name, module_definitions},
         file_module_id,
         implems::module_impls,
-        module_items, std_package,
+        module_items, module_to_file, std_package,
         type_expr::resolve_type_expr,
     },
     parse_tree::top_level::AstTopLevelItemDesc,
@@ -163,7 +163,15 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     }
     println!("Implementations:");
     for impl_ in impls {
-        println!("    {} ({:?})", impl_.display(db), impl_);
+        let start = impl_.span(db).start();
+        let source_file = module_to_file(db, impl_.module(db).interned());
+        let loc_infos = get_loc_info(db, source_file, start.offset);
+        println!(
+            "    {}: {} ({:?})",
+            loc_infos,
+            impl_.id(db).display(db),
+            impl_.id(db)
+        );
     }
 
     println!("***************************************************");

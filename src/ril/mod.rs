@@ -8,7 +8,8 @@ pub use plumbing::*;
 
 use crate::{
     OwnedSourceFile, SourceFile,
-    common::{symbols::Symbol, unord::Set},
+    common::{location::Span, symbols::Symbol, unord::Set},
+    parse_tree::top_level::AstImplItem,
 };
 
 #[salsa::tracked]
@@ -121,6 +122,15 @@ pub enum ScopeOwnerId {
 pub enum TypeDefId {
     Builtin(BuiltinTypeId),
     Struct(StructId),
+}
+
+#[salsa::tracked]
+#[derive(Debug)]
+pub struct ImplSource<'db> {
+    pub id: ImplId,
+    pub module: ModuleId,
+    pub items: Vec<AstImplItem>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
