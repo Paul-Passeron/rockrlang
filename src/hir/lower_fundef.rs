@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter};
+use std::{collections::BTreeMap, iter};
 
 use crate::{
     Db,
@@ -39,18 +39,18 @@ struct LowerFundef<'db> {
     template_args: Vec<AstTemplateArg>,
     next_local_id: u32,
     alloc: HirIdAlloc,
-    locals: HashMap<LocalId, LocalInfo>,
+    locals: BTreeMap<LocalId, LocalInfo>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Scope {
-    pub map: HashMap<Symbol, LocalId>,
+    pub map: BTreeMap<Symbol, LocalId>,
 }
 
 impl Scope {
     fn new() -> Self {
         Self {
-            map: HashMap::new(),
+            map: BTreeMap::new(),
         }
     }
 }
@@ -78,7 +78,7 @@ impl<'db> LowerFundef<'db> {
             template_args,
             next_local_id: 0,
             alloc: HirIdAlloc::new(),
-            locals: HashMap::new(),
+            locals: BTreeMap::new(),
         }
     }
 
@@ -1162,7 +1162,10 @@ impl<'db> LowerFundef<'db> {
             self.db,
             self.function,
             params,
-            self.locals.drain().map(|(_, x)| x).collect::<Vec<_>>(),
+            std::mem::take(&mut self.locals)
+                .into_iter()
+                .map(|(_, x)| x)
+                .collect::<Vec<_>>(),
             stmts,
         )
     }
@@ -1198,7 +1201,10 @@ impl<'db> LowerFundef<'db> {
             self.db,
             self.function,
             params,
-            self.locals.drain().map(|(_, x)| x).collect::<Vec<_>>(),
+            std::mem::take(&mut self.locals)
+                .into_iter()
+                .map(|(_, x)| x)
+                .collect::<Vec<_>>(),
             stmts,
         )
     }

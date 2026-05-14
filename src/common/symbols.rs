@@ -5,7 +5,7 @@ pub struct InternedSymbol {
     pub contents: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Symbol(salsa::Id);
 
 impl<'db> From<InternedSymbol<'db>> for Symbol {

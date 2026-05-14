@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, hash_map::Entry},
+    collections::{HashMap, HashSet, btree_map::Entry},
     fmt,
     iter::once,
     sync::Arc,

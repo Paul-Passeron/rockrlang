@@ -12,8 +12,8 @@ use crate::{
     },
 };
 use nonempty::NonEmpty;
-use std::sync::Arc;
-use std::{collections::HashMap, fmt};
+use std::fmt;
+use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Definition {
@@ -93,8 +93,8 @@ fn definition_of_item<'db>(
 }
 
 #[salsa::tracked]
-pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> {
-    let mut res = HashMap::from([
+pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition> {
+    let mut res = BTreeMap::from([
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
         (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), // i32 is an alias for int. Might want to switch this around
         (
@@ -190,11 +190,11 @@ impl AstIncludePathDesc {
 pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
-) -> HashMap<Symbol, Definition> {
+) -> BTreeMap<Symbol, Definition> {
     if module.package(db).is_none() {
         builtin_definitions(db)
     } else {
-        let mut res = HashMap::new();
+        let mut res = BTreeMap::new();
         for sub in module.file_submodules(db) {
             let id = file_module_id(db, sub, Some(module.into()), module.package(db).unwrap());
             res.insert(id.name(db), Definition::Module(id));

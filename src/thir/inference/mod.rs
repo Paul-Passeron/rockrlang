@@ -10,7 +10,7 @@ mod unify;
 pub mod var;
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     fmt, mem,
     sync::Arc,
 };
@@ -59,19 +59,19 @@ pub struct InterfaceImplem {
 pub struct InferenceCtx<'a> {
     db: &'a dyn Db,
     table: UnificationTable<InPlace<InferVar>>,
-    local_map: HashMap<LocalId, InferVar>,
+    local_map: BTreeMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
     // current_constraints: Vec<Arc<InferenceConstraint>>,
-    all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
-    solved_constraints: HashSet<InferenceConstraintId>,
-    listeners: HashMap<InferVar, Vec<InferenceConstraintId>>,
+    all_constraints: BTreeMap<InferenceConstraintId, Arc<InferenceConstraint>>,
+    solved_constraints: BTreeSet<InferenceConstraintId>,
+    listeners: BTreeMap<InferVar, Vec<InferenceConstraintId>>,
     ready: VecDeque<InferenceConstraintId>,
     ready_set: HashSet<InferenceConstraintId>,
 
-    implements: HashMap<InterfaceId, HashSet<InterfaceImplem>>,
+    implements: BTreeMap<InterfaceId, HashSet<InterfaceImplem>>,
     packages: Arc<[Package<'a>]>,
-    call_infos: HashMap<ExprId, InferCallInfos>,
+    call_infos: BTreeMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
     impl_depth: usize,
 
@@ -83,7 +83,7 @@ impl<'db> InferenceCtx<'db> {
     fn create_local_map(
         table: &mut UnificationTable<InPlace<InferVar>>,
         locals: &[LocalId],
-    ) -> HashMap<LocalId, InferVar> {
+    ) -> BTreeMap<LocalId, InferVar> {
         locals.iter().map(|id| (*id, table.new_key(None))).collect()
     }
 
@@ -122,16 +122,16 @@ impl<'db> InferenceCtx<'db> {
             table,
             local_map,
             // current_constraints: Vec::new(),
-            all_constraints: HashMap::new(),
-            solved_constraints: HashSet::new(),
+            all_constraints: BTreeMap::new(),
+            solved_constraints: BTreeSet::new(),
             packages,
-            call_infos: HashMap::new(),
+            call_infos: BTreeMap::new(),
             next_constraint_id: 0,
-            implements: HashMap::new(),
+            implements: BTreeMap::new(),
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
             diagnostics: Vec::new(),
-            listeners: HashMap::new(),
+            listeners: BTreeMap::new(),
             ready: VecDeque::new(),
             ready_set: HashSet::new(),
             in_flight_impls: HashSet::new(),
@@ -184,7 +184,7 @@ impl<'db> InferenceCtx<'db> {
         this
     }
 
-    pub fn drain_call_infos(&mut self) -> HashMap<ExprId, InferCallInfos> {
+    pub fn drain_call_infos(&mut self) -> BTreeMap<ExprId, InferCallInfos> {
         mem::take(&mut self.call_infos)
     }
 
@@ -200,7 +200,7 @@ impl<'db> InferenceCtx<'db> {
         self.all_constraints
             .keys()
             .copied()
-            .collect::<HashSet<_>>()
+            .collect::<BTreeSet<_>>()
             .difference(&self.solved_constraints)
             .map(|id| self.all_constraints[id].clone())
             .collect()

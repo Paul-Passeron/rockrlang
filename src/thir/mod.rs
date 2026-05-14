@@ -1,8 +1,5 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    mem, panic,
-    sync::Arc,
-};
+use std::collections::HashMap;
+use std::{collections::BTreeMap, mem, panic, sync::Arc};
 
 use crate::thir::inference::constraints::InferenceConstraintKind;
 use crate::{
@@ -67,18 +64,12 @@ struct TyCtx<'db> {
     templates: Arc<[AstTemplateArg]>,
 
     inf_ctx: InferenceCtx<'db>,
-    exprs: HashMap<ExprId, TyRef>,
+    exprs: BTreeMap<ExprId, TyRef>,
     diagnostics: Vec<Diagnostic>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExprId(HirId);
-
-// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct FieldId(usize);
-
-// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct PatternId(HirId);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TyRef {
@@ -106,7 +97,7 @@ impl<'db> TyCtx<'db> {
             templates,
             packages,
             inf_ctx,
-            exprs: HashMap::new(),
+            exprs: BTreeMap::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -143,7 +134,9 @@ impl<'db> TyCtx<'db> {
             println!("-- \\Constraints not solved ---------------------");
         }
 
-        let drain = self.exprs.drain().collect::<Box<[_]>>();
+        let drain = std::mem::take(&mut self.exprs)
+            .into_iter()
+            .collect::<Box<[_]>>();
         let node_types = drain
             .into_iter()
             .map(|(id, infer_ty)| {
