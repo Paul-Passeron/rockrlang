@@ -103,8 +103,6 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn expr_as_place(&mut self, expr: &AstExpr, scope: &Scope, module: ModuleId) -> HirPlace {
-        println!("Calling place with {:?}", expr.data);
-
         match &expr.data {
             AstExprDesc::Name(symbol) => {
                 if let Some(id) = scope.map.get(symbol) {
@@ -267,29 +265,33 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Tuple(tys) => {
-                let partial_args: Vec<PartialTypeArg> = tys
-                    .iter()
-                    .map(|ty| self.resolve_holed_ty(ty, module).to_partial_arg())
-                    .collect();
+                if tys.len() == 1 {
+                    self.resolve_holed(&tys[0])
+                } else {
+                    let partial_args: Vec<PartialTypeArg> = tys
+                        .iter()
+                        .map(|ty| self.resolve_holed_ty(ty, module).to_partial_arg())
+                        .collect();
 
-                let tuple_def: TypeDefId = BuiltinTypeId::tuple(self.db).into();
+                    let tuple_def: TypeDefId = BuiltinTypeId::tuple(self.db).into();
 
-                let all_known: Option<Vec<TypeRef>> = partial_args
-                    .iter()
-                    .map(|a| match a {
-                        PartialTypeArg::Known(t) => Some(*t),
-                        _ => None,
-                    })
-                    .collect();
+                    let all_known: Option<Vec<TypeRef>> = partial_args
+                        .iter()
+                        .map(|a| match a {
+                            PartialTypeArg::Known(t) => Some(*t),
+                            _ => None,
+                        })
+                        .collect();
 
-                match all_known {
-                    Some(resolved) => PartialTypeRef::Resolved(TypeRef::Concrete(TypeId::new(
-                        self.db, tuple_def, resolved,
-                    ))),
-                    None => PartialTypeRef::WithHoles {
-                        def: tuple_def,
-                        args: partial_args,
-                    },
+                    match all_known {
+                        Some(resolved) => PartialTypeRef::Resolved(TypeRef::Concrete(TypeId::new(
+                            self.db, tuple_def, resolved,
+                        ))),
+                        None => PartialTypeRef::WithHoles {
+                            def: tuple_def,
+                            args: partial_args,
+                        },
+                    }
                 }
             }
         }
@@ -319,7 +321,6 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_expr(&mut self, expr: &AstExpr, scope: &Scope, module: ModuleId) -> HirExpr {
-        println!("Calling with {:?}", expr.data);
         HirExpr {
             id: self.alloc.next(),
             data: match &expr.data {
@@ -638,12 +639,18 @@ impl<'db> LowerFundef<'db> {
                         }
                     }
                 }
-                AstExprDesc::Tuple(exprs) => HirExprDesc::Tuple(
-                    exprs
-                        .iter()
-                        .map(|e| self.lower_expr(e, scope, self.module))
-                        .collect(),
-                ),
+                AstExprDesc::Tuple(exprs) => {
+                    if exprs.len() == 1 {
+                        self.lower_expr(&exprs[0], scope, self.module).data
+                    } else {
+                        HirExprDesc::Tuple(
+                            exprs
+                                .iter()
+                                .map(|e| self.lower_expr(e, scope, self.module))
+                                .collect(),
+                        )
+                    }
+                }
                 AstExprDesc::SliceLit(exprs) => HirExprDesc::SliceLit(
                     exprs
                         .iter()

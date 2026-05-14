@@ -1,4 +1,4 @@
-use crate::thir::inference::InferenceCtx;
+use crate::{ril::display::RilDisplay, thir::inference::InferenceCtx};
 
 use super::{InferTy, InferVar, UnificationError, UnifyValue};
 
@@ -86,6 +86,8 @@ impl UnifyValue for InferTy {
 
 impl<'db> InferenceCtx<'db> {
     fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
+        let a = &self.find(a);
+        let b = &self.find(b);
         match (a, b) {
             (InferTy::Var(a), InferTy::Var(b)) => self.table.unify_var_var(*a, *b),
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
@@ -102,6 +104,7 @@ impl<'db> InferenceCtx<'db> {
                 },
             ) => {
                 if def_a != def_b {
+                    println!("{} != {}", def_a.display(self.db), def_b.display(self.db));
                     Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
                 } else if let (len_a, len_b) = (fields_a.len(), fields_b.len())
                     && len_a != len_b
@@ -132,10 +135,13 @@ impl<'db> InferenceCtx<'db> {
     pub fn unify(&mut self, a: InferTy, b: InferTy) -> Result<(), UnificationError> {
         self.snapshot(|this| {
             this.try_unify(&a, &b)?;
-            this.solve_constraints().map_err(|b| {
-                let (inference_constraint, unification_error) = *b;
-                UnificationError::UnmetConstraint(inference_constraint, Box::new(unification_error))
-            })
+            this.solve_constraints()
+                .map_err(|(inference_constraint, unification_error)| {
+                    UnificationError::UnmetConstraint(
+                        inference_constraint,
+                        Box::new(unification_error),
+                    )
+                })
         })
     }
 

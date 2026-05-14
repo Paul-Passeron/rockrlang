@@ -6,15 +6,18 @@ mod types;
 mod unify;
 mod var;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
     Db,
     common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef},
     parse_tree::top_level::AstTemplateArg,
-    ril::{FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeParamId, TypeRef},
-    thir::ExprId,
+    ril::{FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef},
+    thir::{ExprId, InferCallInfos},
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use var::*;
@@ -29,18 +32,43 @@ pub enum InferTy {
     Param(TypeParamId),
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct InterfaceImplem {
+    pub interface: InterfaceId,
+    pub ty: InferTy,
+    pub templates: Box<[InferTy]>,
+}
+
 #[derive(Clone)]
 pub struct InferenceCtx<'a> {
     db: &'a dyn Db,
     table: UnificationTable<InPlace<InferVar>>,
     local_map: HashMap<LocalId, InferVar>,
-    constraints: Vec<InferenceConstraint>,
+
+    current_constraints: Vec<Arc<InferenceConstraint>>,
+    all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
+    solved_constraints: HashSet<InferenceConstraintId>,
+
+    implements: HashMap<InterfaceId, HashSet<InterfaceImplem>>,
+
     templates: Arc<[AstTemplateArg]>,
     packages: Arc<[Package<'a>]>,
+    call_infos: HashMap<ExprId, InferCallInfos>,
+    next_constraint_id: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct InferenceConstraintId(usize);
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct InferenceConstraint {
+    pub id: InferenceConstraintId,
+    pub kind: InferenceConstraintKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum InferenceConstraint {
+#[allow(dead_code)]
+pub enum InferenceConstraintKind {
     Deref {
         var: InferVar,
         target: InferTy,
@@ -104,9 +132,14 @@ impl<'db> InferenceCtx<'db> {
             db,
             table,
             local_map,
-            constraints: Vec::new(),
+            current_constraints: Vec::new(),
+            all_constraints: HashMap::new(),
+            solved_constraints: HashSet::new(),
             templates,
             packages,
+            call_infos: HashMap::new(),
+            next_constraint_id: 0,
+            implements: HashMap::new(),
         }
     }
 
@@ -121,12 +154,12 @@ impl<'db> InferenceCtx<'db> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum UnificationError {
     TypeDefIdMismatch(TypeDefId, TypeDefId),
     FieldCountMismatch(usize, usize),
     RecursiveDefinition(InferVar),
-    UnmetConstraint(InferenceConstraint, Box<UnificationError>),
+    UnmetConstraint(Arc<InferenceConstraint>, Box<UnificationError>),
     ExpectedPtrLike(TypeDefId),
     MinTupleLengthMismatch { expected: usize, got: usize },
     ExpectedStructWithField { def: TypeDefId, field: Symbol },
@@ -136,6 +169,7 @@ pub enum UnificationError {
     TemplateConstraining(TypeParamId),
     ArgCountMismatch(FunctionId, usize),
     StaticMethodCallOnReceiver(ExprId, FunctionId),
+    NoImplemCandidateFor(InferTy, InterfaceId, Box<[InferTy]>),
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -160,7 +194,14 @@ impl<'db> InferenceCtx<'db> {
         let ty = self.find(&ty);
         match ty {
             InferTy::Var(_) => None,
-            InferTy::Adt { .. } => todo!(),
+            InferTy::Adt { def, fields } => Some(TypeRef::Concrete(TypeId::new(
+                self.db,
+                def,
+                fields
+                    .into_iter()
+                    .map(|field| self.solve(field))
+                    .collect::<Option<Vec<_>>>()?,
+            ))),
             InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
         }
     }

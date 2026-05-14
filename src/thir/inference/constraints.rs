@@ -1,13 +1,25 @@
-use std::collections::VecDeque;
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    iter::once,
+    sync::Arc,
+};
+
+use itertools::Itertools;
 
 use crate::{
     common::symbols::Symbol,
     hir::{Mutability, impl_items},
-    parse_tree::top_level::{self, AstImplItem},
-    ril::{BuiltinTypeId, FunctionId, InterfaceId, PtrKind, ScopeOwnerId, TypeDefId},
+    parse_tree::top_level::{AstImplItem, AstReceiver},
+    ril::{
+        BuiltinTypeId, FunctionId, InterfaceId, PtrKind, ScopeOwnerId, TypeDefId,
+        display::RilDisplay,
+    },
     thir::{
-        ExprId,
-        inference::{InferenceConstraint, InferenceCtx, UnificationError, var::InferVar},
+        ExprId, InferCallInfos,
+        inference::{
+            InferenceConstraint, InferenceConstraintId, InferenceConstraintKind, InferenceCtx,
+            InterfaceImplem, UnificationError, var::InferVar,
+        },
     },
 };
 
@@ -20,7 +32,7 @@ enum ConstraintSolveResult {
 }
 
 impl<'db> InferenceCtx<'db> {
-    fn solve_deref_constraint(&mut self, var: InferVar, target: InferTy) -> ConstraintSolveResult {
+    fn solve_deref_constraint(&mut self, var: InferVar, target: &InferTy) -> ConstraintSolveResult {
         if let Some(value) = self.table.probe_value(var) {
             match value {
                 InferTy::Var(_) => ConstraintSolveResult::Pending,
@@ -30,7 +42,8 @@ impl<'db> InferenceCtx<'db> {
                             def,
                         ));
                     }
-                    if let Err(err) = self.unify(target, fields.into_iter().next().unwrap()) {
+                    if let Err(err) = self.unify(target.clone(), fields.into_iter().next().unwrap())
+                    {
                         return ConstraintSolveResult::Error(err);
                     }
                     ConstraintSolveResult::Solved
@@ -47,7 +60,7 @@ impl<'db> InferenceCtx<'db> {
     fn solve_binds_like_constraint(
         &mut self,
         ty: InferVar,
-        inner: InferTy,
+        inner: &InferTy,
         like: InferVar,
     ) -> ConstraintSolveResult {
         if let Some(InferTy::Adt { def, .. }) = self.table.probe_value(like) {
@@ -57,10 +70,10 @@ impl<'db> InferenceCtx<'db> {
                         Mutability::Const => BuiltinTypeId::ref_(self.db),
                         Mutability::Mutable => BuiltinTypeId::mut_ref(self.db),
                     }),
-                    fields: Box::new([inner]),
+                    fields: Box::new([inner.clone()]),
                 }
             } else {
-                inner
+                inner.clone()
             };
             if let Err(err) = self.unify(InferTy::Var(ty), to_unify) {
                 ConstraintSolveResult::Error(err)
@@ -81,14 +94,14 @@ impl<'db> InferenceCtx<'db> {
     fn solve_indexed_by_constraint(
         &mut self,
         elem_var: InferVar,
-        base_ty: InferTy,
-        index_ty: InferTy,
+        base_ty: &InferTy,
+        index_ty: &InferTy,
     ) -> ConstraintSolveResult {
         let found = self.find(&base_ty);
         if let Some(elem_ty) = self.is_builtin_indexed_by_int(&found) {
             if let Err(err) = self
                 .unify(InferTy::Var(elem_var), elem_ty)
-                .and_then(|_| self.unify(index_ty, self.int_ty()))
+                .and_then(|_| self.unify(index_ty.clone(), self.int_ty()))
             {
                 ConstraintSolveResult::Error(err)
             } else {
@@ -104,7 +117,7 @@ impl<'db> InferenceCtx<'db> {
     fn solve_tuple_constraint(
         &mut self,
         elem_var: InferVar,
-        tuple_ty: InferTy,
+        tuple_ty: &InferTy,
         has_index: u32,
     ) -> ConstraintSolveResult {
         let found = self.find(&tuple_ty);
@@ -134,7 +147,7 @@ impl<'db> InferenceCtx<'db> {
     fn solve_struct_field_constraint(
         &mut self,
         elem_var: InferVar,
-        struct_ty: InferTy,
+        struct_ty: &InferTy,
         field: Symbol,
     ) -> ConstraintSolveResult {
         let found = self.find(&struct_ty);
@@ -161,13 +174,28 @@ impl<'db> InferenceCtx<'db> {
     fn solve_method_constraint(
         &mut self,
         ret_var: InferVar,
-        receiver: InferTy,
+        receiver: &InferTy,
         id: ExprId,
         method: Symbol,
         args: &[InferTy],
         interface_hint: Option<InterfaceId>,
     ) -> ConstraintSolveResult {
-        let mut possible_blocks = self.get_potential_blocks(&receiver);
+        let mut possible_blocks = self
+            .get_potential_blocks(&receiver)
+            .into_iter()
+            .unique_by(|(src, _)| src.id(self.db))
+            .filter(|(src, _)| {
+                let items = impl_items(self.db, src.id(self.db).interned());
+                for item in items {
+                    if let AstImplItem::Fundef(def) = item
+                        && def.data.name == method
+                    {
+                        return true;
+                    }
+                }
+                false
+            })
+            .collect::<Box<[_]>>();
         if let Some(id) = interface_hint {
             possible_blocks = possible_blocks
                 .into_iter()
@@ -176,25 +204,15 @@ impl<'db> InferenceCtx<'db> {
                         .interface(self.db)
                         .is_some_and(|impl_interface_id| impl_interface_id.def(self.db) == id)
                 })
-                .filter(|(src, _)| {
-                    let items = impl_items(self.db, src.id(self.db).interned());
-                    for item in items {
-                        match item {
-                            AstImplItem::Fundef(def) => {
-                                if def.data.name == method {
-                                    return true;
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                    false
-                })
                 .collect();
         }
         if possible_blocks.is_empty() {
             todo!()
         } else if possible_blocks.len() > 1 {
+            for possible in possible_blocks {
+                let src = possible.0;
+                println!("Here: {}", src.id(self.db).display(self.db))
+            }
             todo!()
         }
         let (
@@ -208,8 +226,11 @@ impl<'db> InferenceCtx<'db> {
         constraints
             .into_iter()
             .for_each(|constraint| self.emit_constraint(constraint));
-        if let Err(err) = self.solve_constraints() {
-            todo!("{:?}", err)
+        if let Err((inference_constraint, unification_error)) = self.solve_constraints() {
+            return ConstraintSolveResult::Error(UnificationError::UnmetConstraint(
+                inference_constraint,
+                Box::new(unification_error),
+            ));
         }
 
         let module = src.id(self.db).parent(self.db);
@@ -224,13 +245,10 @@ impl<'db> InferenceCtx<'db> {
             })
             .unwrap();
 
-        match ast.data.receiver {
-            top_level::AstReceiver::None => {
-                return ConstraintSolveResult::Error(UnificationError::StaticMethodCallOnReceiver(
-                    id, method_id,
-                ));
-            }
-            _ => (),
+        if ast.data.receiver == AstReceiver::None {
+            return ConstraintSolveResult::Error(UnificationError::StaticMethodCallOnReceiver(
+                id, method_id,
+            ));
         }
 
         if ast.data.args.len() != args.len() {
@@ -289,110 +307,269 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Error(err);
         }
 
+        let call_infos = InferCallInfos {
+            expr_id: id,
+            callee: method_id,
+            substitution: method_templates,
+            variadic: false,
+        };
+
+        self.call_infos.insert(id, call_infos);
+
         ConstraintSolveResult::Solved
     }
 
     fn solve_implements_constraint(
         &mut self,
-        _ty: InferTy,
-        _id: InterfaceId,
-        _args: &[InferTy],
+        _id: InferenceConstraintId,
+        ty: &InferTy,
+        interface_id: InterfaceId,
+        args: &[InferTy],
     ) -> ConstraintSolveResult {
-        todo!()
+        let ty = &self.find(ty);
+        println!(
+            "Does {} implement {} ?",
+            ty.display(self.db),
+            interface_id.display(self.db)
+        );
+        if self.has_implementation(interface_id, ty, args) {
+            return ConstraintSolveResult::Solved;
+        }
+
+        self.add_implementation(interface_id, ty.clone(), args.iter().cloned().collect());
+        // TODO: remove implementation when erroring out, maybe
+
+        let impls = self.get_potential_blocks(ty);
+
+        let competing_impls = impls
+            .into_iter()
+            .filter(|(src, _)| {
+                src.id(self.db)
+                    .interface(self.db)
+                    .is_some_and(|this_id| this_id.def(self.db) == interface_id)
+            })
+            .collect::<HashMap<_, _>>();
+        if competing_impls.is_empty() {
+            return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
+                self.find(ty),
+                interface_id,
+                args.iter().cloned().collect(),
+            ));
+        }
+        let (_, impl_) = if competing_impls.len() > 1 {
+            let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
+
+            let mut possibles = vec![];
+            for (i, (_, impl_)) in competing_impls.iter().enumerate() {
+                let mut this = self.clone();
+                for constraint in &impl_.constraints {
+                    this.emit_constraint(constraint.clone());
+                }
+                if this.solve_constraints() == Ok(()) {
+                    possibles.push(i);
+                }
+            }
+            if possibles.is_empty() {
+                todo!()
+            } else if possibles.len() > 1 {
+                todo!()
+            }
+
+            competing_impls.into_iter().nth(possibles[0]).unwrap()
+        } else {
+            competing_impls.into_iter().next().unwrap()
+        };
+        for constraint in impl_.constraints {
+            self.emit_constraint(constraint.clone());
+        }
+        if let Err((inference_constraint, unification_error)) = self.solve_constraints() {
+            return ConstraintSolveResult::Error(UnificationError::UnmetConstraint(
+                inference_constraint,
+                Box::new(unification_error),
+            ));
+        }
+
+        ConstraintSolveResult::Solved
     }
 
-    fn solve_unify_constraint(&mut self, a: InferTy, b: InferTy) -> ConstraintSolveResult {
-        if let Err(err) = self.unify(a, b) {
+    fn has_implementation(&mut self, id: InterfaceId, ty: &InferTy, templates: &[InferTy]) -> bool {
+        let ty = self.find(&ty);
+        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        if !self.implements.contains_key(&id) {
+            return false;
+        }
+        for implem in self
+            .implements
+            .get(&id)
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Box<[_]>>()
+            .iter()
+        {
+            let implem_ty = self.find(&implem.ty);
+            let implem_templates = implem
+                .templates
+                .iter()
+                .map(|t| self.find(t))
+                .collect::<Box<[_]>>();
+            if ty == implem_ty && templates == implem_templates {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn add_implementation(&mut self, id: InterfaceId, ty: InferTy, templates: Box<[InferTy]>) {
+        let ty = self.find(&ty);
+        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        if self.implements.contains_key(&id) {
+            for implem in self
+                .implements
+                .get(&id)
+                .unwrap()
+                .iter()
+                .cloned()
+                .collect::<Box<[_]>>()
+                .iter()
+            {
+                let implem_ty = self.find(&implem.ty);
+                let implem_templates = implem
+                    .templates
+                    .iter()
+                    .map(|t| self.find(t))
+                    .collect::<Box<[_]>>();
+                if ty == implem_ty && templates == implem_templates {
+                    return;
+                }
+            }
+            self.implements
+                .get_mut(&id)
+                .unwrap()
+                .insert(InterfaceImplem {
+                    interface: id,
+                    ty,
+                    templates,
+                });
+        } else {
+            self.implements.insert(
+                id,
+                HashSet::from_iter(once(InterfaceImplem {
+                    interface: id,
+                    ty,
+                    templates,
+                })),
+            );
+        }
+    }
+
+    fn solve_unify_constraint(&mut self, a: &InferTy, b: &InferTy) -> ConstraintSolveResult {
+        if let Err(err) = self.unify(a.clone(), b.clone()) {
             ConstraintSolveResult::Error(err)
         } else {
             ConstraintSolveResult::Solved
         }
     }
 
-    fn try_solve_constraint(&mut self, constraint: InferenceConstraint) -> ConstraintSolveResult {
-        match constraint {
-            InferenceConstraint::Deref { var, target } => self.solve_deref_constraint(var, target),
-            InferenceConstraint::BindsLike { ty, inner, like } => {
-                self.solve_binds_like_constraint(ty, inner, like)
+    fn try_solve_constraint(&mut self, constraint: &InferenceConstraint) -> ConstraintSolveResult {
+        match &constraint.kind {
+            InferenceConstraintKind::Deref { var, target } => {
+                self.solve_deref_constraint(*var, target)
             }
-            InferenceConstraint::IndexedBy {
+            InferenceConstraintKind::BindsLike { ty, inner, like } => {
+                self.solve_binds_like_constraint(*ty, inner, *like)
+            }
+            InferenceConstraintKind::IndexedBy {
                 elem_var,
                 base_ty,
                 index_ty,
-            } => self.solve_indexed_by_constraint(elem_var, base_ty, index_ty),
-            InferenceConstraint::Tuple {
+            } => self.solve_indexed_by_constraint(*elem_var, base_ty, index_ty),
+            InferenceConstraintKind::Tuple {
                 elem_var,
                 tuple_ty,
                 has_index,
-            } => self.solve_tuple_constraint(elem_var, tuple_ty, has_index),
-            InferenceConstraint::StructField {
+            } => self.solve_tuple_constraint(*elem_var, tuple_ty, *has_index),
+            InferenceConstraintKind::StructField {
                 elem_var,
                 struct_ty,
                 field,
-            } => self.solve_struct_field_constraint(elem_var, struct_ty, field),
-            InferenceConstraint::Method {
+            } => self.solve_struct_field_constraint(*elem_var, struct_ty, *field),
+            InferenceConstraintKind::Method {
                 ret_var,
                 ty,
                 id,
                 method,
                 args,
                 interface_hint,
-            } => self.solve_method_constraint(ret_var, ty, id, method, &args, interface_hint),
-            InferenceConstraint::Implements { ty, id, args } => {
-                self.solve_implements_constraint(ty, id, &args)
+            } => self.solve_method_constraint(*ret_var, ty, *id, *method, &args, *interface_hint),
+            InferenceConstraintKind::Implements { ty, id, args } => {
+                self.solve_implements_constraint(constraint.id, ty, *id, &args)
             }
-            InferenceConstraint::Unify { a, b } => self.solve_unify_constraint(a, b),
+            InferenceConstraintKind::Unify { a, b } => self.solve_unify_constraint(a, b),
         }
     }
 
     fn try_solve_constraints(
         &mut self,
-    ) -> Result<(), Box<(InferenceConstraint, UnificationError)>> {
+    ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
         let mut len = 0;
-        let mut worklist = VecDeque::from(std::mem::take(&mut self.constraints));
+        let mut worklist = VecDeque::from(std::mem::take(&mut self.current_constraints));
 
         while len != worklist.len()
             && let Some(constraint) = worklist.pop_front()
         {
-            match self.try_solve_constraint(constraint.clone()) {
+            match self.try_solve_constraint(constraint.as_ref()) {
                 // The constraint has been solved, no need to push it back in the worklist
-                ConstraintSolveResult::Solved => (),
+                ConstraintSolveResult::Solved => {
+                    self.solved_constraints.insert(constraint.id);
+                }
 
                 // The constraint could not be solved but there were no errors, we push it back onto
                 // the worklist
                 ConstraintSolveResult::Pending => worklist.push_back(constraint),
 
                 // An error was encountered, we return the constraint which caused the error
-                ConstraintSolveResult::Error(error) => return Err(Box::new((constraint, error))),
+                ConstraintSolveResult::Error(error) => return Err((constraint, error)),
             }
             // Solving the constraints might have generated more constraints so we insert them on the worklist
-            worklist.extend_front(std::mem::take(&mut self.constraints));
+            worklist.extend_front(std::mem::take(&mut self.current_constraints));
             len = worklist.len();
         }
-        self.constraints.extend(worklist);
+        self.current_constraints.extend(worklist);
         Ok(())
     }
 
     /// Fix-point iteration on the constraints worklist.
     pub fn solve_constraints(
         &mut self,
-    ) -> Result<(), Box<(InferenceConstraint, UnificationError)>> {
-        let constraints = self.constraints.clone();
+    ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
+        let constraints = self.current_constraints.clone();
         if let Err(err) = self.try_solve_constraints() {
             // roll-back constraints that were eaten during their resolution
-            self.constraints = constraints;
+            self.current_constraints = constraints;
             return Err(err);
         }
         Ok(())
     }
 
-    pub fn emit_constraint(&mut self, constraint: InferenceConstraint) {
-        self.constraints.push(constraint);
+    fn fresh_constraint(&mut self, constraint: InferenceConstraintKind) -> InferenceConstraint {
+        let res = InferenceConstraint {
+            id: InferenceConstraintId(self.next_constraint_id),
+            kind: constraint,
+        };
+        self.next_constraint_id += 1;
+        res
+    }
+
+    pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {
+        let constraint = Arc::new(self.fresh_constraint(constraint));
+        self.current_constraints.push(constraint.clone());
+        self.all_constraints.insert(constraint.id, constraint);
     }
 
     pub fn emit_deref_constraint(&mut self, pointee: InferTy) -> InferVar {
         let ptr_var = self.fresh_var();
-        self.constraints.push(InferenceConstraint::Deref {
+        self.emit_constraint(InferenceConstraintKind::Deref {
             var: ptr_var,
             target: pointee,
         });
@@ -401,7 +578,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn emit_indexed_by_constraint(&mut self, base_ty: InferTy, index_ty: InferTy) -> InferVar {
         let elem_var = self.fresh_var();
-        self.constraints.push(InferenceConstraint::IndexedBy {
+        self.emit_constraint(InferenceConstraintKind::IndexedBy {
             elem_var,
             base_ty,
             index_ty,
@@ -411,7 +588,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn emit_tuple_constraint(&mut self, tuple_ty: InferTy, has_index: u32) -> InferVar {
         let elem_var = self.fresh_var();
-        self.constraints.push(InferenceConstraint::Tuple {
+        self.emit_constraint(InferenceConstraintKind::Tuple {
             elem_var,
             tuple_ty,
             has_index,
@@ -421,7 +598,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn emit_struct_field_constraint(&mut self, struct_ty: InferTy, field: Symbol) -> InferVar {
         let elem_var = self.fresh_var();
-        self.constraints.push(InferenceConstraint::StructField {
+        self.emit_constraint(InferenceConstraintKind::StructField {
             elem_var,
             struct_ty,
             field,
@@ -438,7 +615,7 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
     ) -> InferVar {
         let ret_var = self.fresh_var();
-        self.constraints.push(InferenceConstraint::Method {
+        self.emit_constraint(InferenceConstraintKind::Method {
             ret_var,
             ty,
             id,
@@ -449,13 +626,13 @@ impl<'db> InferenceCtx<'db> {
         ret_var
     }
 
+    #[allow(dead_code)]
     pub fn emit_implements_constraint(
         &mut self,
         ty: InferTy,
         id: InterfaceId,
         args: Box<[InferTy]>,
     ) {
-        self.constraints
-            .push(InferenceConstraint::Implements { ty, id, args });
+        self.emit_constraint(InferenceConstraintKind::Implements { ty, id, args });
     }
 }

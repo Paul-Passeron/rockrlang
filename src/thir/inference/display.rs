@@ -6,7 +6,7 @@ use crate::{
 use std::fmt;
 
 impl InferTy {
-    fn display<'a>(&'a self, db: &'a dyn crate::Db) -> Display<'a, &'a Self> {
+    pub(super) fn display<'a>(&'a self, db: &'a dyn crate::Db) -> Display<'a, &'a Self> {
         Display::new(db, self)
     }
 }

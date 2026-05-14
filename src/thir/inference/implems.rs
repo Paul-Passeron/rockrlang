@@ -7,10 +7,10 @@ use crate::{name_resolve::implems::impls_in_package, ril::ImplSource};
 
 use super::*;
 
-pub struct PotentialBlockRes<'a> {
-    pub src: ImplSource<'a>,
+#[derive(Debug)]
+pub struct PotentialBlockRes {
     pub templates: Box<[InferVar]>,
-    pub constraints: HashSet<InferenceConstraint>,
+    pub constraints: HashSet<InferenceConstraintKind>,
 }
 
 impl<'a> InferenceCtx<'a> {
@@ -19,11 +19,11 @@ impl<'a> InferenceCtx<'a> {
         ty: &InferTy,
         matcher: TypeRef,
         templates: &[InferTy],
-    ) -> Option<HashSet<InferenceConstraint>> {
+    ) -> Option<HashSet<InferenceConstraintKind>> {
         match ty {
             InferTy::Var(infer_var) => {
                 let allocated = self.allocate_type_ref(&matcher, templates);
-                Some(HashSet::from_iter(once(InferenceConstraint::Unify {
+                Some(HashSet::from_iter(once(InferenceConstraintKind::Unify {
                     a: InferTy::Var(*infer_var),
                     b: allocated,
                 })))
@@ -49,12 +49,12 @@ impl<'a> InferenceCtx<'a> {
                         })?;
                     Some(constraints)
                 }
-                TypeRef::Param(id) => {
-                    Some(HashSet::from_iter(iter::once(InferenceConstraint::Unify {
+                TypeRef::Param(id) => Some(HashSet::from_iter(iter::once(
+                    InferenceConstraintKind::Unify {
                         a: ty.clone(),
                         b: templates[id.0].clone(),
-                    })))
-                }
+                    },
+                ))),
                 TypeRef::Error => None,
             },
             InferTy::Param(_) => {
@@ -68,7 +68,7 @@ impl<'a> InferenceCtx<'a> {
         &mut self,
         ty: &InferTy,
         source: ImplSource<'a>,
-    ) -> Option<PotentialBlockRes<'a>> {
+    ) -> Option<PotentialBlockRes> {
         let mut constraints = HashSet::new();
         let templates = source.id(self.db).templates(self.db);
         let infer_templates = templates
@@ -91,7 +91,7 @@ impl<'a> InferenceCtx<'a> {
                         .iter()
                         .map(|arg| self.allocate_type_ref(arg, &mapped_templates))
                         .collect::<Box<[_]>>();
-                    constraints.insert(InferenceConstraint::Implements {
+                    constraints.insert(InferenceConstraintKind::Implements {
                         ty: InferTy::Var(*infer_ty),
                         id,
                         args,
@@ -106,7 +106,6 @@ impl<'a> InferenceCtx<'a> {
         )?);
 
         Some(PotentialBlockRes {
-            src: source,
             templates: infer_templates,
             constraints,
         })
@@ -115,7 +114,7 @@ impl<'a> InferenceCtx<'a> {
     pub fn get_potential_blocks(
         &mut self,
         ty: &InferTy,
-    ) -> HashMap<ImplSource<'a>, PotentialBlockRes<'a>> {
+    ) -> HashMap<ImplSource<'a>, PotentialBlockRes> {
         self.packages
             .iter()
             .copied()

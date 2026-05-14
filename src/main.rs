@@ -2,12 +2,15 @@
 
 use clap::Parser;
 use clap_derive::Parser;
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use crate::{
     common::location::get_loc_info,
     driver::load_package,
-    hir::hir_body,
+    hir::{FunctionLikeAst, function_ast, hir_body},
     name_resolve::{
         core_package,
         definition::{Definition, module_definitions},
@@ -114,6 +117,43 @@ fn print_module_tree<'db>(db: &'db dyn Db, module: FileModule<'db>, indent: usiz
     }
 }
 
+fn get_source_file_in_submodule<'db>(
+    db: &'db dyn Db,
+    file: impl AsRef<Path>,
+    submodule: FileModule<'db>,
+) -> Option<SourceFile<'db>> {
+    if submodule.file(db).path(db).as_path() == file.as_ref() {
+        return Some(submodule.file(db));
+    }
+    for submodule in submodule.submodules(db) {
+        if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
+            return Some(res);
+        }
+    }
+    None
+}
+
+fn get_source_file<'db>(
+    db: &'db dyn Db,
+    file: impl AsRef<Path>,
+    packages: &[Package<'db>],
+) -> Option<SourceFile<'db>> {
+    for package in packages {
+        let source_file = package.root(db).file(db);
+        if source_file.path(db) == file.as_ref() {
+            return Some(source_file);
+        }
+    }
+    for package in packages {
+        for submodule in package.root(db).submodules(db) {
+            if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
+                return Some(res);
+            }
+        }
+    }
+    None
+}
+
 fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'db>>) -> bool {
     let defs = module_definitions(db, module.interned());
     let mut v = defs.values().copied().collect::<Vec<_>>();
@@ -134,6 +174,16 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
                 for (expr_id, ty) in &results.node_types(db) {
                     println!("{:?}: {}", expr_id, ty.display(db));
                 }
+                for diagnostic in &results.diagnostics(db) {
+                    let loc = &diagnostic.span;
+                    let source_file = get_source_file(db, &loc.file, &packages).unwrap();
+                    let loc_info = get_loc_info(db, source_file, loc.start);
+                    println!("{}: {:?}", loc_info, diagnostic.kind);
+                }
+            } else if let FunctionLikeAst::Fundef(_) =
+                function_ast(db, function_id.interned()).inner(db)
+            {
+                panic!("No type check results !")
             }
         }
     }

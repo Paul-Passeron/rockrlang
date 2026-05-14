@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -9,8 +7,7 @@ use crate::{
     Db,
     common::location::Span,
     hir::{
-        HirBody, HirExpr, HirId, HirPattern, HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
-        owning_module,
+        HirBody, HirExpr, HirId, HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body, owning_module,
     },
     name_resolve::type_expr::get_templates_of_fun,
     parse_tree::{top_level::AstTemplateArg, type_expr::AstAnyTypeExprDesc},
@@ -19,13 +16,12 @@ use crate::{
 };
 
 pub mod inference;
-pub mod methods;
 
 #[derive(Clone)]
 struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
-    substitution: Vec<InferTy>,
+    substitution: Box<[InferTy]>,
     variadic: bool,
 }
 
@@ -37,38 +33,24 @@ pub struct CallInfos {
     pub variadic: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Diagnostic {
-    kind: DiagnosticKind,
-    span: Span,
+    pub kind: DiagnosticKind,
+    pub span: Span,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum DiagnosticKind {
     UniError {
         err: UnificationError,
         message: String,
     },
     BadRetType(TyRef),
-}
-
-impl InferCallInfos {
-    fn new(
-        expr_id: ExprId,
-        callee: FunctionId,
-        substitution: Vec<InferTy>,
-        variadic: bool,
-    ) -> Self {
-        Self {
-            expr_id,
-            callee,
-            substitution,
-            variadic,
-        }
-    }
+    BadAssignement(UnificationError),
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 struct TyCtx<'db> {
     db: &'db dyn Db,
     function: FunctionId,
@@ -86,14 +68,14 @@ struct TyCtx<'db> {
     diagnostics: Vec<Diagnostic>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExprId(HirId);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct FieldId(usize);
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct FieldId(usize);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PatternId(HirId);
+// #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct PatternId(HirId);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TyRef {
@@ -147,11 +129,15 @@ impl<'db> TyCtx<'db> {
         this
     }
 
-    fn concretize_infos(&self, infos: InferCallInfos) -> CallInfos {
+    fn concretize_infos(&mut self, infos: InferCallInfos) -> CallInfos {
         CallInfos {
             expr_id: infos.expr_id,
             callee: infos.callee,
-            substitution: infos.substitution.into_iter().map(|_| todo!()).collect(),
+            substitution: infos
+                .substitution
+                .into_iter()
+                .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
+                .collect(),
             variadic: infos.variadic,
         }
     }
@@ -180,38 +166,62 @@ impl<'db> TyCtx<'db> {
             .into_iter()
             .map(|(id, infos)| (id, self.concretize_infos(infos)))
             .collect();
-
-        TypeCheckResults::new(self.db, node_types, call_infos)
+        let diagnostics = self.diagnostics.drain(..).collect::<Vec<_>>();
+        TypeCheckResults::new(self.db, node_types, call_infos, diagnostics)
     }
 
-    fn type_check_expr(&mut self, expr: &'db HirExpr) -> TyRef {
-        let ty = self
-            .inf_ctx
-            .infer_expr(expr)
-            .map_or(TyRef::Error, TyRef::Inf);
+    fn type_check_expr(&mut self, expr: &'db HirExpr) -> (TyRef, Option<UnificationError>) {
+        let (ty, err) = match self.inf_ctx.infer_expr(expr) {
+            Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
+            Err(err) => (TyRef::Error, Some(err)),
+        };
         self.exprs.insert(ExprId(expr.id), ty.clone());
-        ty
+        (ty, err)
     }
 
-    fn get_ret_ty(&self) -> TyRef {
+    fn get_ret_ty(&self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
-        TyRef::Inf(
-            self.inf_ctx
-                .allocate_type_ref(&ret, self.inf_ctx.templates().as_ref()),
-        )
+        self.inf_ctx
+            .allocate_type_ref(&ret, self.inf_ctx.templates().as_ref())
     }
 
-    fn type_check_patt(&mut self, _pattern: &'db HirPattern) -> InferTy {
-        todo!()
+    fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {
+        self.diagnostics.push(Diagnostic {
+            kind: DiagnosticKind::UniError {
+                err,
+                message: String::new(),
+            },
+            span,
+        })
     }
 
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
         match &stmt.kind {
             HirStmtKind::Let { .. } => todo!(),
             HirStmtKind::Match { .. } => todo!(),
-            HirStmtKind::Assign { .. } => todo!(),
+            HirStmtKind::Assign { lhs, rhs } => {
+                let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
+                if let Some(rhs_err) = rhs_err {
+                    self.push_regular_diagnostic(rhs_err, rhs.span.clone());
+                }
+                match self.inf_ctx.infer_place(lhs) {
+                    Ok(lhs_ty) => match rhs_ty {
+                        TyRef::Inf(rhs_ty) => {
+                            if let Err(err) = self.inf_ctx.unify(lhs_ty, rhs_ty) {
+                                self.diagnostics.push(Diagnostic {
+                                    kind: DiagnosticKind::BadAssignement(err),
+                                    span: stmt.span.clone(),
+                                })
+                            }
+                        }
+                        TyRef::Error => (),
+                    },
+                    Err(err) => self.push_regular_diagnostic(err, rhs.span.clone()),
+                }
+            }
             HirStmtKind::Expr(hir_expr) => {
-                if let Err(err) = self.inf_ctx.infer_expr(hir_expr) {
+                let (_, err) = self.type_check_expr(hir_expr);
+                if let Some(err) = err {
                     self.diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::UniError {
                             err,
@@ -222,29 +232,33 @@ impl<'db> TyCtx<'db> {
                 }
             }
             HirStmtKind::Return(hir_expr) => {
-                let ty = hir_expr
-                    .as_ref()
-                    .map(|expr| {
-                        self.inf_ctx
-                            .infer_expr(expr)
-                            .map_err(|err| {
-                                self.diagnostics.push(Diagnostic {
-                                    kind: DiagnosticKind::UniError {
-                                        err,
-                                        message: String::new(),
-                                    },
-                                    span: stmt.span.clone(),
-                                })
-                            })
-                            .map_or(TyRef::Error, TyRef::Inf)
-                    })
-                    .unwrap_or(TyRef::Inf(self.inf_ctx.void_ty()));
+                let ret_ty = self.get_ret_ty();
+                if let Some(expr) = &hir_expr {
+                    let (ty, err) = self.type_check_expr(expr);
+                    if let Some(err) = err {
+                        self.diagnostics.push(Diagnostic {
+                            kind: DiagnosticKind::UniError {
+                                err,
+                                message: String::new(),
+                            },
+                            span: stmt.span.clone(),
+                        })
+                    };
 
-                if self.get_ret_ty() != ty {
-                    self.diagnostics.push(Diagnostic {
-                        kind: DiagnosticKind::BadRetType(ty),
-                        span: stmt.span.clone(),
-                    });
+                    if TyRef::Inf(ret_ty) != ty {
+                        self.diagnostics.push(Diagnostic {
+                            kind: DiagnosticKind::BadRetType(ty),
+                            span: stmt.span.clone(),
+                        });
+                    }
+                } else {
+                    let void_ty = self.inf_ctx.void_ty();
+                    if ret_ty != void_ty {
+                        self.diagnostics.push(Diagnostic {
+                            kind: DiagnosticKind::BadRetType(TyRef::Inf(void_ty)),
+                            span: stmt.span.clone(),
+                        })
+                    }
                 }
             }
             HirStmtKind::If { .. } => todo!(),
@@ -265,6 +279,7 @@ impl<'db> TyCtx<'db> {
 pub struct TypeCheckResults<'db> {
     pub node_types: BTreeMap<ExprId, TypeRef>,
     pub call_infos: BTreeMap<ExprId, CallInfos>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 fn type_check_hir<'db>(
