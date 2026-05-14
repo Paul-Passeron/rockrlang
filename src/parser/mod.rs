@@ -15,7 +15,7 @@ use crate::{
         symbols::Symbol,
     },
     lexer::{LexError, Token, TokenKind, lex_file},
-    parse_tree::{Spanned, top_level::Ast},
+    parse_tree::{Spanned, annotation::Annotation, top_level::Ast},
 };
 
 pub struct Parser<'db> {
@@ -23,10 +23,12 @@ pub struct Parser<'db> {
     pub position: usize,
     pub tokens: &'db [Token],
     pub db: &'db dyn crate::Db,
+    pub annotations: Vec<Annotation>,
 }
 
 #[allow(dead_code)]
 #[salsa::accumulator]
+#[derive(Debug)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
     pub file: PathBuf,
@@ -54,7 +56,12 @@ impl<'db> Parser<'db> {
             tokens,
             db,
             file,
+            annotations: Vec::new(),
         }
+    }
+
+    pub fn annotations(&mut self) -> Vec<Annotation> {
+        std::mem::take(&mut self.annotations)
     }
 
     pub fn last_span(&self) -> Span {
@@ -134,7 +141,7 @@ impl<'db> Parser<'db> {
         match current.kind {
             TokenKind::Identifier(s) => {
                 self.consume();
-                Ok(Spanned::new(s, current.location.clone()))
+                Ok(Spanned::new(s, vec![], current.location.clone()))
             }
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),

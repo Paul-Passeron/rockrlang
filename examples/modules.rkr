@@ -1,12 +1,12 @@
 @include std::io
 
-mod A => {
-    mod B => {
-        let b_func(): int => { return 69; }
+mod A {
+    mod B {
+        fun b_func(): int { return 69; }
     }
 }
 
-let main(): int => {
+fun main(): int {
     printf("%d\n", A::B::b_func());
     return 0;
 }

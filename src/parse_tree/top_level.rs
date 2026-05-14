@@ -21,6 +21,7 @@ pub enum TopLevelItemDesc {
     Interface(Interface),
     Const(ConstDecl),
     Impl(ImplBlock),
+    StructDef(StructDef),
 }
 
 pub type Module = Spanned<ModuleDesc>;
@@ -68,6 +69,13 @@ pub struct FundefArg {
 pub struct Interface {
     pub name: Symbol,
     pub template_args: Vec<TemplateArg>,
+    pub items: Vec<InterfaceItem>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum InterfaceItem {
+    Type(TemplateArg),
+    Sig(Funsig),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -79,10 +87,10 @@ pub struct ConstDecl {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ImplBlock {
-    template_args: Vec<TemplateArg>,
-    interface: Option<TypeExpr>, // Interface being implemented
-    implemented: TypeExpr,       // Type being implemented for
-    items: Vec<ImplItem>,
+    pub template_args: Vec<TemplateArg>,
+    pub interface: Option<TypeExpr>, // Interface being implemented
+    pub implemented: TypeExpr,       // Type being implemented for
+    pub items: Vec<ImplItem>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -105,15 +113,30 @@ pub enum IncludePathDesc {
     NameResolved { from: Symbol, to: Box<IncludePath> },
 }
 
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct StructDef {
+    pub name: Symbol,
+    pub template_args: Vec<TemplateArg>,
+    pub fields: Vec<StructDefField>,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct StructDefField {
+    pub name: Symbol,
+    pub ty: TypeExpr,
+}
+
 impl From<NonEmpty<Spanned<Symbol>>> for IncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
-        let Spanned { data: symbol, span } = symbols.pop().unwrap();
+        let Spanned {
+            data: symbol, span, ..
+        } = symbols.pop().unwrap();
         let start_loc = span.start();
         symbols.reverse();
 
         symbols.into_iter().fold(
-            IncludePath::new(IncludePathDesc::Symbol(symbol), span),
+            IncludePath::new(IncludePathDesc::Symbol(symbol), vec![], span),
             |acc, symb| {
                 let total_span = start_loc.span(&symb.span.end());
                 IncludePath::new(
@@ -121,6 +144,7 @@ impl From<NonEmpty<Spanned<Symbol>>> for IncludePath {
                         from: symb.data,
                         to: Box::new(acc),
                     },
+                    vec![],
                     total_span,
                 )
             },

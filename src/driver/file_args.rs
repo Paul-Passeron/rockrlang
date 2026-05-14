@@ -11,7 +11,7 @@ use nonempty::NonEmpty;
 
 use crate::SourceFileContent;
 
-const ANCHOR_FILE_NAME: &str = "main.ul";
+const ANCHOR_FILE_NAME: &str = "main.rkr";
 
 fn list_files(path: &Path) -> io::Result<Vec<PathBuf>> {
     fn _list_files(vec: &mut Vec<PathBuf>, path: &Path) -> io::Result<()> {
@@ -115,5 +115,14 @@ pub(super) fn get_non_empty_files(
         ps.unwrap_or(&[std::env::current_dir().unwrap_or_default()]),
     )?;
 
+    NonEmpty::from_vec(files.into_iter().collect())
+}
+
+#[allow(dead_code)]
+pub fn get_non_empty_files_from_paths(
+    db: &dyn crate::Db,
+    ps: &[PathBuf],
+) -> Option<NonEmpty<SourceFileContent>> {
+    let files = get_all_files(db, ps)?;
     NonEmpty::from_vec(files.into_iter().collect())
 }

@@ -1,77 +1,78 @@
-struct <T> InnerUnik => {
+struct InnerRef<T> {
     data: T;
     ref_count: u64;
 }
 
-struct <T> Unik => {
-    inner: *InnerUnik<T>;
+struct Ref<T> {
+    inner: *InnerRef<T>;
 }
 
-impl <T> Unik<T> => {
-    let new(counted: T): Unik<T> => {
-        let inner: *InnerUnik<T> = malloc(@sizeof(InnerUnik<T>));
-        inner->data = counted;
-        inner->ref_count = 1;
-        return Unik<T> { .inner = inner };
+impl <T> Ref<T> {
+    fun new(counted: T): Ref<T> {
+        let inner: *InnerRef<T> = malloc(@sizeof(InnerRef<T>));
+        inner$.data = counted;
+        inner$.ref_count = 1;
+        return Ref { .inner:  inner };
     }
 
-    let count(self: *Unik<T>): u64 => {
-        return self->inner.ref_count;
+    fun count(self: *Ref<T>): u64 {
+        return self$.inner.ref_count;
     }
 }
 
-impl <T: Drop> Drop for Unik<T> => {
-    let drop(self: Unik<T>) => {
-        self.inner.ref_count -= 1;
-        if self.inner.ref_count == 0 {
-            self.inner.data.drop();
+impl <T: Drop> Drop for Ref<T> {
+    fun drop(self: Ref<T>): void {
+        self.inner$.ref_count -= 1;
+        if self.inner$.ref_count == 0 {
+            self.inner$.data.drop();
             free(self.inner);
         }
     }
 }
 
-impl <T: NoDrop> Drop for Unik<T> => {
-    let drop(self: Unik<T>) => {
-        self.inner.ref_count -= 1;
+impl <T: NoDrop> Drop for Ref<T> {
+    fun drop(self: Ref<T>): void {
+        self.inner$.ref_count -= 1;
         if self.inner.ref_count == 0 {
             free(self.inner);
         }
     }
 }
 
-impl <T> Clone for Unik<T> => {
-    let clone(self: *Unik<T>): Unik<T> => {
-        self->inner.ref_count += 1;
-        return Unik<T> { .inner = self->inner };
+impl <T> Clone for Ref<T> {
+    fun clone(self: *Ref<T>): Ref<T> {
+        self$.inner$.ref_count += 1;
+        return Ref { .inner: self$.inner };
     }
 }
 
-impl <T> AsRef for Unik<T> => {
-    let as_ref(self: *Unik<T>): *T => {
-        return &self->inner.data;
+impl <T> AsRef for Ref<T> {
+    fun as_ref(self: *Ref<T>): *T {
+        return self$.inner.data@;
     }
 }
 
-let main(): int => {
-    let x_0 = Unik<i32>::new(69);
+
+fun main(): int {
+    let x_0 = Ref<i32>::new(69);
     let x_1 = x_0.clone();
     let x_2 = x_1.clone();
     let x_3 = x_2.clone();
 
     printf("Count = %ld, %d, %d, %d, %d\n",
         x_0.count(),
-        *x_0.as_ref(),
-        *x_1.as_ref(),
-        *x_2.as_ref(),
-        *x_3.as_ref());
+        x_0.as_ref()$,
+        x_1.as_ref()$,
+        x_2.as_ref()$,
+        x_3.as_ref()$);
 
-    *x_0.as_ref() = 420;
+    x_0.as_ref()$ = 420;
 
     printf("Count = %ld, %d, %d, %d, %d\n",
         x_0.count(),
-        *x_0.as_ref(),
-        *x_1.as_ref(),
-        *x_2.as_ref(),
-        *x_3.as_ref());
+        x_0.as_ref()$,
+        x_1.as_ref()$,
+        x_2.as_ref()$,
+        x_3.as_ref()$);
     return 0;
 }

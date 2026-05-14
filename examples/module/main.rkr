@@ -1,6 +1,9 @@
 @include std::io
+@include other_one
 
-let main(): int => {
+fun main(): int {
     "Hello, World !".println();
+    foo();
+    as_module::bar();
     return 0;
 }

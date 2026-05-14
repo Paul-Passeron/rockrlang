@@ -2,8 +2,9 @@
 
 use std::{fmt, hash::Hash};
 
-use crate::common::location::Span;
+use crate::{common::location::Span, parse_tree::annotation::Annotation};
 
+pub mod annotation;
 pub mod expr;
 pub mod pattern;
 pub mod stmt;
@@ -12,6 +13,7 @@ pub mod type_expr;
 
 pub struct Spanned<T> {
     pub data: T,
+    pub annotations: Vec<Annotation>,
     pub span: Span,
 }
 
@@ -30,17 +32,24 @@ impl<T: Hash> Hash for Spanned<T> {
 }
 
 impl<T> Spanned<T> {
-    pub fn new(data: T, span: Span) -> Self {
-        Self { data, span }
-    }
-
-    pub fn as_ref(&self) -> Spanned<&T> {
-        Spanned::new(&self.data, self.span.clone())
+    pub fn new(data: T, annotations: Vec<Annotation>, span: Span) -> Self {
+        Self {
+            data,
+            annotations,
+            span,
+        }
     }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.data.fmt(f)
+        if self.annotations.is_empty() {
+            self.data.fmt(f)
+        } else {
+            f.debug_struct("Annotated")
+                .field("data", &self.data)
+                .field("annotations", &self.annotations)
+                .finish()
+        }
     }
 }

@@ -3,45 +3,21 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        expr::{BinaryOperator, CompoundAssignOp, Expr, ExprDesc, StructField},
+        expr::{BinaryOperator, Expr, ExprDesc, StructField},
         type_expr::{AnyTypeExpr, AnyTypeExprDesc, TypeExpr, TypeExprDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
-// ---------------------------------------------------------------------------
-// Precedence table (precedence climbing)
-// ---------------------------------------------------------------------------
-//
-// Level  Assoc    Operators
-//   1    right    =  +=  -=  (assignment — lowest)
-//   2    left     ..       (range)
-//   3    left     ||
-//   4    left     &&
-//   5    left     |
-//   6    left     ^
-//   7    left     &
-//   8    left     ==  !=
-//   9    left     <  <=  >  >=
-//  10    left     +  -
-//  11    left     *  /  %
-//
-// Then unary prefix (highest among operators): * & - !
-// Then postfix / atom (highest): @ $ . -> [] ()
-
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum Assoc {
     Left,
-    Right,
+    Right, // Will be used later, maybe
 }
 
 fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, Assoc)> {
-    // Returns (left_bp, right_bp, assoc)
-    // For left-assoc:  left_bp == right_bp, and we use > for left recursion stop
-    // For right-assoc: right_bp == left_bp - 1 so right side gets lower threshold
     let (prec, assoc) = match kind {
-        // Assignment — right-associative, lowest precedence
-        TokenKind::EqEq => (1, Assoc::Right),
         TokenKind::DotDot => (2, Assoc::Left),
         TokenKind::Or => (3, Assoc::Left),
         TokenKind::And => (4, Assoc::Left),
@@ -49,6 +25,7 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, Assoc)> {
         TokenKind::BitXor => (6, Assoc::Left),
         TokenKind::BitAnd => (7, Assoc::Left),
         TokenKind::Diff => (8, Assoc::Left),
+        TokenKind::EqEq => (8, Assoc::Left),
         TokenKind::Lt | TokenKind::Leq | TokenKind::Gt | TokenKind::Geq => (9, Assoc::Left),
         TokenKind::Plus | TokenKind::Minus => (10, Assoc::Left),
         TokenKind::Mult | TokenKind::Div | TokenKind::Modulo => (11, Assoc::Left),
@@ -68,7 +45,7 @@ fn token_to_binop(kind: &TokenKind) -> Option<BinaryOperator> {
         TokenKind::Mult => Some(BinaryOperator::Times),
         TokenKind::Div => Some(BinaryOperator::Div),
         TokenKind::Modulo => Some(BinaryOperator::Modulo),
-        TokenKind::EqEq => None, // handled as Assign
+        TokenKind::EqEq => Some(BinaryOperator::Eq),
         TokenKind::Diff => Some(BinaryOperator::Diff),
         TokenKind::Lt => Some(BinaryOperator::Lt),
         TokenKind::Leq => Some(BinaryOperator::Leq),
@@ -97,55 +74,6 @@ impl<'db> Parser<'db> {
                 None => break,
             };
 
-            if matches!(tok_kind, TokenKind::Plus | TokenKind::Minus) {
-                if let Some(next) = self.peek_n(1) {
-                    if next.kind == TokenKind::EqEq {
-                        let ca_lbp: u8 = 2;
-                        let ca_rbp: u8 = 1;
-                        if ca_lbp <= min_bp {
-                            break;
-                        }
-                        let op = match tok_kind {
-                            TokenKind::Plus => CompoundAssignOp::Plus,
-                            TokenKind::Minus => CompoundAssignOp::Minus,
-                            _ => unreachable!(),
-                        };
-                        self.consume();
-                        self.consume();
-                        let rhs = self.parse_binop(ca_rbp)?;
-                        let span = lhs.span.start().span(&self.get_end());
-                        lhs = Spanned::new(
-                            ExprDesc::CompoundAssign {
-                                lhs: Box::new(lhs),
-                                op,
-                                rhs: Box::new(rhs),
-                            },
-                            span,
-                        );
-                        continue;
-                    }
-                }
-            }
-
-            if tok_kind == TokenKind::EqEq {
-                let lbp: u8 = 2;
-                let rbp: u8 = 1;
-                if lbp <= min_bp {
-                    break;
-                }
-                self.consume(); // consume =
-                let rhs = self.parse_binop(rbp)?;
-                let span = lhs.span.start().span(&self.get_end());
-                lhs = Spanned::new(
-                    ExprDesc::Assign {
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    span,
-                );
-                continue;
-            }
-
             if tok_kind == TokenKind::DotDot {
                 let lbp: u8 = 4;
                 let rbp: u8 = 4;
@@ -160,6 +88,7 @@ impl<'db> Parser<'db> {
                         from: Box::new(lhs),
                         to: Box::new(rhs),
                     },
+                    vec![],
                     span,
                 );
                 continue;
@@ -181,6 +110,7 @@ impl<'db> Parser<'db> {
                             op,
                             rhs: Box::new(rhs),
                         },
+                        vec![],
                         span,
                     );
                 }
@@ -202,6 +132,7 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     ExprDesc::Neg(Box::new(operand)),
+                    vec![],
                     start.span(&end),
                 ))
             }
@@ -211,6 +142,7 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     ExprDesc::Not(Box::new(operand)),
+                    vec![],
                     start.span(&end),
                 ))
             }
@@ -227,14 +159,14 @@ impl<'db> Parser<'db> {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
-                    expr = Spanned::new(ExprDesc::AddressOf(Box::new(expr)), span);
+                    expr = Spanned::new(ExprDesc::AddressOf(Box::new(expr)), vec![], span);
                 }
 
                 Some(TokenKind::Deref) => {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
-                    expr = Spanned::new(ExprDesc::PostfixDeref(Box::new(expr)), span);
+                    expr = Spanned::new(ExprDesc::PostfixDeref(Box::new(expr)), vec![], span);
                 }
 
                 Some(TokenKind::Dot) => {
@@ -253,6 +185,7 @@ impl<'db> Parser<'db> {
                                 method: field.data,
                                 args,
                             },
+                            vec![],
                             span,
                         );
                     } else {
@@ -263,23 +196,10 @@ impl<'db> Parser<'db> {
                                 object: Box::new(expr),
                                 field: field.data,
                             },
+                            vec![],
                             span,
                         );
                     }
-                }
-
-                Some(TokenKind::SmallArrow) => {
-                    self.consume();
-                    let field = self.parse_symbol()?;
-                    let end = self.get_end();
-                    let span = expr.span.start().span(&end);
-                    expr = Spanned::new(
-                        ExprDesc::ArrowAccess {
-                            object: Box::new(expr),
-                            field: field.data,
-                        },
-                        span,
-                    );
                 }
 
                 Some(TokenKind::OpenSqr) => {
@@ -294,6 +214,7 @@ impl<'db> Parser<'db> {
                             object: Box::new(expr),
                             index: Box::new(index),
                         },
+                        vec![],
                         span,
                     );
                 }
@@ -310,6 +231,7 @@ impl<'db> Parser<'db> {
                             callee: Box::new(expr),
                             args,
                         },
+                        vec![],
                         span,
                     );
                 }
@@ -328,23 +250,23 @@ impl<'db> Parser<'db> {
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::IntLit(v), tok.location))
+                Ok(Spanned::new(ExprDesc::IntLit(v), vec![], tok.location))
             }
             TokenKind::CharLit(c) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::CharLit(c), tok.location))
+                Ok(Spanned::new(ExprDesc::CharLit(c), vec![], tok.location))
             }
             TokenKind::StrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::StrLit(s), tok.location))
+                Ok(Spanned::new(ExprDesc::StrLit(s), vec![], tok.location))
             }
             TokenKind::True => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::BoolLit(true), tok.location))
+                Ok(Spanned::new(ExprDesc::BoolLit(true), vec![], tok.location))
             }
             TokenKind::False => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::BoolLit(false), tok.location))
+                Ok(Spanned::new(ExprDesc::BoolLit(false), vec![], tok.location))
             }
             TokenKind::OpenPar => {
                 self.consume();
@@ -354,8 +276,24 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     ExprDesc::Paren(Box::new(inner)),
+                    vec![],
                     start.span(&end),
                 ))
+            }
+            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
+                self.consume();
+
+                self.expect(TokenKind::OpenPar)?;
+                self.consume();
+
+                let ty = self.parse_type_expr()?;
+
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+
+                let end = self.get_end();
+
+                Ok(Expr::new(ExprDesc::SizeOf(ty), vec![], start.span(&end)))
             }
 
             TokenKind::Identifier(name) => {
@@ -372,6 +310,7 @@ impl<'db> Parser<'db> {
                                 from: name,
                                 to: Box::new(rhs),
                             },
+                            vec![],
                             start.span(&end),
                         ))
                     }
@@ -387,7 +326,7 @@ impl<'db> Parser<'db> {
                             Ok(static_call)
                         } else {
                             let end = self.get_end();
-                            Ok(Spanned::new(ExprDesc::Name(name), start.span(&end)))
+                            Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
                         }
                     }
 
@@ -404,21 +343,25 @@ impl<'db> Parser<'db> {
                             let end = self.get_end();
                             // Build a plain Named TypeExpr for the struct name
                             let ty_span = start.span(&start);
-                            let ty =
-                                Spanned::new(TypeExprDesc::Named { name, args: vec![] }, ty_span);
+                            let ty = Spanned::new(
+                                TypeExprDesc::Named { name, args: vec![] },
+                                vec![],
+                                ty_span,
+                            );
                             Ok(Spanned::new(
                                 ExprDesc::StructLit { ty, fields },
+                                vec![],
                                 start.span(&end),
                             ))
                         } else {
                             let end = self.get_end();
-                            Ok(Spanned::new(ExprDesc::Name(name), start.span(&end)))
+                            Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
                         }
                     }
 
                     _ => {
                         let end = self.get_end();
-                        Ok(Spanned::new(ExprDesc::Name(name), start.span(&end)))
+                        Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
                     }
                 }
             }
@@ -429,27 +372,17 @@ impl<'db> Parser<'db> {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Static call on a generic type:  Name<T, U>::method(args)
-    // -----------------------------------------------------------------------
-    //
-    // Returns Ok(Some(expr)) if successfully parsed, Ok(None) to signal the
-    // caller should fall back to treating '<' as a less-than operator.
-
     fn try_parse_static_call(
         &mut self,
         type_name: Symbol,
         start: crate::common::location::Location,
     ) -> Result<Option<Expr>, ParseError> {
-        // Save position so we can backtrack on failure.
         let saved_pos = self.position;
 
-        // We are sitting on `<`. Consume it and try to parse type args.
-        self.consume(); // consume '<'
+        self.consume();
 
         let mut type_args: Vec<AnyTypeExpr> = vec![];
 
-        // Parse comma-separated AnyTypeExprs until we hit `>`
         let type_args_result: Result<(), ParseError> = (|| {
             loop {
                 match self.peek_n(0).map(|t| t.kind.clone()) {
@@ -457,22 +390,25 @@ impl<'db> Parser<'db> {
                     None => return Err(self.parse_error(ParseErrorKind::UnexpectedEOF)),
                     _ => {}
                 }
-                // Wildcard `_`
                 let arg_start = self.get_start();
                 if let TokenKind::Identifier(sym) = self.current_token()?.kind {
                     if sym == Symbol::new(self.db, "_") {
                         self.consume();
                         let end = self.get_end();
-                        type_args.push(Spanned::new(AnyTypeExprDesc::Any, arg_start.span(&end)));
+                        type_args.push(Spanned::new(
+                            AnyTypeExprDesc::Any,
+                            vec![],
+                            arg_start.span(&end),
+                        ));
                     } else {
                         let ty = self.parse_type_expr()?;
                         let span = ty.span.clone();
-                        type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), span));
+                        type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), vec![], span));
                     }
                 } else {
                     let ty = self.parse_type_expr()?;
                     let span = ty.span.clone();
-                    type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), span));
+                    type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), vec![], span));
                 }
                 match self.peek_n(0).map(|t| t.kind.clone()) {
                     Some(TokenKind::Comma) => {
@@ -506,6 +442,7 @@ impl<'db> Parser<'db> {
                 name: type_name,
                 args: type_args,
             },
+            vec![],
             ty_span,
         );
 
@@ -526,13 +463,10 @@ impl<'db> Parser<'db> {
                 method: method_sym.data,
                 args,
             },
+            vec![],
             start.span(&end),
         )))
     }
-
-    // -----------------------------------------------------------------------
-    // Struct literal field list: .name = expr { , .name = expr }
-    // -----------------------------------------------------------------------
 
     fn parse_struct_fields(&mut self) -> Result<Vec<StructField>, ParseError> {
         let mut fields = vec![];
@@ -542,7 +476,7 @@ impl<'db> Parser<'db> {
                 Some(TokenKind::Dot) => {
                     self.consume(); // consume '.'
                     let name = self.parse_symbol()?;
-                    self.expect(TokenKind::EqEq)?;
+                    self.expect(TokenKind::Colon)?;
                     self.consume(); // consume '='
                     let value = self.parse_expr()?;
                     fields.push(StructField {
@@ -562,24 +496,18 @@ impl<'db> Parser<'db> {
         Ok(fields)
     }
 
-    // -----------------------------------------------------------------------
-    // Comma-separated expression list (for calls)
-    // -----------------------------------------------------------------------
-
     fn parse_expr_args(&mut self) -> Result<Vec<Expr>, ParseError> {
         let mut args = vec![];
-        loop {
-            match self.peek_n(0).map(|t| t.kind.clone()) {
-                Some(TokenKind::ClosePar) | None => break,
-                _ => {
-                    args.push(self.parse_expr()?);
-                    match self.peek_n(0).map(|t| t.kind.clone()) {
-                        Some(TokenKind::Comma) => {
-                            self.consume();
-                        }
-                        _ => break,
-                    }
-                }
+        while let Some(t) = self.peek_n(0)
+            && !matches!(t.kind, TokenKind::ClosePar)
+        {
+            args.push(self.parse_expr()?);
+            if let Some(t) = self.peek_n(0)
+                && matches!(t.kind, TokenKind::Comma)
+            {
+                self.consume();
+            } else {
+                break;
             }
         }
         Ok(args)

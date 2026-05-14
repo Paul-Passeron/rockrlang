@@ -1,6 +1,6 @@
 @include std::io
 
-let main(): int => {
+fun main(): int {
     "Hello, World !".println();
     return 0;
 }

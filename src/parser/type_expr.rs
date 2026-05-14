@@ -19,6 +19,7 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     TypeExprDesc::Pointer(Box::new(inner)),
+                    vec![],
                     start.span(&end),
                 ))
             }
@@ -36,6 +37,7 @@ impl<'db> Parser<'db> {
                                 from: name,
                                 to: Box::new(rhs.data),
                             },
+                            vec![],
                             start.span(&end),
                         ))
                     }
@@ -48,6 +50,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             TypeExprDesc::Named { name, args },
+                            vec![],
                             start.span(&end),
                         ))
                     }
@@ -56,6 +59,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             TypeExprDesc::Named { name, args: vec![] },
+                            vec![],
                             start.span(&end),
                         ))
                     }
@@ -75,13 +79,13 @@ impl<'db> Parser<'db> {
             if name == Symbol::new(self.db, "_") {
                 self.consume();
                 let end = self.get_end();
-                return Ok(Spanned::new(AnyTypeExprDesc::Any, start.span(&end)));
+                return Ok(Spanned::new(AnyTypeExprDesc::Any, vec![], start.span(&end)));
             }
         }
 
         let ty = self.parse_type_expr()?;
         let span = ty.span.clone();
-        Ok(Spanned::new(AnyTypeExprDesc::Known(ty.data), span))
+        Ok(Spanned::new(AnyTypeExprDesc::Known(ty.data), vec![], span))
     }
 
     fn parse_any_type_args(&mut self) -> Result<Vec<AnyTypeExpr>, ParseError> {

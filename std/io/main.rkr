@@ -1,0 +1,39 @@
+
+struct str {
+    data: *char;
+    len: usize;
+}
+
+impl str {
+    @[inline]
+    fun from_cstr(data: *char): void {
+        let len: usize = 0;
+        while data[len] != 0 {
+            len = len + 1;
+        }
+        return str {
+            .data: data,
+            .len: len
+        };
+    }
+
+    @[inline]
+    fun as_ptr(self: *str): void {
+        return self$.data;
+    }
+
+    @[inline]
+    fun len(self: *str): usize {
+        return self$.len;
+    }
+
+    @[inline]
+    fun println(self: *str): void {
+        printf("%s\n", self);
+    }
+
+    @[inline]
+    fun print(self: *str): void {
+        printf("%s", self);
+    }
+}

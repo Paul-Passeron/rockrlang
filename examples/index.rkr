@@ -1,6 +1,6 @@
 @include std::io
 
-let main(): int => {
+fun main(): int {
     let v = Vec<int>::new();
     for i in 0..150 {
         v.push(i * 2);

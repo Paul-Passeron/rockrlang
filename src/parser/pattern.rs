@@ -16,7 +16,7 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();
-                Ok(Spanned::new(PatternDesc::Any, start.span(&end)))
+                Ok(Spanned::new(PatternDesc::Any, vec![], start.span(&end)))
             }
 
             TokenKind::OpenPar => {
@@ -27,6 +27,7 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     PatternDesc::Named(NamedPattern::Tuple { fields }),
+                    vec![],
                     start.span(&end),
                 ))
             }
@@ -35,7 +36,11 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(_) => {
                 let named = self.parse_named_pattern()?;
                 let end = self.get_end();
-                Ok(Spanned::new(PatternDesc::Named(named), start.span(&end)))
+                Ok(Spanned::new(
+                    PatternDesc::Named(named),
+                    vec![],
+                    start.span(&end),
+                ))
             }
 
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(

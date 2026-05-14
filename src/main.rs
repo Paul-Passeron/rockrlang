@@ -14,6 +14,7 @@ mod driver;
 mod lexer;
 mod parse_tree;
 mod parser;
+mod tests;
 
 #[derive(Debug, Parser)]
 pub struct CliArgs {
@@ -62,20 +63,27 @@ fn main() -> Result<(), String> {
     let args = CliArgs::parse();
     let parsed = parsed_args_from_cli(&db, &args).ok_or("No input file provided".to_string())?;
     let root = SourceRoot::new(&db, parsed.files.into());
+    let mut has_errors = false;
     for file in root.files(&db) {
+        println!("-----------------------------------------------------");
+        println!("File: {}", file.file(&db).display());
+        println!("-----------------------------------------------------");
         let source = SourceFile::new(&db, file.file(&db));
         let parsed = parse_file(&db, root, source);
         let errors: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, root, source);
         for error in &errors {
             let info = get_loc_info(&db, root, source, error.start);
             eprintln!("{info}: {:?}", error.kind);
+            has_errors = true;
         }
-        if !errors.is_empty() {
-            break;
-        }
+
         for item in parsed.items(&db) {
             println!("{item:#?}");
         }
     }
-    Ok(())
+    if has_errors {
+        Err("Compiled with some errors".to_string())
+    } else {
+        Ok(())
+    }
 }

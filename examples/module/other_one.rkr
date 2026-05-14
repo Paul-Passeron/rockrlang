@@ -1,3 +1,5 @@
-let foo(): void => {
+@include std::io
+
+fun foo(): void {
     "bar".println();
 }

@@ -1,6 +1,6 @@
 use crate::{
     lexer::TokenKind,
-    parse_tree::stmt::{Stmt, StmtDesc},
+    parse_tree::stmt::{CompoundAssignOp, Stmt, StmtDesc},
     parser::{ParseError, Parser},
 };
 
@@ -27,7 +27,11 @@ impl<'db> Parser<'db> {
         let start = self.get_end();
         let stmts = self.parse_block()?;
         let end = self.get_end();
-        Ok(Stmt::new(StmtDesc::Block { stmts }, start.span(&end)))
+        Ok(Stmt::new(
+            StmtDesc::Block { stmts },
+            vec![],
+            start.span(&end),
+        ))
     }
 
     fn parse_let_decl(&mut self) -> Result<Stmt, ParseError> {
@@ -55,6 +59,7 @@ impl<'db> Parser<'db> {
                 type_constraint,
                 value,
             },
+            vec![],
             start.span(&end),
         ))
     }
@@ -75,6 +80,7 @@ impl<'db> Parser<'db> {
                 iterator,
                 body: Box::new(body),
             },
+            vec![],
             start.span(&end),
         ))
     }
@@ -94,7 +100,109 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::Semicolon)?;
         self.consume();
         let end = self.get_end();
-        Ok(Stmt::new(StmtDesc::Return { value }, start.span(&end)))
+        Ok(Stmt::new(
+            StmtDesc::Return { value },
+            vec![],
+            start.span(&end),
+        ))
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.get_start();
+        self.expect(TokenKind::While)?;
+        self.consume();
+        let cond = self.parse_expr()?;
+        let body = self.parse_block_as_stmt()?;
+        let end = self.get_end();
+        Ok(Stmt::new(
+            StmtDesc::While {
+                cond,
+                body: Box::new(body),
+            },
+            vec![],
+            start.span(&end),
+        ))
+    }
+
+    fn try_parse_assign(&mut self) -> Option<Stmt> {
+        let saved_pos = self.position;
+        let start = self.get_start();
+
+        // Parse the LHS as an expression — postfix/field/index chains are valid LHS
+        let lhs = match self.parse_expr() {
+            Ok(e) => e,
+            Err(_) => {
+                self.position = saved_pos;
+                return None;
+            }
+        };
+
+        // Match directly on the dedicated compound-assign tokens or plain `=`
+        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind.clone()) {
+            Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
+            Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
+            Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
+            Some(TokenKind::DivEq) => Some(CompoundAssignOp::Div),
+            Some(TokenKind::ModuloEq) => Some(CompoundAssignOp::Modulo),
+            _ => None,
+        };
+
+        let is_plain_assign = self.peek_n(0).map(|t| t.kind.clone()) == Some(TokenKind::Eq);
+
+        if compound_op.is_none() && !is_plain_assign {
+            self.position = saved_pos;
+            return None;
+        }
+
+        self.consume(); // consume = or +=/-=/*=//=/%=
+
+        let rhs = match self.parse_expr() {
+            Ok(e) => e,
+            Err(_) => {
+                self.position = saved_pos;
+                return None;
+            }
+        };
+
+        if self.expect(TokenKind::Semicolon).is_err() {
+            self.position = saved_pos;
+            return None;
+        }
+        self.consume();
+
+        let end = self.get_end();
+        let desc = if let Some(op) = compound_op {
+            StmtDesc::CompoundAssign { lhs, op, rhs }
+        } else {
+            StmtDesc::Assign { lhs, rhs }
+        };
+        Some(Stmt::new(desc, vec![], start.span(&end)))
+    }
+
+    fn parse_if_stmt(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.get_start();
+        self.expect(TokenKind::If)?;
+        self.consume();
+        let cond = self.parse_expr()?;
+        let then = self.parse_block_as_stmt()?;
+        let else_ = if let Some(t) = self.peek_n(0)
+            && matches!(t.kind, TokenKind::Else)
+        {
+            self.consume();
+            Some(self.parse_block_as_stmt()?)
+        } else {
+            None
+        };
+        let end = self.get_end();
+        Ok(Stmt::new(
+            StmtDesc::If {
+                cond,
+                then: Box::new(then),
+                else_: else_.map(Box::new),
+            },
+            vec![],
+            start.span(&end),
+        ))
     }
 
     pub(super) fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
@@ -102,15 +210,20 @@ impl<'db> Parser<'db> {
             TokenKind::OpenBra => self.parse_block_as_stmt(),
             TokenKind::Return => self.parse_return(),
             TokenKind::Let => self.parse_let_decl(),
-            TokenKind::If => todo!(),
+            TokenKind::If => self.parse_if_stmt(),
             TokenKind::For => self.parse_for_stmt(),
-            TokenKind::While => todo!(),
+            TokenKind::While => self.parse_while_stmt(),
+
             _ => {
-                let expr = self.parse_expr()?;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
-                let span = expr.span.clone();
-                Ok(Stmt::new(StmtDesc::Expr(expr), span))
+                if let Some(assignement) = self.try_parse_assign() {
+                    Ok(assignement)
+                } else {
+                    let expr = self.parse_expr()?;
+                    self.expect(TokenKind::Semicolon)?;
+                    self.consume();
+                    let span = expr.span.clone();
+                    Ok(Stmt::new(StmtDesc::Expr(expr), vec![], span))
+                }
             }
         }
     }

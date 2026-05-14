@@ -18,6 +18,7 @@ pub enum TokenKind {
 
     // Keywords
     Let,
+    Fun,
     If,
     Else,
     While,
@@ -58,6 +59,11 @@ pub enum TokenKind {
     Not,
     Deref,
     AddressOf,
+    PlusEq,
+    MinusEq,
+    MultEq,
+    DivEq,
+    ModuloEq,
 
     // Delimeters
     Colon,
@@ -95,6 +101,7 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::StrLit(s) => write!(f, "\"{}\"", s.interned().contents(self.db)),
             TokenKind::Directive(d) => write!(f, "@{}", d.interned().contents(self.db)),
             TokenKind::Let => write!(f, "let"),
+            TokenKind::Fun => write!(f, "fun"),
             TokenKind::If => write!(f, "if"),
             TokenKind::Else => write!(f, "else"),
             TokenKind::While => write!(f, "while"),
@@ -124,7 +131,12 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::BitXor => write!(f, "^"),
             TokenKind::Not => write!(f, "!"),
             TokenKind::AddressOf => write!(f, "@"),
-            TokenKind::Deref => write!(f, "*"),
+            TokenKind::Deref => write!(f, "$"),
+            TokenKind::PlusEq => write!(f, "+="),
+            TokenKind::MinusEq => write!(f, "-="),
+            TokenKind::MultEq => write!(f, "*="),
+            TokenKind::DivEq => write!(f, "/="),
+            TokenKind::ModuloEq => write!(f, "%="),
             TokenKind::Colon => write!(f, ":"),
             TokenKind::Comma => write!(f, ","),
             TokenKind::Semicolon => write!(f, ";"),

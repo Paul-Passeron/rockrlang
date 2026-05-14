@@ -1,0 +1,10 @@
+fun main(): int {
+    let x: int => 5;
+    fun add_one_to_x(): void {
+        x += 1;
+    }
+    printf("x = %d\n", x);
+    add_one_to_x();
+    printf("x = %d\n", x);
+    return 0;
+}
