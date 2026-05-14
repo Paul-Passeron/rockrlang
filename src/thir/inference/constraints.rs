@@ -983,19 +983,6 @@ impl<'db> InferenceCtx<'db> {
         let lhs_ty = self.find(lhs_ty);
         let rhs_ty = self.find(rhs_ty);
 
-        let is_int_like = |id: TypeDefId| -> Option<BuiltinTypeId> {
-            match id {
-                TypeDefId::Builtin(id)
-                    if id == BuiltinTypeId::int(self.db)
-                        || id == BuiltinTypeId::char(self.db)
-                        || id == BuiltinTypeId::mut_ptr(self.db)
-                        || id == BuiltinTypeId::ptr(self.db) =>
-                {
-                    Some(id)
-                }
-                _ => None,
-            }
-        };
         // Is one of them a builtin arithmetic type ?
         // if yes: handle that case specifically
         // otherwise, both must be of the same type
@@ -1005,8 +992,8 @@ impl<'db> InferenceCtx<'db> {
         if let Some((lid, _)) = lhs_ty.is_adt()
             && let Some((rid, _)) = rhs_ty.is_adt()
         {
-            if let Some(lid) = is_int_like(lid)
-                && let Some(rid) = is_int_like(rid)
+            if let Some(lid) = lid.is_int_like(self.db)
+                && let Some(rid) = rid.is_int_like(self.db)
             {
                 return self.solve_int_binop(res_ty, lid, rid, op);
             }
@@ -1019,7 +1006,7 @@ impl<'db> InferenceCtx<'db> {
             (InferTy::Var(v), InferTy::Adt { def, fields })
             | (InferTy::Adt { def, fields }, InferTy::Var(v))
                 if fields.is_empty()
-                    && let Some(int_like) = is_int_like(*def) =>
+                    && let Some(int_like) = def.is_int_like(self.db) =>
             {
                 if let Err(err) = self.unify(InferTy::Var(*v), rhs_ty.clone()) {
                     return ConstraintSolveResult::Error(err);

@@ -314,6 +314,14 @@ impl BuiltinTypeId {
             _ => None,
         }
     }
+
+    pub fn is_int_like(self, db: &dyn Db) -> Option<Self> {
+        (self == BuiltinTypeId::int(db)
+            || self == BuiltinTypeId::char(db)
+            || self == BuiltinTypeId::mut_ptr(db)
+            || self == BuiltinTypeId::ptr(db))
+        .then_some(self)
+    }
 }
 
 impl TypeDefId {

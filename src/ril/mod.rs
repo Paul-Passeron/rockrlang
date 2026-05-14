@@ -144,6 +144,15 @@ pub enum TypeDefId {
     Enum(EnumId),
 }
 
+impl TypeDefId {
+    pub fn is_int_like(self, db: &dyn Db) -> Option<BuiltinTypeId> {
+        match self {
+            Self::Builtin(b) => b.is_int_like(db),
+            _ => None,
+        }
+    }
+}
+
 #[salsa::tracked]
 #[derive(Debug, PartialOrd, Ord)]
 pub struct ImplSource<'db> {

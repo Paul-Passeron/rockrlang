@@ -3,6 +3,7 @@ use std::{fmt, path::PathBuf};
 
 use itertools::Itertools;
 
+use crate::common::location::Location;
 use crate::compiler::diagnostic::Diagnostic;
 use crate::hir::{function_ast, hir_body};
 use crate::name_resolve::definition::{Definition, get_module_pretty_name, module_definitions};
@@ -287,7 +288,19 @@ pub fn check_module<'a>(
     });
 }
 
-pub fn parse_error_to_diagnostic(db: &dyn Db, parse_error: &ParseError) -> Diagnostic {
+pub fn parse_error_to_diagnostic(
+    db: &dyn Db,
+    parse_error: &ParseError,
+    module: ModuleId,
+) -> Diagnostic {
+    let start = Location::new(parse_error.start, parse_error.file.clone());
+    let end = Location::new(parse_error.end, parse_error.file.clone());
+    let start_info = start.loc_info(db, module).unwrap();
+    let end_info = end.loc_info(db, module).unwrap();
+    println!(
+        "Parsing error: {start_info} - {end_info}: {:?}",
+        parse_error.kind
+    );
     todo!()
 }
 
@@ -305,7 +318,7 @@ pub fn check_file_module<'a>(
     report.diagnostics.extend(
         parse_errors
             .into_iter()
-            .map(|parse_error| parse_error_to_diagnostic(db, parse_error)),
+            .map(|parse_error| parse_error_to_diagnostic(db, parse_error, module)),
     );
     check_module(db, module, package, packages, report);
 }
