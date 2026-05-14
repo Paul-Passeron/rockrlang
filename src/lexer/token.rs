@@ -18,6 +18,7 @@ pub enum TokenKind {
 
     // Keywords
     Let,
+    Mut,
     Fun,
     If,
     Else,
@@ -101,6 +102,7 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::StrLit(s) => write!(f, "\"{}\"", s.interned().contents(self.db)),
             TokenKind::Directive(d) => write!(f, "@{}", d.interned().contents(self.db)),
             TokenKind::Let => write!(f, "let"),
+            TokenKind::Mut => write!(f, "mut"),
             TokenKind::Fun => write!(f, "fun"),
             TokenKind::If => write!(f, "if"),
             TokenKind::Else => write!(f, "else"),

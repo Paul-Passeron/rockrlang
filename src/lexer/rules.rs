@@ -90,6 +90,7 @@ pub fn get_token_rules<'db>() -> Vec<(
                     location,
                     kind: match lexeme {
                         "let" => TokenKind::Let,
+                        "mut" => TokenKind::Mut,
                         "fun" => TokenKind::Fun,
                         "mod" => TokenKind::Module,
                         "impl" => TokenKind::Impl,

@@ -3,7 +3,7 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        pattern::{AstNamedPattern, AstPatternDesc, AstPattern},
+        pattern::{AstNamedPattern, AstPattern, AstPatternDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -13,6 +13,15 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
 
         match self.current_token()?.kind.clone() {
+            TokenKind::Mut => {
+                self.consume();
+                let name = self.parse_symbol()?.data;
+                Ok(Spanned::new(
+                    AstPatternDesc::Named(AstNamedPattern::Mut { name }),
+                    vec![],
+                    start.span(&self.get_end()),
+                ))
+            }
             TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();

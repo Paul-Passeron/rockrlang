@@ -4,6 +4,9 @@ pub type AstPattern = Spanned<AstPatternDesc>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstNamedPattern {
+    Mut {
+        name: Symbol,
+    },
     Constructor {
         name: Symbol,
         args: Vec<AstPattern>,
