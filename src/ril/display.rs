@@ -153,6 +153,27 @@ impl fmt::Display for Display<'_, FunctionId> {
 impl fmt::Display for Display<'_, ImplId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "impl ")?;
+
+        let templates = self.value.templates(self.db);
+        if !templates.is_empty() {
+            write!(f, "<")?;
+            for (i, constraints) in self.value.templates(self.db).iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "T{i}",)?;
+                if !constraints.is_empty() {
+                    write!(f, ": ")?;
+                    for (j, constraint) in constraints.iter().enumerate() {
+                        if j > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write!(f, "{}", constraint.display(self.db))?;
+                    }
+                }
+            }
+            write!(f, "> ")?;
+        }
         if let Some(iface) = self.value.interface(self.db) {
             write!(f, "{} for ", iface.display(self.db))?;
         }

@@ -5,7 +5,10 @@ pub mod display;
 
 use std::marker::PhantomData;
 
-use crate::{OwnedSourceFile, SourceFile, common::symbols::Symbol};
+use crate::{
+    OwnedSourceFile, SourceFile,
+    common::{symbols::Symbol, unord::Set},
+};
 
 #[salsa::tracked]
 pub struct FileModule<'db> {
@@ -82,6 +85,7 @@ pub struct InternedImplId {
     pub parent: ModuleId,
     pub implemented: TypeRef,
     pub interface: Option<InterfaceRef>,
+    pub templates: Vec<Set<InterfaceRef>>,
 }
 
 #[salsa::interned]
@@ -139,7 +143,7 @@ pub struct TypeId(salsa::Id);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BuiltinTypeId(salsa::Id);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceRef(salsa::Id);
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
@@ -262,13 +266,14 @@ impl<'db> From<ImplId> for InternedImplId<'db> {
 
 #[allow(dead_code)]
 impl ImplId {
-    pub fn new(
-        db: &dyn crate::Db,
+    pub fn new<'db>(
+        db: &'db dyn crate::Db,
         parent: ModuleId,
         implemented: TypeRef,
         interface: Option<InterfaceRef>,
+        templates: Vec<Set<InterfaceRef>>,
     ) -> Self {
-        InternedImplId::new(db, parent, implemented, interface).into()
+        InternedImplId::new(db, parent, implemented, interface, templates).into()
     }
 
     pub fn interned(self) -> InternedImplId<'static> {
@@ -285,6 +290,10 @@ impl ImplId {
 
     pub fn interface(self, db: &dyn crate::Db) -> Option<InterfaceRef> {
         self.interned().interface(db)
+    }
+
+    pub fn templates(self, db: &dyn crate::Db) -> Vec<Set<InterfaceRef>> {
+        self.interned().templates(db)
     }
 }
 

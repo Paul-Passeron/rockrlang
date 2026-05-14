@@ -1,5 +1,6 @@
 use crate::{
     Db,
+    common::unord::Set,
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items,
@@ -68,6 +69,20 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
             AstTopLevelItemDesc::Impl(ast_impl_block) => Some(ast_impl_block),
             _ => None,
         }) {
+            let mut templates = vec![];
+            for arg in &item.template_args {
+                let mut constraints = Set::new();
+                for constraint in &arg.constraints {
+                    if let Some(interface) =
+                        resolve_type_expr_as_interface(db, constraint, module, &item.template_args)
+                    {
+                        constraints.insert(interface);
+                    } else {
+                        // TODO
+                    }
+                }
+                templates.push(constraints);
+            }
             if let TypeResolution::Type(implemented) =
                 resolve_type_expr(db, &item.implemented, module, &item.template_args)
             {
@@ -75,11 +90,12 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                     resolve_type_expr_as_interface(db, interface, module, &item.template_args)
                 }) {
                     Some(Some(value)) => {
-                        let impl_id = ImplId::new(db, module.into(), implemented, Some(value));
+                        let impl_id =
+                            ImplId::new(db, module.into(), implemented, Some(value), templates);
                         res.push(impl_id);
                     }
                     None => {
-                        let impl_id = ImplId::new(db, module.into(), implemented, None);
+                        let impl_id = ImplId::new(db, module.into(), implemented, None, templates);
                         res.push(impl_id);
                     }
                     Some(None) => {
