@@ -137,6 +137,16 @@ pub enum ScopeOwnerId {
     Interface(InterfaceRef),
 }
 
+impl ScopeOwnerId {
+    pub fn get_canonical_zelf(&self, db: &dyn Db) -> Option<TypeRef> {
+        match self {
+            ScopeOwnerId::Module(_) => None,
+            ScopeOwnerId::Impl(impl_id) => Some(impl_id.implemented(db)),
+            ScopeOwnerId::Interface(_) => Some(TypeRef::Zelf), // TODO: Is this what we want ?
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypeDefId {
     Builtin(BuiltinTypeId),
