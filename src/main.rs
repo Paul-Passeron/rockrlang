@@ -8,14 +8,17 @@ use std::{
 use crate::{
     common::location::get_loc_info,
     driver::load_package,
-    hir::{function_ast, hir_body, FunctionLikeAst},
+    hir::{FunctionLikeAst, function_ast, hir_body},
     name_resolve::{
         core_package,
-        definition::{module_definitions, Definition},
-        file_module_id, std_package,
+        definition::{Definition, module_definitions},
+        file_module_id,
+        implems::module_impls,
+        std_package,
     },
-    parser::{parse_file, ParseError},
-    ril::{display::RilDisplay, FileModule, ModuleId, Package},
+    parse_tree::top_level::AstImplItem,
+    parser::{ParseError, parse_file},
+    ril::{FileModule, FunctionId, ModuleId, Package, ScopeOwnerId, display::RilDisplay},
     thir::type_check_function,
 };
 
@@ -157,34 +160,53 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId, packages: Vec<Package<'d
     let mut v = defs.values().copied().collect::<Vec<_>>();
     v.sort();
     for def in v {
-        if let Definition::Function(function_id) = def {
-            println!("---------------------------------");
-            println!("{}", function_id.display(db));
-            println!("---------------------------------");
-            if let Some(hir) = hir_body(db, function_id.interned()) {
-                println!("{}", hir.display(db));
+        match def {
+            Definition::Function(function_id) => {
+                println!("---------------------------------");
+                println!("{}", function_id.display(db));
+                println!("---------------------------------");
+                if let Some(hir) = hir_body(db, function_id.interned()) {
+                    println!("{}", hir.display(db));
+                }
+                if let Some(results) = type_check_function(
+                    db,
+                    function_id.interned(),
+                    packages.clone().into_boxed_slice(),
+                ) {
+                    for (expr_id, ty) in &results.node_types(db) {
+                        println!("{:?}: {}", expr_id, ty.display(db));
+                    }
+                    for diagnostic in &results.diagnostics(db) {
+                        let loc = &diagnostic.span;
+                        let source_file = get_source_file(db, &loc.file, &packages).unwrap();
+                        let loc_info = get_loc_info(db, source_file, loc.start);
+                        println!("{}: {:?}", loc_info, diagnostic.kind);
+                    }
+                } else if let FunctionLikeAst::Fundef(_) =
+                    function_ast(db, function_id.interned()).inner(db)
+                {
+                    panic!("No type check results !")
+                }
             }
-            if let Some(results) = type_check_function(
-                db,
-                function_id.interned(),
-                packages.clone().into_boxed_slice(),
-            ) {
-                for (expr_id, ty) in &results.node_types(db) {
-                    println!("{:?}: {}", expr_id, ty.display(db));
+            _ => (),
+        }
+    }
+
+    for implem in module_impls(db, module.interned()) {
+        for item in implem.items(db) {
+            match item {
+                AstImplItem::Type { .. } => (),
+                AstImplItem::Fundef(spanned) => {
+                    let id =
+                        FunctionId::new(db, spanned.data.name, ScopeOwnerId::Impl(implem.id(db)));
+                    if let Some(hir) = hir_body(db, id.interned()) {
+                        println!("{}", hir.display(db));
+                    }
                 }
-                for diagnostic in &results.diagnostics(db) {
-                    let loc = &diagnostic.span;
-                    let source_file = get_source_file(db, &loc.file, &packages).unwrap();
-                    let loc_info = get_loc_info(db, source_file, loc.start);
-                    println!("{}: {:?}", loc_info, diagnostic.kind);
-                }
-            } else if let FunctionLikeAst::Fundef(_) =
-                function_ast(db, function_id.interned()).inner(db)
-            {
-                panic!("No type check results !")
             }
         }
     }
+
     false
 }
 
