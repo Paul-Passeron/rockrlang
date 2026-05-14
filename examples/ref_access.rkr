@@ -4,6 +4,9 @@ struct Foo {
     x: int;
 }
 
-fun bar(foo: &Foo): void {
-    let _ = foo.x;
+fun bar(a: &Foo, b: &mut Foo): void {
+    let _ = a.x;
+    let _ = b.x;
+    let c: & &Foo = a@;
+    let _ = c.x;
 }
