@@ -10,6 +10,7 @@ pub mod var;
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     sync::Arc,
 };
 
@@ -21,7 +22,7 @@ use crate::{
     parse_tree::top_level::AstTemplateArg,
     ril::{
         FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
-        TypeRef,
+        TypeRef, display::Display,
     },
     thir::{
         ExprId, InferCallInfos,
@@ -198,6 +199,104 @@ pub enum UnificationError {
     StaticMethodCallOnReceiver(ExprId, FunctionId),
     NoImplemCandidateFor(InferTy, InterfaceId, Box<[InferTy]>),
     ZelfConstraining,
+}
+
+impl UnificationError {
+    pub fn display<'a, 'db>(&'a self, db: &'db dyn Db) -> Display<'db, &'a Self> {
+        Display { value: self, db }
+    }
+}
+
+impl fmt::Display for Display<'_, &UnificationError> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.value {
+            UnificationError::TypeDefIdMismatch(type_def_id, type_def_id1) => {
+                write!(
+                    f,
+                    "TypeDefId mismatch: {} != {}",
+                    type_def_id.name(self.db).display(self.db),
+                    type_def_id1.name(self.db).display(self.db)
+                )
+            }
+            UnificationError::FieldCountMismatch(x, y) => {
+                write!(f, "Field count mismatch: {} != {}", x, y)
+            }
+            UnificationError::RecursiveDefinition(infer_var) => write!(
+                f,
+                "Recursive definition: {}",
+                InferTy::Var(*infer_var).display(self.db)
+            ),
+            UnificationError::UnmetConstraint(inference_constraint, unification_error) => {
+                write!(
+                    f,
+                    "Unmet constraint: {} (reason: {})",
+                    inference_constraint.kind.display(self.db),
+                    unification_error.display(self.db)
+                )
+            }
+            UnificationError::ExpectedPtrLike(type_def_id) => write!(
+                f,
+                "Expected ptr-like: {}",
+                type_def_id.name(self.db).display(self.db)
+            ),
+            UnificationError::MinTupleLengthMismatch { expected, got } => write!(
+                f,
+                "Min tuple length mismatch: expexted {expected} but got {got}"
+            ),
+            UnificationError::ExpectedStructWithField { def, field } => write!(
+                f,
+                "Expected struct with field: {} (field: {})",
+                def.name(self.db).display(self.db),
+                field.display(self.db)
+            ),
+            UnificationError::IncompleteStructLit { id, missing } => write!(
+                f,
+                "Incomplete struct lit: {} (missing: {})",
+                id.name(self.db).display(self.db),
+                missing.display(self.db)
+            ),
+            UnificationError::NonStructForStructLit(partial_type_ref) => {
+                write!(f, "Non struct for struct-lit: {:?}", partial_type_ref)
+            }
+            UnificationError::TemplateDereferencing(type_param_id) => {
+                write!(f, "Template T{} dereferenced", type_param_id.0)
+            }
+            UnificationError::TemplateConstraining(type_param_id) => {
+                write!(f, "Template T{} constrained", type_param_id.0)
+            }
+            UnificationError::ArgCountMismatch(function_id, count) => {
+                write!(
+                    f,
+                    "Argument count mismatch for function {} (expected {count})",
+                    function_id.name(self.db).display(self.db)
+                )
+            }
+            UnificationError::StaticMethodCallOnReceiver(expr_id, function_id) => {
+                write!(
+                    f,
+                    "Static method call on receiver: {:?} (function: {})",
+                    expr_id,
+                    function_id.name(self.db).display(self.db)
+                )
+            }
+            UnificationError::NoImplemCandidateFor(infer_ty, interface_id, items) => {
+                write!(
+                    f,
+                    "No implementation candidate found for type {} with interface {}{}",
+                    infer_ty.display(self.db),
+                    interface_id.name(self.db).display(self.db),
+                    if items.is_empty() {
+                        String::new()
+                    } else {
+                        format!("<{}>", items.iter().map(|i| i.display(self.db)).join(", "))
+                    }
+                )
+            }
+            UnificationError::ZelfConstraining => {
+                write!(f, "Constraining self type")
+            }
+        }
+    }
 }
 
 impl<'db> InferenceCtx<'db> {

@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     iter::empty,
+    panic,
     sync::Arc,
 };
 
@@ -118,19 +119,6 @@ impl<'db> TyCtx<'db> {
             diagnostics: Vec::new(),
         };
 
-        // for param in params {
-        //     let local = locals.iter().find(|x| &x.id == param).unwrap();
-        //     if let Some(annotation) = local.ty_annotation.as_ref()
-        //         && let AstAnyTypeExprDesc::Known(desc) = &annotation.data
-        //     {
-        //         let param_ty = this
-        //             .inf_ctx
-        //             .allocate_ast_type_expr(desc, this.inf_ctx.implicit_ctx().as_ref())
-        //             .unwrap();
-        //         let local_ty = this.inf_ctx.infer_local(local.id);
-        //         this.inf_ctx.unify(param_ty, local_ty).unwrap();
-        //     }
-        // }
         this
     }
 
@@ -148,7 +136,14 @@ impl<'db> TyCtx<'db> {
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
-        self.inf_ctx.solve_constraints().unwrap();
+        if let Err((constraint, err)) = self.inf_ctx.solve_constraints() {
+            println!(
+                "Error solving constraint {}",
+                constraint.kind.display(self.db)
+            );
+            println!("    Reason: {}", err.display(self.db));
+            panic!()
+        }
 
         let unsolveds = self.inf_ctx.get_current_constraints();
         if !unsolveds.is_empty() {

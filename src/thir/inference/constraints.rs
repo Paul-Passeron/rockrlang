@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
     fmt,
-    iter::once,
+    iter::{empty, once},
     sync::Arc,
 };
 
@@ -15,10 +15,12 @@ use crate::{
         implems::resolve_type_expr_as_interface,
         type_expr::{get_templates_of_fun, templates_of_owner},
     },
-    parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
+    parse_tree::top_level::{
+        AstFunsig, AstImplItem, AstInterfaceItem, AstMethodsig, AstTemplateArg,
+    },
     ril::{
-        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
+        BuiltinTypeId, FunctionId, ImplId, ImplSource, InterfaceId, InterfaceRef, PtrKind,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef,
         display::{Display, RilDisplay},
     },
     thir::{
@@ -279,6 +281,111 @@ impl<'db> InferenceCtx<'db> {
         InferTy::Var(var)
     }
 
+    fn try_resolve_via_known_impl(
+        &mut self,
+        ret_var: InferVar,
+        receiver: &InferTy,
+        id: ExprId,
+        method: Symbol,
+        args: &[InferTy],
+        interface_hint: Option<InterfaceId>,
+        is_static: bool,
+    ) -> Option<ConstraintSolveResult> {
+        for (iface_id, implem, sig) in
+            self.known_impls_providing(receiver, method, args.len(), interface_hint, is_static)
+        {
+            return Some(
+                self.apply_interface_method(iface_id, implem, sig, ret_var, args, is_static),
+            );
+        }
+        None
+    }
+
+    fn apply_interface_method(
+        &mut self,
+        iface_id: InterfaceId,
+        implem: InterfaceImplem,
+        sig: AstMethodsig,
+        ret_var: InferVar,
+        args: &[InferTy],
+        is_static: bool,
+    ) -> ConstraintSolveResult {
+        assert!(sig.data.receiver.is_static() == is_static);
+        let ref_args = implem
+            .templates
+            .iter()
+            .map(|a| self.infer_to_ref(a))
+            .collect::<Vec<_>>();
+        if ref_args.iter().any(|a| matches!(a, TypeRef::Error)) {
+            return ConstraintSolveResult::Pending;
+        }
+
+        let iface_ref = InterfaceRef::new(self.db, iface_id, ref_args);
+        let templates = implem
+            .templates
+            .iter()
+            .cloned()
+            .chain(args.iter().cloned())
+            .collect::<Arc<[_]>>();
+        let ctx = ImplicitContext::new(
+            self.db,
+            ScopeOwnerId::Interface(iface_ref),
+            Arc::new([]),
+            templates,
+            Some(self.find(&implem.ty)),
+        )
+        .unwrap();
+
+        let ret_ty = self
+            .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
+            .unwrap();
+        if let Err(e) = self.unify(InferTy::Var(ret_var), ret_ty) {
+            return ConstraintSolveResult::Error(e);
+        }
+
+        for (ast_arg, call_arg) in sig.data.args.iter().zip(args) {
+            let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
+            if let Err(e) = self.unify(expected, call_arg.clone()) {
+                return ConstraintSolveResult::Error(e);
+            }
+        }
+
+        ConstraintSolveResult::Solved
+    }
+
+    fn known_impls_providing(
+        &mut self,
+        receiver: &InferTy,
+        method: Symbol,
+        arity: usize,
+        hint: Option<InterfaceId>,
+        is_static: bool,
+    ) -> Vec<(InterfaceId, InterfaceImplem, AstMethodsig)> {
+        let mut out = vec![];
+        let receiver = self.find(receiver);
+        let implements = self.implements.clone(); // same clone as before, fix later
+        'outer: for (iface_id, implems) in implements {
+            if hint.is_some_and(|h| h != iface_id) {
+                continue;
+            }
+            for implem in implems {
+                if self.find(&implem.ty) != receiver {
+                    continue 'outer;
+                }
+                for item in interface_items(self.db, iface_id.interned()).iter() {
+                    if let AstInterfaceItem::Sig(sig) = item
+                        && sig.data.name == method
+                        && sig.data.args.len() == arity
+                        && sig.data.receiver.is_static() == is_static
+                    {
+                        out.push((iface_id, implem.clone(), sig.clone()));
+                    }
+                }
+            }
+        }
+        out
+    }
+
     fn solve_method_constraint(
         &mut self,
         ret_var: InferVar,
@@ -289,73 +396,16 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> ConstraintSolveResult {
-        // Look for already resolved implementations
-        let found = self.find(receiver);
-        // TODO: Do not clone it
-        for (interface_id, s) in self.implements.clone() {
-            if let Some(hint) = &interface_hint
-                && *hint != interface_id
-            {
-                continue;
-            }
-            for int_implem in s {
-                let implem_ty = self.find(&int_implem.ty);
-                if implem_ty == found {
-                    for item in interface_items(self.db, interface_id.interned()).iter() {
-                        if let AstInterfaceItem::Sig(sig) = item
-                            && sig.data.name == method
-                        {
-                            let ref_args = int_implem
-                                .templates
-                                .iter()
-                                .map(|a| self.infer_to_ref(a))
-                                .collect::<Vec<_>>();
-                            for arg in &ref_args {
-                                if matches!(arg, TypeRef::Error) {
-                                    todo!("Not yet done I guess")
-                                }
-                            }
-                            let interface_ref = InterfaceRef::new(self.db, interface_id, ref_args);
-
-                            let interface_templates = int_implem.templates.clone();
-
-                            let templates_for_ctx = interface_templates
-                                .into_iter()
-                                .chain(args.iter().cloned())
-                                .collect::<Arc<[_]>>();
-
-                            let ctx = ImplicitContext::new(
-                                self.db,
-                                ScopeOwnerId::Interface(interface_ref),
-                                Arc::new([]),
-                                templates_for_ctx.clone(),
-                                Some(implem_ty.clone()),
-                            )
-                            .unwrap();
-
-                            let ret_ty = self
-                                .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
-                                .unwrap();
-
-                            self.unify(InferTy::Var(ret_var), ret_ty).unwrap();
-
-                            let ref_arguments = sig
-                                .data
-                                .args
-                                .iter()
-                                .map(|arg| self.allocate_ast_type_expr(&arg.ty.data, &ctx).unwrap())
-                                .collect::<Box<[_]>>();
-
-                            ref_arguments
-                                .into_iter()
-                                .zip_eq(args)
-                                .for_each(|(a, b)| self.unify(a, b.clone()).unwrap());
-
-                            return ConstraintSolveResult::Solved;
-                        }
-                    }
-                }
-            }
+        if let Some(result) = self.try_resolve_via_known_impl(
+            ret_var,
+            receiver,
+            id,
+            method,
+            args,
+            interface_hint,
+            is_static,
+        ) {
+            return result;
         }
 
         let mut possible_blocks = self
