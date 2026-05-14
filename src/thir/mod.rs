@@ -291,6 +291,7 @@ impl<'db> TyCtx<'db> {
                 }
                 t_ref
             }
+            HirPatternDesc::IntLit(_) => InferTy::Var(self.inf_ctx.emit_intlike_constraint()),
         }
     }
 

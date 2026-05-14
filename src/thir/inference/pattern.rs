@@ -23,6 +23,7 @@ impl<'a> InferenceCtx<'a> {
             HirPatternDesc::Tuple(_) => todo!(),
             HirPatternDesc::DestructureBinding { .. } => todo!(),
             HirPatternDesc::Constructor { .. } => todo!(),
+            HirPatternDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
         }
     }
 }

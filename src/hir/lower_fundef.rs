@@ -879,6 +879,11 @@ impl<'db> LowerFundef<'db> {
                     data: HirPatternDesc::Any,
                     span: pat.span.clone(),
                 },
+                AstPatternDesc::IntLiteral(x) => HirPattern {
+                    id: this.alloc.next(),
+                    data: HirPatternDesc::IntLit(*x),
+                    span: pat.span.clone(),
+                },
             }
         }
 

@@ -54,6 +54,17 @@ impl<'db> Parser<'db> {
                 ))
             }
 
+            TokenKind::IntLit(x) => {
+                self.consume();
+                let end = self.get_end();
+
+                Ok(Spanned::new(
+                    AstPatternDesc::IntLiteral(x),
+                    vec![],
+                    start.span(&end),
+                ))
+            }
+
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),
             ))),

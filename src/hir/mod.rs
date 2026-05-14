@@ -76,6 +76,7 @@ pub enum HirPatternDesc {
         name: Symbol,
         fields: HirPatternConstructorArgs,
     },
+    IntLit(i64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -38,5 +38,6 @@ pub enum AstNamedPattern {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstPatternDesc {
     Named(AstNamedPattern),
+    IntLiteral(i64),
     Any,
 }
