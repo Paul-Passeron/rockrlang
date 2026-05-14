@@ -13,12 +13,38 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
 
         match self.current_token()?.kind.clone() {
-            TokenKind::Mult => {
+            TokenKind::Mult | TokenKind::BitAnd => {
+                let is_ptr = if let Some(t) = self.peek_n(0)
+                    && matches!(t.kind, TokenKind::Mult)
+                {
+                    true
+                } else {
+                    false
+                };
                 self.consume();
+                let mutable = if let Some(t) = self.peek_n(0)
+                    && matches!(t.kind, TokenKind::Mut)
+                {
+                    self.consume();
+                    true
+                } else {
+                    false
+                };
+
                 let inner = self.parse_type_expr()?;
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    AstTypeExprDesc::Pointer(Box::new(inner)),
+                    if is_ptr {
+                        AstTypeExprDesc::Pointer {
+                            mutable,
+                            pointee: Box::new(inner),
+                        }
+                    } else {
+                        AstTypeExprDesc::Ref {
+                            mutable,
+                            pointee: Box::new(inner),
+                        }
+                    },
                     vec![],
                     start.span(&end),
                 ))

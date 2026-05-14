@@ -6,7 +6,7 @@ use crate::{
         top_level::AstTemplateArg,
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{InternedModuleId, TypeId, TypeParamId, TypeRef, ptr_of, slice_of, tuple_of},
+    ril::{InternedModuleId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -76,9 +76,19 @@ pub fn resolve_spanned_type_expr_desc<'db>(
                 TypeResolution::Error
             }
         }
-        AstTypeExprDesc::Pointer(pointee) => {
+        AstTypeExprDesc::Pointer { mutable, pointee } => {
             match resolve_type_expr(db, &*pointee, module, template_args) {
-                TypeResolution::Type(pointee) => TypeResolution::Type(ptr_of(db, pointee).into()),
+                TypeResolution::Type(pointee) => {
+                    TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
+                }
+                _ => TypeResolution::Error,
+            }
+        }
+        AstTypeExprDesc::Ref { mutable, pointee } => {
+            match resolve_type_expr(db, &*pointee, module, template_args) {
+                TypeResolution::Type(pointee) => {
+                    TypeResolution::Type(ref_of(db, pointee, *mutable).into())
+                }
                 _ => TypeResolution::Error,
             }
         }

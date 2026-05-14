@@ -12,7 +12,14 @@ pub enum AstTypeExprDesc {
         from: Symbol,
         to: Box<AstTypeExpr>,
     },
-    Pointer(Box<AstTypeExpr>),
+    Ref {
+        mutable: bool,
+        pointee: Box<AstTypeExpr>,
+    },
+    Pointer {
+        mutable: bool,
+        pointee: Box<AstTypeExpr>,
+    },
     Slice {
         ty: Box<AstTypeExpr>,
         len: Option<usize>,

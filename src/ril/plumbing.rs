@@ -241,6 +241,16 @@ impl BuiltinTypeId {
     pub fn ptr(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "*"))
     }
+    pub fn mut_ptr(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "*mut"))
+    }
+
+    pub fn ref_(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "&"))
+    }
+    pub fn mut_ref(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "&mut"))
+    }
 
     pub fn tuple(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "()"))
@@ -267,8 +277,36 @@ impl BuiltinTypeId {
     }
 }
 
-pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
+    if mutable {
+        mut_ptr_of(db, ty)
+    } else {
+        const_ptr_of(db, ty)
+    }
+}
+
+pub fn const_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::ptr(db).into(), vec![ty])
+}
+
+pub fn mut_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::mut_ptr(db).into(), vec![ty])
+}
+
+pub fn const_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::ref_(db).into(), vec![ty])
+}
+
+pub fn mut_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::mut_ref(db).into(), vec![ty])
+}
+
+pub fn ref_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
+    if mutable {
+        mut_ref_of(db, ty)
+    } else {
+        const_ref_of(db, ty)
+    }
 }
 
 pub fn slice_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
