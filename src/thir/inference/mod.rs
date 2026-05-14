@@ -65,6 +65,7 @@ pub struct InferenceCtx<'a> {
     solved_constraints: HashSet<InferenceConstraintId>,
     listeners: HashMap<InferVar, Vec<InferenceConstraintId>>,
     ready: VecDeque<InferenceConstraintId>,
+    ready_set: HashSet<InferenceConstraintId>,
 
     implements: HashMap<InterfaceId, HashSet<InterfaceImplem>>,
     packages: Arc<[Package<'a>]>,
@@ -129,6 +130,7 @@ impl<'db> InferenceCtx<'db> {
             diagnostics: Vec::new(),
             listeners: HashMap::new(),
             ready: VecDeque::new(),
+            ready_set: HashSet::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);

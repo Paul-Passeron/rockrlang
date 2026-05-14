@@ -1,8 +1,3 @@
-use std::{
-    collections::HashSet,
-    iter::{self, once},
-};
-
 use crate::{
     name_resolve::implems::impls_in_package,
     ril::{ImplSource, ScopeOwnerId},

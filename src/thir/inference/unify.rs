@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use itertools::Itertools;
 
 use crate::thir::inference::InferenceCtx;
@@ -115,11 +113,10 @@ impl<'db> InferenceCtx<'db> {
                 let res = self
                     .table
                     .unify_var_value(*infer_var, Some(value.clone()))?;
-                let mut ready_set: HashSet<_> = HashSet::from_iter(self.ready.iter().copied());
                 let root = self.table.find(*infer_var);
                 if let Some(listeners) = self.listeners.remove(&root) {
                     for l in listeners {
-                        if !self.solved_constraints.contains(&l) && !ready_set.insert(l) {
+                        if !self.solved_constraints.contains(&l) && !self.ready_set.insert(l) {
                             self.ready.push_back(l);
                         }
                     }
