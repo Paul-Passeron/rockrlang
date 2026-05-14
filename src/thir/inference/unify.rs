@@ -119,7 +119,7 @@ impl<'db> InferenceCtx<'db> {
                 let root = self.table.find(*infer_var);
                 if let Some(listeners) = self.listeners.remove(&root) {
                     for l in listeners {
-                        if !ready_set.insert(l) {
+                        if !self.solved_constraints.contains(&l) && !ready_set.insert(l) {
                             self.ready.push_back(l);
                         }
                     }
