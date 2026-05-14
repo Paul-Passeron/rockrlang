@@ -122,7 +122,6 @@ impl<'db> TyCtx<'db> {
                 constraint.kind.display(self.db)
             );
             println!("    Reason: {}", err.display(self.db));
-            panic!()
         }
 
         let unsolveds = self.inf_ctx.unsolved_constraints();

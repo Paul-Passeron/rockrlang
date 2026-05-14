@@ -8,9 +8,8 @@ use crate::compiler::diagnostic::Diagnostic;
 use crate::hir::{function_ast, hir_body};
 use crate::name_resolve::definition::{Definition, get_module_pretty_name, module_definitions};
 use crate::name_resolve::implems::module_impls;
-use crate::name_resolve::type_expr::resolve_type_expr;
 use crate::name_resolve::{core_package, file_module_id, std_package};
-use crate::parse_tree::top_level::{self, AstImplItem};
+use crate::parse_tree::top_level::AstImplItem;
 use crate::parser::{ParseError, parse_file};
 use crate::ril::display::RilDisplay;
 use crate::ril::{
@@ -136,13 +135,13 @@ pub fn check_type_def<'a>(
 }
 
 pub fn check_interface<'a>(
-    db: &'a dyn Db,
-    interface_id: InterfaceId,
-    package: Package<'a>,
-    packages: &[Package<'a>],
-    report: &mut Report,
+    _db: &'a dyn Db,
+    _interface_id: InterfaceId,
+    _package: Package<'a>,
+    _packages: &[Package<'a>],
+    _report: &mut Report,
 ) {
-    // todo!()
+    // Is there anything to do here ?
 }
 
 pub struct FunctionResult {

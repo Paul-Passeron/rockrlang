@@ -97,8 +97,8 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition>
     let mut res = BTreeMap::from([
         (
             Symbol::new(db, "usize"),
-            Definition::Type(int_id(db).def(db)),
-        ), // TODO: make int and usize different types when casting is introduced
+            Definition::Type(usize_id(db).def(db)),
+        ),
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
         (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), // i32 is an alias for int. Might want to switch this around
         (
@@ -117,7 +117,6 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition>
             Symbol::new(db, "never"),
             Definition::Type(never_id(db).def(db)),
         ),
-        // (Symbol::new(db, "str"), Definition::Type(str_id(db).def(db))),
     ]);
 
     if let Some(std_module) = std_module(db) {

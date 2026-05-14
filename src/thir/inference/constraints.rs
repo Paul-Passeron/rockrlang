@@ -1187,12 +1187,14 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             } => {
                 write!(
                     f,
-                    "Binop<{op}> lhs: {}, rhs: {}, res_ty: {res_ty}",
+                    "Binop<{op}> {{lhs: {}, rhs: {}, res_ty: {res_ty}}}",
                     lhs_ty.display(self.db),
                     rhs_ty.display(self.db),
                 )
             }
-            InferenceConstraintKind::IntLike { res_ty } => todo!(),
+            InferenceConstraintKind::IntLike { res_ty } => {
+                write!(f, "IntLike {{ res_ty: {res_ty} }}")
+            }
         }
     }
 }
