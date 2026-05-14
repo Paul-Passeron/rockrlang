@@ -105,6 +105,13 @@ impl Location {
     pub fn new(offset: usize, file: PathBuf) -> Self {
         Self { offset, file }
     }
+
+    pub fn advance(&self, offset: usize) -> Self {
+        Self {
+            offset: self.offset + offset,
+            file: self.file.clone(),
+        }
+    }
 }
 
 impl Location {
