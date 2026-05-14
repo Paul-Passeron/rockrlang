@@ -1,0 +1,9 @@
+mod A {
+    mod B {
+        mod C {
+            fun foo(bar: int): [[int]] {
+                return {};
+            }
+        }
+    }
+}
