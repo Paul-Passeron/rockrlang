@@ -1,0 +1,43 @@
+@[extern(C)]
+fun printf(fmt: *char): void {}
+
+struct Vec<T> {
+    data: *T;
+    length: int;
+    capacity: int;
+}
+
+impl <T> Vec<T> {
+    fun new(): Vec<T> {
+        return Vec {
+            .data: 0,
+            .length: 0,
+            .capacity: 0,
+        };
+    }
+
+    fun push(elem: T): void {
+        if (this.length >= this.capacity) {
+            exit(1); // TODO
+        }
+        this.data[this.length] = elem;
+        this.length += 1;
+    }
+}
+
+fun main(): int {
+    for i in 0..5 {
+        printf("%d\n".as_ptr(), i);
+    }
+
+    let mut v = Vec<int>::new();
+    for i in 0..5 {
+        v.push(2 * i + 1);
+    }
+
+    for elem in v {
+        printf("%d\n".as_ptr(), elem);
+    }
+
+    return 0;
+}

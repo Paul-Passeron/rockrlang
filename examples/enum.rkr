@@ -1,0 +1,4 @@
+
+fun ret_none(): opt<int> {
+    return opt::None;
+}
