@@ -64,7 +64,6 @@ struct TyCtx<'db> {
     templates: Arc<[AstTemplateArg]>,
 
     inf_ctx: InferenceCtx<'db>,
-    exprs: BTreeMap<ExprId, TyRef>,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -98,7 +97,6 @@ impl<'db> TyCtx<'db> {
             templates,
             packages,
             inf_ctx,
-            exprs: BTreeMap::new(),
             diagnostics: Vec::new(),
         }
     }
@@ -134,22 +132,12 @@ impl<'db> TyCtx<'db> {
             println!("-- \\Constraints not solved ---------------------");
         }
 
-        let drain = std::mem::take(&mut self.exprs)
+        let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
             .into_iter()
             .collect::<Box<[_]>>();
         let node_types = drain
             .into_iter()
-            .map(|(id, infer_ty)| {
-                (
-                    id,
-                    match infer_ty {
-                        TyRef::Inf(infer_ty) => {
-                            self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)
-                        }
-                        TyRef::Error => TypeRef::Error,
-                    },
-                )
-            })
+            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
             .collect::<BTreeMap<_, _>>();
 
         let call_infos = self
@@ -173,7 +161,6 @@ impl<'db> TyCtx<'db> {
             Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
             Err(err) => (TyRef::Error, Some(err)),
         };
-        self.exprs.insert(ExprId(expr.id), ty.clone());
         (ty, err)
     }
 

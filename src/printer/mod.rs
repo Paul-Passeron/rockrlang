@@ -60,7 +60,7 @@ pub fn print_function_result(result: &FunctionResult) {
     println!("{}", result.name);
     if !result.hir.is_empty() {
         println!("[HIR]=======================");
-        println!("{}", result.hir);
+        print!("{}", result.hir);
         println!("[EXPRS]=====================");
         for (expr, ty) in &result.typed_exprs {
             println!("{expr:?} => {ty}")

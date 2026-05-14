@@ -125,7 +125,11 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
-        self.snapshot(|this| this._infer_expr(expr))
+        self.snapshot(|this| {
+            let ty = this._infer_expr(expr)?;
+            this.inferred_exprs.insert(ExprId(expr.id), ty.clone());
+            Ok(ty)
+        })
     }
 
     pub fn local_var(&mut self, local_id: LocalId) -> InferVar {
