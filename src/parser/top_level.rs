@@ -185,11 +185,12 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_receiver_aux(&mut self) -> Option<AstReceiver> {
+        let start = self.get_start();
         if let Some(t) = self.peek_n(0) {
             match t.kind {
                 TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "self") => {
                     self.consume();
-                    Some(AstReceiver::Zelf)
+                    Some(AstReceiver::Zelf(start.span(&self.get_end())))
                 }
                 TokenKind::BitAnd => {
                     self.consume();
@@ -198,10 +199,10 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutRefZelf)
+                        Some(AstReceiver::MutRefZelf(start.span(&self.get_end())))
                     } else {
                         self.expect_self()?;
-                        Some(AstReceiver::RefZelf)
+                        Some(AstReceiver::RefZelf(start.span(&self.get_end())))
                     }
                 }
                 TokenKind::Mult => {
@@ -211,10 +212,10 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutPtrZelf)
+                        Some(AstReceiver::MutPtrZelf(start.span(&self.get_end())))
                     } else {
                         self.expect_self()?;
-                        Some(AstReceiver::PtrZelf)
+                        Some(AstReceiver::PtrZelf(start.span(&self.get_end())))
                     }
                 }
                 _ => None,

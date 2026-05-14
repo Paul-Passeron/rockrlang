@@ -60,14 +60,14 @@ pub struct AstMethodDefDesc {
     pub body: Vec<AstStmt>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstReceiver {
-    None,       // No receiver, static method
-    Zelf,       // self
-    RefZelf,    // &self
-    MutRefZelf, // &mut self
-    PtrZelf,    // *self
-    MutPtrZelf, // *mut self
+    None,             // No receiver, static method
+    Zelf(Span),       // self
+    RefZelf(Span),    // &self
+    MutRefZelf(Span), // &mut self
+    PtrZelf(Span),    // *self
+    MutPtrZelf(Span), // *mut self
 }
 
 impl AstReceiver {
