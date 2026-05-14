@@ -165,6 +165,17 @@ impl<'db> Parser<'db> {
         }
     }
 
+    fn expect_self(&mut self) -> Option<()> {
+        if let Some(t) = self.peek_n(0)
+            && matches!(t.kind, TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "self"))
+        {
+            self.consume();
+            Some(())
+        } else {
+            None
+        }
+    }
+
     fn parse_receiver_aux(&mut self) -> Option<AstReceiver> {
         if let Some(t) = self.peek_n(0) {
             match t.kind {
@@ -178,8 +189,10 @@ impl<'db> Parser<'db> {
                         && matches!(t.kind, TokenKind::Mut)
                     {
                         self.consume();
+                        self.expect_self()?;
                         Some(AstReceiver::MutRefZelf)
                     } else {
+                        self.expect_self()?;
                         Some(AstReceiver::RefZelf)
                     }
                 }
@@ -189,8 +202,10 @@ impl<'db> Parser<'db> {
                         && matches!(t.kind, TokenKind::Mut)
                     {
                         self.consume();
+                        self.expect_self()?;
                         Some(AstReceiver::MutPtrZelf)
                     } else {
+                        self.expect_self()?;
                         Some(AstReceiver::PtrZelf)
                     }
                 }
@@ -263,11 +278,12 @@ impl<'db> Parser<'db> {
             let r = self.parse_receiver();
             if let Some(t) = self.peek_n(0)
                 && matches!(t.kind, TokenKind::Comma)
-                && r != AstReceiver::None
             {
                 self.consume();
             } else {
-                has_args = false;
+                if r != AstReceiver::None {
+                    has_args = false;
+                }
             }
             Some(r)
         } else {
