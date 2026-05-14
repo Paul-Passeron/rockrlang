@@ -1,0 +1,2 @@
+@[extern(C)]
+fun exit(code: int): never {}

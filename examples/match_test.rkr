@@ -1,0 +1,41 @@
+@include std::io
+
+enum test<T> {
+    Generic(T),
+    Named {
+        name: str;
+        value: T;
+    }
+    Two(int, T),
+    None,
+}
+
+fun foo(): void {
+    let t1 = test::Generic(5);
+    let t2 = test<str>::Generic("hello");
+    let t3 = test::Named { .name: "foo", .value: 6 };
+    let t4 = test<str>::Named { .name: "foo", .value: "hi" };
+    let t5 = test::Two(5, "hello");
+    let t6 = test<int>::Two(69, 420);
+}
+
+fun get_t<T>(x: test<T>): T {
+    match x {
+        test::Generic(t) => {
+            return t;
+        }
+        test::Named {name, value} => {
+            return value;
+        }
+        test::Two(_, value) => {
+            return value;
+        }
+    }
+}
+
+fun nested(): test<test<int>> {
+    return test<test<int>>::Named {
+        .name: "foo",
+        .value: test<int>::None,
+    };
+}

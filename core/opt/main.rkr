@@ -2,3 +2,30 @@ enum opt<T> {
     None,
     Some(T),
 }
+
+@[extern(C)]
+fun printf(format: str): void {}
+
+impl <T> opt<T> {
+    fun unwrap(self): T {
+        match self {
+            opt::None => {
+                panic("opt::unwrap called on opt::None");
+            }
+            opt::Some(value) => {
+                return value;
+            }
+        }
+    }
+
+    fun as_ref(&self): opt<&T> {
+        match self {
+            opt::None => {
+                return opt::None;
+            }
+            opt::Some(value) => {
+                return opt::Some(value);
+            }
+        }
+    }
+}
