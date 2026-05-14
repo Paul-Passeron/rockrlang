@@ -6,12 +6,12 @@ use crate::{
         module_items,
     },
     parse_tree::{
-        top_level::{AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
+        top_level::{AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
-        InternedModuleId, InternedStructId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of,
-        tuple_of,
+        InternedEnumId, InternedModuleId, InternedStructId, TypeId, TypeParamId, TypeRef, ptr_of,
+        ref_of, slice_of, tuple_of,
     },
 };
 
@@ -146,6 +146,18 @@ pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> As
 }
 
 #[salsa::tracked]
+pub fn enum_item<'db>(db: &'db dyn Db, struct_id: InternedEnumId<'db>) -> AstEnumDef {
+    for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
+        if let AstTopLevelItemDesc::EnumDef(ast) = item.data
+            && ast.name == struct_id.name(db)
+        {
+            return ast;
+        }
+    }
+    unreachable!()
+}
+
+#[salsa::tracked]
 pub fn templates_of_struct<'db>(
     db: &'db dyn Db,
     struct_id: InternedStructId<'db>,
@@ -153,3 +165,10 @@ pub fn templates_of_struct<'db>(
     struct_item(db, struct_id).template_args
 }
 
+#[salsa::tracked]
+pub fn templates_of_enum<'db>(
+    db: &'db dyn Db,
+    enum_id: InternedEnumId<'db>,
+) -> Vec<AstTemplateArg> {
+    enum_item(db, enum_id).template_args
+}

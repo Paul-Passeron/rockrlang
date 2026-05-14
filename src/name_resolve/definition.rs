@@ -5,8 +5,8 @@ use crate::{
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{
-        FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
-        StructId, TypeDefId, char_id,
+        EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
+        ScopeOwnerId, StructId, TypeDefId, char_id,
         display::{Display, RilDisplay},
         int_id, str_id, void_id,
     },
@@ -28,6 +28,7 @@ impl TypeDefId {
         match self {
             TypeDefId::Builtin(builtin) => builtin.name(db),
             TypeDefId::Struct(struct_id) => struct_id.name(db),
+            TypeDefId::Enum(enum_id) => enum_id.name(db),
         }
     }
 }
@@ -75,6 +76,9 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::Const(_) => todo!(
             "Not handled yet for multiple reasons: Not handled in parsing and need to unfold pattern definitions"
         ),
+        AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
+            EnumId::new(db, ast_enum_def.name, m_id.into()),
+        ))),
     }
 }
 

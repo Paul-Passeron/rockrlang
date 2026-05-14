@@ -9,7 +9,7 @@ use crate::{
     },
     name_resolve::{
         definition::{Definition, resolve_in_module},
-        type_expr::templates_of_struct,
+        type_expr::{templates_of_enum, templates_of_struct},
     },
     parse_tree::{
         expr::{AstExpr, AstExprDesc},
@@ -59,6 +59,7 @@ fn get_template_param_count<'db>(db: &'db dyn Db, ty: TypeDefId) -> usize {
     match ty {
         TypeDefId::Builtin(builtin_type_id) => builtin_type_id.template_count(db),
         TypeDefId::Struct(struct_id) => templates_of_struct(db, struct_id.interned()).len(),
+        TypeDefId::Enum(enum_id) => templates_of_enum(db, enum_id.interned()).len(),
     }
 }
 

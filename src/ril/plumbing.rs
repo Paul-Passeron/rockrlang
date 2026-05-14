@@ -369,3 +369,33 @@ impl InterfaceRef {
         self.interned().args(db)
     }
 }
+
+impl<'db> From<InternedEnumId<'db>> for EnumId {
+    fn from(v: InternedEnumId<'db>) -> Self {
+        EnumId(v.0)
+    }
+}
+
+impl<'db> From<EnumId> for InternedEnumId<'db> {
+    fn from(v: EnumId) -> Self {
+        Self(v.0, PhantomData)
+    }
+}
+
+impl EnumId {
+    pub fn new(db: &dyn crate::Db, name: Symbol, parent: ModuleId) -> Self {
+        InternedEnumId::new(db, name, parent).into()
+    }
+
+    pub fn interned(self) -> InternedEnumId<'static> {
+        InternedEnumId(self.0, PhantomData)
+    }
+
+    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+        self.interned().name(db)
+    }
+
+    pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
+        self.interned().parent(db)
+    }
+}

@@ -6,10 +6,11 @@ use crate::{
     parse_tree::{
         annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
         top_level::{
-            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundef, AstFundefArg, AstFundefDesc,
-            AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
-            AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig, AstMethodsigDesc,
-            AstModule, AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField, AstTemplateArg,
+            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef, AstEnumVariant,
+            AstEnumVariantKind, AstFundef, AstFundefArg, AstFundefDesc, AstFunsig, AstFunsigDesc,
+            AstImplBlock, AstImplItem, AstIncludePath, AstInterface, AstInterfaceItem,
+            AstMethodDef, AstMethodDefDesc, AstMethodsig, AstMethodsigDesc, AstModule,
+            AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField, AstTemplateArg,
             AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
@@ -552,6 +553,69 @@ impl<'db> Parser<'db> {
         Ok(fields)
     }
 
+    fn parse_enum_variant(&mut self) -> Result<AstEnumVariant, ParseError> {
+        let name = self.parse_symbol()?.data;
+
+        let kind = match self.peek_n(0).map(|t| t.kind) {
+            Some(TokenKind::OpenBra) => {
+                self.consume();
+                let fields = self.parse_struct_def_fields()?;
+                self.expect(TokenKind::CloseBra)?;
+                self.consume();
+                AstEnumVariantKind::StructLike(fields)
+            }
+            Some(TokenKind::OpenPar) => {
+                self.consume();
+                let mut fields = Vec::new();
+                while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::ClosePar) {
+                    fields.push(self.parse_type_expr()?);
+                    if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+                AstEnumVariantKind::TupleLike(fields)
+            }
+            _ => AstEnumVariantKind::Unit,
+        };
+        Ok(AstEnumVariant { name, kind })
+    }
+
+    fn parse_enum_variants(&mut self) -> Result<Vec<AstEnumVariant>, ParseError> {
+        let mut variants = vec![];
+        while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::CloseBra) {
+            let variant = self.parse_enum_variant()?;
+            let is_struct = matches!(variant.kind, AstEnumVariantKind::StructLike(_));
+            variants.push(variant);
+            if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
+                self.consume();
+            } else if !is_struct {
+                break;
+            }
+        }
+        Ok(variants)
+    }
+
+    fn parse_enum_def(&mut self) -> Result<AstEnumDef, ParseError> {
+        self.expect(TokenKind::Enum)?;
+        self.consume();
+        let name = self.parse_symbol()?.data;
+        let template_args = self.parse_optional_template_args()?;
+        self.expect(TokenKind::OpenBra)?;
+        self.consume();
+        let variants = self.parse_enum_variants()?;
+        self.expect(TokenKind::CloseBra)?;
+        self.consume();
+        Ok(AstEnumDef {
+            name,
+            template_args,
+            variants,
+        })
+    }
+
     fn parse_struct_def(&mut self) -> Result<AstStructDef, ParseError> {
         self.expect(TokenKind::Struct)?;
         self.consume();
@@ -639,6 +703,17 @@ impl<'db> Parser<'db> {
                 let span = start.span(&end);
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::StructDef(struct_def),
+                    annotations,
+                    span,
+                ))
+            }
+            TokenKind::Enum => {
+                let start = self.get_start();
+                let enum_def = self.parse_enum_def()?;
+                let end = self.get_end();
+                let span = start.span(&end);
+                Ok(AstTopLevelItem::new(
+                    AstTopLevelItemDesc::EnumDef(enum_def),
                     annotations,
                     span,
                 ))

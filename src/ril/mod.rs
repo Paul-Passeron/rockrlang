@@ -67,6 +67,12 @@ pub struct InternedStructId {
     pub parent: ModuleId,
 }
 
+#[salsa::interned]
+pub struct InternedEnumId {
+    pub name: Symbol,
+    pub parent: ModuleId,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeParamId(pub usize);
 
@@ -124,6 +130,7 @@ pub enum ScopeOwnerId {
 pub enum TypeDefId {
     Builtin(BuiltinTypeId),
     Struct(StructId),
+    Enum(EnumId),
 }
 
 #[salsa::tracked]
@@ -143,6 +150,9 @@ pub struct FunctionId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructId(salsa::Id);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EnumId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ImplId(salsa::Id);

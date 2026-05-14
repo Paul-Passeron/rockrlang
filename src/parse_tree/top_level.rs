@@ -24,6 +24,7 @@ pub enum AstTopLevelItemDesc {
     Const(AstConstDecl),
     Impl(AstImplBlock),
     StructDef(AstStructDef),
+    EnumDef(AstEnumDef),
 }
 
 pub type AstModule = Spanned<AstModuleDesc>;
@@ -163,6 +164,26 @@ pub struct AstStructDef {
     pub name: Symbol,
     pub template_args: Vec<AstTemplateArg>,
     pub fields: Vec<AstStructDefField>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AstEnumDef {
+    pub name: Symbol,
+    pub template_args: Vec<AstTemplateArg>,
+    pub variants: Vec<AstEnumVariant>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AstEnumVariant {
+    pub name: Symbol,
+    pub kind: AstEnumVariantKind,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstEnumVariantKind {
+    Unit,
+    StructLike(Vec<AstStructDefField>),
+    TupleLike(Vec<AstTypeExpr>),
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

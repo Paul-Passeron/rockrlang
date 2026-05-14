@@ -101,6 +101,7 @@ pub fn get_token_rules<'db>() -> Vec<(
                         "return" => TokenKind::Return,
                         "defer" => TokenKind::Defer,
                         "struct" => TokenKind::Struct,
+                        "enum" => TokenKind::Enum,
                         "interface" => TokenKind::Interface,
                         "in" => TokenKind::In,
                         "for" => TokenKind::For,

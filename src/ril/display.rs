@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::Db;
+use crate::{Db, ril::EnumId};
 
 use crate::name_resolve::type_expr::TypeResolution;
 
@@ -8,10 +8,6 @@ use super::{
     BuiltinTypeId, FunctionId, ImplId, InterfaceId, InterfaceRef, ModuleId, StructId, TypeDefId,
     TypeId, TypeParamId, TypeRef,
 };
-
-// ---------------------------------------------------------------------------
-// Wrapper — pairs a RIL value with a db reference so fmt::Display can work
-// ---------------------------------------------------------------------------
 
 pub struct Display<'db, T> {
     pub value: T,
@@ -36,6 +32,7 @@ impl RilDisplay for TypeId {}
 impl RilDisplay for TypeDefId {}
 impl RilDisplay for BuiltinTypeId {}
 impl RilDisplay for StructId {}
+impl RilDisplay for EnumId {}
 impl RilDisplay for InterfaceId {}
 impl RilDisplay for InterfaceRef {}
 impl RilDisplay for FunctionId {}
@@ -74,6 +71,16 @@ impl fmt::Display for Display<'_, StructId> {
     }
 }
 
+impl fmt::Display for Display<'_, EnumId> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.value.name(self.db).interned().contents(self.db)
+        )
+    }
+}
+
 impl fmt::Display for Display<'_, InterfaceId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -89,6 +96,7 @@ impl fmt::Display for Display<'_, TypeDefId> {
         match self.value {
             TypeDefId::Builtin(b) => write!(f, "{}", b.display(self.db)),
             TypeDefId::Struct(s) => write!(f, "{}", s.display(self.db)),
+            TypeDefId::Enum(e) => write!(f, "{}", e.display(self.db)),
         }
     }
 }
@@ -208,10 +216,6 @@ impl fmt::Display for Display<'_, ModuleId> {
         )
     }
 }
-
-// ---------------------------------------------------------------------------
-// fmt::Debug — delegates to Display for a cleaner debug output
-// ---------------------------------------------------------------------------
 
 impl fmt::Debug for Display<'_, ImplId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
