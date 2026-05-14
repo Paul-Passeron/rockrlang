@@ -1,0 +1,10 @@
+@include std::io
+
+fun main(): int {
+    let (mut x, y) = 0;
+    while x < 100 {
+        x += 1;
+    }
+    printf("%d\n", x);
+    return 0;
+}
