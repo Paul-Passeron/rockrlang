@@ -149,7 +149,16 @@ impl<'db> TyCtx<'db> {
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
         self.inf_ctx.solve_constraints().unwrap();
-        // assert!(self.inf_ctx.finished_solving_constraints());
+
+        let unsolveds = self.inf_ctx.get_current_constraints();
+        if !unsolveds.is_empty() {
+            println!("-- Constraints not solved ----------------------");
+            for c in unsolveds {
+                println!("Constraint not solved:\n    {}", c.kind.display(self.db))
+            }
+            println!("-- \\Constraints not solved ---------------------");
+        }
+
         let drain = self.exprs.drain().collect::<Box<[_]>>();
         let node_types = drain
             .into_iter()

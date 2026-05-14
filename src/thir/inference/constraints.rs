@@ -848,3 +848,111 @@ impl<'db> InferenceCtx<'db> {
         self.emit_constraint(InferenceConstraintKind::Implements { ty, id, args });
     }
 }
+
+impl InferenceConstraintKind {
+    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
+        Display { value: self, db }
+    }
+}
+
+impl fmt::Display for Display<'_, &InferenceConstraintKind> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.value {
+            InferenceConstraintKind::Deref { var, target } => {
+                write!(
+                    f,
+                    "Defer {{var: {}, target: {}}}",
+                    InferTy::Var(*var).display(self.db),
+                    target.display(self.db)
+                )
+            }
+            InferenceConstraintKind::BindsLike { ty, inner, like } => {
+                write!(
+                    f,
+                    "BindsLike {{ty: {}, inner: {}, like: {}}}",
+                    InferTy::Var(*ty).display(self.db),
+                    inner.display(self.db),
+                    InferTy::Var(*like).display(self.db)
+                )
+            }
+            InferenceConstraintKind::IndexedBy {
+                elem_var,
+                base_ty,
+                index_ty,
+            } => {
+                write!(
+                    f,
+                    "IndexedBy {{elem_var: {}, base_ty: {}, index_ty: {}}}",
+                    InferTy::Var(*elem_var).display(self.db),
+                    base_ty.display(self.db),
+                    index_ty.display(self.db)
+                )
+            }
+            InferenceConstraintKind::Tuple {
+                elem_var,
+                tuple_ty,
+                has_index,
+            } => {
+                write!(
+                    f,
+                    "Tuple {{elem_var: {}, tuple_ty: {}, has_index: {has_index}}}",
+                    InferTy::Var(*elem_var).display(self.db),
+                    tuple_ty.display(self.db),
+                )
+            }
+            InferenceConstraintKind::StructField {
+                elem_var,
+                struct_ty,
+                field,
+            } => {
+                write!(
+                    f,
+                    "IndexedBy {{elem_var: {}, struct_ty: {}, field: {}}}",
+                    InferTy::Var(*elem_var).display(self.db),
+                    struct_ty.display(self.db),
+                    field.display(self.db)
+                )
+            }
+            InferenceConstraintKind::Method {
+                ret_var,
+                ty,
+                id,
+                method,
+                args,
+                interface_hint,
+                is_static,
+            } => {
+                write!(
+                    f,
+                    "Method {{ret_var: {}, ty: {}, id: ExprId({:?}), method: {}, args: [{}], interface_hint: {}, is_static: {is_static}}}",
+                    InferTy::Var(*ret_var).display(self.db),
+                    ty.display(self.db),
+                    id.0,
+                    method.display(self.db),
+                    args.iter().map(|a| a.display(self.db)).join(", "),
+                    match interface_hint {
+                        Some(hint) => hint.display(self.db).to_string(),
+                        None => "".to_string(),
+                    }
+                )
+            }
+            InferenceConstraintKind::Implements { ty, id, args } => {
+                write!(
+                    f,
+                    "Implements {{ty: {}, id: {}, args: [{}]}}",
+                    ty.display(self.db),
+                    id.display(self.db),
+                    args.iter().map(|a| a.display(self.db)).join(", "),
+                )
+            }
+            InferenceConstraintKind::Unify { a, b } => {
+                write!(
+                    f,
+                    "Unify {{a: {}, b: {}}}",
+                    a.display(self.db),
+                    b.display(self.db),
+                )
+            }
+        }
+    }
+}

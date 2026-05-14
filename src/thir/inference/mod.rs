@@ -175,6 +175,10 @@ impl<'db> InferenceCtx<'db> {
     pub fn implicit_ctx(&self) -> Arc<ImplicitContext> {
         self.implicit_ctx.clone()
     }
+
+    pub fn get_current_constraints(&self) -> &[Arc<InferenceConstraint>] {
+        &self.current_constraints
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
