@@ -10,7 +10,7 @@ pub mod var;
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
+    fmt, mem,
     sync::Arc,
 };
 
@@ -160,8 +160,16 @@ impl<'db> InferenceCtx<'db> {
         this
     }
 
-    pub fn templates(&self) -> Arc<[InferTy]> {
-        self.implicit_ctx.get_templates()
+    // pub fn templates(&self) -> Arc<[InferTy]> {
+    //     self.implicit_ctx.get_templates()
+    // }
+
+    pub fn get_call_infos(&self) -> &HashMap<ExprId, InferCallInfos> {
+        &self.call_infos
+    }
+
+    pub fn drain_call_infos(&mut self) -> HashMap<ExprId, InferCallInfos> {
+        mem::take(&mut self.call_infos)
     }
 
     pub fn zelf(&self) -> Option<InferTy> {

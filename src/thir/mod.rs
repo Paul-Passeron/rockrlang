@@ -72,10 +72,7 @@ struct TyCtx<'db> {
     templates: Arc<[AstTemplateArg]>,
 
     inf_ctx: InferenceCtx<'db>,
-
-    calls: HashMap<ExprId, InferCallInfos>,
     exprs: HashMap<ExprId, TyRef>,
-
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -114,7 +111,6 @@ impl<'db> TyCtx<'db> {
             templates,
             packages,
             inf_ctx,
-            calls: HashMap::new(),
             exprs: HashMap::new(),
             diagnostics: Vec::new(),
         }
@@ -168,9 +164,8 @@ impl<'db> TyCtx<'db> {
             })
             .collect::<BTreeMap<_, _>>();
         let call_infos = self
-            .calls
-            .drain()
-            .collect::<Box<[_]>>()
+            .inf_ctx
+            .drain_call_infos()
             .into_iter()
             .map(|(id, infos)| (id, self.concretize_infos(infos)))
             .collect();
