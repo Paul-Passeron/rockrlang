@@ -106,7 +106,7 @@ impl<'db> TyCtx<'db> {
         let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
         let inf_ctx = InferenceCtx::new(db, &local_ids, function, params, packages.clone());
 
-        let mut this = Self {
+        Self {
             db,
             function,
             locals,
@@ -117,9 +117,7 @@ impl<'db> TyCtx<'db> {
             calls: HashMap::new(),
             exprs: HashMap::new(),
             diagnostics: Vec::new(),
-        };
-
-        this
+        }
     }
 
     fn concretize_infos(&mut self, infos: InferCallInfos) -> CallInfos {
@@ -458,7 +456,7 @@ impl<'db> TyCtx<'db> {
                 }
             },
             HirStmtKind::Block(stmts) => stmts.iter().for_each(|stmt| self.type_check_stmt(stmt)),
-            HirStmtKind::Defer(_) => todo!(),
+            HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
             HirStmtKind::Break => todo!(),
         }
     }
