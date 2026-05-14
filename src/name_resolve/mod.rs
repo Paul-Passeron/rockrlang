@@ -1,6 +1,6 @@
 use crate::{
     Db, SourceFile,
-    common::symbols::Symbol,
+    common::{symbols::Symbol, unord::Set},
     driver::load_package,
     parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
@@ -133,4 +133,54 @@ pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
     let package = std_package(db)?;
     let file_module = package.root(db);
     Some(file_module_id(db, file_module, Some(builtin_module(db)), package).interned())
+}
+
+fn collect_modules_in_file_module<'db>(
+    db: &'db dyn Db,
+    file_module: FileModule<'db>,
+    module_id: ModuleId,
+    package: Package<'db>,
+    set: &mut Set<ModuleId>,
+) {
+    set.insert(module_id);
+
+    for sub in file_module.submodules(db) {
+        let sub_id = file_module_id(db, *sub, Some(module_id), package);
+        collect_modules_in_file_module(db, *sub, sub_id, package, set);
+    }
+
+    if let Some(items) = module_items(db, module_id.interned()) {
+        collect_modules_in_items(db, &items, module_id, package, set);
+    }
+}
+
+fn collect_modules_in_items<'db>(
+    db: &'db dyn Db,
+    items: &[AstTopLevelItem],
+    parent: ModuleId,
+    package: Package<'db>,
+    set: &mut Set<ModuleId>,
+) {
+    for item in items {
+        if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
+            let child_id = ModuleId::new(
+                db,
+                module_ast.data.name,
+                Some(parent),
+                None,
+                vec![],
+                Some(package),
+            );
+            set.insert(child_id);
+            collect_modules_in_items(db, &module_ast.data.items, child_id, package, set);
+        }
+    }
+}
+
+#[salsa::tracked]
+pub fn modules_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ModuleId> {
+    let root_id = file_module_id(db, package.root(db), None, package);
+    let mut set = Set::new();
+    collect_modules_in_file_module(db, package.root(db), root_id, package, &mut set);
+    set
 }

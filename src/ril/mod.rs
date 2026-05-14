@@ -125,7 +125,7 @@ pub enum TypeDefId {
 }
 
 #[salsa::tracked]
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, Ord)]
 pub struct ImplSource<'db> {
     pub id: ImplId,
     pub module: ModuleId,
@@ -133,7 +133,7 @@ pub struct ImplSource<'db> {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModuleId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

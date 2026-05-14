@@ -8,7 +8,7 @@ use crate::{
     name_resolve::{
         definition::{get_module_pretty_name, module_definitions},
         file_module_id,
-        implems::module_impls,
+        implems::{impls_in_package, module_impls},
         module_items, module_to_file, std_package,
         type_expr::resolve_type_expr,
     },
@@ -210,6 +210,19 @@ fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
     print_module_tree(db, package.root(db), 0);
     println!();
     let has_errors = check_module_tree(db, package.root(db), None, package);
+    println!("ALL IMPLEMENTATIONS:");
+    for impl_ in impls_in_package(db, package) {
+        let start = impl_.span(db).start();
+        let source_file = module_to_file(db, impl_.module(db).interned());
+        let loc_infos = get_loc_info(db, source_file, start.offset);
+        println!(
+            "    {}: {} ({:?})",
+            loc_infos,
+            impl_.id(db).display(db),
+            impl_.id(db)
+        );
+    }
+
     has_errors
 }
 

@@ -3,14 +3,14 @@ use crate::{
     common::unord::Set,
     name_resolve::{
         definition::{Definition, resolve_in_module},
-        module_items,
+        module_items, modules_in_package,
         type_expr::{TypeResolution, resolve_any_type_expr, resolve_type_expr},
     },
     parse_tree::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId},
+    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId, Package},
 };
 
 pub fn resolve_type_expr_as_interface<'db>(
@@ -124,4 +124,14 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
         }
     }
     res
+}
+
+#[salsa::tracked]
+pub fn impls_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ImplSource<'db>> {
+    Set::from_iter(
+        modules_in_package(db, package)
+            .into_iter()
+            .map(|module| module_impls(db, module.interned()))
+            .flatten(),
+    )
 }
