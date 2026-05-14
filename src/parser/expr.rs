@@ -383,11 +383,7 @@ impl<'db> Parser<'db> {
                         ))
                     }
 
-                    // `Name<T, U>::method(args)` — static call on a generic type
                     Some(TokenKind::Lt) => {
-                        // We need to disambiguate `a < b` from `Name<T>::…`.
-                        // Heuristic: if after parsing a type-arg list we see `>`,
-                        // followed by `::`, treat this as a static call.
                         if let Some(static_call) =
                             self.try_parse_static_call(name, start.clone())?
                         {
@@ -402,18 +398,13 @@ impl<'db> Parser<'db> {
                         }
                     }
 
-                    // `Name { .field = expr, … }` — struct literal
                     Some(TokenKind::OpenBra) => {
-                        // Only interpret as struct literal if the first token inside
-                        // is a '.' (field initialiser). Otherwise it's a block and
-                        // we return the bare name.
                         if self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Dot) {
-                            self.consume(); // consume '{'
+                            self.consume();
                             let fields = self.parse_struct_fields()?;
                             self.expect(TokenKind::CloseBra)?;
                             self.consume();
                             let end = self.get_end();
-                            // Build a plain Named TypeExpr for the struct name
                             let ty_span = start.span(&start);
                             let ty = Spanned::new(
                                 AstTypeExprDesc::Named { name, args: vec![] },

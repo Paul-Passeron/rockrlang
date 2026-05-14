@@ -99,6 +99,7 @@ pub struct AstTemplateArg {
 pub struct AstFundefArg {
     pub name: Symbol,
     pub ty: AstTypeExpr,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -40,3 +40,13 @@ pub struct AstConstrainedType {
     ty: AstTypeExpr,
     constraints: Vec<AstTypeExpr>,
 }
+
+impl From<AstTypeExpr> for AstAnyTypeExpr {
+    fn from(ty: AstTypeExpr) -> Self {
+        AstAnyTypeExpr {
+            data: AstAnyTypeExprDesc::Known(ty.data),
+            annotations: ty.annotations,
+            span: ty.span,
+        }
+    }
+}

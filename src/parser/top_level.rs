@@ -105,14 +105,16 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_fundef_arg(&mut self) -> Result<AstFundefArg, ParseError> {
-        // TODO: handle patterns
+        let start = self.get_start();
         let name = self.parse_symbol()?;
         self.expect(TokenKind::Colon)?;
         self.consume();
         let ty = self.parse_type_expr()?;
+        let end = self.get_end();
         Ok(AstFundefArg {
             name: name.data,
             ty,
+            span: start.span(&end),
         })
     }
 

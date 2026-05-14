@@ -15,12 +15,10 @@ pub enum AstExprDesc {
 
     // Names and resolution
     Name(Symbol),
-    /// `A::B::expr` — module / namespace resolution
     NameResolved {
         from: Symbol,
         to: Box<AstExpr>,
     },
-    /// `Type<T>::method(args)` — static method call on a generic type
     StaticCall {
         ty: AstTypeExpr,
         method: Symbol,
@@ -40,7 +38,7 @@ pub enum AstExprDesc {
         to: Box<AstExpr>,
     },
 
-    Ref(Box<AstExpr>),
+    // Ref(Box<AstExpr>),
     Neg(Box<AstExpr>),
     Not(Box<AstExpr>),
 
@@ -54,10 +52,6 @@ pub enum AstExprDesc {
     TupleAccess {
         object: Box<AstExpr>,
         index: u32,
-    },
-    ArrowAccess {
-        object: Box<AstExpr>,
-        field: Symbol,
     },
 
     Call {

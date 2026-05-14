@@ -5,9 +5,10 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{
     common::location::get_loc_info,
     driver::load_package,
+    hir::hir_body,
     name_resolve::{
         core_package,
-        definition::{get_module_pretty_name, module_definitions},
+        definition::{Definition, get_module_pretty_name, module_definitions},
         file_module_id,
         implems::{impls_in_package, module_impls},
         module_items, module_to_file, std_package,
@@ -20,6 +21,7 @@ use crate::{
 
 mod common;
 mod driver;
+mod hir;
 mod lexer;
 mod name_resolve;
 mod parse_tree;
@@ -136,7 +138,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     println!("Function signatures:");
     let mut has_errors = false;
 
-    for item in items {
+    for item in &items {
         if let AstTopLevelItemDesc::Fundef(fundef) = &item.data {
             let fd = &fundef.data;
             println!("  fn {}:", fd.name.interned().contents(db));
@@ -162,6 +164,19 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             has_errors |= check_module(db, child_id);
         }
     }
+
+    let mut v = defs.values().copied().collect::<Vec<_>>();
+    v.sort();
+    for def in v {
+        match def {
+            Definition::Function(function_id) => {
+                let hir = hir_body(db, function_id.interned());
+                println!("{hir:#?}");
+            }
+            _ => (),
+        }
+    }
+
     println!("Implementations:");
     for impl_ in impls {
         let start = impl_.span(db).start();

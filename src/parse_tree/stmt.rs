@@ -1,4 +1,9 @@
-use crate::parse_tree::{Spanned, expr::AstExpr, pattern::AstPattern, type_expr::AstAnyTypeExpr};
+use crate::parse_tree::{
+    Spanned,
+    expr::{AstExpr, BinaryOperator},
+    pattern::AstPattern,
+    type_expr::AstAnyTypeExpr,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CompoundAssignOp {
@@ -7,6 +12,18 @@ pub enum CompoundAssignOp {
     Times,
     Div,
     Modulo,
+}
+
+impl CompoundAssignOp {
+    pub fn to_binop(&self) -> BinaryOperator {
+        match self {
+            CompoundAssignOp::Plus => BinaryOperator::Plus,
+            CompoundAssignOp::Minus => BinaryOperator::Minus,
+            CompoundAssignOp::Times => BinaryOperator::Times,
+            CompoundAssignOp::Div => BinaryOperator::Div,
+            CompoundAssignOp::Modulo => BinaryOperator::Modulo,
+        }
+    }
 }
 
 pub type AstStmt = Spanned<AstStmtDesc>;

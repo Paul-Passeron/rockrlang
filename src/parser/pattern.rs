@@ -3,7 +3,7 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        pattern::{AstNamedPattern, AstPattern, AstPatternDesc},
+        pattern::{AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -73,13 +73,21 @@ impl<'db> Parser<'db> {
 
             Some(TokenKind::OpenPar) => {
                 self.consume();
-                let args = self.parse_pattern_list(TokenKind::ClosePar)?;
+                let args =
+                    AstConstructFields::TupleFields(self.parse_pattern_list(TokenKind::ClosePar)?);
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 Ok(AstNamedPattern::Constructor { name, args })
             }
 
-            _ => Ok(AstNamedPattern::Constructor { name, args: vec![] }),
+            Some(TokenKind::OpenBra) => {
+                todo!("parse struct fields in pattern")
+            }
+
+            _ => Ok(AstNamedPattern::Constructor {
+                name,
+                args: AstConstructFields::None,
+            }),
         }
     }
 

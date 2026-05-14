@@ -15,7 +15,7 @@ use nonempty::NonEmpty;
 use std::sync::Arc;
 use std::{collections::HashMap, fmt};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Definition {
     Function(FunctionId),
     Interface(InterfaceId),

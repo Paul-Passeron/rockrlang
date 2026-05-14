@@ -275,6 +275,13 @@ impl BuiltinTypeId {
     pub fn void(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "void"))
     }
+
+    pub fn template_count(&self, db: &dyn crate::Db) -> usize {
+        match self.name(db).interned().contents(db).as_str() {
+            "*mut" | "*" | "&" | "&mut" | "[]" => 1,
+            _ => 0,
+        }
+    }
 }
 
 pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {

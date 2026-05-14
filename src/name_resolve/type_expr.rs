@@ -1,12 +1,18 @@
 use crate::{
     Db,
     common::location::Span,
-    name_resolve::definition::{Definition, resolve_in_module},
+    name_resolve::{
+        definition::{Definition, resolve_in_module},
+        module_items,
+    },
     parse_tree::{
-        top_level::AstTemplateArg,
+        top_level::{AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{InternedModuleId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of},
+    ril::{
+        InternedModuleId, InternedStructId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of,
+        tuple_of,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -126,3 +132,24 @@ pub fn resolve_type_expr<'db>(
 ) -> TypeResolution {
     resolve_spanned_type_expr_desc(db, &type_expr.data, &type_expr.span, module, template_args)
 }
+
+#[salsa::tracked]
+pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> AstStructDef {
+    for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
+        if let AstTopLevelItemDesc::StructDef(ast) = item.data
+            && ast.name == struct_id.name(db)
+        {
+            return ast;
+        }
+    }
+    unreachable!()
+}
+
+#[salsa::tracked]
+pub fn templates_of_struct<'db>(
+    db: &'db dyn Db,
+    struct_id: InternedStructId<'db>,
+) -> Vec<AstTemplateArg> {
+    struct_item(db, struct_id).template_args
+}
+
