@@ -1,20 +1,20 @@
-@[builtin]
+// @[builtin]
 interface Clone {
     fun clone(&self): Self;
 }
 
-@[builtin]
+// @[builtin]
 interface Copy {} // Marker struct
 
-@[builtin]
+// @[builtin]
 interface Drop {
     fun drop(self): void;
 }
 
-@[builtin, orthogonal(Drop)]
+@[orthogonal(Drop)]
 interface NoDrop {} // Marker struct
 
-@[builtin]
-interface AsRef<T> {
+interface AsRef {
+    type T;
     fun as_ref(&self): &T;
 }

@@ -1,7 +1,7 @@
 use crate::{
     Db,
     common::symbols::{InternedSymbol, Symbol},
-    name_resolve::{module_items, std_module},
+    name_resolve::{core_module, module_items, std_module},
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{
@@ -99,6 +99,10 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
             Definition::Module(std_module.into()),
         );
     }
+    res.insert(
+        Symbol::new(db, "core"),
+        Definition::Module(core_module(db).into()),
+    );
 
     res
 }

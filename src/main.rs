@@ -208,19 +208,6 @@ fn check_module_tree<'db>(
 
 fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
     let has_errors = check_module_tree(db, package.root(db), None, package);
-    println!("ALL IMPLEMENTATIONS:");
-    for impl_ in impls_in_package(db, package) {
-        let start = impl_.span(db).start();
-        let source_file = module_to_file(db, impl_.module(db).interned());
-        let loc_infos = get_loc_info(db, source_file, start.offset);
-        println!(
-            "    {}: {} ({:?})",
-            loc_infos,
-            impl_.id(db).display(db),
-            impl_.id(db)
-        );
-    }
-
     has_errors
 }
 
@@ -249,8 +236,23 @@ fn main() -> Result<(), String> {
     println!();
 
     let mut has_errors = false;
-    for package in packages {
-        has_errors |= try_package(&db, package);
+    for package in &packages {
+        has_errors |= try_package(&db, *package);
+    }
+
+    println!("ALL IMPLEMENTATIONS:");
+    for package in &packages {
+        for impl_ in impls_in_package(&db, *package) {
+            let start = impl_.span(&db).start();
+            let source_file = module_to_file(&db, impl_.module(&db).interned());
+            let loc_infos = get_loc_info(&db, source_file, start.offset);
+            println!(
+                "    {}: {} ({:?})",
+                loc_infos,
+                impl_.id(&db).display(&db),
+                impl_.id(&db)
+            );
+        }
     }
 
     if has_errors {
