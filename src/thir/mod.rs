@@ -134,7 +134,7 @@ impl<'db> TyCtx<'db> {
             panic!()
         }
 
-        let unsolveds = self.inf_ctx.get_current_constraints();
+        let unsolveds = self.inf_ctx.unsolved_constraints();
         if !unsolveds.is_empty() {
             println!("-- Constraints not solved ----------------------");
             for c in unsolveds {

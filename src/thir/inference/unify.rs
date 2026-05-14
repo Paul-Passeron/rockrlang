@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+
+use itertools::Itertools;
+
 use crate::thir::inference::InferenceCtx;
 
 use super::{InferTy, InferVar, UnificationError, UnifyValue};
@@ -85,14 +89,42 @@ impl UnifyValue for InferTy {
 }
 
 impl<'db> InferenceCtx<'db> {
+    fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
+        let flattened = self
+            .listeners
+            .remove(&b)
+            .into_iter()
+            .flatten()
+            .collect_vec();
+        self.listeners.entry(a).or_default().extend(flattened);
+    }
+
     fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
             (InferTy::Zelf, InferTy::Zelf) => Ok(()),
-            (InferTy::Var(a), InferTy::Var(b)) => self.table.unify_var_var(*a, *b),
+            (InferTy::Var(a), InferTy::Var(b)) => {
+                let res = self.table.unify_var_var(*a, *b);
+                if res.is_ok() {
+                    self.merge_listeners(*a, *b);
+                }
+                res
+            }
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
-                self.table.unify_var_value(*infer_var, Some(value.clone()))
+                let res = self
+                    .table
+                    .unify_var_value(*infer_var, Some(value.clone()))?;
+                let mut ready_set: HashSet<_> = HashSet::from_iter(self.ready.iter().copied());
+                let root = self.table.find(*infer_var);
+                if let Some(listeners) = self.listeners.remove(&root) {
+                    for l in listeners {
+                        if !ready_set.insert(l) {
+                            self.ready.push_back(l);
+                        }
+                    }
+                }
+                Ok(res)
             }
             (
                 InferTy::Adt {
@@ -135,14 +167,13 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn unify(&mut self, a: InferTy, b: InferTy) -> Result<(), UnificationError> {
         self.snapshot(|this| {
-            this.try_unify(&a, &b)?;
-            this.solve_constraints()
-                .map_err(|(inference_constraint, unification_error)| {
-                    UnificationError::UnmetConstraint(
-                        inference_constraint,
-                        Box::new(unification_error),
-                    )
-                })
+            this.try_unify(&a, &b)
+            //         .map_err(|(inference_constraint, unification_error)| {
+            //             UnificationError::UnmetConstraint(
+            //                 inference_constraint,
+            //                 Box::new(unification_error),
+            //             )
+            //         })
         })
     }
 

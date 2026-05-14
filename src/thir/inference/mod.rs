@@ -9,7 +9,7 @@ mod unify;
 pub mod var;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fmt, mem,
     sync::Arc,
 };
@@ -60,9 +60,11 @@ pub struct InferenceCtx<'a> {
     local_map: HashMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
-    current_constraints: Vec<Arc<InferenceConstraint>>,
+    // current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
     solved_constraints: HashSet<InferenceConstraintId>,
+    listeners: HashMap<InferVar, Vec<InferenceConstraintId>>,
+    ready: VecDeque<InferenceConstraintId>,
 
     implements: HashMap<InterfaceId, HashSet<InterfaceImplem>>,
     packages: Arc<[Package<'a>]>,
@@ -115,7 +117,7 @@ impl<'db> InferenceCtx<'db> {
             db,
             table,
             local_map,
-            current_constraints: Vec::new(),
+            // current_constraints: Vec::new(),
             all_constraints: HashMap::new(),
             solved_constraints: HashSet::new(),
             packages,
@@ -125,6 +127,8 @@ impl<'db> InferenceCtx<'db> {
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
             diagnostics: Vec::new(),
+            listeners: HashMap::new(),
+            ready: VecDeque::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
@@ -194,8 +198,14 @@ impl<'db> InferenceCtx<'db> {
         self.implicit_ctx.clone()
     }
 
-    pub fn get_current_constraints(&self) -> &[Arc<InferenceConstraint>] {
-        &self.current_constraints
+    pub fn unsolved_constraints(&self) -> Box<[Arc<InferenceConstraint>]> {
+        self.all_constraints
+            .keys()
+            .copied()
+            .collect::<HashSet<_>>()
+            .difference(&self.solved_constraints)
+            .map(|id| self.all_constraints[id].clone())
+            .collect()
     }
 }
 
@@ -333,6 +343,8 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         f: impl Fn(&mut Self) -> Result<T, UnificationError>,
     ) -> Result<T, UnificationError> {
+        let old_listeners = self.listeners.clone();
+        let old_ready = self.ready.clone();
         let snapshot = self.table.snapshot();
         match f(self) {
             Ok(res) => {
@@ -341,6 +353,8 @@ impl<'db> InferenceCtx<'db> {
             }
             Err(err) => {
                 self.table.rollback_to(snapshot);
+                self.listeners = old_listeners;
+                self.ready = old_ready;
                 Err(err)
             }
         }

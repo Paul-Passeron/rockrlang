@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque, hash_map::Entry},
+    collections::{HashMap, HashSet, hash_map::Entry},
     fmt,
     iter::once,
     sync::Arc,
@@ -705,6 +705,9 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn try_solve_constraint(&mut self, constraint: &InferenceConstraint) -> ConstraintSolveResult {
+        if self.solved_constraints.contains(&constraint.id) {
+            return ConstraintSolveResult::Solved;
+        }
         match &constraint.kind {
             InferenceConstraintKind::Deref { var, target } => {
                 self.solve_deref_constraint(*var, target)
@@ -751,57 +754,68 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn try_solve_constraints(
-        &mut self,
-    ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-        let mut len = 0;
-        let mut worklist = VecDeque::from(std::mem::take(&mut self.current_constraints));
+    // fn try_solve_constraints(
+    //     &mut self,
+    // ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
+    //     let mut len = 0;
+    //     let mut worklist = VecDeque::from(std::mem::take(&mut self.current_constraints));
 
-        while len != worklist.len()
-            && let Some(constraint) = worklist.pop_front()
-        {
-            match self.try_solve_constraint(constraint.as_ref()) {
-                // The constraint has been solved, no need to push it back in the worklist
-                ConstraintSolveResult::Solved => {
-                    self.solved_constraints.insert(constraint.id);
-                }
+    //     while len != worklist.len()
+    //         && let Some(constraint) = worklist.pop_front()
+    //     {
+    //         match self.try_solve_constraint(constraint.as_ref()) {
+    //             // The constraint has been solved, no need to push it back in the worklist
+    //             ConstraintSolveResult::Solved => {
+    //                 self.solved_constraints.insert(constraint.id);
+    //             }
 
-                // The constraint could not be solved but there were no errors, we push it back onto
-                // the worklist
-                ConstraintSolveResult::Pending => worklist.push_back(constraint),
+    //             // The constraint could not be solved but there were no errors, we push it back onto
+    //             // the worklist
+    //             ConstraintSolveResult::Pending => worklist.push_back(constraint),
 
-                // An error was encountered, we return the constraint which caused the error
-                ConstraintSolveResult::Error(error) => return Err((constraint, error)),
-            }
-            // Solving the constraints might have generated more constraints so we insert them on the worklist
-            std::mem::take(&mut self.current_constraints)
-                .into_iter()
-                .for_each(|elem| worklist.push_front(elem));
-            len = worklist.len();
-        }
-        self.current_constraints.extend(worklist);
-        Ok(())
-    }
+    //             // An error was encountered, we return the constraint which caused the error
+    //             ConstraintSolveResult::Error(error) => return Err((constraint, error)),
+    //         }
+    //         // Solving the constraints might have generated more constraints so we insert them on the worklist
+    //         std::mem::take(&mut self.current_constraints)
+    //             .into_iter()
+    //             .for_each(|elem| worklist.push_front(elem));
+    //         len = worklist.len();
+    //     }
+    //     self.current_constraints.extend(worklist);
+    //     Ok(())
+    // }
 
-    /// Fix-point iteration on the constraints worklist.
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-        loop {
-            let before = self.current_constraints.len();
-            let constraints = self.current_constraints.clone();
-            if let Err(err) = self.try_solve_constraints() {
-                // roll-back constraints that were eaten during their resolution
-                self.current_constraints = constraints;
-                return Err(err);
-            }
-            if self.current_constraints.len() == before {
-                break;
+        // loop {
+        //     let before = self.current_constraints.len();
+        //     let constraints = self.current_constraints.clone();
+        //     if let Err(err) = self.try_solve_constraints() {
+        //         // roll-back constraints that were eaten during their resolution
+        //         self.current_constraints = constraints;
+        //         return Err(err);
+        //     }
+        //     if self.current_constraints.len() == before {
+        //         break;
+        //     }
+        // }
+        // Ok(())
+
+        while let Some(id) = self.ready.pop_front() {
+            let constraint = self.all_constraints[&id].clone();
+            match self.try_solve_constraint(&constraint) {
+                ConstraintSolveResult::Solved => {
+                    self.solved_constraints.insert(id);
+                }
+                ConstraintSolveResult::Pending => {
+                    self.register_listeners(&constraint);
+                }
+                ConstraintSolveResult::Error(e) => return Err((constraint, e)),
             }
         }
         Ok(())
-
-        // Ok(())
     }
 
     fn fresh_constraint(&mut self, constraint: InferenceConstraintKind) -> InferenceConstraint {
@@ -813,9 +827,19 @@ impl<'db> InferenceCtx<'db> {
         res
     }
 
+    pub fn register_listeners(&mut self, constraint: &InferenceConstraint) {
+        for listener in constraint.listeners(self) {
+            self.listeners
+                .entry(listener)
+                .or_default()
+                .push(constraint.id);
+        }
+    }
+
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {
         let constraint = Arc::new(self.fresh_constraint(constraint));
-        self.current_constraints.push(constraint.clone());
+        self.ready.push_back(constraint.id);
+        self.register_listeners(&constraint);
         self.all_constraints.insert(constraint.id, constraint);
     }
 
@@ -995,6 +1019,95 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                     b.display(self.db),
                 )
             }
+        }
+    }
+}
+
+impl InferenceConstraint {
+    #[inline(always)]
+    pub fn listeners(&self, ctx: &mut InferenceCtx) -> HashSet<InferVar> {
+        self.kind.listeners(ctx)
+    }
+}
+
+impl InferTy {
+    pub fn listeners(&self) -> HashSet<InferVar> {
+        match self {
+            InferTy::Var(var) => [*var].into(),
+            InferTy::Adt { fields, .. } => fields.iter().flat_map(|f| f.listeners()).collect(),
+            InferTy::Zelf | InferTy::Param(_) => HashSet::new(),
+        }
+    }
+}
+
+impl InferenceConstraintKind {
+    pub fn listeners(&self, ctx: &mut InferenceCtx) -> HashSet<InferVar> {
+        match self {
+            InferenceConstraintKind::Deref { var, target } => ctx
+                .find(target)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&InferTy::Var(*var)).listeners())
+                .collect(),
+            InferenceConstraintKind::BindsLike { ty, inner, like } => ctx
+                .find(inner)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&InferTy::Var(*ty)).listeners())
+                .chain(ctx.find(&InferTy::Var(*like)).listeners())
+                .collect(),
+            InferenceConstraintKind::IndexedBy {
+                elem_var,
+                base_ty,
+                index_ty,
+            } => ctx
+                .find(base_ty)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(index_ty).listeners())
+                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .collect(),
+            InferenceConstraintKind::Tuple {
+                elem_var, tuple_ty, ..
+            } => ctx
+                .find(tuple_ty)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .collect(),
+            InferenceConstraintKind::StructField {
+                elem_var,
+                struct_ty,
+                ..
+            } => ctx
+                .find(struct_ty)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .collect(),
+            InferenceConstraintKind::Method {
+                ret_var, ty, args, ..
+            } => args
+                .iter()
+                .flat_map(|t| ctx.find(t).listeners())
+                .collect::<Box<_>>()
+                .into_iter()
+                .chain(ty.listeners())
+                .chain(ctx.find(&InferTy::Var(*ret_var)).listeners())
+                .collect(),
+            InferenceConstraintKind::Implements { ty, args, .. } => args
+                .iter()
+                .flat_map(|t| ctx.find(t).listeners())
+                .collect::<Box<_>>()
+                .into_iter()
+                .chain(ctx.find(ty).listeners())
+                .collect(),
+            InferenceConstraintKind::Unify { a, b } => ctx
+                .find(a)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(b).listeners())
+                .collect(),
         }
     }
 }
