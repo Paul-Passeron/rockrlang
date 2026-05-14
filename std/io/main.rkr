@@ -36,3 +36,6 @@ impl str {
         printf("%s", self);
     }
 }
+
+@[extern(C)]
+fun printf(fmt: *char): void {}

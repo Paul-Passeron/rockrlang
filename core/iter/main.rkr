@@ -1,0 +1,28 @@
+@include core::opt
+
+interface Iter {
+    type Item;
+    fun next(&mut self): opt<Item>;
+}
+
+struct IntIter {
+    start: int;
+    end: int;
+}
+
+impl Iter for IntIter {
+    type Item = int;
+
+    fun next(&mut self): opt<int> {
+        if self$.start >= self$.end { return opt::None; }
+        let res = self$.start;
+        self$.start += 1;
+        return res;
+    }
+}
+
+
+interface IntoIterator {
+    type Out: Iter;
+    fun into_iter(self): Out;
+}

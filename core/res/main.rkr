@@ -1,0 +1,4 @@
+enum res<T, Error> {
+    Ok(T),
+    Err(Error)
+}

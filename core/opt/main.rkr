@@ -1,0 +1,4 @@
+enum opt<T> {
+    None,
+    Some(T),
+}
