@@ -17,13 +17,13 @@ impl <T> Ref<T> {
         return Ref { .inner:  inner };
     }
 
-    fun count(self: *Ref<T>): u64 {
+    fun count(&self): u64 {
         return self$.inner.ref_count;
     }
 }
 
 impl <T: Drop> Drop for Ref<T> {
-    fun drop(self: Ref<T>): void {
+    fun drop(self): void {
         self.inner$.ref_count -= 1;
         if self.inner$.ref_count == 0 {
             self.inner$.data.drop();
@@ -33,7 +33,7 @@ impl <T: Drop> Drop for Ref<T> {
 }
 
 impl <T: NoDrop> Drop for Ref<T> {
-    fun drop(self: Ref<T>): void {
+    fun drop(self): void {
         self.inner$.ref_count -= 1;
         if self.inner.ref_count == 0 {
             free(self.inner);
@@ -42,14 +42,14 @@ impl <T: NoDrop> Drop for Ref<T> {
 }
 
 impl <T> Clone for Ref<T> {
-    fun clone(self: *Ref<T>): Ref<T> {
+    fun clone(&self): Ref<T> {
         self$.inner$.ref_count += 1;
         return Ref { .inner: self$.inner };
     }
 }
 
 impl <T> AsRef for Ref<T> {
-    fun as_ref(self: *Ref<T>): *T {
+    fun a_ref(&self): &T {
         return self$.inner.data@;
     }
 }

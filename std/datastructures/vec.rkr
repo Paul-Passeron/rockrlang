@@ -14,21 +14,21 @@ impl <T> Vec<T> {
         };
     }
 
-    fun push(elem: T): void {
-        if self.capacity <= self.len {
-            self.capacity = self.capacity * 2 + 1;
-            if self.capacity <= 8 {
-                self.capacity = 8;
+    fun push(&mut self, elem: T): void {
+        if self$.capacity <= self$.len {
+            self$.capacity = self$.capacity * 2 + 1;
+            if self$.capacity <= 8 {
+                self$.capacity = 8;
             }
-            let old_ptr = self.data;
-            self.data = malloc(self.capacity * @sizeof(T));
+            let old_ptr = self$.data;
+            self$.data = malloc(self$.capacity * @sizeof(T));
             if old_ptr != nullptr {
-                for i in 0..self.len {
-                    self.data[i] = old_ptr[i];
+                for i in 0..self$.len {
+                    self$.data[i] = old_ptr[i];
                 }
             }
         }
-        self.data[self.len] = elem;
-        self.len += 1;
+        self$.data[self.len] = elem;
+        self$.len += 1;
     }
 }

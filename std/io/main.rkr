@@ -17,22 +17,22 @@ impl str {
     }
 
     @[inline]
-    fun as_ptr(self: *str): void {
+    fun as_ptr(&self): *char {
         return self$.data;
     }
 
     @[inline]
-    fun len(self: *str): usize {
+    fun len(&self): usize {
         return self$.len;
     }
 
     @[inline]
-    fun println(self: *str): void {
+    fun println(&self): void {
         printf("%s\n", self);
     }
 
     @[inline]
-    fun print(self: *str): void {
+    fun print(&self): void {
         printf("%s", self);
     }
 }
