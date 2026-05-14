@@ -1,12 +1,12 @@
 use crate::{
     common::symbols::{StrLit, Symbol},
-    parse_tree::{Spanned, type_expr::TypeExpr},
+    parse_tree::{Spanned, type_expr::AstTypeExpr},
 };
 
-pub type Expr = Spanned<ExprDesc>;
+pub type AstExpr = Spanned<AstExprDesc>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum ExprDesc {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstExprDesc {
     // Literals
     IntLit(i32),
     CharLit(char),
@@ -18,79 +18,79 @@ pub enum ExprDesc {
     /// `A::B::expr` — module / namespace resolution
     NameResolved {
         from: Symbol,
-        to: Box<Expr>,
+        to: Box<AstExpr>,
     },
     /// `Type<T>::method(args)` — static method call on a generic type
     StaticCall {
-        ty: TypeExpr,
+        ty: AstTypeExpr,
         method: Symbol,
-        args: Vec<Expr>,
+        args: Vec<AstExpr>,
     },
 
     // Binary operations
     BinOp {
-        lhs: Box<Expr>,
+        lhs: Box<AstExpr>,
         op: BinaryOperator,
-        rhs: Box<Expr>,
+        rhs: Box<AstExpr>,
     },
 
     // Range  `a..b`
     Range {
-        from: Box<Expr>,
-        to: Box<Expr>,
+        from: Box<AstExpr>,
+        to: Box<AstExpr>,
     },
 
-    Ref(Box<Expr>),
-    Neg(Box<Expr>),
-    Not(Box<Expr>),
+    Ref(Box<AstExpr>),
+    Neg(Box<AstExpr>),
+    Not(Box<AstExpr>),
 
-    AddressOf(Box<Expr>),
-    PostfixDeref(Box<Expr>),
+    AddressOf(Box<AstExpr>),
+    PostfixDeref(Box<AstExpr>),
 
     FieldAccess {
-        object: Box<Expr>,
+        object: Box<AstExpr>,
         field: Symbol,
     },
     TupleAccess {
-        object: Box<Expr>,
+        object: Box<AstExpr>,
         index: u32,
     },
     ArrowAccess {
-        object: Box<Expr>,
+        object: Box<AstExpr>,
         field: Symbol,
     },
 
     Call {
-        callee: Box<Expr>,
-        args: Vec<Expr>,
+        callee: Box<AstExpr>,
+        args: Vec<AstExpr>,
     },
     MethodCall {
-        object: Box<Expr>,
+        object: Box<AstExpr>,
         method: Symbol,
-        args: Vec<Expr>,
+        args: Vec<AstExpr>,
     },
 
     Index {
-        object: Box<Expr>,
-        index: Box<Expr>,
+        object: Box<AstExpr>,
+        index: Box<AstExpr>,
     },
 
     StructLit {
-        ty: TypeExpr,
-        fields: Vec<StructField>,
+        ty: AstTypeExpr,
+        fields: Vec<AstStructField>,
     },
 
-    Tuple(Vec<Expr>),
+    Tuple(Vec<AstExpr>),
 
-    SliceLit(Vec<Expr>),
+    SliceLit(Vec<AstExpr>),
 
-    SizeOf(TypeExpr),
+    SizeOf(AstTypeExpr),
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct StructField {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AstStructField {
     pub name: Symbol,
-    pub value: Expr,
+    pub value: AstExpr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

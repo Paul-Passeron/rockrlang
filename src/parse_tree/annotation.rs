@@ -1,11 +1,11 @@
 use crate::common::symbols::Symbol;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Annotation {
-    pub items: Vec<AnnotationItem>,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AstAnnotation {
+    pub items: Vec<AstAnnotationItem>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum AnnotationItem {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AstAnnotationItem {
     Named(Symbol),
 }

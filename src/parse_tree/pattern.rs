@@ -1,16 +1,24 @@
 use crate::{common::symbols::Symbol, parse_tree::Spanned};
 
-pub type Pattern = Spanned<PatternDesc>;
+pub type AstPattern = Spanned<AstPatternDesc>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum NamedPattern {
-    Constructor { name: Symbol, args: Vec<Pattern> },
-    NameResolved { from: Symbol, to: Box<NamedPattern> },
-    Tuple { fields: Vec<Pattern> },
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AstNamedPattern {
+    Constructor {
+        name: Symbol,
+        args: Vec<AstPattern>,
+    },
+    NameResolved {
+        from: Symbol,
+        to: Box<AstNamedPattern>,
+    },
+    Tuple {
+        fields: Vec<AstPattern>,
+    },
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum PatternDesc {
-    Named(NamedPattern),
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AstPatternDesc {
+    Named(AstNamedPattern),
     Any,
 }

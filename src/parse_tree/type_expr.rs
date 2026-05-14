@@ -1,34 +1,34 @@
 use crate::{common::symbols::Symbol, parse_tree::Spanned};
 
-pub type TypeExpr = Spanned<TypeExprDesc>;
+pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum TypeExprDesc {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstTypeExprDesc {
     Named {
         name: Symbol,
-        args: Vec<AnyTypeExpr>,
+        args: Vec<AstAnyTypeExpr>,
     },
     NameResolved {
         from: Symbol,
-        to: Box<TypeExprDesc>,
+        to: Box<AstTypeExprDesc>,
     },
-    Pointer(Box<TypeExpr>),
+    Pointer(Box<AstTypeExpr>),
     Slice {
-        ty: Box<TypeExpr>,
+        ty: Box<AstTypeExpr>,
         len: Option<usize>,
     },
 }
 
-pub type AnyTypeExpr = Spanned<AnyTypeExprDesc>;
+pub type AstAnyTypeExpr = Spanned<AstAnyTypeExprDesc>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum AnyTypeExprDesc {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstAnyTypeExprDesc {
     Any,
-    Known(TypeExprDesc),
+    Known(AstTypeExprDesc),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ConstrainedType {
-    ty: TypeExpr,
-    constraints: Vec<TypeExpr>,
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AstConstrainedType {
+    ty: AstTypeExpr,
+    constraints: Vec<AstTypeExpr>,
 }

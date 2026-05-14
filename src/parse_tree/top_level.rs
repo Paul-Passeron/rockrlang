@@ -2,131 +2,140 @@ use nonempty::NonEmpty;
 
 use crate::{
     common::symbols::Symbol,
-    parse_tree::{Spanned, expr::Expr, pattern::Pattern, stmt::Stmt, type_expr::TypeExpr},
+    parse_tree::{
+        Spanned, expr::AstExpr, pattern::AstPattern, stmt::AstStmt, type_expr::AstTypeExpr,
+    },
 };
 
-pub type TopLevelItem = Spanned<TopLevelItemDesc>;
-pub type AnyTopLevelItem = Spanned<AnyTopLevelItemDesc>;
+pub type AstTopLevelItem = Spanned<AstTopLevelItemDesc>;
+pub type AstAnyTopLevelItem = Spanned<AstAnyTopLevelItemDesc>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum AnyTopLevelItemDesc {
-    Include(IncludePath),
-    Item(TopLevelItemDesc),
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstAnyTopLevelItemDesc {
+    Include(AstIncludePath),
+    Item(AstTopLevelItemDesc),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum TopLevelItemDesc {
-    Module(Module),
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AstTopLevelItemDesc {
+    Module(AstModule),
     Fundef(Fundef),
-    Interface(Interface),
-    Const(ConstDecl),
-    Impl(ImplBlock),
-    StructDef(StructDef),
+    Interface(AstInterface),
+    Const(AstConstDecl),
+    Impl(AstImplBlock),
+    StructDef(AstStructDef),
 }
 
-pub type Module = Spanned<ModuleDesc>;
+pub type AstModule = Spanned<AstModuleDesc>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ModuleDesc {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstModuleDesc {
     pub name: Symbol,
-    pub items: Vec<TopLevelItem>,
+    pub items: Vec<AstTopLevelItem>,
+    pub includes: Vec<AstIncludePath>,
 }
 
-pub type Fundef = Spanned<FundefDesc>;
+pub type Fundef = Spanned<AstFundefDesc>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FundefDesc {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstFundefDesc {
     pub name: Symbol,
-    pub args: Vec<FundefArg>,
-    pub template_args: Vec<TemplateArg>,
-    pub return_type: TypeExpr,
-    pub body: Vec<Stmt>,
+    pub args: Vec<AstFundefArg>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub return_type: AstTypeExpr,
+    pub body: Vec<AstStmt>,
 }
 
-pub type Funsig = Spanned<FunsigDesc>;
+pub type AstFunsig = Spanned<AstFunsigDesc>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FunsigDesc {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstFunsigDesc {
     pub name: Symbol,
-    pub args: Vec<FundefArg>,
-    pub template_args: Vec<TemplateArg>,
-    pub return_type: TypeExpr,
+    pub args: Vec<AstFundefArg>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub return_type: AstTypeExpr,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TemplateArg {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstTemplateArg {
     pub name: Symbol,
-    pub constraints: Vec<TypeExpr>,
+    pub constraints: Vec<AstTypeExpr>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FundefArg {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstFundefArg {
     pub name: Symbol,
-    pub ty: TypeExpr,
+    pub ty: AstTypeExpr,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Interface {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstInterface {
     pub name: Symbol,
-    pub template_args: Vec<TemplateArg>,
-    pub items: Vec<InterfaceItem>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub items: Vec<AstInterfaceItem>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum InterfaceItem {
-    Type(TemplateArg),
-    Sig(Funsig),
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AstInterfaceItem {
+    Type(AstTemplateArg),
+    Sig(AstFunsig),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ConstDecl {
-    pub pat: Pattern,
-    pub ty: TypeExpr,
-    pub value: Expr,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstConstDecl {
+    pub pat: AstPattern,
+    pub ty: AstTypeExpr,
+    pub value: AstExpr,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ImplBlock {
-    pub template_args: Vec<TemplateArg>,
-    pub interface: Option<TypeExpr>, // Interface being implemented
-    pub implemented: TypeExpr,       // Type being implemented for
-    pub items: Vec<ImplItem>,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AstImplBlock {
+    pub template_args: Vec<AstTemplateArg>,
+
+    pub interface: Option<AstTypeExpr>, // Interface being implemented
+    pub implemented: AstTypeExpr,       // Type being implemented for
+    pub items: Vec<AstImplItem>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ImplItem {
-    Type { name: Symbol, ty: TypeExpr },
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AstImplItem {
+    Type { name: Symbol, ty: AstTypeExpr },
     Fundef(Fundef),
 }
 
 #[salsa::tracked]
 pub struct Ast<'db> {
     #[returns(ref)]
-    pub items: Vec<AnyTopLevelItem>,
+    pub items: Vec<AstTopLevelItem>,
+    #[returns(ref)]
+    pub includes: Vec<AstIncludePath>,
 }
 
-pub type IncludePath = Spanned<IncludePathDesc>;
+pub type AstIncludePath = Spanned<AstIncludePathDesc>;
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum IncludePathDesc {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AstIncludePathDesc {
     Symbol(Symbol),
-    NameResolved { from: Symbol, to: Box<IncludePath> },
+    NameResolved {
+        from: Symbol,
+        to: Box<AstIncludePath>,
+    },
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct StructDef {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AstStructDef {
     pub name: Symbol,
-    pub template_args: Vec<TemplateArg>,
-    pub fields: Vec<StructDefField>,
+    pub template_args: Vec<AstTemplateArg>,
+    pub fields: Vec<AstStructDefField>,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub struct StructDefField {
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AstStructDefField {
     pub name: Symbol,
-    pub ty: TypeExpr,
+    pub ty: AstTypeExpr,
 }
 
-impl From<NonEmpty<Spanned<Symbol>>> for IncludePath {
+impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
         let Spanned {
@@ -136,11 +145,11 @@ impl From<NonEmpty<Spanned<Symbol>>> for IncludePath {
         symbols.reverse();
 
         symbols.into_iter().fold(
-            IncludePath::new(IncludePathDesc::Symbol(symbol), vec![], span),
+            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
             |acc, symb| {
                 let total_span = start_loc.span(&symb.span.end());
-                IncludePath::new(
-                    IncludePathDesc::NameResolved {
+                AstIncludePath::new(
+                    AstIncludePathDesc::NameResolved {
                         from: symb.data,
                         to: Box::new(acc),
                     },

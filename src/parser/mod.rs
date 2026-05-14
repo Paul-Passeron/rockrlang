@@ -9,13 +9,17 @@ mod type_expr;
 use salsa::Accumulator;
 
 use crate::{
-    SourceFile, SourceRoot,
+    SourceFile,
     common::{
         location::{Location, Span},
         symbols::Symbol,
     },
     lexer::{LexError, Token, TokenKind, lex_file},
-    parse_tree::{Spanned, annotation::Annotation, top_level::Ast},
+    parse_tree::{
+        Spanned,
+        annotation::AstAnnotation,
+        top_level::{Ast, AstAnyTopLevelItemDesc},
+    },
 };
 
 pub struct Parser<'db> {
@@ -23,7 +27,7 @@ pub struct Parser<'db> {
     pub position: usize,
     pub tokens: &'db [Token],
     pub db: &'db dyn crate::Db,
-    pub annotations: Vec<Annotation>,
+    pub annotations: Vec<AstAnnotation>,
 }
 
 #[allow(dead_code)]
@@ -61,7 +65,7 @@ impl<'db> Parser<'db> {
         }
     }
 
-    pub fn annotations(&mut self) -> Vec<Annotation> {
+    pub fn annotations(&mut self) -> Vec<AstAnnotation> {
         std::mem::take(&mut self.annotations)
     }
 
@@ -167,12 +171,8 @@ impl<'db> Parser<'db> {
 }
 
 #[salsa::tracked]
-pub fn parse_file<'db>(
-    db: &'db dyn crate::Db,
-    root: SourceRoot,
-    file: SourceFile<'db>,
-) -> Ast<'db> {
-    let lex_res = lex_file(db, root, file);
+pub fn parse_file<'db>(db: &'db dyn crate::Db, file: SourceFile<'db>) -> Ast<'db> {
+    let lex_res = lex_file(db, file);
     let tokens = match lex_res {
         Ok(tokens) => tokens,
         Err(lex_error) => {
@@ -191,13 +191,19 @@ pub fn parse_file<'db>(
     let mut parser = Parser::new(db, &tokens, file.path(db));
 
     let mut items = vec![];
+    let mut includes = vec![];
 
     while parser.position < tokens.len() {
         let item = parser.parse_any_toplevel_item();
         match item {
-            Ok(item) => {
-                items.push(item);
-            }
+            Ok(item) => match item.data {
+                AstAnyTopLevelItemDesc::Include(include) => {
+                    includes.push(include);
+                }
+                AstAnyTopLevelItemDesc::Item(x) => {
+                    items.push(Spanned::new(x, item.annotations, item.span));
+                }
+            },
             Err(parse_error) => {
                 parse_error.accumulate(db);
                 break;
@@ -205,5 +211,5 @@ pub fn parse_file<'db>(
         }
     }
 
-    Ast::new(db, items)
+    Ast::new(db, items, includes)
 }

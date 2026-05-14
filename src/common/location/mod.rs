@@ -1,6 +1,6 @@
 use std::{fmt::Display, path::PathBuf};
 
-use crate::{SourceFile, SourceRoot, lookup_file};
+use crate::SourceFile;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Location {
@@ -56,12 +56,10 @@ pub struct LocationInfo {
 #[salsa::tracked]
 pub fn get_loc_info<'db>(
     db: &'db dyn crate::Db,
-    root: SourceRoot,
     file: SourceFile<'db>,
     offset: usize,
 ) -> LocationInfo {
-    let contents = lookup_file(db, root, file).unwrap();
-    let s = contents.content(db);
+    let s = file.content(db);
     let mut line = 1;
     let mut column = 1;
     for i in 0..offset {

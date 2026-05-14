@@ -7,13 +7,12 @@ use std::{path::PathBuf, sync::Arc};
 use regex::Regex;
 
 use crate::{
-    SourceFile, SourceRoot,
+    SourceFile,
     common::location::{Location, Span},
     lexer::{
         Token,
         rules::{get_skip_rules, get_token_rules},
     },
-    lookup_file,
 };
 
 #[derive(Debug)]
@@ -89,20 +88,19 @@ impl<'db, T> Lexer<'db, T> {
     }
 
     pub fn new_blank(
-        source: SourceFile,
+        source: SourceFile<'db>,
         db: &'db dyn crate::Db,
-        root: SourceRoot,
         token_patterns: Vec<(
             Regex,
             fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>,
         )>,
         skip_patterns: Vec<Regex>,
     ) -> Lexer<'db, T> {
-        let contents = lookup_file(db, root, source).unwrap();
+        let contents = source.content(db);
         Self {
             db,
             offset: 0,
-            contents: contents.content(db),
+            contents: contents,
             file: source.path(db),
             token_patterns,
             skip_patterns,
@@ -157,7 +155,7 @@ impl<'db, T> Lexer<'db, T> {
 }
 
 impl<'db> Lexer<'db, Token> {
-    pub fn new(db: &'db dyn crate::Db, source: SourceFile, root: SourceRoot) -> Self {
-        Self::new_blank(source, db, root, get_token_rules(), get_skip_rules())
+    pub fn new(db: &'db dyn crate::Db, source: SourceFile<'db>) -> Self {
+        Self::new_blank(source, db, get_token_rules(), get_skip_rules())
     }
 }

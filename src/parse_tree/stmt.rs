@@ -1,4 +1,4 @@
-use crate::parse_tree::{Spanned, expr::Expr, pattern::Pattern, type_expr::AnyTypeExpr};
+use crate::parse_tree::{Spanned, expr::AstExpr, pattern::AstPattern, type_expr::AstAnyTypeExpr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CompoundAssignOp {
@@ -9,43 +9,43 @@ pub enum CompoundAssignOp {
     Modulo,
 }
 
-pub type Stmt = Spanned<StmtDesc>;
+pub type AstStmt = Spanned<AstStmtDesc>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub enum StmtDesc {
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AstStmtDesc {
     Return {
-        value: Option<Expr>,
+        value: Option<AstExpr>,
     },
     If {
-        cond: Expr,
-        then: Box<Stmt>,
-        else_: Option<Box<Stmt>>,
+        cond: AstExpr,
+        then: Box<AstStmt>,
+        else_: Option<Box<AstStmt>>,
     },
     While {
-        cond: Expr,
-        body: Box<Stmt>,
+        cond: AstExpr,
+        body: Box<AstStmt>,
     },
     For {
-        element: Pattern,
-        iterator: Expr,
-        body: Box<Stmt>,
+        element: AstPattern,
+        iterator: AstExpr,
+        body: Box<AstStmt>,
     },
     LetDecl {
-        pat: Pattern,
-        type_constraint: Option<AnyTypeExpr>,
-        value: Expr,
+        pat: AstPattern,
+        type_constraint: Option<AstAnyTypeExpr>,
+        value: AstExpr,
     },
     Block {
-        stmts: Vec<Stmt>,
+        stmts: Vec<AstStmt>,
     },
     Assign {
-        lhs: Expr,
-        rhs: Expr,
+        lhs: AstExpr,
+        rhs: AstExpr,
     },
     CompoundAssign {
-        lhs: Expr,
+        lhs: AstExpr,
         op: CompoundAssignOp,
-        rhs: Expr,
+        rhs: AstExpr,
     },
-    Expr(Expr),
+    Expr(AstExpr),
 }

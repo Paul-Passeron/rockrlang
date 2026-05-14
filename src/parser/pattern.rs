@@ -3,20 +3,20 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        pattern::{NamedPattern, Pattern, PatternDesc},
+        pattern::{AstNamedPattern, AstPatternDesc, AstPattern},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
 impl<'db> Parser<'db> {
-    pub(super) fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+    pub(super) fn parse_pattern(&mut self) -> Result<AstPattern, ParseError> {
         let start = self.get_start();
 
         match self.current_token()?.kind.clone() {
             TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();
-                Ok(Spanned::new(PatternDesc::Any, vec![], start.span(&end)))
+                Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(&end)))
             }
 
             TokenKind::OpenPar => {
@@ -26,7 +26,7 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    PatternDesc::Named(NamedPattern::Tuple { fields }),
+                    AstPatternDesc::Named(AstNamedPattern::Tuple { fields }),
                     vec![],
                     start.span(&end),
                 ))
@@ -37,7 +37,7 @@ impl<'db> Parser<'db> {
                 let named = self.parse_named_pattern()?;
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    PatternDesc::Named(named),
+                    AstPatternDesc::Named(named),
                     vec![],
                     start.span(&end),
                 ))
@@ -49,14 +49,14 @@ impl<'db> Parser<'db> {
         }
     }
 
-    fn parse_named_pattern(&mut self) -> Result<NamedPattern, ParseError> {
+    fn parse_named_pattern(&mut self) -> Result<AstNamedPattern, ParseError> {
         let name = self.parse_symbol()?.data;
 
         match self.peek_n(0).map(|t| t.kind.clone()) {
             Some(TokenKind::Access) => {
                 self.consume();
                 let rhs = self.parse_named_pattern()?;
-                Ok(NamedPattern::NameResolved {
+                Ok(AstNamedPattern::NameResolved {
                     from: name,
                     to: Box::new(rhs),
                 })
@@ -67,14 +67,14 @@ impl<'db> Parser<'db> {
                 let args = self.parse_pattern_list(TokenKind::ClosePar)?;
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
-                Ok(NamedPattern::Constructor { name, args })
+                Ok(AstNamedPattern::Constructor { name, args })
             }
 
-            _ => Ok(NamedPattern::Constructor { name, args: vec![] }),
+            _ => Ok(AstNamedPattern::Constructor { name, args: vec![] }),
         }
     }
 
-    fn parse_pattern_list(&mut self, end_tok: TokenKind) -> Result<Vec<Pattern>, ParseError> {
+    fn parse_pattern_list(&mut self, end_tok: TokenKind) -> Result<Vec<AstPattern>, ParseError> {
         let mut pats = vec![];
 
         loop {

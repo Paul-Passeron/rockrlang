@@ -3,7 +3,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::{
-        RockrDb, SourceFile, SourceRoot,
+        RockrDb,
         driver::get_non_empty_files_from_paths,
         parser::{ParseError, parse_file},
     };
@@ -12,12 +12,10 @@ mod tests {
         let db = RockrDb::default();
         let files =
             get_non_empty_files_from_paths(&db, &[PathBuf::from(path)]).expect("no files found");
-        let root = SourceRoot::new(&db, files.into());
         let mut errors = Vec::new();
-        for file in root.files(&db) {
-            let source = SourceFile::new(&db, file.file(&db));
-            parse_file(&db, root, source);
-            let errs: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, root, source);
+        for file in files {
+            parse_file(&db, file);
+            let errs: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, file);
             for e in errs {
                 errors.push(format!("{:?}", e));
             }

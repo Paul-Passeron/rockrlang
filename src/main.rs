@@ -12,8 +12,11 @@ use crate::{
 mod common;
 mod driver;
 mod lexer;
+mod name_resolve;
 mod parse_tree;
 mod parser;
+mod ril;
+
 mod tests;
 
 #[derive(Debug, Parser)]
@@ -30,49 +33,48 @@ pub struct RockrDb {
 #[salsa::db]
 impl salsa::Database for RockrDb {}
 
-#[salsa::input]
-pub struct SourceFileContent {
-    pub file: PathBuf,
-    pub content: Arc<String>,
-}
-
-#[salsa::input]
-pub struct SourceRoot {
-    pub files: Vec<SourceFileContent>,
-}
-
 #[salsa::interned]
 pub struct SourceFile {
     pub path: PathBuf,
+    pub content: Arc<String>,
 }
 
-#[salsa::tracked]
-pub fn lookup_file<'db>(
-    db: &'db dyn crate::Db,
-    root: SourceRoot,
-    file: SourceFile<'db>,
-) -> Option<SourceFileContent> {
-    root.files(db)
-        .iter()
-        .copied()
-        .find(|f| f.file(db) == file.path(db))
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OwnedSourceFile {
+    pub path: PathBuf,
+    pub content: Arc<String>,
+}
+
+impl OwnedSourceFile {
+    pub fn new(path: PathBuf, content: Arc<String>) -> Self {
+        Self { path, content }
+    }
+
+    pub fn to_source_file<'db>(&self, db: &'db dyn Db) -> SourceFile<'db> {
+        SourceFile::new(db, self.path.clone(), self.content.clone())
+    }
+}
+
+impl<'db> SourceFile<'db> {
+    pub fn to_owned(&self, db: &'db dyn crate::Db) -> OwnedSourceFile {
+        OwnedSourceFile::new(self.path(db), self.content(db))
+    }
 }
 
 fn main() -> Result<(), String> {
     let db = RockrDb::default();
     let args = CliArgs::parse();
     let parsed = parsed_args_from_cli(&db, &args).ok_or("No input file provided".to_string())?;
-    let root = SourceRoot::new(&db, parsed.files.into());
     let mut has_errors = false;
-    for file in root.files(&db) {
+    for file in parsed.files {
         println!("-----------------------------------------------------");
-        println!("File: {}", file.file(&db).display());
+        println!("File: {}", file.path(&db).display());
         println!("-----------------------------------------------------");
-        let source = SourceFile::new(&db, file.file(&db));
-        let parsed = parse_file(&db, root, source);
-        let errors: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, root, source);
+        let source = SourceFile::new(&db, file.path(&db), file.content(&db));
+        let parsed = parse_file(&db, source);
+        let errors: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, source);
         for error in &errors {
-            let info = get_loc_info(&db, root, source, error.start);
+            let info = get_loc_info(&db, source, error.start);
             eprintln!("{info}: {:?}", error.kind);
             has_errors = true;
         }

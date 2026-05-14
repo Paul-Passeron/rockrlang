@@ -9,7 +9,7 @@ use std::{
 
 use nonempty::NonEmpty;
 
-use crate::SourceFileContent;
+use crate::SourceFile;
 
 const ANCHOR_FILE_NAME: &str = "main.rkr";
 
@@ -33,10 +33,10 @@ fn list_files(path: &Path) -> io::Result<Vec<PathBuf>> {
     Ok(vec)
 }
 
-fn source_file_contents_from_path<P: AsRef<Path>>(
-    db: &dyn crate::Db,
+fn source_file_contents_from_path<'db, P: AsRef<Path>>(
+    db: &'db dyn crate::Db,
     p: P,
-) -> Option<SourceFileContent> {
+) -> Option<SourceFile<'db>> {
     let path = p.as_ref();
     let buf = PathBuf::from(path);
     let s = {
@@ -45,12 +45,12 @@ fn source_file_contents_from_path<P: AsRef<Path>>(
         f.read_to_string(&mut s).ok()?;
         s
     };
-    Some(SourceFileContent::new(db, buf, Arc::new(s)))
+    Some(SourceFile::new(db, buf, Arc::new(s)))
 }
 
 fn discover_files_from_dir<P: AsRef<Path>>(p: P) -> HashSet<PathBuf> {
     let mut files = HashSet::new();
-    // we must look for anchor file (main.ul)
+    // we must look for anchor file (main.rkr)
     let mut main_path = p.as_ref().to_path_buf();
     main_path.push(ANCHOR_FILE_NAME);
     if main_path.exists() {
@@ -83,10 +83,10 @@ fn discover_files_from_path<P: AsRef<Path>>(p: P) -> Option<HashSet<PathBuf>> {
     }
 }
 
-fn get_all_files<P: AsRef<Path>>(
-    db: &dyn crate::Db,
+fn get_all_files<'db, P: AsRef<Path>>(
+    db: &'db dyn crate::Db,
     paths: &[P],
-) -> Option<HashSet<SourceFileContent>> {
+) -> Option<HashSet<SourceFile<'db>>> {
     let mut files = HashSet::new();
     for p in paths {
         if let Some(f) = discover_files_from_path(p) {
@@ -106,10 +106,10 @@ fn get_all_files<P: AsRef<Path>>(
     }
 }
 
-pub(super) fn get_non_empty_files(
-    db: &dyn crate::Db,
+pub(super) fn get_non_empty_files<'db>(
+    db: &'db dyn crate::Db,
     ps: Option<&[PathBuf]>,
-) -> Option<NonEmpty<SourceFileContent>> {
+) -> Option<NonEmpty<SourceFile<'db>>> {
     let files = get_all_files(
         db,
         ps.unwrap_or(&[std::env::current_dir().unwrap_or_default()]),
@@ -119,10 +119,10 @@ pub(super) fn get_non_empty_files(
 }
 
 #[allow(dead_code)]
-pub fn get_non_empty_files_from_paths(
-    db: &dyn crate::Db,
+pub fn get_non_empty_files_from_paths<'db>(
+    db: &'db dyn crate::Db,
     ps: &[PathBuf],
-) -> Option<NonEmpty<SourceFileContent>> {
+) -> Option<NonEmpty<SourceFile<'db>>> {
     let files = get_all_files(db, ps)?;
     NonEmpty::from_vec(files.into_iter().collect())
 }

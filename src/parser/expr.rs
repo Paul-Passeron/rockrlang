@@ -3,8 +3,8 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        expr::{BinaryOperator, Expr, ExprDesc, StructField},
-        type_expr::{AnyTypeExpr, AnyTypeExprDesc, TypeExpr, TypeExprDesc},
+        expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
+        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -61,11 +61,11 @@ fn token_to_binop(kind: &TokenKind) -> Option<BinaryOperator> {
 }
 
 impl<'db> Parser<'db> {
-    pub(super) fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+    pub(super) fn parse_expr(&mut self) -> Result<AstExpr, ParseError> {
         self.parse_binop(0)
     }
 
-    fn parse_binop(&mut self, min_bp: u8) -> Result<Expr, ParseError> {
+    fn parse_binop(&mut self, min_bp: u8) -> Result<AstExpr, ParseError> {
         let mut lhs = self.parse_unary()?;
 
         loop {
@@ -84,7 +84,7 @@ impl<'db> Parser<'db> {
                 let rhs = self.parse_binop(rbp)?;
                 let span = lhs.span.start().span(&self.get_end());
                 lhs = Spanned::new(
-                    ExprDesc::Range {
+                    AstExprDesc::Range {
                         from: Box::new(lhs),
                         to: Box::new(rhs),
                     },
@@ -105,7 +105,7 @@ impl<'db> Parser<'db> {
                     let rhs = self.parse_binop(rbp)?;
                     let span = lhs.span.start().span(&self.get_end());
                     lhs = Spanned::new(
-                        ExprDesc::BinOp {
+                        AstExprDesc::BinOp {
                             lhs: Box::new(lhs),
                             op,
                             rhs: Box::new(rhs),
@@ -123,7 +123,7 @@ impl<'db> Parser<'db> {
         Ok(lhs)
     }
 
-    fn parse_unary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_unary(&mut self) -> Result<AstExpr, ParseError> {
         let start = self.get_start();
         match self.current_token()?.kind.clone() {
             TokenKind::Minus => {
@@ -131,7 +131,7 @@ impl<'db> Parser<'db> {
                 let operand = self.parse_unary()?;
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    ExprDesc::Neg(Box::new(operand)),
+                    AstExprDesc::Neg(Box::new(operand)),
                     vec![],
                     start.span(&end),
                 ))
@@ -141,7 +141,7 @@ impl<'db> Parser<'db> {
                 let operand = self.parse_unary()?;
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    ExprDesc::Not(Box::new(operand)),
+                    AstExprDesc::Not(Box::new(operand)),
                     vec![],
                     start.span(&end),
                 ))
@@ -150,7 +150,7 @@ impl<'db> Parser<'db> {
         }
     }
 
-    fn parse_postfix(&mut self) -> Result<Expr, ParseError> {
+    fn parse_postfix(&mut self) -> Result<AstExpr, ParseError> {
         let mut expr = self.parse_primary()?;
 
         loop {
@@ -159,14 +159,14 @@ impl<'db> Parser<'db> {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
-                    expr = Spanned::new(ExprDesc::AddressOf(Box::new(expr)), vec![], span);
+                    expr = Spanned::new(AstExprDesc::AddressOf(Box::new(expr)), vec![], span);
                 }
 
                 Some(TokenKind::Deref) => {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
-                    expr = Spanned::new(ExprDesc::PostfixDeref(Box::new(expr)), vec![], span);
+                    expr = Spanned::new(AstExprDesc::PostfixDeref(Box::new(expr)), vec![], span);
                 }
 
                 Some(TokenKind::Dot) => {
@@ -176,7 +176,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         let span = expr.span.start().span(&end);
                         expr = Spanned::new(
-                            ExprDesc::TupleAccess {
+                            AstExprDesc::TupleAccess {
                                 object: Box::new(expr),
                                 index: index as u32,
                             },
@@ -194,7 +194,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         let span = expr.span.start().span(&end);
                         expr = Spanned::new(
-                            ExprDesc::MethodCall {
+                            AstExprDesc::MethodCall {
                                 object: Box::new(expr),
                                 method: field.data,
                                 args,
@@ -206,7 +206,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         let span = expr.span.start().span(&end);
                         expr = Spanned::new(
-                            ExprDesc::FieldAccess {
+                            AstExprDesc::FieldAccess {
                                 object: Box::new(expr),
                                 field: field.data,
                             },
@@ -224,7 +224,7 @@ impl<'db> Parser<'db> {
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
                     expr = Spanned::new(
-                        ExprDesc::Index {
+                        AstExprDesc::Index {
                             object: Box::new(expr),
                             index: Box::new(index),
                         },
@@ -241,7 +241,7 @@ impl<'db> Parser<'db> {
                     let end = self.get_end();
                     let span = expr.span.start().span(&end);
                     expr = Spanned::new(
-                        ExprDesc::Call {
+                        AstExprDesc::Call {
                             callee: Box::new(expr),
                             args,
                         },
@@ -268,30 +268,38 @@ impl<'db> Parser<'db> {
         }
     }
 
-    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+    fn parse_primary(&mut self) -> Result<AstExpr, ParseError> {
         let start = self.get_start();
         let tok = self.current_token()?.clone();
 
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::IntLit(v), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::IntLit(v), vec![], tok.location))
             }
             TokenKind::CharLit(c) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::CharLit(c), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::CharLit(c), vec![], tok.location))
             }
             TokenKind::StrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::StrLit(s), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::StrLit(s), vec![], tok.location))
             }
             TokenKind::True => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::BoolLit(true), vec![], tok.location))
+                Ok(Spanned::new(
+                    AstExprDesc::BoolLit(true),
+                    vec![],
+                    tok.location,
+                ))
             }
             TokenKind::False => {
                 self.consume();
-                Ok(Spanned::new(ExprDesc::BoolLit(false), vec![], tok.location))
+                Ok(Spanned::new(
+                    AstExprDesc::BoolLit(false),
+                    vec![],
+                    tok.location,
+                ))
             }
             TokenKind::OpenBra => {
                 self.consume();
@@ -309,7 +317,7 @@ impl<'db> Parser<'db> {
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
                 Ok(Spanned::new(
-                    ExprDesc::SliceLit(exprs),
+                    AstExprDesc::SliceLit(exprs),
                     vec![],
                     tok.location,
                 ))
@@ -331,7 +339,7 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    ExprDesc::Tuple(exprs),
+                    AstExprDesc::Tuple(exprs),
                     vec![],
                     start.span(&end),
                 ))
@@ -349,7 +357,11 @@ impl<'db> Parser<'db> {
 
                 let end = self.get_end();
 
-                Ok(Expr::new(ExprDesc::SizeOf(ty), vec![], start.span(&end)))
+                Ok(AstExpr::new(
+                    AstExprDesc::SizeOf(ty),
+                    vec![],
+                    start.span(&end),
+                ))
             }
 
             TokenKind::Identifier(name) => {
@@ -362,7 +374,7 @@ impl<'db> Parser<'db> {
                         let rhs = self.parse_postfix()?;
                         let end = self.get_end();
                         Ok(Spanned::new(
-                            ExprDesc::NameResolved {
+                            AstExprDesc::NameResolved {
                                 from: name,
                                 to: Box::new(rhs),
                             },
@@ -382,7 +394,11 @@ impl<'db> Parser<'db> {
                             Ok(static_call)
                         } else {
                             let end = self.get_end();
-                            Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
+                            Ok(Spanned::new(
+                                AstExprDesc::Name(name),
+                                vec![],
+                                start.span(&end),
+                            ))
                         }
                     }
 
@@ -400,24 +416,32 @@ impl<'db> Parser<'db> {
                             // Build a plain Named TypeExpr for the struct name
                             let ty_span = start.span(&start);
                             let ty = Spanned::new(
-                                TypeExprDesc::Named { name, args: vec![] },
+                                AstTypeExprDesc::Named { name, args: vec![] },
                                 vec![],
                                 ty_span,
                             );
                             Ok(Spanned::new(
-                                ExprDesc::StructLit { ty, fields },
+                                AstExprDesc::StructLit { ty, fields },
                                 vec![],
                                 start.span(&end),
                             ))
                         } else {
                             let end = self.get_end();
-                            Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
+                            Ok(Spanned::new(
+                                AstExprDesc::Name(name),
+                                vec![],
+                                start.span(&end),
+                            ))
                         }
                     }
 
                     _ => {
                         let end = self.get_end();
-                        Ok(Spanned::new(ExprDesc::Name(name), vec![], start.span(&end)))
+                        Ok(Spanned::new(
+                            AstExprDesc::Name(name),
+                            vec![],
+                            start.span(&end),
+                        ))
                     }
                 }
             }
@@ -432,12 +456,12 @@ impl<'db> Parser<'db> {
         &mut self,
         type_name: Symbol,
         start: crate::common::location::Location,
-    ) -> Result<Option<Expr>, ParseError> {
+    ) -> Result<Option<AstExpr>, ParseError> {
         let saved_pos = self.position;
 
         self.consume();
 
-        let mut type_args: Vec<AnyTypeExpr> = vec![];
+        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
 
         let type_args_result: Result<(), ParseError> = (|| {
             loop {
@@ -452,19 +476,27 @@ impl<'db> Parser<'db> {
                         self.consume();
                         let end = self.get_end();
                         type_args.push(Spanned::new(
-                            AnyTypeExprDesc::Any,
+                            AstAnyTypeExprDesc::Any,
                             vec![],
                             arg_start.span(&end),
                         ));
                     } else {
                         let ty = self.parse_type_expr()?;
                         let span = ty.span.clone();
-                        type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), vec![], span));
+                        type_args.push(Spanned::new(
+                            AstAnyTypeExprDesc::Known(ty.data),
+                            vec![],
+                            span,
+                        ));
                     }
                 } else {
                     let ty = self.parse_type_expr()?;
                     let span = ty.span.clone();
-                    type_args.push(Spanned::new(AnyTypeExprDesc::Known(ty.data), vec![], span));
+                    type_args.push(Spanned::new(
+                        AstAnyTypeExprDesc::Known(ty.data),
+                        vec![],
+                        span,
+                    ));
                 }
                 match self.peek_n(0).map(|t| t.kind.clone()) {
                     Some(TokenKind::Comma) => {
@@ -493,8 +525,8 @@ impl<'db> Parser<'db> {
 
         // Build the TypeExpr for the generic type
         let ty_span = start.span(&self.get_end());
-        let ty: TypeExpr = Spanned::new(
-            TypeExprDesc::Named {
+        let ty: AstTypeExpr = Spanned::new(
+            AstTypeExprDesc::Named {
                 name: type_name,
                 args: type_args,
             },
@@ -514,7 +546,7 @@ impl<'db> Parser<'db> {
 
         let end = self.get_end();
         Ok(Some(Spanned::new(
-            ExprDesc::StaticCall {
+            AstExprDesc::StaticCall {
                 ty,
                 method: method_sym.data,
                 args,
@@ -524,7 +556,7 @@ impl<'db> Parser<'db> {
         )))
     }
 
-    fn parse_struct_fields(&mut self) -> Result<Vec<StructField>, ParseError> {
+    fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {
         let mut fields = vec![];
         loop {
             match self.peek_n(0).map(|t| t.kind.clone()) {
@@ -535,7 +567,7 @@ impl<'db> Parser<'db> {
                     self.expect(TokenKind::Colon)?;
                     self.consume(); // consume '='
                     let value = self.parse_expr()?;
-                    fields.push(StructField {
+                    fields.push(AstStructField {
                         name: name.data,
                         value,
                     });
@@ -552,7 +584,7 @@ impl<'db> Parser<'db> {
         Ok(fields)
     }
 
-    fn parse_expr_args(&mut self) -> Result<Vec<Expr>, ParseError> {
+    fn parse_expr_args(&mut self) -> Result<Vec<AstExpr>, ParseError> {
         let mut args = vec![];
         while let Some(t) = self.peek_n(0)
             && !matches!(t.kind, TokenKind::ClosePar)
