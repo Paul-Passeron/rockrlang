@@ -21,7 +21,6 @@ impl Symbol {
 impl StrLit {
     pub fn display(&self, db: &dyn Db) -> String {
         self.interned().contents(db)
-        // format!("\"{}\"", self.interned().contents(db).escape_debug())
     }
 }
 

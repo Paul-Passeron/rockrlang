@@ -132,7 +132,7 @@ impl<'db> InferenceCtx<'db> {
         })
     }
 
-    pub fn local_var(&mut self, local_id: LocalId) -> InferVar {
+    pub fn local_var(&self, local_id: LocalId) -> InferVar {
         self.local_map[&local_id]
     }
 

@@ -153,7 +153,19 @@ impl<'db> TyCtx<'db> {
             .chain(mem::take(&mut self.inf_ctx.diagnostics))
             .collect::<Vec<_>>();
 
-        TypeCheckResults::new(self.db, node_types, call_infos, diagnostics)
+        let locals = self
+            .locals
+            .iter()
+            .map(|local| {
+                (
+                    local.id,
+                    self.inf_ctx
+                        .solve(InferTy::Var(self.inf_ctx.local_var(local.id))),
+                )
+            })
+            .collect();
+
+        TypeCheckResults::new(self.db, node_types, call_infos, diagnostics, locals)
     }
 
     fn type_check_expr(&mut self, expr: &'db HirExpr) -> (TyRef, Option<UnificationError>) {
@@ -482,6 +494,7 @@ pub struct TypeCheckResults<'db> {
     pub node_types: BTreeMap<ExprId, TypeRef>,
     pub call_infos: BTreeMap<ExprId, CallInfos>,
     pub diagnostics: Vec<Diagnostic>,
+    pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
 
 fn type_check_hir<'db>(

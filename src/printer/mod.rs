@@ -65,6 +65,10 @@ pub fn print_function_result(result: &FunctionResult) {
         for (expr, ty) in &result.typed_exprs {
             println!("{expr:?} => {ty}")
         }
+        println!("[LOCALS]====================");
+        for (local, ty) in &result.locals {
+            println!("_{} => {ty}", local.0)
+        }
     }
     println!("[DIAGS]=====================");
     for diag in &result.diagnostics {

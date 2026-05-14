@@ -7,9 +7,10 @@ use itertools::Itertools;
 use crate::common::location::Location;
 use crate::common::symbols::Symbol;
 use crate::compiler::diagnostic::Diagnostic;
-use crate::hir::{Mutability, function_ast, hir_body};
+use crate::hir::{LocalId, Mutability, function_ast, hir_body};
 use crate::name_resolve::definition::{Definition, get_module_pretty_name, module_definitions};
 use crate::name_resolve::implems::module_impls;
+
 use crate::name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner};
 use crate::name_resolve::{core_package, file_module_id, std_package};
 use crate::parse_tree::top_level::{AstImplItem, AstReceiver, AstTemplateArg};
@@ -154,6 +155,7 @@ pub struct FunctionResult {
     pub name: String,
     pub hir: String,
     pub typed_exprs: Vec<(ExprId, String)>,
+    pub locals: Vec<(LocalId, String)>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -447,6 +449,12 @@ pub fn check_function<'a>(
                     println!("TODO: report diagnostics: {diag:?}");
                     None
                 })
+                .collect()
+        }),
+        locals: thir.as_ref().map_or(vec![], |thir| {
+            thir.locals(db)
+                .into_iter()
+                .map(|(id, ty)| (id, ty.map_or("???".into(), |ty| ty.display(db).to_string())))
                 .collect()
         }),
     });
