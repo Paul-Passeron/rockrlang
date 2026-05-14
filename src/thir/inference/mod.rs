@@ -93,6 +93,7 @@ impl<'db> InferenceCtx<'db> {
         db: &'db dyn Db,
         locals: &[LocalId],
         func: FunctionId,
+        zelf: Option<LocalId>,
         params: &'db [LocalId],
         packages: Arc<[Package<'db>]>,
     ) -> Self {
@@ -118,15 +119,16 @@ impl<'db> InferenceCtx<'db> {
         )
         .unwrap();
 
-        let ctx = ImplicitContext::from_function(
-            db,
-            func,
-            infer_templates.clone(),
-            func.parent(db)
-                .get_canonical_zelf(db)
-                .map(|ty| Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap()),
-        )
-        .expect("Could not create implicit context for inference context. This should not fail");
+        let zelf_ty = func
+            .parent(db)
+            .get_canonical_zelf(db)
+            .map(|ty| Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap());
+
+        let ctx =
+            ImplicitContext::from_function(db, func, infer_templates.clone(), zelf_ty.clone())
+                .expect(
+                    "Could not create implicit context for inference context. This should not fail",
+                );
 
         let mut this = Self {
             db,
@@ -166,6 +168,16 @@ impl<'db> InferenceCtx<'db> {
             this.unify(local_ty, ty)
                 .expect("First local type unification should not fail");
         }
+
+        let actual_zelf_ty = func
+            .receiver(db)
+            .as_zelf_arg()
+            .map(|arg| arg.get_zelf_type_for(db, zelf_ty.unwrap()));
+
+        actual_zelf_ty.map(|ty| {
+            let local_ty = this.local_var(zelf.unwrap());
+            this.unify(ty, InferTy::Var(local_ty)).unwrap();
+        });
 
         infer_templates
             .iter()

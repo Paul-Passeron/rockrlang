@@ -16,9 +16,10 @@ use crate::parse_tree::top_level::{AstImplItem, AstReceiver, AstTemplateArg};
 use crate::parser::{ParseError, parse_file};
 use crate::ril::display::{Display, RilDisplay};
 use crate::ril::{
-    FileModule, FunctionId, ImplSource, InterfaceId, InterfaceRef, InternedFunctionId, ModuleId,
-    Package, ScopeOwnerId, TypeDefId, TypeRef,
+    BuiltinTypeId, FileModule, FunctionId, ImplSource, InterfaceId, InterfaceRef,
+    InternedFunctionId, ModuleId, Package, ScopeOwnerId, TypeDefId, TypeRef,
 };
+use crate::thir::inference::InferTy;
 use crate::thir::inference::implicit::AstImplicitContext;
 use crate::thir::{ExprId, type_check_function};
 use crate::{Db, OwnedSourceFile, RockrDb, driver};
@@ -217,6 +218,39 @@ pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
 pub struct ZelfArg {
     mutability: Mutability,
     kind: ZelfKind,
+}
+impl ZelfArg {
+    pub fn get_zelf_type_for(&self, db: &dyn Db, ty: InferTy) -> InferTy {
+        match self.kind {
+            ZelfKind::Zelf => ty,
+            ZelfKind::RefZelf => {
+                if self.mutability.is_mut() {
+                    InferTy::Adt {
+                        def: TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)),
+                        fields: Box::new([ty]),
+                    }
+                } else {
+                    InferTy::Adt {
+                        def: TypeDefId::Builtin(BuiltinTypeId::ref_(db)),
+                        fields: Box::new([ty]),
+                    }
+                }
+            }
+            ZelfKind::PtrZelf => {
+                if self.mutability.is_mut() {
+                    InferTy::Adt {
+                        def: TypeDefId::Builtin(BuiltinTypeId::mut_ptr(db)),
+                        fields: Box::new([ty]),
+                    }
+                } else {
+                    InferTy::Adt {
+                        def: TypeDefId::Builtin(BuiltinTypeId::ptr(db)),
+                        fields: Box::new([ty]),
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

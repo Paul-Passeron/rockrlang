@@ -1182,12 +1182,14 @@ impl<'db> LowerFundef<'db> {
                 .into_iter()
                 .map(|(_, x)| x)
                 .collect::<Vec<_>>(),
+            None,
             stmts,
         )
     }
 
     fn lower_method(&mut self, ast: &AstMethodDef) -> HirBody<'db> {
         let mut s = Scope::new();
+        let mut zelf = None;
         if let Some((mutability, span)) = match &ast.data.receiver {
             AstReceiver::None => None,
             AstReceiver::Zelf(span) | AstReceiver::RefZelf(span) | AstReceiver::PtrZelf(span) => {
@@ -1197,13 +1199,13 @@ impl<'db> LowerFundef<'db> {
             | AstReceiver::MutRefZelf(span)
             | AstReceiver::MutPtrZelf(span) => Some((Mutability::Mutable, span)),
         } {
-            self.allocate_local(
+            zelf = Some(self.allocate_local(
                 &mut s,
                 Symbol::new(self.db, "self"),
                 mutability,
                 None,
                 span.clone(),
-            );
+            ));
         }
         let params = self.collect_args(&ast.data.args, &mut s);
         let stmts = ast
@@ -1221,6 +1223,7 @@ impl<'db> LowerFundef<'db> {
                 .into_iter()
                 .map(|(_, x)| x)
                 .collect::<Vec<_>>(),
+            zelf,
             stmts,
         )
     }

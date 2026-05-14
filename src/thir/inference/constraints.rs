@@ -251,6 +251,7 @@ impl<'db> InferenceCtx<'db> {
         } else if let Some((def, _)) = found.is_adt() {
             ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField { def, field })
         } else {
+            println!("Pending here ! found type to be {}", found.display(self.db));
             ConstraintSolveResult::Pending
         }
     }

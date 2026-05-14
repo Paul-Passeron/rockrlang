@@ -112,6 +112,11 @@ pub enum Mutability {
     Const,
     Mutable,
 }
+impl Mutability {
+    pub fn is_mut(&self) -> bool {
+        matches!(self, Self::Mutable)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirExprDesc {
@@ -260,6 +265,7 @@ pub struct HirBody<'db> {
     pub params: Vec<LocalId>,
     #[returns(ref)]
     pub locals: Vec<LocalInfo>,
+    pub zelf: Option<LocalId>,
     #[returns(ref)]
     pub stmts: Vec<HirStmt>,
 }
@@ -431,6 +437,15 @@ pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
 }
 
 impl FunctionId {
+    pub fn receiver<'a>(self, db: &'a dyn Db) -> AstReceiver {
+        let ast = function_ast(db, self.interned());
+        match ast.inner(db) {
+            FunctionLikeAst::Fundef(_) | FunctionLikeAst::ExternDef(_, _) => AstReceiver::None,
+            FunctionLikeAst::Method(spanned) => spanned.data.receiver.clone(),
+            FunctionLikeAst::TraitMethod(spanned) => spanned.data.receiver.clone(),
+        }
+    }
+
     pub fn ret_ty<'db>(&'db self, db: &'db dyn Db) -> TypeRef {
         let templates = get_templates_of_fun(db, self.interned());
         let owning_module = owning_module(db, self.parent(db));

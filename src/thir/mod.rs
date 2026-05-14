@@ -83,11 +83,12 @@ impl<'db> TyCtx<'db> {
         function: FunctionId,
         locals: &'db [LocalInfo],
         params: &'db [LocalId],
+        zelf: Option<LocalId>,
         packages: Arc<[Package<'db>]>,
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned());
         let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
-        let inf_ctx = InferenceCtx::new(db, &local_ids, function, params, packages.clone());
+        let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params, packages.clone());
 
         Self {
             db,
@@ -500,8 +501,15 @@ fn type_check_hir<'db>(
     hir: HirBody<'db>,
     packages: Arc<[Package<'db>]>,
 ) -> TypeCheckResults<'db> {
-    TyCtx::new(db, hir.owner(db), hir.locals(db), hir.params(db), packages)
-        .type_check(hir.stmts(db))
+    TyCtx::new(
+        db,
+        hir.owner(db),
+        hir.locals(db),
+        hir.params(db),
+        hir.zelf(db),
+        packages,
+    )
+    .type_check(hir.stmts(db))
 }
 
 #[salsa::tracked]
