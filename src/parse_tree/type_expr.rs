@@ -35,12 +35,6 @@ pub enum AstAnyTypeExprDesc {
     Known(AstTypeExprDesc),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct AstConstrainedType {
-    ty: AstTypeExpr,
-    constraints: Vec<AstTypeExpr>,
-}
-
 impl From<AstTypeExpr> for AstAnyTypeExpr {
     fn from(ty: AstTypeExpr) -> Self {
         AstAnyTypeExpr {

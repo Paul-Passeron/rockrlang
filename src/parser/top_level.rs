@@ -459,6 +459,8 @@ impl<'db> Parser<'db> {
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
                 Ok(AstImplItem::Type { name, ty })
             }
             TokenKind::Fun => {

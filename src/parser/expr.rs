@@ -1,10 +1,13 @@
 use crate::{
-    common::symbols::Symbol,
+    common::{
+        location::{self},
+        symbols::Symbol,
+    },
     lexer::TokenKind,
     parse_tree::{
         Spanned,
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
-        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+        type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -368,7 +371,6 @@ impl<'db> Parser<'db> {
                 self.consume();
 
                 match self.peek_n(0).map(|t| t.kind.clone()) {
-                    // `Name::…` — could be name resolution OR static method call
                     Some(TokenKind::Access) => {
                         self.consume();
                         let rhs = self.parse_postfix()?;
@@ -384,10 +386,12 @@ impl<'db> Parser<'db> {
                     }
 
                     Some(TokenKind::Lt) => {
-                        if let Some(static_call) =
-                            self.try_parse_static_call(name, start.clone())?
-                        {
+                        if let Some(static_call) = self.try_parse_static_call(name, start.clone()) {
                             Ok(static_call)
+                        } else if let Some(qualified_cons) =
+                            self.try_parse_qualified_cons(name, start.clone())
+                        {
+                            Ok(qualified_cons)
                         } else {
                             let end = self.get_end();
                             Ok(Spanned::new(
@@ -436,85 +440,42 @@ impl<'db> Parser<'db> {
                     }
                 }
             }
-
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),
             ))),
         }
     }
 
-    fn try_parse_static_call(
+    fn parse_static_call(
         &mut self,
         type_name: Symbol,
-        start: crate::common::location::Location,
-    ) -> Result<Option<AstExpr>, ParseError> {
-        let saved_pos = self.position;
-
+        start: location::Location,
+    ) -> Result<AstExpr, ParseError> {
         self.consume();
 
         let mut type_args: Vec<AstAnyTypeExpr> = vec![];
 
-        let type_args_result: Result<(), ParseError> = (|| {
-            loop {
-                match self.peek_n(0).map(|t| t.kind.clone()) {
-                    Some(TokenKind::Gt) => break,
-                    None => return Err(self.parse_error(ParseErrorKind::UnexpectedEOF)),
-                    _ => {}
-                }
-                let arg_start = self.get_start();
-                if let TokenKind::Identifier(sym) = self.current_token()?.kind {
-                    if sym == Symbol::new(self.db, "_") {
-                        self.consume();
-                        let end = self.get_end();
-                        type_args.push(Spanned::new(
-                            AstAnyTypeExprDesc::Any,
-                            vec![],
-                            arg_start.span(&end),
-                        ));
-                    } else {
-                        let ty = self.parse_type_expr()?;
-                        let span = ty.span.clone();
-                        type_args.push(Spanned::new(
-                            AstAnyTypeExprDesc::Known(ty.data),
-                            vec![],
-                            span,
-                        ));
-                    }
-                } else {
-                    let ty = self.parse_type_expr()?;
-                    let span = ty.span.clone();
-                    type_args.push(Spanned::new(
-                        AstAnyTypeExprDesc::Known(ty.data),
-                        vec![],
-                        span,
-                    ));
-                }
-                match self.peek_n(0).map(|t| t.kind.clone()) {
-                    Some(TokenKind::Comma) => {
-                        self.consume();
-                    }
-                    _ => break,
-                }
+        while let Some(t) = self.peek_n(0)
+            && t.kind != TokenKind::Gt
+        {
+            type_args.push(self.parse_any_type_expr()?);
+
+            if let Some(t) = self.peek_n(0)
+                && t.kind == TokenKind::Comma
+            {
+                self.consume();
+            } else {
+                break;
             }
-            Ok(())
-        })();
-
-        if type_args_result.is_err() || self.peek_n(0).map(|t| &t.kind) != Some(&TokenKind::Gt) {
-            // Backtrack — this wasn't a type-arg list
-            self.position = saved_pos;
-            return Ok(None);
         }
+        // todo!();
 
-        self.consume(); // consume '>'
+        self.expect(TokenKind::Gt)?;
+        self.consume();
 
-        // Must be followed by '::'
-        if self.peek_n(0).map(|t| &t.kind) != Some(&TokenKind::Access) {
-            self.position = saved_pos;
-            return Ok(None);
-        }
-        self.consume(); // consume '::'
+        self.expect(TokenKind::Access)?;
+        self.consume();
 
-        // Build the TypeExpr for the generic type
         let ty_span = start.span(&self.get_end());
         let ty: AstTypeExpr = Spanned::new(
             AstTypeExprDesc::Named {
@@ -525,18 +486,16 @@ impl<'db> Parser<'db> {
             ty_span,
         );
 
-        // Now parse the method name
         let method_sym = self.parse_symbol()?;
 
-        // Must be a call
         self.expect(TokenKind::OpenPar)?;
-        self.consume(); // consume '('
+        self.consume();
         let args = self.parse_expr_args()?;
         self.expect(TokenKind::ClosePar)?;
         self.consume();
 
         let end = self.get_end();
-        Ok(Some(Spanned::new(
+        Ok(Spanned::new(
             AstExprDesc::StaticCall {
                 ty,
                 method: method_sym.data,
@@ -544,7 +503,84 @@ impl<'db> Parser<'db> {
             },
             vec![],
             start.span(&end),
-        )))
+        ))
+    }
+
+    fn try_parse_static_call(
+        &mut self,
+        type_name: Symbol,
+        start: location::Location,
+    ) -> Option<AstExpr> {
+        let saved = self.position;
+        if let Ok(res) = self.parse_static_call(type_name, start) {
+            return Some(res);
+        }
+        self.position = saved;
+        None
+    }
+
+    fn parse_qualified_cons(
+        &mut self,
+        type_name: Symbol,
+        start: location::Location,
+    ) -> Result<AstExpr, ParseError> {
+        self.consume();
+
+        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
+
+        while let Some(t) = self.peek_n(0)
+            && t.kind != TokenKind::Gt
+        {
+            type_args.push(self.parse_any_type_expr()?);
+            if let Some(t) = self.peek_n(0)
+                && t.kind == TokenKind::Comma
+            {
+                self.consume();
+            } else {
+                break;
+            }
+        }
+
+        self.expect(TokenKind::Gt)?;
+        self.consume();
+
+        self.expect(TokenKind::Access)?;
+        self.consume();
+
+        let ty_span = start.span(&self.get_end());
+        let ty: AstTypeExpr = Spanned::new(
+            AstTypeExprDesc::Named {
+                name: type_name,
+                args: type_args,
+            },
+            vec![],
+            ty_span,
+        );
+
+        let variant_sym = self.parse_symbol()?;
+
+        let end = self.get_end();
+        Ok(Spanned::new(
+            AstExprDesc::QualifiedPath {
+                ty,
+                name: variant_sym.data,
+            },
+            vec![],
+            start.span(&end),
+        ))
+    }
+
+    fn try_parse_qualified_cons(
+        &mut self,
+        type_name: Symbol,
+        start: location::Location,
+    ) -> Option<AstExpr> {
+        let saved = self.position;
+        if let Ok(expr) = self.parse_qualified_cons(type_name, start) {
+            return Some(expr);
+        }
+        self.position = saved;
+        None
     }
 
     fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {

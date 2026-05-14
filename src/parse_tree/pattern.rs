@@ -2,12 +2,14 @@ use crate::{common::symbols::Symbol, parse_tree::Spanned};
 
 pub type AstPattern = Spanned<AstPatternDesc>;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructFieldPattern {
     Rebind { name: Symbol, pattern: AstPattern },
     Name(Symbol),
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstConstructFields {
     TupleFields(Vec<AstPattern>),

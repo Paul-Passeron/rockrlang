@@ -1,8 +1,6 @@
 // Rockr Intermediate Language
-// #![allow(dead_code)]
 
 pub mod display;
-pub mod locals;
 pub mod plumbing;
 
 pub use plumbing::*;

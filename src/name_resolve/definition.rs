@@ -73,9 +73,6 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(TypeDefId::Struct(
             StructId::new(db, struct_def.name, m_id.into()),
         ))),
-        AstTopLevelItemDesc::Const(_) => todo!(
-            "Not handled yet for multiple reasons: Not handled in parsing and need to unfold pattern definitions"
-        ),
         AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
             EnumId::new(db, ast_enum_def.name, m_id.into()),
         ))),

@@ -13,9 +13,13 @@ use crate::{
         top_level::{AstFundef, AstImplItem, AstMethodDef, AstTopLevelItemDesc},
         type_expr::AstAnyTypeExpr,
     },
-    ril::{FunctionId, InternedFunctionId, InternedImplId, ScopeOwnerId, TypeDefId, TypeRef},
+    ril::{
+        FunctionId, InterfaceId, InternedFunctionId, InternedImplId, ScopeOwnerId, TypeDefId,
+        TypeRef,
+    },
 };
 
+mod display;
 mod lower_fundef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,7 +63,7 @@ pub enum HirPatternDesc {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LocalId(pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -124,6 +128,10 @@ pub enum HirExprDesc {
         receiver: Box<HirExpr>,
         method: Symbol,
         args: Vec<HirExpr>,
+
+        // None: regular method call    : expr.method(...)
+        // Some(Trait)                  : Trait::method(expr, ...)
+        interface_hint: Option<InterfaceId>,
     },
 
     CallStatic {
@@ -148,6 +156,10 @@ pub enum HirExprDesc {
     Tuple(Vec<HirExpr>),
     SliceLit(Vec<HirExpr>),
     SizeOf(PartialTypeRef),
+    Constructor {
+        ty: PartialTypeRef,
+        name: Symbol,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -200,7 +212,7 @@ pub enum HirStmtKind {
     Block(Vec<HirStmt>),
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LocalInfo {
     pub id: LocalId,
     pub name: Symbol,
@@ -209,12 +221,28 @@ pub struct LocalInfo {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct HirBody {
     pub owner: FunctionId,
     pub params: Vec<LocalId>,
     pub locals: Vec<LocalInfo>,
     pub stmts: Vec<HirStmt>,
+}
+
+impl HirBody {
+    pub fn new(
+        owner: FunctionId,
+        params: Vec<LocalId>,
+        locals: Vec<LocalInfo>,
+        stmts: Vec<HirStmt>,
+    ) -> Self {
+        Self {
+            owner,
+            params,
+            locals,
+            stmts,
+        }
+    }
 }
 
 #[salsa::tracked]

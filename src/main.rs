@@ -10,11 +10,9 @@ use crate::{
         core_package,
         definition::{Definition, get_module_pretty_name, module_definitions},
         file_module_id,
-        implems::{impls_in_package, module_impls},
-        module_items, module_to_file, std_package,
-        type_expr::resolve_type_expr,
+        implems::impls_in_package,
+        module_to_file, std_package,
     },
-    parse_tree::top_level::AstTopLevelItemDesc,
     parser::{ParseError, parse_file},
     ril::{FileModule, ModuleId, Package, display::RilDisplay},
 };
@@ -127,43 +125,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
         println!("  {} => {}", name.interned().contents(db), def.display(db));
     }
 
-    let Some(items) = module_items(db, module.interned()) else {
-        println!("  (file-backed module — items not yet wired)");
-        println!("------------------------------------------------");
-        return false;
-    };
-
-    let impls = module_impls(db, module.interned());
-
-    println!("Function signatures:");
-    let mut has_errors = false;
-
-    for item in &items {
-        if let AstTopLevelItemDesc::Fundef(fundef) = &item.data {
-            let fd = &fundef.data;
-            println!("  fn {}:", fd.name.interned().contents(db));
-            for arg in &fd.args {
-                let resolved = resolve_type_expr(db, &arg.ty, module.interned(), &fd.template_args);
-                println!(
-                    "    {} : {}",
-                    arg.name.interned().contents(db),
-                    resolved.display(db)
-                );
-            }
-            let ret = resolve_type_expr(db, &fd.return_type, module.interned(), &fd.template_args);
-            println!("    -> {}", ret.display(db));
-        } else if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
-            let child_id = ModuleId::new(
-                db,
-                module_ast.data.name,
-                Some(module),
-                None,
-                vec![],
-                module.package(db),
-            );
-            has_errors |= check_module(db, child_id);
-        }
-    }
+    // let impls = module_impls(db, module.interned());
 
     let mut v = defs.values().copied().collect::<Vec<_>>();
     v.sort();
@@ -171,28 +133,27 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
         match def {
             Definition::Function(function_id) => {
                 let hir = hir_body(db, function_id.interned());
-                println!("{hir:#?}");
+                println!("{}", hir.display(db));
             }
             _ => (),
         }
     }
 
-    println!("Implementations:");
-    for impl_ in impls {
-        let start = impl_.span(db).start();
-        let source_file = module_to_file(db, impl_.module(db).interned());
-        let loc_infos = get_loc_info(db, source_file, start.offset);
-        println!(
-            "    {}: {} ({:?})",
-            loc_infos,
-            impl_.id(db).display(db),
-            impl_.id(db)
-        );
-    }
+    // println!("Implementations:");
+    // for impl_ in impls {
+    //     let start = impl_.span(db).start();
+    //     let source_file = module_to_file(db, impl_.module(db).interned());
+    //     let loc_infos = get_loc_info(db, source_file, start.offset);
+    //     println!(
+    //         "    {}: {} ({:?})",
+    //         loc_infos,
+    //         impl_.id(db).display(db),
+    //         impl_.id(db)
+    //     );
+    // }
 
     println!("***************************************************");
-
-    has_errors
+    false
 }
 
 fn check_file<'db>(db: &'db dyn Db, source: SourceFile<'db>, module_id: ModuleId) -> bool {

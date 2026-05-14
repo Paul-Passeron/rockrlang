@@ -24,6 +24,10 @@ pub enum AstExprDesc {
         method: Symbol,
         args: Vec<AstExpr>,
     },
+    QualifiedPath {
+        ty: AstTypeExpr,
+        name: Symbol,
+    },
 
     // Binary operations
     BinOp {

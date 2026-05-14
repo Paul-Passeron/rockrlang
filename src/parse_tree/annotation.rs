@@ -17,10 +17,11 @@ pub enum AstAnnotationItem {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstAnnotationArg {
-    Symbol(Symbol),
+    // Symbol(Symbol),
     Type(AstTypeExpr),
 }
 
+#[allow(dead_code)]
 impl AstAnnotationItem {
     pub fn name(&self) -> Symbol {
         match self {

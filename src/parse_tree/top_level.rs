@@ -21,7 +21,7 @@ pub enum AstTopLevelItemDesc {
     Module(AstModule),
     Fundef(AstFundef),
     Interface(AstInterface),
-    Const(AstConstDecl),
+    // Const(AstConstDecl),
     Impl(AstImplBlock),
     StructDef(AstStructDef),
     EnumDef(AstEnumDef),
@@ -117,6 +117,7 @@ pub enum AstInterfaceItem {
     Sig(AstMethodsig),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstConstDecl {
     pub pat: AstPattern,
