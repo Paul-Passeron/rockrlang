@@ -8,8 +8,8 @@ use crate::{
         top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstFundef, AstFundefArg, AstFundefDesc,
             AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
-            AstMethodDef, AstMethodDefDesc, AstMethodsig, AstMethodsigDesc, AstModule,
-            AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField, AstTemplateArg,
+            AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig, AstMethodsigDesc,
+            AstModule, AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField, AstTemplateArg,
             AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
@@ -568,6 +568,34 @@ impl<'db> Parser<'db> {
         })
     }
 
+    fn parse_interface_item(&mut self) -> Result<AstInterfaceItem, ParseError> {
+        match self.current_token()?.kind {
+            TokenKind::Type => {
+                self.consume();
+                let arg = self.parse_template_arg()?;
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
+                Ok(AstInterfaceItem::Type(arg))
+            }
+            TokenKind::Fun => {
+                self.consume();
+                let sig = self.parse_methodsig()?;
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
+                Ok(AstInterfaceItem::Sig(sig))
+            }
+            x => Err(ParseError {
+                kind: ParseErrorKind::ExpectedToken {
+                    expected: TokenKind::Fun,
+                    found: x,
+                },
+                file: self.file.clone(),
+                start: self.current_token()?.location.start,
+                end: self.current_token()?.location.end,
+            }),
+        }
+    }
+
     pub fn parse_toplevel_item(&mut self) -> Result<AstTopLevelItem, ParseError> {
         self.collect_annotations()?;
         let annotations = self.annotations();
@@ -618,21 +646,39 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let name = self.parse_symbol()?.data;
                 let template_args = self.parse_optional_template_args()?;
+                let supers = if let Some(t) = self.peek_n(0)
+                    && t.kind == TokenKind::Colon
+                {
+                    let mut supers = vec![self.parse_type_expr()?];
+                    while let Some(t) = self.peek_n(0)
+                        && t.kind == TokenKind::Plus
+                    {
+                        self.consume();
+                        supers.push(self.parse_type_expr()?);
+                    }
+                    self.expect(TokenKind::CloseBra)?;
+                    self.consume();
+                    supers
+                } else {
+                    vec![]
+                };
                 self.expect(TokenKind::OpenBra)?;
                 self.consume();
-                let mut _items = vec![];
+                let mut items = vec![];
                 while let Some(t) = self.peek_n(0)
                     && !matches!(t.kind, TokenKind::CloseBra)
                 {
-                    todo!()
+                    let item = self.parse_interface_item()?;
+                    items.push(item);
                 }
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Interface(AstInterface {
                         name,
+                        supers,
                         template_args,
-                        items: _items,
+                        items,
                     }),
                     vec![],
                     start.span(&self.get_end()),

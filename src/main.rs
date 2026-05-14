@@ -6,6 +6,7 @@ use crate::{
     common::location::get_loc_info,
     driver::load_package,
     name_resolve::{
+        core_package,
         definition::{get_module_pretty_name, module_definitions},
         file_module_id,
         implems::{impls_in_package, module_impls},
@@ -206,9 +207,6 @@ fn check_module_tree<'db>(
 }
 
 fn try_package<'db>(db: &'db dyn Db, package: Package<'db>) -> bool {
-    println!("Package structure:");
-    print_module_tree(db, package.root(db), 0);
-    println!();
     let has_errors = check_module_tree(db, package.root(db), None, package);
     println!("ALL IMPLEMENTATIONS:");
     for impl_ in impls_in_package(db, package) {
@@ -239,10 +237,20 @@ fn main() -> Result<(), String> {
     let package = load_package(&db, root_path)
         .ok_or_else(|| format!("No package found at `{}`", root_path.display()))?;
 
-    let mut has_errors = false;
-    has_errors |= try_package(&db, package);
+    let mut packages = vec![package, core_package(&db)];
     if !db.config.no_std {
-        has_errors |= try_package(&db, std_package(&db).unwrap());
+        packages.push(std_package(&db).unwrap());
+    }
+
+    println!("Packages structure:");
+    for package in &packages {
+        print_module_tree(&db, package.root(&db), 0);
+    }
+    println!();
+
+    let mut has_errors = false;
+    for package in packages {
+        has_errors |= try_package(&db, package);
     }
 
     if has_errors {

@@ -135,6 +135,20 @@ pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
     Some(file_module_id(db, file_module, Some(builtin_module(db)), package).interned())
 }
 
+#[salsa::tracked]
+pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
+    let std_path = std::env::var("ROCKR_CORE").unwrap_or_default();
+    let std_root = std::path::Path::new(&std_path);
+    load_package(db, std_root).unwrap()
+}
+
+#[salsa::tracked]
+pub fn core_module<'db>(db: &'db dyn Db) -> InternedModuleId<'db> {
+    let package = core_package(db);
+    let file_module = package.root(db);
+    file_module_id(db, file_module, Some(builtin_module(db)), package).interned()
+}
+
 fn collect_modules_in_file_module<'db>(
     db: &'db dyn Db,
     file_module: FileModule<'db>,

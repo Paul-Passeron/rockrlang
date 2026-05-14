@@ -104,6 +104,7 @@ pub struct AstFundefArg {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstInterface {
     pub name: Symbol,
+    pub supers: Vec<AstTypeExpr>,
     pub template_args: Vec<AstTemplateArg>,
     pub items: Vec<AstInterfaceItem>,
 }
