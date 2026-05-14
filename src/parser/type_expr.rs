@@ -13,7 +13,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
 
         match self.current_token()?.kind {
-            TokenKind::Mult | TokenKind::BitAnd => {
+            TokenKind::Mult | TokenKind::BitAnd | TokenKind::And => {
                 let is_ptr = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mult)
                 {
@@ -21,6 +21,10 @@ impl<'db> Parser<'db> {
                 } else {
                     false
                 };
+                let two = self
+                    .current_token()
+                    .map(|t| matches!(t.kind, TokenKind::And))
+                    .unwrap_or(false);
                 self.consume();
                 let mutable = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mut)
@@ -33,21 +37,40 @@ impl<'db> Parser<'db> {
 
                 let inner = self.parse_type_expr()?;
                 let end = self.get_end();
-                Ok(Spanned::new(
-                    if is_ptr {
-                        AstTypeExprDesc::Pointer {
-                            mutable,
-                            pointee: Box::new(inner),
-                        }
-                    } else {
+                if two {
+                    Ok(Spanned::new(
                         AstTypeExprDesc::Ref {
-                            mutable,
-                            pointee: Box::new(inner),
-                        }
-                    },
-                    vec![],
-                    start.span(&end),
-                ))
+                            // &&<mut|""> so mutable only on the inner ref
+                            mutable: false,
+                            pointee: Box::new(Spanned::new(
+                                AstTypeExprDesc::Ref {
+                                    mutable,
+                                    pointee: Box::new(inner),
+                                },
+                                vec![],
+                                start.advance(1).span(&end),
+                            )),
+                        },
+                        vec![],
+                        start.span(&end),
+                    ))
+                } else {
+                    Ok(Spanned::new(
+                        if is_ptr {
+                            AstTypeExprDesc::Pointer {
+                                mutable,
+                                pointee: Box::new(inner),
+                            }
+                        } else {
+                            AstTypeExprDesc::Ref {
+                                mutable,
+                                pointee: Box::new(inner),
+                            }
+                        },
+                        vec![],
+                        start.span(&end),
+                    ))
+                }
             }
 
             TokenKind::OpenSqr => {
