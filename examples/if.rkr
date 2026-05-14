@@ -1,0 +1,10 @@
+@include core::io
+
+fun main(): int {
+    if true {
+        printf(c"Hello from true !\n");
+    } else {
+        printf(c"How did you get there ?\n");
+    }
+    return 0;
+}
