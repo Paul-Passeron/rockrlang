@@ -179,10 +179,13 @@ impl<'db> LowerFundef<'db> {
     fn resolve_holed_desc(&self, desc: &AstTypeExprDesc, module: ModuleId) -> PartialTypeRef {
         match desc {
             AstTypeExprDesc::Named { name, args } => {
-                if args.is_empty()
-                    && let Some(idx) = self.template_args.iter().position(|p| p.name == *name)
-                {
-                    return PartialTypeRef::Resolved(TypeRef::Param(TypeParamId(idx)));
+                if args.is_empty() {
+                    if *name == Symbol::new(self.db, "Self") {
+                        return PartialTypeRef::Resolved(TypeRef::Zelf);
+                    }
+                    if let Some(idx) = self.template_args.iter().position(|p| p.name == *name) {
+                        return PartialTypeRef::Resolved(TypeRef::Param(TypeParamId(idx)));
+                    }
                 }
 
                 let resolution = resolve_in_module(self.db, name.interned(), module.interned())
