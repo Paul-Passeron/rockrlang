@@ -1,34 +1,34 @@
-struct Vec<T> {
-    data: *T;
-    len: usize;
-    capacity: usize;
-}
+// struct Vec<T> {
+//     data: *T;
+//     len: usize;
+//     capacity: usize;
+// }
 
-impl <T> Vec<T> {
-    @[inline]
-    fun new(): Vec<T> {
-        return Vec {
-            .data: nullptr,
-            .len: 0,
-            .capacity: 0,
-        };
-    }
+// impl <T> Vec<T> {
+//     @[inline]
+//     fun new(): Vec<T> {
+//         return Vec {
+//             .data: nullptr,
+//             .len: 0,
+//             .capacity: 0,
+//         };
+//     }
 
-    fun push(&mut self, elem: T): void {
-        if self$.capacity <= self$.len {
-            self$.capacity = self$.capacity * 2 + 1;
-            if self$.capacity <= 8 {
-                self$.capacity = 8;
-            }
-            let old_ptr = self$.data;
-            self$.data = malloc(self$.capacity * @sizeof(T));
-            if old_ptr != nullptr {
-                for i in 0..self$.len {
-                    self$.data[i] = old_ptr[i];
-                }
-            }
-        }
-        self$.data[self.len] = elem;
-        self$.len += 1;
-    }
-}
+//     fun push(&mut self, elem: T): void {
+//         if self$.capacity <= self$.len {
+//             self$.capacity = self$.capacity * 2 + 1;
+//             if self$.capacity <= 8 {
+//                 self$.capacity = 8;
+//             }
+//             let old_ptr = self$.data;
+//             self$.data = malloc(self$.capacity * @sizeof(T));
+//             if old_ptr != nullptr {
+//                 for i in 0..self$.len {
+//                     self$.data[i] = old_ptr[i];
+//                 }
+//             }
+//         }
+//         self$.data[self.len] = elem;
+//         self$.len += 1;
+//     }
+// }

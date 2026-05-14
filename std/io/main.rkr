@@ -37,5 +37,7 @@ impl str {
     }
 }
 
-@[extern(C)]
-fun printf(fmt: *char): void {}
+@extern {
+    @[ffi(C, printf)]
+    fun printf(fmt: *char, +): void;
+}

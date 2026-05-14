@@ -3,9 +3,6 @@ enum opt<T> {
     Some(T),
 }
 
-@[extern(C)]
-fun printf(format: str): void {}
-
 impl <T> opt<T> {
     fun unwrap(self): T {
         match self {
