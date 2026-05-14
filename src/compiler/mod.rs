@@ -173,11 +173,23 @@ pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
                         impl_id
                             .templates(db)
                             .iter()
-                            .map(|t| t
-                                .iter()
-                                .map(|it| it.display(db).to_string())
-                                .collect_vec()
-                                .join(" + "))
+                            .enumerate()
+                            .map(|(i, t)| {
+                                format!(
+                                    "T{i}{}",
+                                    if !t.is_empty() {
+                                        format!(
+                                            ": {}",
+                                            t.iter()
+                                                .map(|it| it.display(db).to_string())
+                                                .collect_vec()
+                                                .join(" + ")
+                                        )
+                                    } else {
+                                        String::new()
+                                    }
+                                )
+                            })
                             .collect_vec()
                             .join(", ")
                     )
