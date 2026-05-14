@@ -260,28 +260,32 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_template(&mut self, arg: &AstTemplateArg) -> InferTy {
-        let var = self.fresh_var();
+    // pub fn allocate_template(
+    //     &mut self,
+    //     arg: &AstTemplateArg,
+    //     template_args: &[AstTemplateArg],
+    // ) -> InferTy {
+    //     let var = self.fresh_var();
 
-        for constraint in &arg.constraints {
-            let resolved = resolve_type_expr_as_interface(
-                self.db,
-                &constraint,
-                self.implicit_ctx().owner_module(self.db).interned(),
-                self.templates.as_ref(),
-                false,
-            )
-            .unwrap();
-            let interface_id = resolved.def(self.db);
-            let interface_args = resolved
-                .args(self.db)
-                .iter()
-                .map(|t_ref| self.allocate_type_ref(t_ref, self.implicit_ctx().as_ref()))
-                .collect::<Box<[_]>>();
-            self.emit_implements_constraint(InferTy::Var(var), interface_id, interface_args);
-        }
-        InferTy::Var(var)
-    }
+    //     for constraint in &arg.constraints {
+    //         let resolved = resolve_type_expr_as_interface(
+    //             self.db,
+    //             &constraint,
+    //             self.implicit_ctx().owner_module(self.db).interned(),
+    //             template_args,
+    //             false,
+    //         )
+    //         .unwrap();
+    //         let interface_id = resolved.def(self.db);
+    //         let interface_args = resolved
+    //             .args(self.db)
+    //             .iter()
+    //             .map(|t_ref| self.allocate_type_ref(t_ref, self.implicit_ctx().as_ref()))
+    //             .collect::<Box<[_]>>();
+    //         self.emit_implements_constraint(InferTy::Var(var), interface_id, interface_args);
+    //     }
+    //     InferTy::Var(var)
+    // }
 
     fn try_resolve_via_known_impl(
         &mut self,
@@ -816,9 +820,9 @@ impl<'db> InferenceCtx<'db> {
         // Ok(())
     }
 
-    pub fn finished_solving_constraints(&self) -> bool {
-        self.current_constraints.is_empty()
-    }
+    // pub fn finished_solving_constraints(&self) -> bool {
+    //     self.current_constraints.is_empty()
+    // }
 
     fn fresh_constraint(&mut self, constraint: InferenceConstraintKind) -> InferenceConstraint {
         let res = InferenceConstraint {

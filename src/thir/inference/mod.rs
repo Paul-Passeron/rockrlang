@@ -19,7 +19,6 @@ use crate::{
     common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef, function_ast},
     name_resolve::{implems::resolve_type_expr_as_interface, type_expr::get_templates_of_fun},
-    parse_tree::top_level::AstTemplateArg,
     ril::{
         FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
         TypeRef, display::Display,
@@ -61,15 +60,11 @@ pub struct InferenceCtx<'a> {
     local_map: HashMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
-    func: FunctionId,
-
     current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: HashMap<InferenceConstraintId, Arc<InferenceConstraint>>,
     solved_constraints: HashSet<InferenceConstraintId>,
 
     implements: HashMap<InterfaceId, HashSet<InterfaceImplem>>,
-
-    templates: Arc<[AstTemplateArg]>,
     packages: Arc<[Package<'a>]>,
     call_infos: HashMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
@@ -118,11 +113,9 @@ impl<'db> InferenceCtx<'db> {
             db,
             table,
             local_map,
-            func,
             current_constraints: Vec::new(),
             all_constraints: HashMap::new(),
             solved_constraints: HashSet::new(),
-            templates: templates.clone(),
             packages,
             call_infos: HashMap::new(),
             next_constraint_id: 0,
