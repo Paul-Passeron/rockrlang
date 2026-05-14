@@ -1,0 +1,10 @@
+@include core::io
+
+struct Foo {
+    x: int;
+}
+
+fun bar(foo: &Foo): void {
+    let x = foo.x;
+    printf(c"%d\n", x);
+}
