@@ -1,5 +1,5 @@
 // Rockr Intermediate Language
-#![allow(dead_code)]
+// #![allow(dead_code)]
 
 use std::marker::PhantomData;
 
@@ -63,6 +63,7 @@ pub struct InternedStructId {
 pub struct TypeParamId(pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
 pub struct TypeParam {
     pub name: Symbol,
     pub constraints: Vec<InterfaceId>,
@@ -188,6 +189,7 @@ impl<'db> From<FunctionId> for InternedFunctionId<'db> {
     }
 }
 
+#[allow(dead_code)]
 impl FunctionId {
     pub fn new(db: &dyn crate::Db, name: Symbol, parent: ScopeOwnerId) -> Self {
         InternedFunctionId::new(db, name, parent).into()
@@ -248,6 +250,7 @@ impl<'db> From<ImplId> for InternedImplId<'db> {
     }
 }
 
+#[allow(dead_code)]
 impl ImplId {
     pub fn new(
         db: &dyn crate::Db,
@@ -364,6 +367,10 @@ impl BuiltinTypeId {
         Self::new(db, Symbol::new(db, "*"))
     }
 
+    pub fn tuple(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "()"))
+    }
+
     pub fn slice(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "[]"))
     }
@@ -391,6 +398,10 @@ pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
 
 pub fn slice_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::slice(db).into(), vec![ty])
+}
+
+pub fn tuple_of(db: &dyn crate::Db, tys: Vec<TypeRef>) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::tuple(db).into(), tys)
 }
 
 pub fn int_id(db: &dyn crate::Db) -> TypeId {

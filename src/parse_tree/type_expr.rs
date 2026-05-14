@@ -17,6 +17,7 @@ pub enum AstTypeExprDesc {
         ty: Box<AstTypeExpr>,
         len: Option<usize>,
     },
+    Tuple(Vec<AstTypeExpr>),
 }
 
 pub type AstAnyTypeExpr = Spanned<AstAnyTypeExprDesc>;

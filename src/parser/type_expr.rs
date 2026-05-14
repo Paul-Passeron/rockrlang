@@ -46,6 +46,36 @@ impl<'db> Parser<'db> {
                 ))
             }
 
+            TokenKind::OpenPar => {
+                self.consume();
+
+                let mut tys = vec![];
+
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::ClosePar)
+                {
+                    let t_e = self.parse_type_expr()?;
+                    tys.push(t_e);
+                    if let Some(t) = self.peek_n(0)
+                        && matches!(t.kind, TokenKind::Comma)
+                    {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+                let end = self.get_end();
+
+                Ok(AstTypeExpr::new(
+                    AstTypeExprDesc::Tuple(tys),
+                    vec![],
+                    start.span(&end),
+                ))
+            }
+
             TokenKind::Identifier(name) => {
                 self.consume();
 

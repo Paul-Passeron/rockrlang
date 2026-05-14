@@ -1,21 +1,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use nonempty::nonzero::NonEmpty;
+use nonempty::NonEmpty;
 
 use crate::Db;
 
 use crate::common::location::Span;
 use crate::common::symbols::{InternedSymbol, Symbol};
 use crate::name_resolve::{builtin_module, module_items};
-use crate::parse_tree::top_level::{AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc};
+use crate::parse_tree::top_level::{
+    AstIncludePathDesc, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
+};
 use crate::parse_tree::type_expr::{
     AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
 };
+use crate::parser::parse_file;
 use crate::ril::{
     FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
     StructId, TypeDefId, TypeId, TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id,
-    void_id,
+    tuple_of, void_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -116,21 +119,46 @@ pub fn file_module_id<'db>(
     )
 }
 
-#[salsa::tracked]
-pub fn file_module_definitions<'db>(
-    db: &'db dyn Db,
-    file_module: FileModule<'db>,
-    parent: Option<ModuleId>,
-    package: Package<'db>,
-) -> HashMap<Symbol, Definition> {
-    let module_id = file_module_id(db, file_module, parent, package);
-    let mut defs = HashMap::new();
-    for sub in file_module.submodules(db) {
-        let sub_id = file_module_id(db, *sub, Some(module_id), package);
-        defs.insert(sub.name(db), Definition::Module(sub_id));
+// #[salsa::tracked]
+// pub fn file_module_definitions<'db>(
+//     db: &'db dyn Db,
+//     file_module: FileModule<'db>,
+//     parent: Option<ModuleId>,
+//     package: Package<'db>,
+// ) -> HashMap<Symbol, Definition> {
+//     let module_id = file_module_id(db, file_module, parent, package);
+//     let mut defs = HashMap::new();
+//     for sub in file_module.submodules(db) {
+//         let sub_id = file_module_id(db, *sub, Some(module_id), package);
+//         defs.insert(sub.name(db), Definition::Module(sub_id));
+//     }
+//     defs.extend(module_definitions(db, module_id.interned()));
+//     defs
+// }
+
+impl AstIncludePathDesc {
+    pub fn to_segments(&self) -> NonEmpty<Symbol> {
+        let (hd, tl) = match self {
+            AstIncludePathDesc::Symbol(symbol) => (*symbol, None),
+            AstIncludePathDesc::NameResolved { from, to } => (*from, Some(to)),
+        };
+        fn _to_segments(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
+            match this {
+                AstIncludePathDesc::Symbol(symbol) => {
+                    v.push(*symbol);
+                }
+                AstIncludePathDesc::NameResolved { from, to } => {
+                    v.push(*from);
+                    _to_segments(&to.data, v);
+                }
+            }
+        }
+        let mut res = NonEmpty::singleton(hd);
+        if let Some(rest) = tl {
+            _to_segments(&rest.data, &mut res);
+        }
+        res
     }
-    defs.extend(module_definitions(db, module_id.interned()));
-    defs
 }
 
 #[salsa::tracked]
@@ -162,18 +190,58 @@ pub fn module_definitions<'db>(
 }
 
 #[salsa::tracked]
+pub fn module_includes<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<Segments<'db>> {
+    let mut res = vec![];
+    if let Some(file) = module.file(db) {
+        let ast = parse_file(db, file.to_source_file(db));
+        for include in ast.includes(db) {
+            let segments = Segments::new(db, include.data.to_segments());
+            res.push(segments);
+        }
+    }
+    res
+}
+
+#[salsa::tracked]
+pub fn resolve_include_path<'db>(
+    db: &'db dyn Db,
+    segments: Segments<'db>,
+    current: InternedModuleId<'db>,
+) -> Option<ModuleId> {
+    let self_defs = module_definitions(db, current);
+    let v = segments.segments(db);
+    let (hd, tl) = v.split_first();
+    if let Some(Definition::Module(res)) = self_defs.get(hd) {
+        NonEmpty::from_slice(tl).map_or(Some(*res), |segs| {
+            let segs = Segments::new(db, segs);
+            resolve_include_path(db, segs, res.interned())
+        })
+    } else {
+        None
+    }
+}
+
+#[salsa::tracked]
 pub fn resolve_in_module<'db>(
     db: &'db dyn Db,
     name: InternedSymbol<'db>,
     module: InternedModuleId<'db>,
 ) -> Option<Definition> {
-    let mut defs = module_definitions(db, module);
-    defs.remove(&Symbol::from(name)).or_else(|| {
-        module
-            .parent(db)
-            .map(|parent| resolve_in_module(db, name, parent.interned()))
-            .flatten()
-    })
+    let defs = module_definitions(db, module);
+    if let Some(def) = defs.get(&Symbol::from(name)) {
+        return Some(def.clone());
+    }
+    let includes = module_includes(db, module);
+
+    for included_module in includes {
+        let included_id = resolve_include_path(db, included_module, module)?;
+        if let Some(def) = module_definitions(db, included_id.interned()).get(&Symbol::from(name)) {
+            return Some(def.clone());
+        }
+    }
+    module
+        .parent(db)
+        .and_then(|parent| resolve_in_module(db, name, parent.interned()))
 }
 
 #[salsa::tracked]
@@ -278,6 +346,21 @@ pub fn resolve_spanned_type_expr_desc<'db>(
             match resolve_type_expr(db, &*ty, module, template_args) {
                 TypeResolution::Type(elem) => TypeResolution::Type(slice_of(db, elem).into()),
                 _ => TypeResolution::Infer,
+            }
+        }
+        AstTypeExprDesc::Tuple(tys) => {
+            let types = tys
+                .iter()
+                .map(
+                    |ty| match resolve_type_expr(db, ty, module, template_args) {
+                        TypeResolution::Type(type_ref) => Some(type_ref),
+                        _ => None,
+                    },
+                )
+                .collect::<Option<_>>();
+            match types {
+                Some(tys) => TypeResolution::Type(tuple_of(db, tys).into()),
+                None => TypeResolution::Error,
             }
         }
     }
