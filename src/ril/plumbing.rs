@@ -317,6 +317,7 @@ impl BuiltinTypeId {
 
     pub fn is_int_like(self, db: &dyn Db) -> Option<Self> {
         (self == BuiltinTypeId::int(db)
+            || self == BuiltinTypeId::usize(db)
             || self == BuiltinTypeId::char(db)
             || self == BuiltinTypeId::mut_ptr(db)
             || self == BuiltinTypeId::ptr(db))

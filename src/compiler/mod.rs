@@ -1,20 +1,25 @@
 use std::path::Path;
+use std::sync::Arc;
 use std::{fmt, path::PathBuf};
 
 use itertools::Itertools;
 
 use crate::common::location::Location;
+use crate::common::symbols::Symbol;
 use crate::compiler::diagnostic::Diagnostic;
-use crate::hir::{function_ast, hir_body};
+use crate::hir::{Mutability, function_ast, hir_body};
 use crate::name_resolve::definition::{Definition, get_module_pretty_name, module_definitions};
 use crate::name_resolve::implems::module_impls;
+use crate::name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner};
 use crate::name_resolve::{core_package, file_module_id, std_package};
-use crate::parse_tree::top_level::AstImplItem;
+use crate::parse_tree::top_level::{AstImplItem, AstReceiver, AstTemplateArg};
 use crate::parser::{ParseError, parse_file};
-use crate::ril::display::RilDisplay;
+use crate::ril::display::{Display, RilDisplay};
 use crate::ril::{
-    FileModule, FunctionId, ImplSource, InterfaceId, ModuleId, Package, ScopeOwnerId, TypeDefId,
+    FileModule, FunctionId, ImplSource, InterfaceId, InterfaceRef, InternedFunctionId, ModuleId,
+    Package, ScopeOwnerId, TypeDefId, TypeRef,
 };
+use crate::thir::inference::implicit::{AstImplicitContext, ImplicitContext};
 use crate::thir::{ExprId, type_check_function};
 use crate::{Db, OwnedSourceFile, RockrDb, driver};
 
@@ -159,9 +164,26 @@ pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
         ScopeOwnerId::Impl(impl_id) => {
             let parent = get_module_pretty_name(db, impl_id.parent(db).interned());
             format!(
-                "{parent}::`impl {}{}`",
+                "{parent}::`impl{} {}{}`",
+                if impl_id.templates(db).is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        "<{}>",
+                        impl_id
+                            .templates(db)
+                            .iter()
+                            .map(|t| t
+                                .iter()
+                                .map(|it| it.display(db).to_string())
+                                .collect_vec()
+                                .join(" + "))
+                            .collect_vec()
+                            .join(", ")
+                    )
+                },
                 match impl_id.interface(db) {
-                    Some(interface_ref) => format!("{} for ", interface_ref.def(db).display(db)),
+                    Some(interface_ref) => format!("{} for ", interface_ref.display(db)),
                     _ => "".into(),
                 },
                 impl_id.implemented(db).display(db)
@@ -179,21 +201,178 @@ pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
     res
 }
 
-pub fn get_pretty_function<'a>(db: &'a dyn Db, function_id: FunctionId) -> String {
-    let ast = function_ast(db, function_id.interned()).inner(db);
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ZelfArg {
+    mutability: Mutability,
+    kind: ZelfKind,
+}
 
-    format!(
-        "{}::{}({}{}): {}",
-        get_pretty_owner(db, function_id.parent(db)),
-        function_id.name(db).display(db),
-        ast.receiver()
-            .map_or(String::new(), |receiver| receiver.to_string()),
-        ast.get_args()
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ZelfKind {
+    Zelf,
+    RefZelf,
+    PtrZelf,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FunctionSignature {
+    pub name: Symbol,
+    pub zelf: Option<ZelfArg>,
+    pub implicit_templates: Vec<Vec<InterfaceRef>>, // Templates inherited from environment
+    pub added_templates: Vec<Vec<InterfaceRef>>,    // Templates for this function only
+    pub args: Vec<(Symbol, TypeRef)>,
+    pub ret: TypeRef,
+}
+
+impl AstReceiver {
+    pub fn as_zelf_arg(&self) -> Option<ZelfArg> {
+        let mutability = match self {
+            AstReceiver::None => {
+                return None;
+            }
+            AstReceiver::MutZelf(_) | AstReceiver::MutRefZelf(_) | AstReceiver::MutPtrZelf(_) => {
+                Mutability::Mutable
+            }
+            _ => Mutability::Const,
+        };
+        let kind = match self {
+            AstReceiver::None => {
+                return None;
+            }
+            AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
+            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
+            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
+        };
+        Some(ZelfArg { mutability, kind })
+    }
+}
+
+impl fmt::Display for ZelfArg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (self.mutability, self.kind) {
+            (Mutability::Const, ZelfKind::Zelf) => write!(f, "self"),
+            (Mutability::Const, ZelfKind::RefZelf) => write!(f, "&self"),
+            (Mutability::Const, ZelfKind::PtrZelf) => write!(f, "*self"),
+            (Mutability::Mutable, ZelfKind::Zelf) => write!(f, "mut self"),
+            (Mutability::Mutable, ZelfKind::RefZelf) => write!(f, "&mut self"),
+            (Mutability::Mutable, ZelfKind::PtrZelf) => write!(f, "*mut self"),
+        }
+    }
+}
+
+#[salsa::tracked]
+pub fn get_sig_of_function(
+    db: &dyn Db,
+    function_id: InternedFunctionId<'_>,
+) -> Option<Arc<FunctionSignature>> {
+    let function_templates: Arc<[AstTemplateArg]> =
+        get_templates_of_fun_only(db, function_id).into();
+    let ctx =
+        AstImplicitContext::new(db, function_id.parent(db), function_templates.clone()).ok()?;
+    let added_templates: Vec<Vec<InterfaceRef>> = function_templates
+        .iter()
+        .map(|t| {
+            t.constraints
+                .iter()
+                .map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                .collect::<Option<_>>()
+        })
+        .collect::<Option<_>>()?;
+
+    let implicit_templates: Vec<Vec<InterfaceRef>> =
+        get_templates_of_owner(db, function_id.parent(db))
             .iter()
-            .map(|arg| arg.display(db).to_string())
-            .collect_vec()
-            .join(", "),
-        ast.get_ret().data.display(db)
+            .map(|t| {
+                t.constraints
+                    .iter()
+                    .map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                    .collect::<Option<_>>()
+            })
+            .collect::<Option<_>>()?;
+    let ast = function_ast(db, function_id);
+    let zelf = ast.inner(db).receiver().and_then(|r| r.as_zelf_arg());
+    let args: Vec<_> = ast
+        .inner(db)
+        .get_args()
+        .iter()
+        .map(|arg| ctx.resolve(db, &arg.ty.data).map(|ty| (arg.name, ty)))
+        .collect::<Option<_>>()?;
+    let ret = ctx.resolve(db, &ast.inner(db).get_ret().data)?;
+    Some(Arc::new(FunctionSignature {
+        name: function_id.name(db),
+        zelf,
+        implicit_templates,
+        added_templates,
+        args,
+        ret,
+    }))
+}
+
+impl FunctionSignature {
+    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
+        Display { value: self, db }
+    }
+}
+
+impl<'a, 'b> fmt::Display for Display<'b, &'a FunctionSignature> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let this = self.value;
+        let db = self.db;
+        write!(f, "{}", this.name.display(db))?;
+        if !this.added_templates.is_empty() || !this.implicit_templates.is_empty() {
+            write!(f, "<")?;
+            for (i, t) in this
+                .implicit_templates
+                .iter()
+                .chain(&this.added_templates)
+                .enumerate()
+            {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "T{i}")?;
+                if !t.is_empty() {
+                    write!(
+                        f,
+                        ": {}",
+                        t.iter()
+                            .map(|c| c.display(db).to_string())
+                            .collect_vec()
+                            .join(" + ")
+                    )?;
+                }
+            }
+            write!(f, ">")?;
+        }
+        write!(f, "(")?;
+        if let Some(arg) = this.zelf {
+            write!(f, "{arg}")?;
+            if !this.args.is_empty() {
+                write!(f, ", ")?;
+            }
+        }
+        write!(
+            f,
+            "{}): {}",
+            this.args
+                .iter()
+                .map(|arg| format!("{}: {}", arg.0.display(db), arg.1.display(db)))
+                .collect_vec()
+                .join(", "),
+            this.ret.display(db)
+        )?;
+
+        Ok(())
+    }
+}
+
+pub fn get_pretty_function<'a>(db: &'a dyn Db, function_id: FunctionId) -> String {
+    format!(
+        "{}::{}",
+        get_pretty_owner(db, function_id.parent(db)),
+        get_sig_of_function(db, function_id.interned())
+            .unwrap()
+            .display(db)
     )
 }
 

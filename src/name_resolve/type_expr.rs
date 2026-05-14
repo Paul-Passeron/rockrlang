@@ -183,25 +183,11 @@ pub fn templates_of_enum<'db>(
 }
 
 #[salsa::tracked]
-pub fn get_templates_of_fun<'db>(
+pub fn get_templates_of_fun_only<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-) -> Arc<[AstTemplateArg]> {
+) -> Box<[AstTemplateArg]> {
     let mut res = vec![];
-    match function.parent(db) {
-        ScopeOwnerId::Module(_) => (),
-        ScopeOwnerId::Impl(impl_id) => {
-            let sources = impl_sources(db, impl_id.interned());
-            res.extend(sources.into_iter().next().unwrap().templates(db));
-        }
-        ScopeOwnerId::Interface(id) => {
-            res.extend(
-                interface_item(db, id.def(db).interned())
-                    .template_args
-                    .clone(),
-            );
-        }
-    }
     let ast = function_ast(db, function);
     match ast.inner(db) {
         FunctionLikeAst::ExternDef(sig, _) => res.extend(sig.data.template_args.clone()),
@@ -212,6 +198,31 @@ pub fn get_templates_of_fun<'db>(
         FunctionLikeAst::TraitMethod(sig) => res.extend(sig.data.template_args.clone()),
     }
     res.into()
+}
+
+pub fn get_templates_of_owner(db: &dyn Db, owner: ScopeOwnerId) -> Box<[AstTemplateArg]> {
+    match owner {
+        ScopeOwnerId::Module(_) => Box::new([]),
+        ScopeOwnerId::Impl(impl_id) => {
+            let sources = impl_sources(db, impl_id.interned());
+            sources.into_iter().next().unwrap().templates(db).into()
+        }
+        ScopeOwnerId::Interface(id) => interface_item(db, id.def(db).interned())
+            .template_args
+            .clone()
+            .into_boxed_slice(),
+    }
+}
+
+#[salsa::tracked]
+pub fn get_templates_of_fun<'db>(
+    db: &'db dyn Db,
+    function: InternedFunctionId<'db>,
+) -> Arc<[AstTemplateArg]> {
+    get_templates_of_owner(db, function.parent(db))
+        .into_iter()
+        .chain(get_templates_of_fun_only(db, function))
+        .collect()
 }
 
 pub fn templates_of_owner<'db>(

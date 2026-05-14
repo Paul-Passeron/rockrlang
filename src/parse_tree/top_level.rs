@@ -73,6 +73,7 @@ pub struct AstMethodDefDesc {
 pub enum AstReceiver {
     None,             // No receiver, static method
     Zelf(Span),       // self
+    MutZelf(Span),    // mut self
     RefZelf(Span),    // &self
     MutRefZelf(Span), // &mut self
     PtrZelf(Span),    // *self
@@ -90,6 +91,7 @@ impl fmt::Display for AstReceiver {
         match self {
             AstReceiver::None => Ok(()),
             AstReceiver::Zelf(_) => write!(f, "self"),
+            AstReceiver::MutZelf(_) => write!(f, "mut self"),
             AstReceiver::RefZelf(_) => write!(f, "&self"),
             AstReceiver::MutRefZelf(_) => write!(f, "&mut self"),
             AstReceiver::PtrZelf(_) => write!(f, "*self"),

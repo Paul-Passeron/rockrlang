@@ -175,15 +175,17 @@ impl AstImplicitContext {
             db: &dyn Db,
             ty: &AstTypeExprDesc,
             module: ModuleId,
+            can_be_template: bool,
         ) -> Option<TypeRef> {
             match ty {
                 AstTypeExprDesc::Named { name, args } => {
                     if *name == Symbol::new(db, "Self") && module == this.owning_module(db) {
                         return Some(TypeRef::Zelf);
-                    } else if let Some(pos) = this
-                        .template_asts
-                        .iter()
-                        .position(|temp| temp.name == *name)
+                    } else if can_be_template
+                        && let Some(pos) = this
+                            .template_asts
+                            .iter()
+                            .position(|temp| temp.name == *name)
                     {
                         if !args.is_empty() {
                             return None;
@@ -218,7 +220,8 @@ impl AstImplicitContext {
                                 Definition::Module(module_id) => module_id,
                                 _ => return None,
                             };
-                        _resolve(this, db, &to.data, new_module)
+                        // Cannot be a template because of the form A::B, so B here isn't a template
+                        _resolve(this, db, &to.data, new_module, false)
                     }
                 }
                 AstTypeExprDesc::Ref { mutable, pointee } => {
@@ -255,6 +258,48 @@ impl AstImplicitContext {
                         )))
                     }
                 }
+            }
+        }
+        _resolve(self, db, ty, self.owning_module(db), true)
+    }
+
+    pub fn resolve_interface(&self, db: &dyn Db, ty: &AstTypeExprDesc) -> Option<InterfaceRef> {
+        fn _resolve(
+            this: &AstImplicitContext,
+            db: &dyn Db,
+            ty: &AstTypeExprDesc,
+            module: ModuleId,
+        ) -> Option<InterfaceRef> {
+            match ty {
+                AstTypeExprDesc::Named { name, args } => {
+                    if this.template_asts.iter().any(|temp| temp.name == *name) {
+                        return None;
+                    }
+                    match resolve_in_module(db, name.interned(), module.interned())? {
+                        Definition::Interface(def) => {
+                            let args = args
+                                .iter()
+                                .map(|arg| {
+                                    arg.as_known().and_then(|arg| this.resolve(db, &arg.data))
+                                })
+                                .collect::<Option<Vec<_>>>()?;
+                            Some(InterfaceRef::new(db, def, args))
+                        }
+                        _ => None,
+                    }
+                }
+                AstTypeExprDesc::NameResolved { from, to } => {
+                    let new_module =
+                        match resolve_in_module(db, from.interned(), module.interned())? {
+                            Definition::Module(module_id) => module_id,
+                            _ => return None,
+                        };
+                    _resolve(this, db, &to.data, new_module)
+                }
+                AstTypeExprDesc::Tuple(_)
+                | AstTypeExprDesc::Slice { .. }
+                | AstTypeExprDesc::Pointer { .. }
+                | AstTypeExprDesc::Ref { .. } => None,
             }
         }
         _resolve(self, db, ty, self.owning_module(db))

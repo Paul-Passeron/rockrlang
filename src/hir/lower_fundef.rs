@@ -1177,9 +1177,9 @@ impl<'db> LowerFundef<'db> {
             AstReceiver::Zelf(span) | AstReceiver::RefZelf(span) | AstReceiver::PtrZelf(span) => {
                 Some((Mutability::Const, span))
             }
-            AstReceiver::MutRefZelf(span) | AstReceiver::MutPtrZelf(span) => {
-                Some((Mutability::Mutable, span))
-            }
+            AstReceiver::MutZelf(span)
+            | AstReceiver::MutRefZelf(span)
+            | AstReceiver::MutPtrZelf(span) => Some((Mutability::Mutable, span)),
         } {
             self.allocate_local(
                 &mut s,
