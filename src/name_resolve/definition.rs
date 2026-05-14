@@ -1,9 +1,7 @@
 use crate::{
     Db,
     common::symbols::{InternedSymbol, Symbol},
-    name_resolve::{
-        builtin_module, core_module, core_package, module_items, std_module, std_package,
-    },
+    name_resolve::{builtin_module, core_module, core_package, module_items, std_module},
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{

@@ -6,7 +6,6 @@ use crate::{
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
-        std_module,
     },
 };
 
