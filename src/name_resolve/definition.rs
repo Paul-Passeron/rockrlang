@@ -13,8 +13,9 @@ use crate::parse_tree::type_expr::{
     AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
 };
 use crate::ril::{
-    FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId, StructId,
-    TypeDefId, TypeId, TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id, void_id,
+    FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package, ScopeOwnerId,
+    StructId, TypeDefId, TypeId, TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id,
+    void_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -60,6 +61,7 @@ fn definition_of_item<'db>(
             Some(m_id),
             None,
             vec![],
+            parent.package(db),
         ))),
         AstTopLevelItemDesc::Fundef(fundef) => Some(Definition::Function(FunctionId::new(
             db,
@@ -102,6 +104,7 @@ pub fn file_module_id<'db>(
     db: &'db dyn Db,
     fm: FileModule<'db>,
     parent: Option<ModuleId>,
+    package: Package<'db>,
 ) -> ModuleId {
     ModuleId::new(
         db,
@@ -109,6 +112,7 @@ pub fn file_module_id<'db>(
         parent,
         Some(fm.file(db).to_owned(db)),
         fm.submodules(db).clone(),
+        package,
     )
 }
 
@@ -117,11 +121,12 @@ pub fn file_module_definitions<'db>(
     db: &'db dyn Db,
     file_module: FileModule<'db>,
     parent: Option<ModuleId>,
+    package: Package<'db>,
 ) -> HashMap<Symbol, Definition> {
-    let module_id = file_module_id(db, file_module, parent);
+    let module_id = file_module_id(db, file_module, parent, package);
     let mut defs = HashMap::new();
     for sub in file_module.submodules(db) {
-        let sub_id = file_module_id(db, *sub, Some(module_id));
+        let sub_id = file_module_id(db, *sub, Some(module_id), package);
         defs.insert(sub.name(db), Definition::Module(sub_id));
     }
     defs.extend(module_definitions(db, module_id.interned()));
@@ -133,12 +138,12 @@ pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
 ) -> HashMap<Symbol, Definition> {
-    if module == builtin_module(db).interned() {
+    if module == builtin_module(db, module.package(db)).interned() {
         builtin_definitions(db)
     } else {
         let mut res = HashMap::new();
         for sub in module.file_submodules(db) {
-            let id = file_module_id(db, sub, Some(module.into()));
+            let id = file_module_id(db, sub, Some(module.into()), module.package(db));
             res.insert(id.name(db), Definition::Module(id));
         }
         let items = module_items(db, module);

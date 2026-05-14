@@ -18,7 +18,7 @@ mod tests {
         print_module_tree(&db, package.root(&db), 0);
         println!();
 
-        let has_errors = check_module_tree(&db, package.root(&db), None);
+        let has_errors = check_module_tree(&db, package.root(&db), None, package);
 
         return !has_errors;
     }

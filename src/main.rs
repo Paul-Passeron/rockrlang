@@ -12,7 +12,7 @@ use crate::{
     },
     parse_tree::top_level::AstTopLevelItemDesc,
     parser::{ParseError, parse_file},
-    ril::{FileModule, ModuleId},
+    ril::{FileModule, ModuleId, Package},
 };
 
 mod common;
@@ -113,7 +113,14 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             let ret = resolve_type_expr(db, &fd.return_type, module.interned(), &fd.template_args);
             println!("    -> {:?}", ret);
         } else if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
-            let child_id = ModuleId::new(db, module_ast.data.name, Some(module), None, vec![]);
+            let child_id = ModuleId::new(
+                db,
+                module_ast.data.name,
+                Some(module),
+                None,
+                vec![],
+                module.package(db),
+            );
             has_errors |= check_module(db, child_id);
         }
     }
@@ -138,11 +145,12 @@ fn check_module_tree<'db>(
     db: &'db RockrDb,
     file_module: FileModule<'db>,
     parent: Option<ModuleId>,
+    package: Package<'db>,
 ) -> bool {
-    let module_id = file_module_id(db, file_module, parent);
+    let module_id = file_module_id(db, file_module, parent, package);
     let mut has_errors = check_file(db, file_module.file(db), module_id);
     for sub in file_module.submodules(db) {
-        has_errors |= check_module_tree(db, *sub, Some(module_id));
+        has_errors |= check_module_tree(db, *sub, Some(module_id), package);
     }
     has_errors
 }
@@ -161,7 +169,7 @@ fn main() -> Result<(), String> {
     print_module_tree(&db, package.root(&db), 0);
     println!();
 
-    let has_errors = check_module_tree(&db, package.root(&db), None);
+    let has_errors = check_module_tree(&db, package.root(&db), None, package);
 
     if has_errors {
         Err("Compiled with some errors".to_string())
