@@ -34,6 +34,8 @@ use crate::{
 
 use super::{InferTy, implems::PotentialBlockRes};
 
+const MAX_IMPL_DEPTH: usize = 1_000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InferenceConstraintId(usize);
 
@@ -548,54 +550,60 @@ impl<'db> InferenceCtx<'db> {
         interface_id: InterfaceId,
         args: &[InferTy],
     ) -> ConstraintSolveResult {
-        let ty = &self.find(ty);
-        println!(
-            "Does {} implement {} ?",
-            ty.display(self.db),
-            interface_id.display(self.db)
-        );
-        if self.has_implementation(interface_id, ty, args) {
-            return ConstraintSolveResult::Solved;
+        if self.impl_depth >= MAX_IMPL_DEPTH {
+            return ConstraintSolveResult::Pending;
         }
 
-        self.add_implementation(interface_id, ty.clone(), args);
-        // TODO: remove implementation when erroring out, maybe
+        self.impl_depth += 1;
+        let mut result_fun = || {
+            let ty = &self.find(ty);
 
-        let impls = self.get_potential_blocks(ty);
+            if self.has_implementation(interface_id, ty, args) {
+                return ConstraintSolveResult::Solved;
+            }
 
-        let competing_impls = impls
-            .into_iter()
-            .filter(|(src, _)| {
-                src.id(self.db)
-                    .interface(self.db)
-                    .is_some_and(|this_id| this_id.def(self.db) == interface_id)
-            })
-            .collect::<HashMap<_, _>>();
-        if competing_impls.is_empty() {
-            return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
-                self.find(ty),
-                interface_id,
-                args.iter().cloned().collect(),
-            ));
-        }
-        let competing_impls = self.get_working_impls(competing_impls);
-        let impl_ = if competing_impls.len() == 1 {
-            let (_, impl_) = competing_impls.into_iter().next().unwrap();
-            impl_
-        } else {
-            todo!("Ambiguous implem")
+            self.add_implementation(interface_id, ty.clone(), args);
+            // TODO: remove implementation when erroring out, maybe
+
+            let impls = self.get_potential_blocks(ty);
+
+            let competing_impls = impls
+                .into_iter()
+                .filter(|(src, _)| {
+                    src.id(self.db)
+                        .interface(self.db)
+                        .is_some_and(|this_id| this_id.def(self.db) == interface_id)
+                })
+                .collect::<HashMap<_, _>>();
+            if competing_impls.is_empty() {
+                return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
+                    self.find(ty),
+                    interface_id,
+                    args.iter().cloned().collect(),
+                ));
+            }
+            let competing_impls = self.get_working_impls(competing_impls);
+            let impl_ = if competing_impls.len() == 1 {
+                let (_, impl_) = competing_impls.into_iter().next().unwrap();
+                impl_
+            } else {
+                todo!("Ambiguous implem")
+            };
+            for constraint in impl_.constraints {
+                self.emit_constraint(constraint.clone());
+            }
+            if let Err((inference_constraint, unification_error)) = self.solve_constraints() {
+                return ConstraintSolveResult::Error(UnificationError::UnmetConstraint(
+                    inference_constraint,
+                    Box::new(unification_error),
+                ));
+            }
+
+            ConstraintSolveResult::Solved
         };
-        for constraint in impl_.constraints {
-            self.emit_constraint(constraint.clone());
-        }
-        if let Err((inference_constraint, unification_error)) = self.solve_constraints() {
-            return ConstraintSolveResult::Error(UnificationError::UnmetConstraint(
-                inference_constraint,
-                Box::new(unification_error),
-            ));
-        }
-
-        ConstraintSolveResult::Solved
+        let result = result_fun();
+        self.impl_depth -= 1;
+        result
     }
 
     fn get_working_impls(

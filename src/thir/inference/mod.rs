@@ -73,6 +73,7 @@ pub struct InferenceCtx<'a> {
     packages: Arc<[Package<'a>]>,
     call_infos: HashMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
+    impl_depth: usize,
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -127,6 +128,7 @@ impl<'db> InferenceCtx<'db> {
             next_constraint_id: 0,
             implements: HashMap::new(),
             implicit_ctx: Arc::new(ctx),
+            impl_depth: 0,
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
