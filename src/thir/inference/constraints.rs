@@ -135,7 +135,6 @@ impl<'db> InferenceCtx<'db> {
                 InferTy::Param(id) => {
                     ConstraintSolveResult::Error(UnificationError::TemplateDereferencing(id))
                 }
-                InferTy::Zelf => todo!(),
             }
         } else {
             ConstraintSolveResult::Pending
@@ -273,7 +272,6 @@ impl<'db> InferenceCtx<'db> {
                 TypeRef::Concrete(TypeId::new(self.db, def, args))
             }
             InferTy::Param(type_param_id) => TypeRef::Param(type_param_id),
-            InferTy::Zelf => TypeRef::Zelf,
         }
     }
 
@@ -817,7 +815,6 @@ impl<'db> InferenceCtx<'db> {
                             type_param_id.0
                         )
                     }
-                    InferTy::Zelf => todo!("Trying to constraint `Self` to int like type"),
                 }
             }
         }
@@ -1211,7 +1208,7 @@ impl InferTy {
         match self {
             InferTy::Var(var) => [*var].into(),
             InferTy::Adt { fields, .. } => fields.iter().flat_map(|f| f.listeners()).collect(),
-            InferTy::Zelf | InferTy::Param(_) => HashSet::new(),
+            InferTy::Param(_) => HashSet::new(),
         }
     }
 }

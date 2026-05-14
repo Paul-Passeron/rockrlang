@@ -19,10 +19,13 @@ use crate::{
     Db,
     common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef, function_ast, owning_module},
-    name_resolve::{implems::resolve_type_expr_as_interface, type_expr::get_templates_of_fun},
+    name_resolve::{
+        implems::resolve_type_expr_as_interface,
+        type_expr::{get_templates_of_fun, get_templates_of_fun_only},
+    },
     ril::{
-        FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId,
-        TypeRef, display::Display,
+        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        display::Display,
     },
     thir::{
         Diagnostic, ExprId, InferCallInfos,
@@ -45,7 +48,6 @@ pub enum InferTy {
         fields: Box<[InferTy]>,
     },
     Param(TypeParamId),
-    Zelf,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -130,7 +132,6 @@ impl<'db> InferenceCtx<'db> {
             db,
             table,
             local_map,
-            // current_constraints: Vec::new(),
             all_constraints: BTreeMap::new(),
             solved_constraints: BTreeSet::new(),
             packages,
@@ -197,10 +198,6 @@ impl<'db> InferenceCtx<'db> {
         mem::take(&mut self.call_infos)
     }
 
-    pub fn zelf(&self) -> Option<InferTy> {
-        self.implicit_ctx().zelf().cloned()
-    }
-
     pub fn implicit_ctx(&self) -> Arc<ImplicitContext> {
         self.implicit_ctx.clone()
     }
@@ -232,7 +229,6 @@ pub enum UnificationError {
     ArgCountMismatch(FunctionId, usize),
     StaticMethodCallOnReceiver(ExprId, FunctionId),
     NoImplemCandidateFor(InferTy, InterfaceId, Box<[InferTy]>),
-    ZelfConstraining,
     InvalidStructField { id: StructId, invalid: Symbol },
     AlreadyDiagnosed,
     Custom(String),
@@ -338,9 +334,6 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     }
                 )
             }
-            UnificationError::ZelfConstraining => {
-                write!(f, "Constraining self type")
-            }
             UnificationError::AlreadyDiagnosed => Ok(()),
             UnificationError::Custom(s) => write!(f, "Custom : {s}"),
         }
@@ -382,7 +375,6 @@ impl<'db> InferenceCtx<'db> {
                     .collect::<Option<Vec<_>>>()?,
             ))),
             InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
-            InferTy::Zelf => self.zelf().map(|_| TypeRef::Zelf),
         }
     }
 }

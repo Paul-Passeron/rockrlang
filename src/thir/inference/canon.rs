@@ -13,7 +13,6 @@ use crate::{
 pub enum CanonTy {
     Hole,
     Adt { id: TypeDefId, args: Box<[CanonTy]> },
-    Zelf,
     Param(usize),
 }
 
@@ -26,7 +25,6 @@ impl<'db> InferenceCtx<'db> {
                 args: fields.iter().map(|f| self.canonize(f)).collect(),
             },
             InferTy::Param(type_param_id) => CanonTy::Param(type_param_id.0),
-            InferTy::Zelf => CanonTy::Zelf,
         }
     }
 }
@@ -55,7 +53,6 @@ impl fmt::Display for Display<'_, &CanonTy> {
                 }
                 Ok(())
             }
-            CanonTy::Zelf => write!(f, "Self"),
             CanonTy::Param(n) => write!(f, "T{}", n),
         }
     }

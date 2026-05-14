@@ -55,7 +55,6 @@ impl<'a> InferenceCtx<'a> {
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },
             InferTy::Param(_) => None,
-            InferTy::Zelf => todo!(),
         }
     }
 
