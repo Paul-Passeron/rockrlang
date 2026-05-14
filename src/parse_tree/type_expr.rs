@@ -13,6 +13,10 @@ pub enum TypeExprDesc {
         to: Box<TypeExprDesc>,
     },
     Pointer(Box<TypeExpr>),
+    Slice {
+        ty: Box<TypeExpr>,
+        len: Option<usize>,
+    },
 }
 
 pub type AnyTypeExpr = Spanned<AnyTypeExprDesc>;

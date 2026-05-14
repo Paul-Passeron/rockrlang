@@ -171,6 +171,20 @@ impl<'db> Parser<'db> {
 
                 Some(TokenKind::Dot) => {
                     self.consume();
+                    if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind.clone()) {
+                        self.consume();
+                        let end = self.get_end();
+                        let span = expr.span.start().span(&end);
+                        expr = Spanned::new(
+                            ExprDesc::TupleAccess {
+                                object: Box::new(expr),
+                                index: index as u32,
+                            },
+                            vec![],
+                            span,
+                        );
+                        continue;
+                    }
                     let field = self.parse_symbol()?;
                     if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::OpenPar) {
                         self.consume();
@@ -243,6 +257,17 @@ impl<'db> Parser<'db> {
         Ok(expr)
     }
 
+    pub(super) fn parse_int_lit(&mut self) -> Result<Spanned<usize>, ParseError> {
+        let tok = self.current_token()?.clone();
+        match tok.kind {
+            TokenKind::IntLit(v) => {
+                self.consume();
+                Ok(Spanned::new(v as usize, vec![], tok.location))
+            }
+            x => Err(self.parse_error(ParseErrorKind::ExpectedIntLit(x))),
+        }
+    }
+
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         let start = self.get_start();
         let tok = self.current_token()?.clone();
@@ -268,14 +293,45 @@ impl<'db> Parser<'db> {
                 self.consume();
                 Ok(Spanned::new(ExprDesc::BoolLit(false), vec![], tok.location))
             }
+            TokenKind::OpenBra => {
+                self.consume();
+                let mut exprs = vec![];
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::CloseBra)
+                {
+                    exprs.push(self.parse_expr()?);
+                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+                self.expect(TokenKind::CloseBra)?;
+                self.consume();
+                Ok(Spanned::new(
+                    ExprDesc::SliceLit(exprs),
+                    vec![],
+                    tok.location,
+                ))
+            }
             TokenKind::OpenPar => {
                 self.consume();
-                let inner = self.parse_expr()?;
+                let mut exprs = vec![];
+                while let Some(t) = self.peek_n(0)
+                    && !matches!(t.kind, TokenKind::ClosePar)
+                {
+                    exprs.push(self.parse_expr()?);
+                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    ExprDesc::Paren(Box::new(inner)),
+                    ExprDesc::Tuple(exprs),
                     vec![],
                     start.span(&end),
                 ))

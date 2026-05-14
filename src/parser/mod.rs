@@ -47,6 +47,7 @@ pub enum ParseErrorKind {
         found: TokenKind,
     },
     TopLevelLetDecl,
+    ExpectedIntLit(TokenKind),
 }
 
 impl<'db> Parser<'db> {

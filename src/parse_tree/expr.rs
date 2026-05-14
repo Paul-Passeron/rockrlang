@@ -51,6 +51,14 @@ pub enum ExprDesc {
         object: Box<Expr>,
         field: Symbol,
     },
+    TupleAccess {
+        object: Box<Expr>,
+        index: u32,
+    },
+    ArrowAccess {
+        object: Box<Expr>,
+        field: Symbol,
+    },
 
     Call {
         callee: Box<Expr>,
@@ -72,7 +80,9 @@ pub enum ExprDesc {
         fields: Vec<StructField>,
     },
 
-    Paren(Box<Expr>),
+    Tuple(Vec<Expr>),
+
+    SliceLit(Vec<Expr>),
 
     SizeOf(TypeExpr),
 }
