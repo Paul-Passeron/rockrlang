@@ -6,8 +6,9 @@ pub mod plumbing;
 pub use plumbing::*;
 
 use crate::{
-    OwnedSourceFile, SourceFile,
+    Db, OwnedSourceFile, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
+    name_resolve::type_expr::{templates_of_enum, templates_of_struct},
     parse_tree::top_level::AstImplItem,
 };
 
@@ -85,6 +86,7 @@ pub struct TypeParam {
 pub enum TypeRef {
     Concrete(TypeId),
     Param(TypeParamId),
+    Error,
 }
 
 #[salsa::interned]
@@ -166,3 +168,11 @@ pub struct BuiltinTypeId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceRef(salsa::Id);
+
+pub fn get_template_param_count<'db>(db: &'db dyn Db, ty: TypeDefId) -> usize {
+    match ty {
+        TypeDefId::Builtin(builtin_type_id) => builtin_type_id.template_count(db),
+        TypeDefId::Struct(struct_id) => templates_of_struct(db, struct_id.interned()).len(),
+        TypeDefId::Enum(enum_id) => templates_of_enum(db, enum_id.interned()).len(),
+    }
+}

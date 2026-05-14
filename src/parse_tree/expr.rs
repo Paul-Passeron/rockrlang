@@ -11,6 +11,7 @@ pub enum AstExprDesc {
     IntLit(i32),
     CharLit(char),
     StrLit(StrLit),
+    CStrLit(StrLit),
     BoolLit(bool),
 
     // Names and resolution

@@ -97,6 +97,11 @@ impl<'db> Parser<'db> {
                 && matches!(t.kind, TokenKind::Comma)
             {
                 self.consume();
+                if let Some(t) = self.peek_n(0)
+                    && matches!(t.kind, TokenKind::Plus)
+                {
+                    break;
+                }
             } else {
                 break;
             }
@@ -219,8 +224,9 @@ impl<'db> Parser<'db> {
         }
     }
 
-    fn parse_funsig(&mut self) -> Result<AstFunsig, ParseError> {
-        Ok(self.parse_any_funsig(false)?.0)
+    fn parse_funsig(&mut self, can_be_variadic: bool) -> Result<(AstFunsig, bool), ParseError> {
+        let (sig, _, var) = self.parse_any_funsig(false, can_be_variadic)?;
+        Ok((sig, var))
     }
 
     fn parse_methodsig(&mut self) -> Result<AstMethodsig, ParseError> {
@@ -237,7 +243,8 @@ impl<'db> Parser<'db> {
                 span,
             },
             receiver,
-        ) = self.parse_any_funsig(true)?;
+            _,
+        ) = self.parse_any_funsig(true, false)?;
         let receiver = receiver.unwrap();
         Ok(AstMethodsig::new(
             AstMethodsigDesc {
@@ -255,7 +262,9 @@ impl<'db> Parser<'db> {
     fn parse_any_funsig(
         &mut self,
         accept_receiver: bool,
-    ) -> Result<(AstFunsig, Option<AstReceiver>), ParseError> {
+        can_be_variadic: bool,
+    ) -> Result<(AstFunsig, Option<AstReceiver>, bool), ParseError> {
+        assert!(!(accept_receiver && can_be_variadic));
         let annotations = self.annotations();
         let start = self.get_start();
         let name = self.parse_symbol()?;
@@ -298,6 +307,17 @@ impl<'db> Parser<'db> {
         } else {
             vec![]
         };
+
+        let variadic = if let Some(t) = self.peek_n(0)
+            && matches!(t.kind, TokenKind::Plus)
+            && can_be_variadic
+        {
+            self.consume();
+            true
+        } else {
+            false
+        };
+
         self.expect(TokenKind::ClosePar)?;
         self.consume();
 
@@ -320,6 +340,7 @@ impl<'db> Parser<'db> {
                 start.span(&end),
             ),
             receiver,
+            variadic,
         ))
     }
 
@@ -359,17 +380,20 @@ impl<'db> Parser<'db> {
     fn parse_fundef(&mut self) -> Result<AstFundef, ParseError> {
         self.expect(TokenKind::Fun)?;
         self.consume();
-        let AstFunsig {
-            data:
-                AstFunsigDesc {
-                    name,
-                    args,
-                    template_args,
-                    return_type,
-                },
-            annotations,
-            span,
-        } = self.parse_funsig()?;
+        let (
+            AstFunsig {
+                data:
+                    AstFunsigDesc {
+                        name,
+                        args,
+                        template_args,
+                        return_type,
+                    },
+                annotations,
+                span,
+            },
+            _,
+        ) = self.parse_funsig(false)?;
 
         let body = self.parse_block()?;
 
@@ -761,6 +785,30 @@ impl<'db> Parser<'db> {
                     }),
                     vec![],
                     start.span(&self.get_end()),
+                ))
+            }
+            TokenKind::Meta => {
+                self.consume();
+                todo!()
+            }
+            TokenKind::Directive(s) if *s == Symbol::new(self.db, "extern") => {
+                let start = self.get_start();
+                self.consume();
+                self.expect(TokenKind::OpenBra)?;
+                self.consume();
+                self.collect_annotations()?;
+                self.expect(TokenKind::Fun)?;
+                self.consume();
+                let (funsig, variadic) = self.parse_funsig(true)?;
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
+                self.expect(TokenKind::CloseBra)?;
+                self.consume();
+                let end = self.get_end();
+                Ok(AstTopLevelItem::new(
+                    AstTopLevelItemDesc::ExternDef(funsig, variadic),
+                    vec![],
+                    start.span(&end),
                 ))
             }
             x => todo!("{:?}: {}", self.get_start(), x.display(self.db)),

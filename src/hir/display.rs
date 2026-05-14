@@ -25,8 +25,8 @@ impl StrLit {
     }
 }
 
-impl HirBody {
-    pub fn display<'db>(&'db self, db: &'db dyn Db) -> Display<'db, &'db Self> {
+impl<'db> HirBody<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> Display<'db, &'db Self> {
         Display { value: self, db }
     }
 }
@@ -54,14 +54,14 @@ impl fmt::Display for BinaryOperator {
     }
 }
 
-impl<'a> fmt::Display for Display<'a, &'a HirBody> {
+impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "fn {} {{", self.value.owner.display(self.db))?;
+        writeln!(f, "fn {} {{", self.value.owner(self.db).display(self.db))?;
         writeln!(
             f,
             "  params: [{}]",
             self.value
-                .params
+                .params(self.db)
                 .iter()
                 .map(|p| format!("_{}", p.0))
                 .collect::<Vec<_>>()
@@ -69,7 +69,7 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody> {
         )?;
         writeln!(f, "  locals:")?;
 
-        let mut sorted_locals = self.value.locals.clone();
+        let mut sorted_locals = self.value.locals(self.db).clone();
         sorted_locals.sort_by_key(|x| x.id);
 
         for local in &sorted_locals {
@@ -86,7 +86,7 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody> {
             )?;
         }
         writeln!(f, "  body:")?;
-        for stmt in &self.value.stmts {
+        for stmt in self.value.stmts(self.db) {
             write_stmt(f, stmt, self.db, 2)?;
         }
         writeln!(f, "}}")
@@ -303,6 +303,7 @@ fn write_expr(f: &mut fmt::Formatter<'_>, expr: &HirExpr, db: &dyn Db) -> fmt::R
         HirExprDesc::IntLit(n) => write!(f, "{}", n),
         HirExprDesc::CharLit(c) => write!(f, "'{}'", c),
         HirExprDesc::StrLit(s) => write!(f, "\"{}\"", s.display(db)),
+        HirExprDesc::CStrLit(s) => write!(f, "c\"{}\"", s.display(db)),
         HirExprDesc::BoolLit(b) => write!(f, "{}", b),
 
         HirExprDesc::Use(place) => write_place(f, place, db),

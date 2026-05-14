@@ -1,6 +1,7 @@
 use crate::{
     Db,
     common::location::Span,
+    hir::{FunctionLikeAst, function_ast},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items,
@@ -10,8 +11,8 @@ use crate::{
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
-        InternedEnumId, InternedModuleId, InternedStructId, TypeId, TypeParamId, TypeRef, ptr_of,
-        ref_of, slice_of, tuple_of,
+        FunctionId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
+        ScopeOwnerId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of,
     },
 };
 
@@ -171,4 +172,28 @@ pub fn templates_of_enum<'db>(
     enum_id: InternedEnumId<'db>,
 ) -> Vec<AstTemplateArg> {
     enum_item(db, enum_id).template_args
+}
+
+#[salsa::tracked]
+pub fn get_templates_of_fun<'db>(
+    db: &'db dyn Db,
+    function: InternedFunctionId<'db>,
+) -> Vec<AstTemplateArg> {
+    let mut res = vec![];
+    match function.parent(db) {
+        ScopeOwnerId::Module(_) => (),
+        ScopeOwnerId::Impl(impl_id) => {
+            // Add templates from the impl_id, maybe
+            todo!()
+        }
+    }
+    let ast = function_ast(db, function);
+    match ast.inner(db) {
+        FunctionLikeAst::ExternDef(_, _) => (),
+        FunctionLikeAst::Fundef(def) => {
+            res.extend(def.data.template_args.clone());
+        }
+        FunctionLikeAst::Method(_) => todo!(),
+    }
+    res
 }

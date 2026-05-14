@@ -14,7 +14,9 @@ pub enum TokenKind {
     IntLit(i32),
     CharLit(char),
     StrLit(StrLit),
+    CStrLit(StrLit),
     Directive(Symbol),
+    Hashed(Symbol), // #symbol
 
     // Keywords
     Let,
@@ -39,6 +41,7 @@ pub enum TokenKind {
     Static,
     True,
     False,
+    Meta,
     Eq,
 
     // Operators
@@ -80,8 +83,10 @@ pub enum TokenKind {
     CloseSqr,
     OpenBra,
     CloseBra,
+    DotDotDot,
     DotDot,
     Dot,
+    HashPound,
 }
 
 pub struct TokenKindDisplay<'db, 'a> {
@@ -102,7 +107,10 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::IntLit(value) => write!(f, "{}", value),
             TokenKind::CharLit(c) => write!(f, "{}", c),
             TokenKind::StrLit(s) => write!(f, "\"{}\"", s.interned().contents(self.db)),
+            TokenKind::CStrLit(s) => write!(f, "c\"{}\"", s.interned().contents(self.db)),
             TokenKind::Directive(d) => write!(f, "@{}", d.interned().contents(self.db)),
+            TokenKind::Hashed(symbol) => write!(f, "#{}", symbol.interned().contents(self.db)),
+            TokenKind::HashPound => write!(f, "#"),
             TokenKind::Let => write!(f, "let"),
             TokenKind::Mut => write!(f, "mut"),
             TokenKind::Fun => write!(f, "fun"),
@@ -156,6 +164,7 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::CloseBra => write!(f, "}}"),
             TokenKind::Dot => write!(f, "."),
             TokenKind::DotDot => write!(f, ".."),
+            TokenKind::DotDotDot => write!(f, "..."),
             TokenKind::For => write!(f, "for"),
             TokenKind::In => write!(f, "in"),
             TokenKind::Type => write!(f, "type"),
@@ -164,6 +173,7 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::Static => write!(f, "static"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
+            TokenKind::Meta => write!(f, "meta"),
         }
     }
 }

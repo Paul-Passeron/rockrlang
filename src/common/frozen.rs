@@ -2,7 +2,7 @@ use std::{
     cell::RefCell,
     fmt,
     hash::Hash,
-    mem::{MaybeUninit, transmute},
+    mem::{self, MaybeUninit, transmute},
     ops::{Index, IndexMut},
 };
 
@@ -355,6 +355,73 @@ impl<T: Hash> Hash for Frozen<T> {
 impl<T> Default for Frozen<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<T> Frozen<T> {
+    pub fn is_sorted_by_key<R: Ord>(&self, cmp: impl Fn(&T) -> R) -> bool {
+        self.iter()
+            .zip(self.iter().skip(1))
+            .all(|(a, b)| cmp(a) < cmp(b))
+    }
+
+    pub fn binary_search_by_key<R: Ord>(
+        &self,
+        value: R,
+        cmp: &impl Fn(&T) -> R,
+    ) -> Result<usize, usize> {
+        debug_assert!(self.is_sorted_by_key(cmp));
+        let l = self.len();
+        let mut left = 0;
+        let mut right = l;
+        while left < right {
+            let mid = (left + right) / 2;
+            if cmp(self.get(mid).unwrap()) < value {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        (left < l && self.get(left).map(|x| cmp(x)) == Some(value))
+            .then_some(left)
+            .ok_or(left)
+    }
+}
+
+impl<T: Ord> Frozen<T> {
+    pub fn is_sorted(&self) -> bool {
+        self.iter().zip(self.iter().skip(1)).all(|(a, b)| a <= b)
+    }
+
+    pub fn sort(&mut self) {
+        let this = mem::take(self);
+        let mut v = this.into_iter().collect::<Vec<_>>();
+        v.sort();
+        *self = Frozen::from_iter(v.into_iter());
+    }
+
+    pub fn into_sorted(self) -> Self {
+        let mut this = self;
+        this.sort();
+        this
+    }
+
+    pub fn binary_search(&self, value: &T) -> Result<usize, usize> {
+        debug_assert!(self.is_sorted());
+        let l = self.len();
+        let mut left = 0;
+        let mut right = l;
+        while left < right {
+            let mid = (left + right) / 2;
+            if self.get(mid).unwrap() < value {
+                left = mid + 1;
+            } else {
+                right = mid;
+            }
+        }
+        (left < l && self.get(left) == Some(value))
+            .then_some(left)
+            .ok_or(left)
     }
 }
 

@@ -25,6 +25,7 @@ pub enum AstTopLevelItemDesc {
     Impl(AstImplBlock),
     StructDef(AstStructDef),
     EnumDef(AstEnumDef),
+    ExternDef(AstFunsig, bool), // true means variadic
 }
 
 pub type AstModule = Spanned<AstModuleDesc>;

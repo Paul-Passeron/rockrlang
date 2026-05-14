@@ -34,9 +34,20 @@ pub fn get_token_rules<'db>() -> Vec<(
     fn(&'db dyn crate::Db, &str, Span) -> Result<Token, LexError>,
 )> {
     vec![
+        (
+            Regex::new(r#"c"(\\.|[^"\\])*""#).unwrap(),
+            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+                let len = lexeme.len();
+                Ok(Token {
+                    location,
+                    kind: TokenKind::CStrLit(StrLit::new(db, String::from(&lexeme[2..len - 1]))),
+                })
+            },
+        ),
         get_simple_rule!(r#"\$"#, TokenKind::Deref),
         get_simple_rule!(r#"::"#, TokenKind::Access),
-        get_simple_rule!(r#"\.\."#, TokenKind::DotDot),
+        get_simple_rule!("\\.\\.\\.", TokenKind::DotDotDot),
+        get_simple_rule!("\\.\\.", TokenKind::DotDot),
         get_simple_rule!(r#"\."#, TokenKind::Dot),
         get_simple_rule!(r#":"#, TokenKind::Colon),
         get_simple_rule!(r#","#, TokenKind::Comma),
@@ -71,8 +82,17 @@ pub fn get_token_rules<'db>() -> Vec<(
         get_simple_rule!("\\^", TokenKind::BitXor),
         get_simple_rule!(r#"&&"#, TokenKind::And),
         get_simple_rule!("&", TokenKind::BitAnd),
-        get_simple_rule!("\\.\\.", TokenKind::DotDot),
         get_simple_rule!("!", TokenKind::Not),
+        (
+            Regex::new("#[A-Za-z_][A-Za-z0-9_]*").unwrap(),
+            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+                Ok(Token {
+                    location,
+                    kind: TokenKind::Hashed(Symbol::new(db, String::from(&lexeme[1..]))),
+                })
+            },
+        ),
+        get_simple_rule!("#", TokenKind::HashPound),
         (
             Regex::new("@[A-Za-z_][A-Za-z0-9_]*").unwrap(),
             |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
@@ -103,6 +123,7 @@ pub fn get_token_rules<'db>() -> Vec<(
                         "defer" => TokenKind::Defer,
                         "struct" => TokenKind::Struct,
                         "enum" => TokenKind::Enum,
+                        "meta" => TokenKind::Meta,
                         "interface" => TokenKind::Interface,
                         "in" => TokenKind::In,
                         "for" => TokenKind::For,

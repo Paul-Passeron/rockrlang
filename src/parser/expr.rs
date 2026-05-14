@@ -386,6 +386,10 @@ impl<'db> Parser<'db> {
                 self.consume();
                 Ok(Spanned::new(AstExprDesc::StrLit(s), vec![], tok.location))
             }
+            TokenKind::CStrLit(s) => {
+                self.consume();
+                Ok(Spanned::new(AstExprDesc::CStrLit(s), vec![], tok.location))
+            }
             TokenKind::True => {
                 self.consume();
                 Ok(Spanned::new(

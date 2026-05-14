@@ -264,6 +264,10 @@ impl BuiltinTypeId {
         Self::new(db, Symbol::new(db, "int"))
     }
 
+    pub fn bool(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "bool"))
+    }
+
     pub fn char(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "char"))
     }
@@ -274,6 +278,10 @@ impl BuiltinTypeId {
 
     pub fn void(db: &dyn crate::Db) -> Self {
         Self::new(db, Symbol::new(db, "void"))
+    }
+
+    pub fn never(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "never"))
     }
 
     pub fn template_count(&self, db: &dyn crate::Db) -> usize {
@@ -338,6 +346,14 @@ pub fn str_id(db: &dyn crate::Db) -> TypeId {
 
 pub fn void_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
+}
+
+pub fn bool_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::bool(db).into(), vec![])
+}
+
+pub fn never_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::never(db).into(), vec![])
 }
 
 impl<'db> From<InternedInterfaceRef<'db>> for InterfaceRef {

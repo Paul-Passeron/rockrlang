@@ -24,6 +24,7 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        get_template_param_count,
     },
 };
 
@@ -56,14 +57,6 @@ impl PartialTypeRef {
             PartialTypeRef::Resolved(type_ref) => PartialTypeArg::Known(*type_ref),
             _ => PartialTypeArg::Partial(Box::new(self)),
         }
-    }
-}
-
-fn get_template_param_count<'db>(db: &'db dyn Db, ty: TypeDefId) -> usize {
-    match ty {
-        TypeDefId::Builtin(builtin_type_id) => builtin_type_id.template_count(db),
-        TypeDefId::Struct(struct_id) => templates_of_struct(db, struct_id.interned()).len(),
-        TypeDefId::Enum(enum_id) => templates_of_enum(db, enum_id.interned()).len(),
     }
 }
 
@@ -108,6 +101,8 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn expr_as_place(&mut self, expr: &AstExpr, scope: &Scope, module: ModuleId) -> HirPlace {
+        println!("Calling place with {:?}", expr.data);
+
         match &expr.data {
             AstExprDesc::Name(symbol) => {
                 if let Some(id) = scope.map.get(symbol) {
@@ -317,12 +312,14 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_expr(&mut self, expr: &AstExpr, scope: &Scope, module: ModuleId) -> HirExpr {
+        println!("Calling with {:?}", expr.data);
         HirExpr {
             id: self.alloc.next(),
             data: match &expr.data {
                 AstExprDesc::IntLit(intlit) => HirExprDesc::IntLit(*intlit as i64),
                 AstExprDesc::CharLit(c) => HirExprDesc::CharLit(*c),
                 AstExprDesc::StrLit(strlit) => HirExprDesc::StrLit(*strlit),
+                AstExprDesc::CStrLit(strlit) => HirExprDesc::CStrLit(*strlit),
                 AstExprDesc::BoolLit(boollit) => HirExprDesc::BoolLit(*boollit),
 
                 AstExprDesc::Name(symbol) => {
@@ -1101,7 +1098,7 @@ impl<'db> LowerFundef<'db> {
             .collect()
     }
 
-    fn lower(&mut self, ast: &AstFundef) -> HirBody {
+    fn lower(&mut self, ast: &AstFundef) -> HirBody<'db> {
         let mut s = Scope::new();
         let params = self.collect_args(&ast.data.args, &mut s);
         let stmts = ast
@@ -1111,6 +1108,7 @@ impl<'db> LowerFundef<'db> {
             .map(|stmt| self.lower_stmt(stmt, &mut s))
             .collect::<Vec<_>>();
         HirBody::new(
+            self.db,
             self.function,
             params,
             self.locals.drain().map(|(_, x)| x).collect::<Vec<_>>(),
@@ -1185,11 +1183,12 @@ pub(super) fn lower_fundef_body<'db>(
     db: &'db dyn Db,
     function: FunctionId,
     ast: &'db AstFundef,
-) -> HirBody {
+) -> HirBody<'db> {
     let module = match function.parent(db) {
         ScopeOwnerId::Module(m) => m,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
     };
     let template_args = ast.data.template_args.clone();
-    LowerFundef::new(db, function, module, template_args).lower(ast)
+    let mut ctx = LowerFundef::new(db, function, module, template_args);
+    ctx.lower(ast)
 }

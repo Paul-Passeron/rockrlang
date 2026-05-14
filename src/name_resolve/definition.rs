@@ -6,9 +6,9 @@ use crate::{
     parser::parse_file,
     ril::{
         EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
-        ScopeOwnerId, StructId, TypeDefId, char_id,
+        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
         display::{Display, RilDisplay},
-        int_id, str_id, void_id,
+        int_id, never_id, str_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -76,6 +76,11 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
             EnumId::new(db, ast_enum_def.name, m_id.into()),
         ))),
+        AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(FunctionId::new(
+            db,
+            funsig.data.name,
+            ScopeOwnerId::Module(m_id),
+        ))),
     }
 }
 
@@ -90,6 +95,14 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
         (
             Symbol::new(db, "char"),
             Definition::Type(char_id(db).def(db)),
+        ),
+        (
+            Symbol::new(db, "bool"),
+            Definition::Type(bool_id(db).def(db)),
+        ),
+        (
+            Symbol::new(db, "never"),
+            Definition::Type(never_id(db).def(db)),
         ),
         (Symbol::new(db, "str"), Definition::Type(str_id(db).def(db))),
     ]);

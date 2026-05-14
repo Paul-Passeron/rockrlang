@@ -14,7 +14,8 @@ use crate::{
         file_module_id, std_package,
     },
     parser::{ParseError, parse_file},
-    ril::{FileModule, ModuleId, Package},
+    ril::{FileModule, ModuleId, Package, display::RilDisplay},
+    thir::type_check_function,
 };
 
 mod common;
@@ -120,8 +121,17 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
     for def in v {
         match def {
             Definition::Function(function_id) => {
-                let hir = hir_body(db, function_id.interned());
-                println!("{}", hir.display(db));
+                println!("---------------------------------");
+                println!("{}", function_id.display(db));
+                println!("---------------------------------");
+                if let Some(hir) = hir_body(db, function_id.interned()) {
+                    println!("{}", hir.display(db));
+                }
+                if let Some(results) = type_check_function(db, function_id.interned()) {
+                    for (expr_id, ty) in &results.node_types(db) {
+                        println!("{:?}: {}", expr_id, ty.display(db));
+                    }
+                }
             }
             _ => (),
         }
