@@ -560,7 +560,22 @@ impl<'db> InferenceCtx<'db> {
                 let (_, impl_) = competing_impls.into_iter().next().unwrap();
                 impl_
             } else {
-                todo!("Ambiguous implem")
+                let mut iterator = competing_impls.iter();
+                let fst = iterator.next().unwrap();
+                let snd = iterator.next().unwrap();
+                todo!(
+                    "Ambiguous implems: \n    {}\n    {}",
+                    fst.0
+                        .span(self.db)
+                        .start()
+                        .loc_info(self.db, fst.0.module(self.db))
+                        .unwrap(),
+                    snd.0
+                        .span(self.db)
+                        .start()
+                        .loc_info(self.db, fst.0.module(self.db))
+                        .unwrap()
+                )
             };
             for constraint in impl_.constraints {
                 self.emit_constraint(constraint.clone());

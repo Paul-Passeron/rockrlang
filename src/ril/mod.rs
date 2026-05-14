@@ -180,3 +180,9 @@ pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
         TypeDefId::Enum(enum_id) => templates_of_enum(db, enum_id.interned()).len(),
     }
 }
+
+impl ModuleId {
+    pub fn get_span(&self, db: &dyn Db) -> Span {
+        todo!()
+    }
+}

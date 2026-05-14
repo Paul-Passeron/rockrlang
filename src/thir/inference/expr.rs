@@ -1,15 +1,19 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use crate::{
-    common::symbols::Symbol,
+    common::{location::Span, symbols::Symbol},
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
         PartialTypeArg, PartialTypeRef, function_ast,
     },
     name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
+    parse_tree::top_level::AstStructDef,
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     thir::{
-        ExprId,
+        Diagnostic, DiagnosticKind, ExprId,
         inference::{implicit::ImplicitContext, var::InferVar},
     },
 };
@@ -40,7 +44,9 @@ impl<'db> InferenceCtx<'db> {
                 self.infer_static(ExprId(expr.id), ty, *method, args)
             }
             HirExprDesc::BinOp { lhs, op, rhs } => self.infer_binop(lhs, *op, rhs),
-            HirExprDesc::StructLit { ty, fields } => self.infer_struct_lit(ty, fields),
+            HirExprDesc::StructLit { ty, fields } => {
+                self.infer_struct_lit(ty, fields, expr.span.clone())
+            }
             HirExprDesc::Neg(hir_expr) => {
                 let ty = self.infer_expr(hir_expr)?;
                 self.unify(ty.clone(), self.int_ty())?;
@@ -243,6 +249,7 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         ty: &PartialTypeRef,
         fields: &[(Symbol, HirExpr)],
+        span: Span,
     ) -> Result<InferTy, UnificationError> {
         if let Some((struct_id, templates)) = self.allocate_struct_partial_ref(ty) {
             let ast = struct_item(self.db, struct_id.interned());
@@ -250,18 +257,8 @@ impl<'db> InferenceCtx<'db> {
                 .iter()
                 .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
-            if ast.fields.len() != inferred_fields.len() {
-                let missing = ast
-                    .fields
-                    .iter()
-                    .find(|field| !inferred_fields.contains_key(&field.name))
-                    .unwrap()
-                    .name;
-                return Err(UnificationError::IncompleteStructLit {
-                    id: struct_id,
-                    missing,
-                });
-            }
+
+            self.diagnose_bad_struct_fields(fields, span, &ast, &inferred_fields, struct_id)?;
 
             let module = struct_id.parent(self.db);
             let zelf = self.fresh_var();
@@ -294,6 +291,61 @@ impl<'db> InferenceCtx<'db> {
         } else {
             Err(UnificationError::NonStructForStructLit(ty.clone()))
         }
+    }
+
+    fn diagnose_bad_struct_fields(
+        &mut self,
+        fields: &[(Symbol, HirExpr)],
+        span: Span,
+        ast: &Arc<AstStructDef>,
+        inferred_fields: &HashMap<Symbol, InferTy>,
+        struct_id: StructId,
+    ) -> Result<(), UnificationError> {
+        let field_sets = (
+            inferred_fields.keys().copied().collect::<HashSet<_>>(),
+            ast.fields.iter().map(|f| f.name).collect::<HashSet<_>>(),
+        );
+        if field_sets.0 != field_sets.1 {
+            let all_fields = field_sets
+                .0
+                .union(&field_sets.1)
+                .copied()
+                .collect::<HashSet<_>>();
+            // For ast fields not in inferred fields
+            for field in field_sets.1.difference(&all_fields) {
+                self.diagnostics.push(Diagnostic {
+                    kind: DiagnosticKind::UniError {
+                        err: UnificationError::IncompleteStructLit {
+                            id: struct_id,
+                            missing: *field,
+                        },
+                        message: format!("Missing field in struct lit"),
+                    },
+                    span: span.clone(),
+                });
+            }
+            // For inferred fields not in ast fields
+            for field in field_sets.0.difference(&all_fields) {
+                self.diagnostics.push(Diagnostic {
+                    kind: DiagnosticKind::UniError {
+                        err: UnificationError::InvalidStructField {
+                            id: struct_id,
+                            invalid: *field,
+                        },
+                        message: format!("Invalid field in struct lit"),
+                    },
+                    span: fields
+                        .iter()
+                        .find(|(name, _)| name == field)
+                        .expect("field should be in fields")
+                        .1
+                        .span
+                        .clone(),
+                });
+            }
+            return Err(UnificationError::AlreadyDiagnosed);
+        }
+        Ok(())
     }
 
     fn infer_constructor(

@@ -10,7 +10,10 @@ impl<'a> InferenceCtx<'a> {
     ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
             HirPatternDesc::Bind { id, .. } => {
-                let var = *self.local_map.get(id).unwrap();
+                let var = *self
+                    .local_map
+                    .get(id)
+                    .expect("Internal error: local_map should contain all bind ids");
                 if let Some(_like) = binds_like {
                     todo!()
                 }

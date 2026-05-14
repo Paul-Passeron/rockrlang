@@ -6,9 +6,12 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     ril::{BuiltinTypeId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
-    thir::inference::{
-        InferTy, InferenceCtx,
-        implicit::{AsAstImplCtx, ImplicitContext},
+    thir::{
+        Diagnostic, DiagnosticKind,
+        inference::{
+            InferTy, InferenceCtx,
+            implicit::{AsAstImplCtx, ImplicitContext},
+        },
     },
 };
 
@@ -128,7 +131,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_type_ref(&self, type_ref: &TypeRef, ctx: &ImplicitContext) -> InferTy {
+    pub fn allocate_type_ref(&mut self, type_ref: &TypeRef, ctx: &ImplicitContext) -> InferTy {
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
@@ -138,7 +141,21 @@ impl<'db> InferenceCtx<'db> {
                     .map(|ty| self.allocate_type_ref(ty, ctx))
                     .collect(),
             },
-            TypeRef::Param(type_param_id) => ctx.get_template(type_param_id.0).unwrap().clone(),
+            TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
+                Some(res) => res.clone(),
+                None => {
+                    let templates = ctx.get_ast_templates();
+                    self.diagnostics.push(Diagnostic {
+                        kind: DiagnosticKind::Custom(format!("")),
+                        span: if let Some(ast) = templates.first() {
+                            ast.span.clone()
+                        } else {
+                            ctx.owning_module(self.db).get_span(self.db)
+                        },
+                    });
+                    InferTy::Var(self.fresh_var())
+                }
+            },
             TypeRef::Error => panic!(),
             TypeRef::Zelf => {
                 if let Some(zelf) = ctx.zelf() {
@@ -183,7 +200,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn allocate_ast_type_expr(
-        &self,
+        &mut self,
         type_expr: &AstTypeExprDesc,
         ctx: &ImplicitContext,
     ) -> Option<InferTy> {
@@ -204,8 +221,7 @@ impl<'db> InferenceCtx<'db> {
                 Arc::new([]),
                 templates.iter().cloned().collect(),
                 None,
-            )
-            .unwrap();
+            )?;
             ast.fields
                 .iter()
                 .map(|field| {
