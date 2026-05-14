@@ -13,8 +13,8 @@ use crate::parse_tree::type_expr::{
     AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
 };
 use crate::ril::{
-    FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId, StructId, TypeDefId, TypeId,
-    TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id, void_id,
+    FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId, StructId,
+    TypeDefId, TypeId, TypeParamId, TypeRef, char_id, int_id, ptr_of, slice_of, str_id, void_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -59,6 +59,7 @@ fn definition_of_item<'db>(
             module.data.name,
             Some(m_id),
             None,
+            vec![],
         ))),
         AstTopLevelItemDesc::Fundef(fundef) => Some(Definition::Function(FunctionId::new(
             db,
@@ -97,6 +98,37 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> HashMap<Symbol, Definition> 
 }
 
 #[salsa::tracked]
+pub fn file_module_id<'db>(
+    db: &'db dyn Db,
+    fm: FileModule<'db>,
+    parent: Option<ModuleId>,
+) -> ModuleId {
+    ModuleId::new(
+        db,
+        fm.name(db),
+        parent,
+        Some(fm.file(db).to_owned(db)),
+        fm.submodules(db).clone(),
+    )
+}
+
+#[salsa::tracked]
+pub fn file_module_definitions<'db>(
+    db: &'db dyn Db,
+    file_module: FileModule<'db>,
+    parent: Option<ModuleId>,
+) -> HashMap<Symbol, Definition> {
+    let module_id = file_module_id(db, file_module, parent);
+    let mut defs = HashMap::new();
+    for sub in file_module.submodules(db) {
+        let sub_id = file_module_id(db, *sub, Some(module_id));
+        defs.insert(sub.name(db), Definition::Module(sub_id));
+    }
+    defs.extend(module_definitions(db, module_id.interned()));
+    defs
+}
+
+#[salsa::tracked]
 pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
@@ -105,6 +137,10 @@ pub fn module_definitions<'db>(
         builtin_definitions(db)
     } else {
         let mut res = HashMap::new();
+        for sub in module.file_submodules(db) {
+            let id = file_module_id(db, sub, Some(module.into()));
+            res.insert(id.name(db), Definition::Module(id));
+        }
         let items = module_items(db, module);
         items.iter().for_each(|items| {
             items.iter().for_each(|item| {
@@ -115,6 +151,7 @@ pub fn module_definitions<'db>(
                     })
             })
         });
+
         res
     }
 }

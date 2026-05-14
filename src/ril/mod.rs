@@ -43,6 +43,7 @@ pub struct InternedModuleId {
     pub name: Symbol,
     pub parent: Option<ModuleId>,
     pub file: Option<OwnedSourceFile>,
+    pub file_submodules: Vec<FileModule<'db>>,
 }
 
 #[salsa::interned]
@@ -142,13 +143,14 @@ impl<'db> From<ModuleId> for InternedModuleId<'db> {
 }
 
 impl ModuleId {
-    pub fn new(
-        db: &dyn crate::Db,
+    pub fn new<'db>(
+        db: &'db dyn crate::Db,
         name: Symbol,
         parent: Option<ModuleId>,
         file: Option<OwnedSourceFile>,
+        file_submodules: Vec<FileModule<'db>>,
     ) -> Self {
-        InternedModuleId::new(db, name, parent, file).into()
+        InternedModuleId::new(db, name, parent, file, file_submodules).into()
     }
 
     pub fn interned(self) -> InternedModuleId<'static> {

@@ -18,7 +18,7 @@ pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> So
 
 #[salsa::tracked]
 pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
-    ModuleId::new(db, Symbol::new(db, "@builtin"), None, None)
+    ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![])
 }
 
 /// Build the ModuleId hierarchy for a FileModule tree rooted at a package root.
@@ -35,6 +35,7 @@ pub fn file_module_id<'db>(
         file_module.name(db),
         Some(actual_parent),
         Some(file_module.file(db).to_owned(db)),
+        file_module.submodules(db).clone(),
     );
     // Eagerly register submodules so their ModuleIds exist with the right parent
     for sub in file_module.submodules(db) {
@@ -44,7 +45,8 @@ pub fn file_module_id<'db>(
 }
 
 #[salsa::tracked]
-pub fn root_module<'db>(db: &'db dyn Db, file: SourceFile<'db>) -> ModuleId {
+pub fn root_module<'db>(db: &'db dyn Db, file_module: FileModule<'db>) -> ModuleId {
+    let file = file_module.file(db);
     let full_name = if file.path(db).file_name().unwrap() == "main.rkr" {
         file.path(db)
             .parent()
@@ -64,7 +66,13 @@ pub fn root_module<'db>(db: &'db dyn Db, file: SourceFile<'db>) -> ModuleId {
         full_name
     };
     let name = Symbol::new(db, full_name);
-    ModuleId::new(db, name, Some(builtin_module(db)), Some(file.to_owned(db)))
+    ModuleId::new(
+        db,
+        name,
+        Some(builtin_module(db)),
+        Some(file.to_owned(db)),
+        file_module.submodules(db).clone(),
+    )
 }
 
 #[allow(dead_code)]

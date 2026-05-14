@@ -113,7 +113,7 @@ fn check_module<'db>(db: &'db dyn Db, module: ModuleId) -> bool {
             let ret = resolve_type_expr(db, &fd.return_type, module.interned(), &fd.template_args);
             println!("    -> {:?}", ret);
         } else if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
-            let child_id = ModuleId::new(db, module_ast.data.name, Some(module), None);
+            let child_id = ModuleId::new(db, module_ast.data.name, Some(module), None, vec![]);
             has_errors |= check_module(db, child_id);
         }
     }
