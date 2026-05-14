@@ -19,7 +19,7 @@ use crate::ril::{
     FileModule, FunctionId, ImplSource, InterfaceId, InterfaceRef, InternedFunctionId, ModuleId,
     Package, ScopeOwnerId, TypeDefId, TypeRef,
 };
-use crate::thir::inference::implicit::{AstImplicitContext, ImplicitContext};
+use crate::thir::inference::implicit::AstImplicitContext;
 use crate::thir::{ExprId, type_check_function};
 use crate::{Db, OwnedSourceFile, RockrDb, driver};
 

@@ -106,16 +106,28 @@ impl fmt::Display for Display<'_, TypeId> {
         let def = self.value.def(self.db);
         let args = self.value.args(self.db);
 
-        if def == TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)) {
-            write!(f, "(")?;
-            for (i, arg) in args.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
+        if let TypeDefId::Builtin(builtin) = def {
+            if builtin == BuiltinTypeId::tuple(self.db) {
+                write!(f, "(")?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg.display(self.db))?;
                 }
-                write!(f, "{}", arg.display(self.db))?;
+                write!(f, ")")?;
+                return Ok(());
             }
-            write!(f, ")")?;
-            return Ok(());
+
+            if builtin.is_ptr_like(self.db).is_some() {
+                let txt = builtin.display(self.db).to_string();
+                let txt = if txt.ends_with("t") {
+                    format!("{txt} ")
+                } else {
+                    txt
+                };
+                return write!(f, "{txt}{}", args[0].display(self.db));
+            }
         }
 
         write!(f, "{}", def.display(self.db))?;
