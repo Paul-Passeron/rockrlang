@@ -94,6 +94,18 @@ pub enum InferenceConstraintKind {
         rhs_ty: InferTy,
         op: BinaryOperator,
     },
+    IntLike {
+        res_ty: InferVar,
+    },
+}
+
+impl InferenceConstraintKind {
+    pub fn has_default_behaviour(&self) -> bool {
+        match self {
+            InferenceConstraintKind::IntLike { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -439,7 +451,7 @@ impl<'db> InferenceCtx<'db> {
                 let src = possible.0;
                 println!("Here: {}", src.id(self.db).display(self.db))
             }
-            todo!()
+            return ConstraintSolveResult::Pending;
         }
         let (
             src,
@@ -713,6 +725,28 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn try_default_constraint(
+        &mut self,
+        constraint: &InferenceConstraint,
+    ) -> ConstraintSolveResult {
+        if !constraint.kind.has_default_behaviour() {
+            panic!(
+                "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
+            )
+        }
+        match constraint.kind {
+            InferenceConstraintKind::IntLike { res_ty } => {
+                match self.unify(InferTy::Var(res_ty), self.int_ty()) {
+                    Ok(()) => ConstraintSolveResult::Solved,
+                    Err(err) => ConstraintSolveResult::Error(err),
+                }
+            }
+            _ => {
+                unreachable!("`try_default_constraint` is not in sync with `has_default_behaviour`")
+            }
+        }
+    }
+
     fn try_solve_constraint(&mut self, constraint: &InferenceConstraint) -> ConstraintSolveResult {
         if self.solved_constraints.contains(&constraint.id) {
             return ConstraintSolveResult::Solved;
@@ -765,25 +799,59 @@ impl<'db> InferenceCtx<'db> {
                 lhs_ty,
                 rhs_ty,
                 op,
-            } => todo!("{op:#?}"),
+            } => self.solve_binop_constraint(*res_ty, lhs_ty, rhs_ty, *op),
+            InferenceConstraintKind::IntLike { res_ty } => todo!(),
         }
     }
 
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
-        while let Some(id) = self.ready.pop_front() {
-            let constraint = self.all_constraints[&id].clone();
-            match self.try_solve_constraint(&constraint) {
-                ConstraintSolveResult::Solved => {
-                    self.solved_constraints.insert(id);
+        loop {
+            while let Some(id) = self.ready.pop_front() {
+                let constraint = self.all_constraints[&id].clone();
+                match self.try_solve_constraint(&constraint) {
+                    ConstraintSolveResult::Solved => {
+                        self.solved_constraints.insert(id);
+                    }
+                    ConstraintSolveResult::Pending => {
+                        self.register_listeners(&constraint);
+                    }
+                    ConstraintSolveResult::Error(e) => return Err((constraint, e)),
                 }
-                ConstraintSolveResult::Pending => {
-                    self.register_listeners(&constraint);
+            }
+
+            // For all pending constraints remaining, solve them using the default behaviour
+            // Might want to do this one at a time, in order to avoid non-determinism issues
+
+            let pending = self
+                .all_constraints
+                .iter()
+                .filter(|(id, constraint)| {
+                    !self.solved_constraints.contains(*id)
+                        && (constraint.kind.has_default_behaviour())
+                })
+                .next()
+                .map(|(_, val)| val.clone());
+            match pending {
+                None => {
+                    break;
                 }
-                ConstraintSolveResult::Error(e) => return Err((constraint, e)),
+                Some(constraint) => {
+                    let res = self.try_default_constraint(constraint.as_ref());
+                    match res {
+                        ConstraintSolveResult::Solved => {
+                            self.solved_constraints.insert(constraint.id);
+                        }
+                        ConstraintSolveResult::Pending => {
+                            panic!("Default constraint solving should never return pending")
+                        }
+                        ConstraintSolveResult::Error(e) => return Err((constraint, e)),
+                    }
+                }
             }
         }
+
         Ok(())
     }
 
@@ -898,6 +966,107 @@ impl<'db> InferenceCtx<'db> {
         });
         res_ty
     }
+
+    pub fn emit_intlike_constraint(&mut self) -> InferVar {
+        let res_ty = self.fresh_var();
+        self.emit_constraint(InferenceConstraintKind::IntLike { res_ty });
+        res_ty
+    }
+
+    fn solve_binop_constraint(
+        &mut self,
+        res_ty: InferVar,
+        lhs_ty: &InferTy,
+        rhs_ty: &InferTy,
+        op: BinaryOperator,
+    ) -> ConstraintSolveResult {
+        let lhs_ty = self.find(lhs_ty);
+        let rhs_ty = self.find(rhs_ty);
+
+        let is_int_like = |id: TypeDefId| -> Option<BuiltinTypeId> {
+            match id {
+                TypeDefId::Builtin(id)
+                    if id == BuiltinTypeId::int(self.db)
+                        || id == BuiltinTypeId::char(self.db)
+                        || id == BuiltinTypeId::mut_ptr(self.db)
+                        || id == BuiltinTypeId::ptr(self.db) =>
+                {
+                    Some(id)
+                }
+                _ => None,
+            }
+        };
+        // Is one of them a builtin arithmetic type ?
+        // if yes: handle that case specifically
+        // otherwise, both must be of the same type
+        // and this type must implement the <op> interface
+        // or something etc...
+
+        if let Some((lid, _)) = lhs_ty.is_adt()
+            && let Some((rid, _)) = rhs_ty.is_adt()
+        {
+            if let Some(lid) = is_int_like(lid)
+                && let Some(rid) = is_int_like(rid)
+            {
+                return self.solve_int_binop(res_ty, lid, rid, op);
+            }
+        }
+
+        match (&lhs_ty, &rhs_ty) {
+            (InferTy::Var(_), InferTy::Var(_)) => {
+                return ConstraintSolveResult::Pending;
+            }
+            (InferTy::Var(v), InferTy::Adt { def, fields })
+            | (InferTy::Adt { def, fields }, InferTy::Var(v))
+                if fields.is_empty()
+                    && let Some(int_like) = is_int_like(*def) =>
+            {
+                if let Err(err) = self.unify(InferTy::Var(*v), rhs_ty.clone()) {
+                    return ConstraintSolveResult::Error(err);
+                }
+                self.solve_int_binop(res_ty, int_like, int_like, op)
+            }
+            (lhs_ty, rhs_ty) => todo!(
+                "Implement non arithmetic binops: `{} {op} {}`",
+                lhs_ty.display(self.db),
+                rhs_ty.display(self.db)
+            ),
+        }
+    }
+
+    fn solve_int_binop(
+        &mut self,
+        res_ty: InferVar,
+        lid: BuiltinTypeId,
+        rid: BuiltinTypeId,
+        op: BinaryOperator,
+    ) -> ConstraintSolveResult {
+        match op {
+            BinaryOperator::Diff => {
+                // We know they are int like, so it is safe to just say
+                // that res_ty must be bool
+                if let Err(err) = self.unify(InferTy::Var(res_ty), self.bool_ty()) {
+                    return ConstraintSolveResult::Error(err);
+                }
+                ConstraintSolveResult::Solved
+            }
+            BinaryOperator::Plus => {
+                if lid == rid {
+                    let ty = InferTy::Adt {
+                        def: TypeDefId::Builtin(lid),
+                        fields: Box::new([]),
+                    };
+                    if let Err(err) = self.unify(InferTy::Var(res_ty), ty) {
+                        return ConstraintSolveResult::Error(err);
+                    }
+                    ConstraintSolveResult::Solved
+                } else {
+                    todo!()
+                }
+            }
+            op => todo!("{} {op} {}", lid.display(self.db), rid.display(self.db)),
+        }
+    }
 }
 
 impl InferenceConstraintKind {
@@ -1009,7 +1178,15 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 lhs_ty,
                 rhs_ty,
                 op,
-            } => todo!(),
+            } => {
+                write!(
+                    f,
+                    "Binop<{op}> lhs: {}, rhs: {}, res_ty: {res_ty}",
+                    lhs_ty.display(self.db),
+                    rhs_ty.display(self.db),
+                )
+            }
+            InferenceConstraintKind::IntLike { res_ty } => todo!(),
         }
     }
 }
@@ -1110,6 +1287,7 @@ impl InferenceConstraintKind {
                 .chain(rhs_ty.listeners())
                 .chain(ctx.find(&InferTy::Var(*res_ty)).listeners())
                 .collect(),
+            InferenceConstraintKind::IntLike { res_ty } => todo!(),
         }
     }
 }

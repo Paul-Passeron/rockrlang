@@ -3,17 +3,21 @@ use std::{
     sync::Arc,
 };
 
+use itertools::Itertools;
+
 use crate::{
-    common::{
-        location::{Span, get_loc_info},
-        symbols::Symbol,
-    },
+    common::{location::Span, symbols::Symbol},
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
         PartialTypeArg, PartialTypeRef, function_ast,
     },
-    name_resolve::type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_struct},
-    parse_tree::{expr::BinaryOperator, top_level::AstStructDef},
+    name_resolve::type_expr::{
+        enum_item, get_templates_of_fun, struct_item, templates_of_enum, templates_of_struct,
+    },
+    parse_tree::{
+        expr::BinaryOperator,
+        top_level::{AstEnumVariantKind, AstStructDef},
+    },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     thir::{
         Diagnostic, DiagnosticKind, ExprId,
@@ -375,11 +379,8 @@ impl<'db> InferenceCtx<'db> {
         args: &HirConstructorArgs,
         template_hints: &[PartialTypeArg],
     ) -> Result<InferTy, UnificationError> {
-        let Some(variant) = enum_item(self.db, enum_def.interned())
-            .variants
-            .iter()
-            .find(|variant| variant.name == name)
-        else {
+        let variants = &enum_item(self.db, enum_def.interned()).variants;
+        let Some(variant) = variants.iter().find(|variant| variant.name == name) else {
             todo!(
                 "report unknown variant `{}` in type `{}`",
                 name.display(self.db),
@@ -387,7 +388,55 @@ impl<'db> InferenceCtx<'db> {
             )
         };
 
-        todo!()
+        let enum_templates = templates_of_enum(self.db, enum_def.interned());
+
+        let templates: Arc<[InferTy]> = enum_templates
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                // TODO: handle conformances for t
+                let var = InferTy::Var(self.fresh_var());
+                if let Some(hint) = template_hints.get(i) {
+                    let allocated = self.allocate_partial_type_arg(hint, &self.implicit_ctx());
+                    self.unify(allocated, var.clone())?;
+                }
+                Ok(var)
+            })
+            .try_collect()?;
+
+        let zelf = self.fresh_var();
+
+        let ctx = ImplicitContext::new(
+            self.db,
+            ScopeOwnerId::Module(enum_def.parent(self.db)),
+            enum_templates.iter().cloned().collect(),
+            templates.clone(),
+            Some(InferTy::Var(zelf)),
+        )
+        .unwrap();
+
+        match (args, &variant.kind) {
+            (HirConstructorArgs::TupleLike(hir_exprs), AstEnumVariantKind::TupleLike(spanneds)) => {
+                assert_eq!(hir_exprs.len(), spanneds.len());
+                for (hir, ast) in hir_exprs.iter().zip(spanneds) {
+                    let hir_ty = self.infer_expr(hir)?;
+                    let in_ctx = self.allocate_ast_type_expr(&ast.data, &ctx).unwrap();
+                    self.unify(hir_ty, in_ctx)?;
+                }
+            }
+            (HirConstructorArgs::StructLike { .. }, AstEnumVariantKind::StructLike(_)) => {
+                todo!();
+            }
+            (HirConstructorArgs::None, AstEnumVariantKind::Unit) => (),
+            _ => todo!("handle constructor kind mismatch between decl and use"),
+        }
+
+        let as_enum = InferTy::Adt {
+            def: TypeDefId::Enum(enum_def),
+            fields: templates.iter().cloned().collect(),
+        };
+        self.unify(InferTy::Var(zelf), as_enum.clone())?;
+        Ok(InferTy::Var(zelf))
     }
 
     fn infer_static(
