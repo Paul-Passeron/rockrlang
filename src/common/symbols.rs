@@ -5,7 +5,6 @@ pub struct InternedSymbol {
     pub contents: String,
 }
 
-/// A 'static-compatible symbol ID, safe to store anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol(salsa::Id);
 

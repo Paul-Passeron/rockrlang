@@ -1,75 +1,75 @@
 #[cfg(test)]
 mod tests {
+
     use std::path::PathBuf;
 
-    use crate::{
-        RockrDb,
-        driver::get_non_empty_files_from_paths,
-        parser::{ParseError, parse_file},
-    };
+    use crate::{RockrDb, check_module_tree, driver::load_package, print_module_tree};
 
-    fn parse_path(path: &str) -> Vec<String> {
+    fn parse_path(path: &str) -> bool {
         let db = RockrDb::default();
-        let files =
-            get_non_empty_files_from_paths(&db, &[PathBuf::from(path)]).expect("no files found");
-        let mut errors = Vec::new();
-        for file in files {
-            parse_file(&db, file);
-            let errs: Vec<&ParseError> = parse_file::accumulated::<ParseError>(&db, file);
-            for e in errs {
-                errors.push(format!("{:?}", e));
-            }
-        }
-        errors
+
+        let root_path = PathBuf::from(path);
+
+        let package = load_package(&db, &root_path)
+            .ok_or_else(|| format!("No package found at `{}`", root_path.display()))
+            .unwrap();
+
+        println!("Package structure:");
+        print_module_tree(&db, package.root(&db), 0);
+        println!();
+
+        let has_errors = check_module_tree(&db, package.root(&db), None);
+
+        return !has_errors;
     }
 
     #[test]
     fn std_io() {
-        assert!(dbg!(parse_path("std/io")).is_empty());
+        assert!(dbg!(parse_path("std/io")));
     }
 
     #[test]
     fn example_module_crate() {
-        assert!(dbg!(parse_path("examples/module")).is_empty());
+        assert!(dbg!(parse_path("examples/module")));
     }
 
     #[test]
     fn example_args() {
-        assert!(dbg!(parse_path("examples/args.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/args.rkr")));
     }
 
     #[test]
     fn example_empty() {
-        assert!(dbg!(parse_path("examples/empty.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/empty.rkr")));
     }
 
     #[test]
     fn example_hello_world() {
-        assert!(dbg!(parse_path("examples/hello_world.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/hello_world.rkr")));
     }
 
     #[test]
     fn example_index() {
-        assert!(dbg!(parse_path("examples/index.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/index.rkr")));
     }
 
     #[test]
     fn example_modules() {
-        assert!(dbg!(parse_path("examples/modules.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/modules.rkr")));
     }
 
     #[test]
     fn example_smart_pointers() {
-        assert!(dbg!(parse_path("examples/smart_pointers.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/smart_pointers.rkr")));
     }
 
     #[test]
     fn example_slices() {
-        assert!(dbg!(parse_path("examples/slices.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/slices.rkr")));
     }
 
     #[test]
     fn example_tuples() {
-        assert!(dbg!(parse_path("examples/tuples.rkr")).is_empty());
+        assert!(dbg!(parse_path("examples/tuples.rkr")));
     }
 }

@@ -10,7 +10,7 @@ pub enum AstTypeExprDesc {
     },
     NameResolved {
         from: Symbol,
-        to: Box<AstTypeExprDesc>,
+        to: Box<AstTypeExpr>,
     },
     Pointer(Box<AstTypeExpr>),
     Slice {

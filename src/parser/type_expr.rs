@@ -57,7 +57,7 @@ impl<'db> Parser<'db> {
                         Ok(Spanned::new(
                             AstTypeExprDesc::NameResolved {
                                 from: name,
-                                to: Box::new(rhs.data),
+                                to: Box::new(rhs),
                             },
                             vec![],
                             start.span(&end),

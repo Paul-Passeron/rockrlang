@@ -3,7 +3,40 @@
 
 use std::marker::PhantomData;
 
-use crate::{OwnedSourceFile, common::symbols::Symbol};
+use crate::{OwnedSourceFile, SourceFile, common::symbols::Symbol};
+
+#[salsa::tracked]
+pub struct FileModule<'db> {
+    pub file: SourceFile<'db>,
+    #[returns(ref)]
+    pub submodules: Vec<FileModule<'db>>,
+}
+
+impl<'db> FileModule<'db> {
+    pub fn name(&self, db: &'db dyn crate::Db) -> Symbol {
+        let path = self.file(db).path(db);
+        let stem = path
+            .parent()
+            .and_then(|parent| {
+                // If this file is main.rkr, the module name is the directory name
+                if path.file_name().and_then(|n| n.to_str()) == Some("main.rkr") {
+                    parent.file_name()
+                } else {
+                    None
+                }
+            })
+            .or_else(|| path.file_stem())
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        Symbol::new(db, stem)
+    }
+}
+
+#[salsa::tracked]
+pub struct Package<'db> {
+    pub root: FileModule<'db>,
+}
 
 #[salsa::interned]
 pub struct InternedModuleId {
@@ -25,7 +58,7 @@ pub struct InternedStructId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TypeParamId(usize);
+pub struct TypeParamId(pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeParam {
@@ -55,7 +88,12 @@ pub struct InternedInterfaceId {
 #[salsa::interned]
 pub struct InternedTypeId {
     pub def: TypeDefId,
-    pub args: Vec<TypeId>,
+    pub args: Vec<TypeRef>, // None means inferred
+}
+
+#[salsa::interned]
+pub struct InternedBuiltinTypeId {
+    pub name: Symbol,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -65,6 +103,7 @@ pub enum ScopeOwnerId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TypeDefId {
+    Builtin(BuiltinTypeId),
     Struct(StructId),
     Interface(InterfaceId),
 }
@@ -86,6 +125,9 @@ pub struct InterfaceId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeId(salsa::Id);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BuiltinTypeId(salsa::Id);
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
     fn from(v: InternedModuleId<'db>) -> Self {
@@ -264,7 +306,7 @@ impl<'db> From<TypeId> for InternedTypeId<'db> {
 }
 
 impl TypeId {
-    pub fn new(db: &dyn crate::Db, def: TypeDefId, args: Vec<TypeId>) -> Self {
+    pub fn new(db: &dyn crate::Db, def: TypeDefId, args: Vec<TypeRef>) -> Self {
         InternedTypeId::new(db, def, args).into()
     }
 
@@ -276,7 +318,81 @@ impl TypeId {
         self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn crate::Db) -> Vec<TypeId> {
+    pub fn args(self, db: &dyn crate::Db) -> Vec<TypeRef> {
         self.interned().args(db)
     }
+}
+
+impl From<BuiltinTypeId> for TypeDefId {
+    fn from(value: BuiltinTypeId) -> Self {
+        Self::Builtin(value)
+    }
+}
+
+impl From<TypeId> for TypeRef {
+    fn from(value: TypeId) -> Self {
+        Self::Concrete(value)
+    }
+}
+
+impl BuiltinTypeId {
+    pub fn new(db: &dyn crate::Db, name: Symbol) -> Self {
+        Self(InternedBuiltinTypeId::new(db, name).0)
+    }
+
+    pub fn interned(self) -> InternedBuiltinTypeId<'static> {
+        InternedBuiltinTypeId(self.0, PhantomData)
+    }
+
+    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+        self.interned().name(db)
+    }
+
+    pub fn ptr(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "*"))
+    }
+
+    pub fn slice(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "[]"))
+    }
+
+    pub fn int(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "int"))
+    }
+
+    pub fn char(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "char"))
+    }
+
+    pub fn str(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "str"))
+    }
+
+    pub fn void(db: &dyn crate::Db) -> Self {
+        Self::new(db, Symbol::new(db, "void"))
+    }
+}
+
+pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::ptr(db).into(), vec![ty])
+}
+
+pub fn slice_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::slice(db).into(), vec![ty])
+}
+
+pub fn int_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::int(db).into(), vec![])
+}
+
+pub fn char_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::char(db).into(), vec![])
+}
+
+pub fn str_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::str(db).into(), vec![])
+}
+
+pub fn void_id(db: &dyn crate::Db) -> TypeId {
+    TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
 }
