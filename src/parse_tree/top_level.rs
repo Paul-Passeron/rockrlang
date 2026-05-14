@@ -101,6 +101,7 @@ pub struct AstMethodsigDesc {
 pub struct AstTemplateArg {
     pub name: Symbol,
     pub constraints: Vec<AstTypeExpr>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

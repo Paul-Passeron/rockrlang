@@ -125,6 +125,8 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_template_arg(&mut self) -> Result<AstTemplateArg, ParseError> {
+        let start = self.get_start();
+
         let name = self.parse_symbol()?.data;
         let constraints = if let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Colon)
@@ -141,7 +143,11 @@ impl<'db> Parser<'db> {
         } else {
             vec![]
         };
-        Ok(AstTemplateArg { name, constraints })
+        Ok(AstTemplateArg {
+            name,
+            constraints,
+            span: start.span(&self.get_end()),
+        })
     }
 
     fn parse_template_args(&mut self) -> Result<Vec<AstTemplateArg>, ParseError> {
