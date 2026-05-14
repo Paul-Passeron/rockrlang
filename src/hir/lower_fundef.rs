@@ -1,8 +1,12 @@
 use std::{collections::HashMap, iter};
 
 use crate::{
-    Db,
-    common::{location::Span, symbols::Symbol},
+    Db, SourceFile,
+    common::{
+        location::{Span, get_loc_info},
+        symbols::Symbol,
+    },
+    get_source_file,
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc, HirMatchBranch, HirPattern,
         HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind,
@@ -21,7 +25,9 @@ use crate::{
             AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc, StructFieldPattern,
         },
         stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
-        top_level::{AstEnumVariantKind, AstFundef, AstFundefArg, AstTemplateArg},
+        top_level::{
+            AstEnumVariantKind, AstFundef, AstFundefArg, AstMethodDef, AstReceiver, AstTemplateArg,
+        },
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
@@ -187,7 +193,6 @@ impl<'db> LowerFundef<'db> {
                         return PartialTypeRef::Resolved(TypeRef::Param(TypeParamId(idx)));
                     }
                 }
-
                 let resolution = resolve_in_module(self.db, name.interned(), module.interned())
                     .unwrap_or_else(|| {
                         panic!("Could not resolve name {} in scope", name.display(self.db))
@@ -451,10 +456,35 @@ impl<'db> LowerFundef<'db> {
                                     }
                                 }
                             },
-                            unhandled => todo!("{:?}", unhandled),
+                            AstExprDesc::Name(variant) => match type_def_id {
+                                TypeDefId::Builtin(_builtin_type_id) => todo!(),
+                                TypeDefId::Struct(_struct_id) => todo!(),
+                                TypeDefId::Enum(enum_def) => {
+                                    let mut template_hints = vec![];
+                                    for _ in
+                                        0..templates_of_enum(self.db, enum_def.interned()).len()
+                                    {
+                                        template_hints.push(PartialTypeArg::Infer);
+                                    }
+                                    HirExprDesc::Constructor {
+                                        enum_def,
+                                        name: *variant,
+                                        args: HirConstructorArgs::None,
+                                        template_hints,
+                                    }
+                                }
+                            },
+                            unhandled => {
+                                todo!(
+                                    "{}: {:?}",
+                                    to.span.start().loc_info(self.db, self.module).unwrap(),
+                                    unhandled
+                                )
+                            }
                         },
                         _ => todo!(
-                            "error: badly name-resolved item ({})",
+                            "error: {}, badly name-resolved item ({})",
+                            to.span.start().loc_info(self.db, self.module).unwrap(),
                             from.interned().contents(self.db)
                         ),
                     }
@@ -536,7 +566,8 @@ impl<'db> LowerFundef<'db> {
                                     HirExprDesc::CallDirect { target: fid, args }
                                 }
                                 other => todo!(
-                                    "Call callee `{}` resolved to {:?}",
+                                    "{}: Call callee `{}` resolved to {:?}",
+                                    callee.span.start().loc_info(self.db, self.module).unwrap(),
                                     symbol.interned().contents(self.db),
                                     other
                                 ),
@@ -1138,6 +1169,42 @@ impl<'db> LowerFundef<'db> {
         )
     }
 
+    fn lower_method(&mut self, ast: &AstMethodDef) -> HirBody<'db> {
+        let mut s = Scope::new();
+        if let Some((mutability, span)) = match &ast.data.receiver {
+            AstReceiver::None => None,
+            AstReceiver::Zelf(span) | AstReceiver::RefZelf(span) | AstReceiver::PtrZelf(span) => {
+                Some((Mutability::Const, span))
+            }
+            AstReceiver::MutRefZelf(span) | AstReceiver::MutPtrZelf(span) => {
+                Some((Mutability::Mutable, span))
+            }
+        } {
+            self.allocate_local(
+                &mut s,
+                Symbol::new(self.db, "self"),
+                mutability,
+                None,
+                span.clone(),
+            );
+        }
+        let params = self.collect_args(&ast.data.args, &mut s);
+        let stmts = ast
+            .data
+            .body
+            .iter()
+            .map(|stmt| self.lower_stmt(stmt, &mut s))
+            .collect::<Vec<_>>();
+
+        HirBody::new(
+            self.db,
+            self.function,
+            params,
+            self.locals.drain().map(|(_, x)| x).collect::<Vec<_>>(),
+            stmts,
+        )
+    }
+
     fn lower_pattern_as_constructor_args(
         &mut self,
         pat: &AstNamedPattern,
@@ -1214,4 +1281,19 @@ pub(super) fn lower_fundef_body<'db>(
     let template_args = ast.data.template_args.clone();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
+}
+
+pub(super) fn lower_method_body<'db>(
+    db: &'db dyn Db,
+    function: FunctionId,
+    ast: &'db AstMethodDef,
+) -> HirBody<'db> {
+    let module = match function.parent(db) {
+        ScopeOwnerId::Module(m) => m,
+        ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
+    };
+    let template_args = ast.data.template_args.clone();
+    let mut ctx = LowerFundef::new(db, function, module, template_args);
+    ctx.lower_method(ast)
 }

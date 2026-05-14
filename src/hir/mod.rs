@@ -8,7 +8,7 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
-    hir::lower_fundef::lower_fundef_body,
+    hir::lower_fundef::{lower_fundef_body, lower_method_body},
     name_resolve::{
         implems::module_impls,
         interfaces::module_interfaces,
@@ -396,7 +396,9 @@ pub fn hir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Opti
 
     match ast.inner(db) {
         FunctionLikeAst::Fundef(fundef) => Some(lower_fundef_body(db, function.into(), fundef)),
-        FunctionLikeAst::Method(_) => todo!(),
+        FunctionLikeAst::Method(methoddef) => {
+            Some(lower_method_body(db, function.into(), methoddef))
+        }
         FunctionLikeAst::ExternDef(_, _) => None,
         FunctionLikeAst::TraitMethod(_) => None,
     }
