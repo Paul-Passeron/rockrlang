@@ -1,6 +1,7 @@
 @include std::io
 
 fun main(): int {
+    printf(c"Hello, World !");
     "Hello, World !".println();
     return 0;
 }
