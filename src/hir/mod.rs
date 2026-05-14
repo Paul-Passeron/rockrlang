@@ -324,6 +324,17 @@ pub enum FunctionLikeAst {
     TraitMethod(AstMethodsig),
 }
 
+impl FunctionLikeAst {
+    pub fn get_args(&self) -> &[AstFundefArg] {
+        match self {
+            FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.args,
+            FunctionLikeAst::Fundef(spanned) => &spanned.data.args,
+            FunctionLikeAst::Method(spanned) => &spanned.data.args,
+            FunctionLikeAst::TraitMethod(spanned) => &spanned.data.args,
+        }
+    }
+}
+
 #[salsa::tracked]
 pub struct InternedFunctionLikeAst<'db> {
     #[returns(ref)]
