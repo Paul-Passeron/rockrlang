@@ -5,14 +5,23 @@ enum Foo {
 
 fun baz(x: Foo): void {
     match x {
-        Foo::foo(y) => {}
-        Foo::bar(a, b) => {}
+        Foo::foo(y) => {}    // int
+        Foo::bar(a, b) => {} // str, str
     }
 }
 
 fun baz_ref(x: &Foo): void {
     match x {
-        Foo::foo(y) => {}
-        Foo::bar(a, b) => {}
+        Foo::foo(y) => {}    // &int
+        Foo::bar(a, b) => {} // &str, &str
+    }
+}
+
+fun baz_ref_ref(x: &&Foo): void {
+    match x {
+        Foo::foo(y) => {}    // &int
+        Foo::bar(a, b) => {} // &str, &str
+        // This is what Rust does and this is what we do as well
+        // (because of how the binds-like constraint work)
     }
 }
