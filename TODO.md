@@ -9,6 +9,7 @@ This can be a great starting point for contributors looking for something to do.
     - That might mean adding some sort of metadata for the constraint or have a side-table that keeps track of that for them in a non-intrusive way
   - [ ] Turn `ParseError`s into diagnostics
 - [ ] More semantic analysis
+  - [ ] Check that all path return the right type
   - [ ] Improve the type-checker
     - [ ] Formalize the interface system
       - [ ] Actually check that implementations implement the interface
