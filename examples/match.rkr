@@ -27,10 +27,10 @@ fun baz_ref_ref(x: &&Foo): void {
 }
 
 
-// This should fail
-fun with_ptr(x: *Foo): void {
-    match x {
-        Foo::foo(y) => {}
-        Foo::bar(a, b) => {}
-    }
-}
+// // This should fail
+// fun with_ptr(x: *Foo): void {
+//     match x {
+//         Foo::foo(y) => {}
+//         Foo::bar(a, b) => {}
+//     }
+// }
