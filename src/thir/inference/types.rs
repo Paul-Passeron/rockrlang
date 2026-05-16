@@ -24,12 +24,9 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     ril::{BuiltinTypeId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
-    thir::{
-        Diagnostic, DiagnosticKind,
-        inference::{
-            InferTy, InferenceCtx,
-            implicit::{AsAstImplCtx, ImplicitContext},
-        },
+    thir::inference::{
+        InferTy, InferenceCtx,
+        implicit::{AsAstImplCtx, ImplicitContext},
     },
 };
 
@@ -184,16 +181,17 @@ impl<'db> InferenceCtx<'db> {
             TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
                 Some(res) => res.clone(),
                 None => {
-                    let templates = ctx.get_ast_templates();
-                    self.diagnostics.push(Diagnostic {
-                        kind: DiagnosticKind::Custom(format!("")),
-                        span: if let Some(ast) = templates.first() {
-                            ast.span.clone()
-                        } else {
-                            ctx.owning_module(self.db).get_span(self.db)
-                        },
-                    });
-                    InferTy::Var(self.fresh_var())
+                    todo!("Diagnostics");
+                    // let templates = ctx.get_ast_templates();
+                    // self.diagnostics.push(Diagnostic {
+                    //     kind: DiagnosticKind::Custom(format!("")),
+                    //     span: if let Some(ast) = templates.first() {
+                    //         ast.span.clone()
+                    //     } else {
+                    //         ctx.owning_module(self.db).get_span(self.db)
+                    //     },
+                    // });
+                    // InferTy::Var(self.fresh_var())
                 }
             },
             TypeRef::Error => panic!(),

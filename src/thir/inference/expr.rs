@@ -37,7 +37,7 @@ use crate::{
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     thir::{
-        Diagnostic, DiagnosticKind, ExprId,
+        ExprId,
         inference::{implicit::ImplicitContext, var::InferVar},
     },
 };
@@ -348,11 +348,11 @@ impl<'db> InferenceCtx<'db> {
 
     fn diagnose_bad_struct_fields(
         &mut self,
-        fields: &[(Symbol, HirExpr)],
-        span: Span,
+        _fields: &[(Symbol, HirExpr)],
+        _span: Span,
         ast: &Arc<AstStructDef>,
         inferred_fields: &HashMap<Symbol, InferTy>,
-        struct_id: StructId,
+        _struct_id: StructId,
     ) -> Result<(), UnificationError> {
         let field_sets = (
             inferred_fields.keys().copied().collect::<HashSet<_>>(),
@@ -360,44 +360,46 @@ impl<'db> InferenceCtx<'db> {
         );
         if field_sets.0 != field_sets.1 {
             // For ast fields not in inferred fields
-            for field in field_sets.1.difference(&field_sets.0) {
-                self.diagnostics.push(Diagnostic {
-                    kind: DiagnosticKind::UniError {
-                        err: UnificationError::IncompleteStructLit {
-                            id: struct_id,
-                            missing: *field,
-                        },
-                        message: format!("Missing field in struct lit"),
-                    },
-                    span: span.clone(),
-                });
-                println!(
-                    "[Info]: Missing field in struct lit: {}",
-                    field.display(self.db)
-                );
+            for _field in field_sets.1.difference(&field_sets.0) {
+                // self.diagnostics.push(Diagnostic {
+                //     kind: DiagnosticKind::UniError {
+                //         err: UnificationError::IncompleteStructLit {
+                //             id: struct_id,
+                //             missing: *field,
+                //         },
+                //         message: format!("Missing field in struct lit"),
+                //     },
+                //     span: span.clone(),
+                // });
+                // println!(
+                //     "[Info]: Missing field in struct lit: {}",
+                //     field.display(self.db)
+                // );
+                todo!("Diagnostics")
             }
             // For inferred fields not in ast fields
-            for field in field_sets.0.difference(&field_sets.1) {
-                self.diagnostics.push(Diagnostic {
-                    kind: DiagnosticKind::UniError {
-                        err: UnificationError::InvalidStructField {
-                            id: struct_id,
-                            invalid: *field,
-                        },
-                        message: format!("Invalid field in struct lit"),
-                    },
-                    span: fields
-                        .iter()
-                        .find(|(name, _)| name == field)
-                        .expect("field should be in fields")
-                        .1
-                        .span
-                        .clone(),
-                });
-                println!(
-                    "[Info]: Invalid field in struct lit: {}",
-                    field.display(self.db)
-                );
+            for _field in field_sets.0.difference(&field_sets.1) {
+                todo!("Diagnostics");
+                // self.diagnostics.push(Diagnostic {
+                //     kind: DiagnosticKind::UniError {
+                //         err: UnificationError::InvalidStructField {
+                //             id: struct_id,
+                //             invalid: *field,
+                //         },
+                //         message: format!("Invalid field in struct lit"),
+                //     },
+                //     span: fields
+                //         .iter()
+                //         .find(|(name, _)| name == field)
+                //         .expect("field should be in fields")
+                //         .1
+                //         .span
+                //         .clone(),
+                // });
+                // println!(
+                //     "[Info]: Invalid field in struct lit: {}",
+                //     field.display(self.db)
+                // );
             }
             Err(UnificationError::AlreadyDiagnosed)
         } else {

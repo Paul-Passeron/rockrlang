@@ -15,9 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::fmt;
+
 use crate::compiler::SourceFileInfo;
 
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Diagnostic {
     pub severity: Severity,
     pub message: String,
@@ -28,6 +30,7 @@ pub struct Diagnostic {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SpanInfo {
     pub file: SourceFileInfo,
     pub start: usize,
@@ -35,21 +38,39 @@ pub struct SpanInfo {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Label {
     pub span: SpanInfo,
     pub message: Option<String>,
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DiagnosticCode {
     pub code: u32,
     pub category: &'static str,
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Severity {
     Error,
     Warning,
     Note,
     Help,
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Severity::Error => "error",
+                Severity::Warning => "warning",
+                Severity::Note => "note",
+                Severity::Help => "help",
+            }
+        )
+    }
 }

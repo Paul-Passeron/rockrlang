@@ -246,6 +246,7 @@ impl<'db> InferenceCtx<'db> {
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
+#[allow(dead_code)]
 pub enum UnificationError {
     TypeDefIdMismatch(TypeDefId, TypeDefId),
     FieldCountMismatch(usize, usize),

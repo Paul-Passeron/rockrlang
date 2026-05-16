@@ -16,9 +16,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::{collections::BTreeMap, mem, panic, sync::Arc};
 
-use crate::compiler::get_pretty_function;
+use crate::OwnedSourceFile;
+use crate::compiler::diagnostic::{Diagnostic, Label, Severity, SpanInfo};
+use crate::ril::FileModule;
 use crate::thir::inference::constraints::InferenceConstraintKind;
 use crate::{
     Db,
@@ -53,22 +56,22 @@ pub struct CallInfos {
     pub variadic: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
-    pub span: Span,
-}
+// #[derive(Debug, Clone, PartialEq, Hash)]
+// pub struct Diagnostic {
+//     pub kind: DiagnosticKind,
+//     pub span: Span,
+// }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
-pub enum DiagnosticKind {
-    UniError {
-        err: UnificationError,
-        message: String,
-    },
-    BadRetType(TyRef),
-    BadAssignement(UnificationError),
-    Custom(String),
-}
+// #[derive(Debug, Clone, PartialEq, Hash)]
+// pub enum DiagnosticKind {
+//     UniError {
+//         err: UnificationError,
+//         message: String,
+//     },
+//     BadRetType(TyRef),
+//     BadAssignement(UnificationError),
+//     Custom(String),
+// }
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -133,23 +136,13 @@ impl<'db> TyCtx<'db> {
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
-        if let Err((constraint, err)) = self.inf_ctx.solve_constraints() {
-            println!(
-                "Error solving constraint {}",
-                constraint.kind.display(self.db)
-            );
-            println!("    Reason: {}", err.display(self.db));
+        if let Err(_err) = self.inf_ctx.solve_constraints() {
+            panic!("Report error")
         }
 
+        // Temporary
         let unsolveds = self.inf_ctx.unsolved_constraints();
-        if !unsolveds.is_empty() {
-            println!("{}", get_pretty_function(self.db, self.function));
-            println!("-- Constraints not solved ----------------------");
-            for c in unsolveds {
-                println!("Constraint not solved:\n    {}", c.kind.display(self.db))
-            }
-            println!("-- \\Constraints not solved ---------------------");
-        }
+        assert!(unsolveds.is_empty());
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
             .into_iter()
@@ -201,14 +194,60 @@ impl<'db> TyCtx<'db> {
             .allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
     }
 
-    fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {
+    fn find_file(&self, path: impl AsRef<Path>) -> Option<OwnedSourceFile> {
+        let canon = path.as_ref().canonicalize().ok()?;
+        fn handle_submodule(
+            this: &TyCtx,
+            sub: &FileModule,
+            path: &PathBuf,
+        ) -> Option<OwnedSourceFile> {
+            if &sub.file(this.db).path(this.db) == path {
+                return Some(sub.file(this.db).to_owned(this.db));
+            }
+            for submodule in sub.submodules(this.db) {
+                if let Some(res) = handle_submodule(this, submodule, path) {
+                    return Some(res);
+                }
+            }
+            None
+        }
+        for package in self.packages.iter() {
+            if let Some(res) = handle_submodule(self, &package.root(self.db), &canon) {
+                return Some(res);
+            }
+        }
+        None
+    }
+
+    fn push_regular_diagnostic_with_message_and_primary(
+        &mut self,
+        err: String,
+        primary: Option<String>,
+        span: Span,
+    ) {
         self.diagnostics.push(Diagnostic {
-            kind: DiagnosticKind::UniError {
-                err,
-                message: String::new(),
+            severity: Severity::Error,
+            message: err,
+            primary: Label {
+                span: SpanInfo {
+                    file: self.find_file(span.file).unwrap(),
+                    start: span.start,
+                    end: span.end,
+                },
+                message: primary,
             },
-            span,
+            secondary: vec![],
+            notes: vec![],
+            help: vec![],
         })
+    }
+
+    fn push_regular_diagnostic_with_message(&mut self, err: String, span: Span) {
+        self.push_regular_diagnostic_with_message_and_primary(err, None, span);
+    }
+
+    fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {
+        self.push_regular_diagnostic_with_message(err.display(self.db).to_string(), span);
     }
 
     fn typeof_pattern(
@@ -251,15 +290,7 @@ impl<'db> TyCtx<'db> {
                     infer_templates.clone(),
                     None, // TODO: Is this right ?
                 ) else {
-                    self.diagnostics.push(Diagnostic {
-                        kind: DiagnosticKind::Custom(format!(
-                            "Could not create ctx for some reason at {}:{}",
-                            file!(),
-                            line!()
-                        )),
-                        span: pattern.span.clone(),
-                    });
-                    return InferTy::Var(self.inf_ctx.fresh_var());
+                    todo!("Diagnostics")
                 };
                 let t_ref = InferTy::Adt {
                     def: TypeDefId::Enum(*resolution),
@@ -288,14 +319,14 @@ impl<'db> TyCtx<'db> {
                             let Some(ast_ty) =
                                 self.inf_ctx.allocate_ast_type_expr(&ast_pattern.data, &ctx)
                             else {
-                                self.diagnostics.push(Diagnostic {
-                                    kind: DiagnosticKind::Custom(format!(
+                                self.push_regular_diagnostic_with_message(
+                                    format!(
                                         "Could not allocate ast_type_expr for some reason at {}:{}",
                                         file!(),
                                         line!()
-                                    )),
-                                    span: pattern.span.clone(),
-                                });
+                                    ),
+                                    pattern.span.clone(),
+                                );
                                 return InferTy::Var(self.inf_ctx.fresh_var());
                             };
                             self.inf_ctx
@@ -405,11 +436,16 @@ impl<'db> TyCtx<'db> {
                 match self.inf_ctx.infer_place(lhs) {
                     Ok(lhs_ty) => match rhs_ty {
                         TyRef::Inf(rhs_ty) => {
-                            if let Err(err) = self.inf_ctx.unify(lhs_ty, rhs_ty) {
-                                self.diagnostics.push(Diagnostic {
-                                    kind: DiagnosticKind::BadAssignement(err),
-                                    span: stmt.span.clone(),
-                                })
+                            if let Err(err) = self.inf_ctx.unify(lhs_ty.clone(), rhs_ty.clone()) {
+                                self.push_regular_diagnostic_with_message_and_primary(
+                                    format!(
+                                        "Cannot assign {} to {}",
+                                        lhs_ty.display(self.db),
+                                        rhs_ty.display(self.db)
+                                    ),
+                                    Some(err.display(self.db).to_string()),
+                                    stmt.span.clone(),
+                                );
                             }
                         }
                         TyRef::Error => (),
@@ -420,13 +456,7 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Expr(hir_expr) => {
                 let (_, err) = self.type_check_expr(hir_expr);
                 if let Some(err) = err {
-                    self.diagnostics.push(Diagnostic {
-                        kind: DiagnosticKind::UniError {
-                            err,
-                            message: String::new(),
-                        },
-                        span: stmt.span.clone(),
-                    });
+                    self.push_regular_diagnostic(err, stmt.span.clone());
                 }
             }
             HirStmtKind::Return(hir_expr) => {
@@ -434,39 +464,44 @@ impl<'db> TyCtx<'db> {
                 if let Some(expr) = &hir_expr {
                     let (ty, err) = self.type_check_expr(expr);
                     if let Some(err) = err {
-                        self.diagnostics.push(Diagnostic {
-                            kind: DiagnosticKind::UniError {
-                                err,
-                                message: String::new(),
-                            },
-                            span: stmt.span.clone(),
-                        })
+                        self.push_regular_diagnostic(err, stmt.span.clone());
                     };
 
                     match ty {
                         TyRef::Inf(infer_ty) => {
-                            if let Err(err) = self.inf_ctx.unify(ret_ty, infer_ty.clone()) {
-                                self.push_regular_diagnostic(err, stmt.span.clone());
-                                self.diagnostics.push(Diagnostic {
-                                    kind: DiagnosticKind::BadRetType(TyRef::Inf(infer_ty)),
-                                    span: stmt.span.clone(),
-                                });
+                            if let Err(err) = self.inf_ctx.unify(ret_ty.clone(), infer_ty.clone()) {
+                                let fmt = format!(
+                                    "Cannot return {} form a function expected to return {}",
+                                    self.inf_ctx.find(&infer_ty).display(self.db),
+                                    self.inf_ctx.find(&ret_ty).display(self.db)
+                                );
+                                self.push_regular_diagnostic_with_message_and_primary(
+                                    fmt,
+                                    Some(err.display(self.db).to_string()),
+                                    stmt.span.clone(),
+                                );
                             }
                         }
                         TyRef::Error => {
-                            self.diagnostics.push(Diagnostic {
-                                kind: DiagnosticKind::BadRetType(TyRef::Error),
-                                span: stmt.span.clone(),
-                            });
+                            self.push_regular_diagnostic_with_message(
+                                format!(
+                                    "Cannot return error type form a function expected to return {}",
+                                    ret_ty.display(self.db)
+                                ),
+                                stmt.span.clone(),
+                            );
                         }
                     }
                 } else {
                     let void_ty = self.inf_ctx.void_ty();
                     if ret_ty != void_ty {
-                        self.diagnostics.push(Diagnostic {
-                            kind: DiagnosticKind::BadRetType(TyRef::Inf(void_ty)),
-                            span: stmt.span.clone(),
-                        })
+                        self.push_regular_diagnostic_with_message(
+                            format!(
+                                "Cannot have an empty return from a function expected to return {}",
+                                ret_ty.display(self.db)
+                            ),
+                            stmt.span.clone(),
+                        );
                     }
                 }
             }

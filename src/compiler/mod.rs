@@ -459,15 +459,9 @@ pub fn check_function<'a>(
                 .map(|(key, val)| (key, val.display(db).to_string()))
                 .collect()
         }),
-        diagnostics: thir.as_ref().map_or(vec![], |thir| {
-            thir.diagnostics(db)
-                .into_iter()
-                .filter_map(|diag| {
-                    println!("TODO: report diagnostics: {diag:?}");
-                    None
-                })
-                .collect()
-        }),
+        diagnostics: thir
+            .as_ref()
+            .map_or(vec![], |thir| thir.diagnostics(db).into_iter().collect()),
         locals: thir.as_ref().map_or(vec![], |thir| {
             thir.locals(db)
                 .into_iter()

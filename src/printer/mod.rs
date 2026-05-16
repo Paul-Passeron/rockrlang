@@ -68,8 +68,8 @@ fn print_packages_structure<'a>(packages: impl IntoIterator<Item = &'a PackageIn
     }
 }
 
-pub fn print_diagnostic(_diag: &Diagnostic) {
-    todo!()
+pub fn print_diagnostic(diag: &Diagnostic) {
+    eprintln!("{}: {}", diag.severity, diag.message);
 }
 
 pub fn print_function_result(result: &FunctionResult) {
