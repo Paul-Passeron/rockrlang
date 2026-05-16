@@ -17,7 +17,7 @@ impl Iter for IntIter {
         if self$.start >= self$.end { return opt::None; }
         let res = self$.start;
         self$.start += 1;
-        return res;
+        return opt::Some(res);
     }
 }
 
