@@ -97,6 +97,10 @@ pub enum InferenceConstraintKind {
     IntLike {
         res_ty: InferVar,
     },
+    IsInner {
+        inner: InferTy,
+        ref_ty: InferTy,
+    },
 }
 
 impl InferenceConstraintKind {
@@ -818,6 +822,33 @@ impl<'db> InferenceCtx<'db> {
                     }
                 }
             }
+            InferenceConstraintKind::IsInner { inner, ref_ty } => {
+                fn get_ref_inner(ctx: &mut InferenceCtx, ty: InferTy) -> Option<InferTy> {
+                    match ty {
+                        InferTy::Var(_) => None,
+                        InferTy::Adt { def, fields } => {
+                            if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
+                                assert_eq!(fields.len(), 1);
+                                get_ref_inner(ctx, fields.into_iter().next().unwrap())
+                            } else {
+                                Some(InferTy::Adt { def, fields })
+                            }
+                        }
+                        InferTy::Param(id) => Some(InferTy::Param(id)),
+                    }
+                }
+                let ref_ty = self.find(ref_ty);
+                let inner = self.find(inner);
+                if let Some(ty) = get_ref_inner(self, ref_ty) {
+                    if let Err(err) = self.unify(inner, ty) {
+                        ConstraintSolveResult::Error(err)
+                    } else {
+                        ConstraintSolveResult::Solved
+                    }
+                } else {
+                    ConstraintSolveResult::Pending
+                }
+            }
         }
     }
 
@@ -1193,6 +1224,12 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             InferenceConstraintKind::IntLike { res_ty } => {
                 write!(f, "IntLike {{ res_ty: {res_ty} }}")
             }
+            InferenceConstraintKind::IsInner { inner, ref_ty } => write!(
+                f,
+                "IsInner {{ inner: {}, ref_ty: {} }}",
+                inner.display(self.db),
+                ref_ty.display(self.db)
+            ),
         }
     }
 }
@@ -1296,6 +1333,11 @@ impl InferenceConstraintKind {
             InferenceConstraintKind::IntLike { res_ty } => {
                 ctx.find(&InferTy::Var(*res_ty)).listeners()
             }
+            InferenceConstraintKind::IsInner { inner, ref_ty } => inner
+                .listeners()
+                .union(&ref_ty.listeners())
+                .copied()
+                .collect(),
         }
     }
 }

@@ -351,9 +351,10 @@ impl<'db> TyCtx<'db> {
                 let typeof_scrut_var = self.inf_ctx.fresh_var();
                 self.inf_ctx
                     .emit_constraint(InferenceConstraintKind::Unify {
-                        a: typeof_scrut,
+                        a: typeof_scrut.clone(),
                         b: InferTy::Var(typeof_scrut_var),
                     });
+
                 for branch in branches {
                     let mut loc_inners = HashMap::new();
                     for local in &branch.locals {
@@ -369,12 +370,11 @@ impl<'db> TyCtx<'db> {
                     }
 
                     let typeof_pattern = self.typeof_pattern(&branch.pattern, &loc_inners);
-                    let var = self.inf_ctx.fresh_var();
+
                     self.inf_ctx
-                        .emit_constraint(InferenceConstraintKind::BindsLike {
+                        .emit_constraint(InferenceConstraintKind::IsInner {
                             inner: typeof_pattern,
-                            like: typeof_scrut_var,
-                            ty: var,
+                            ref_ty: typeof_scrut.clone(),
                         });
                 }
             }
