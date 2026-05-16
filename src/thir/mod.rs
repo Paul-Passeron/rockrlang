@@ -21,6 +21,7 @@ use std::{collections::BTreeMap, mem, panic, sync::Arc};
 
 use crate::OwnedSourceFile;
 use crate::compiler::diagnostic::{Diagnostic, Label, Severity, SpanInfo};
+use crate::hir::function_ast;
 use crate::ril::FileModule;
 use crate::thir::inference::constraints::InferenceConstraintKind;
 use crate::{
@@ -55,23 +56,6 @@ pub struct CallInfos {
     pub substitution: Vec<TypeRef>,
     pub variadic: bool,
 }
-
-// #[derive(Debug, Clone, PartialEq, Hash)]
-// pub struct Diagnostic {
-//     pub kind: DiagnosticKind,
-//     pub span: Span,
-// }
-
-// #[derive(Debug, Clone, PartialEq, Hash)]
-// pub enum DiagnosticKind {
-//     UniError {
-//         err: UnificationError,
-//         message: String,
-//     },
-//     BadRetType(TyRef),
-//     BadAssignement(UnificationError),
-//     Custom(String),
-// }
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -136,13 +120,22 @@ impl<'db> TyCtx<'db> {
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
-        if let Err(_err) = self.inf_ctx.solve_constraints() {
-            panic!("Report error")
+        if let Err((_, err)) = self.inf_ctx.solve_constraints() {
+            let span = function_ast(self.db, self.function.interned())
+                .inner(self.db)
+                .get_span();
+            self.push_regular_diagnostic(err, span);
         }
 
         // Temporary
         let unsolveds = self.inf_ctx.unsolved_constraints();
-        assert!(unsolveds.is_empty());
+        for unsolved in unsolveds {
+            let span = function_ast(self.db, self.function.interned())
+                .inner(self.db)
+                .get_span();
+            let txt = format!("<UNSOLVED> {}", unsolved.kind.display(self.db));
+            self.push_regular_diagnostic_with_message(txt, span);
+        }
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
             .into_iter()
