@@ -1054,13 +1054,20 @@ impl<'db> InferenceCtx<'db> {
         // and this type must implement the <op> interface
         // or something etc...
 
-        if let Some((lid, _)) = lhs_ty.is_adt()
-            && let Some((rid, _)) = rhs_ty.is_adt()
-        {
-            if let Some(lid) = lid.is_int_like(self.db)
+        if let Some((lid, _)) = lhs_ty.is_adt() {
+            if let Some((rid, _)) = rhs_ty.is_adt()
+                && let Some(lid) = lid.is_int_like(self.db)
                 && let Some(rid) = rid.is_int_like(self.db)
             {
                 return self.solve_int_binop(res_ty, lid, rid, op);
+            }
+            if let InferTy::Var(_) = rhs_ty
+                && let Some(lid) = lid.is_int_like(self.db)
+            {
+                if let Err(err) = self.unify(lhs_ty, rhs_ty) {
+                    return ConstraintSolveResult::Error(err);
+                }
+                return self.solve_int_binop(res_ty, lid, lid, op);
             }
         }
 
@@ -1100,7 +1107,7 @@ impl<'db> InferenceCtx<'db> {
             | BinaryOperator::Leq
             | BinaryOperator::Gt
             | BinaryOperator::Lt => {
-                // We know they are int like, so it is safe to just say
+                // We know they are int-like, so it is safe to just say
                 // that res_ty must be bool
                 if let Err(err) = self.unify(InferTy::Var(res_ty), self.bool_ty()) {
                     return ConstraintSolveResult::Error(err);
