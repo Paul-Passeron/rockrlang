@@ -1,0 +1,11 @@
+enum Foo {
+    foo(int),
+    bar(str, str)
+}
+
+fun with_ptr(x: *Foo): void {
+    match x {
+        Foo::foo(y) => {}
+        Foo::bar(a, b) => {}
+    }
+}

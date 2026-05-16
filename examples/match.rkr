@@ -25,12 +25,3 @@ fun baz_ref_ref(x: &&Foo): void {
         // (because of how the binds-like constraint work)
     }
 }
-
-
-// // This should fail
-// fun with_ptr(x: *Foo): void {
-//     match x {
-//         Foo::foo(y) => {}
-//         Foo::bar(a, b) => {}
-//     }
-// }

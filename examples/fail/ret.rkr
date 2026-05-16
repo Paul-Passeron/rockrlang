@@ -1,0 +1,11 @@
+fun foo(): void {
+    return "Hey !";
+}
+
+fun bar(): int {
+    return "Hey !";
+}
+
+fun baz(): int {
+    return;
+}

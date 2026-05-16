@@ -1,0 +1,4 @@
+fun foo(): void {
+    let mut x: int = 0;
+    x = "Hey !";
+}
