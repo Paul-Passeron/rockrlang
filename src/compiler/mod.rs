@@ -23,7 +23,7 @@ use itertools::Itertools;
 
 use crate::common::location::Location;
 use crate::common::symbols::Symbol;
-use crate::compiler::diagnostic::Diagnostic;
+use crate::compiler::diagnostic::{Diagnostic, Severity};
 use crate::hir::{LocalId, Mutability, function_ast, hir_body};
 use crate::name_resolve::definition::{Definition, get_module_pretty_name, module_definitions};
 use crate::name_resolve::implems::module_impls;
@@ -107,7 +107,13 @@ pub struct Report {
 
 impl Report {
     pub fn has_errors(&self) -> bool {
-        false
+        self.diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+            || self
+                .funcs
+                .iter()
+                .any(|f| f.diagnostics.iter().any(|d| d.severity == Severity::Error))
     }
 
     pub fn new(packages: Box<[PackageInfo]>) -> Self {

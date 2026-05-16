@@ -58,6 +58,7 @@ fn main() -> std::process::ExitCode {
         Ok(report) => {
             printer::print(&report);
             if report.has_errors() {
+                eprintln!("Could not compile, errors were encountered.");
                 std::process::ExitCode::FAILURE
             } else {
                 std::process::ExitCode::SUCCESS
