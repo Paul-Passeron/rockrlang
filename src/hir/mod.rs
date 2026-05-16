@@ -349,6 +349,14 @@ pub enum FunctionLikeAst {
 }
 
 impl FunctionLikeAst {
+    pub fn get_span(&self) -> Span {
+        match self {
+            FunctionLikeAst::ExternDef(spanned, _) => spanned.span.clone(),
+            FunctionLikeAst::Fundef(spanned) => spanned.span.clone(),
+            FunctionLikeAst::Method(spanned) => spanned.span.clone(),
+            FunctionLikeAst::TraitMethod(spanned) => spanned.span.clone(),
+        }
+    }
     pub fn get_args(&self) -> &[AstFundefArg] {
         match self {
             FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.args,
