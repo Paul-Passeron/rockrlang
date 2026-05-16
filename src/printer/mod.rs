@@ -17,8 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::path::PathBuf;
 
-use crate::compiler::{
-    FileModuleInfo, FunctionResult, PackageInfo, Report, diagnostic::Diagnostic,
+use crate::{
+    common::location::compute_loc_info,
+    compiler::{FileModuleInfo, FunctionResult, PackageInfo, Report, diagnostic::Diagnostic},
 };
 
 fn print_file_module(file_module: &FileModuleInfo, indent: usize) {
@@ -69,7 +70,17 @@ fn print_packages_structure<'a>(packages: impl IntoIterator<Item = &'a PackageIn
 }
 
 pub fn print_diagnostic(diag: &Diagnostic) {
+    let f = diag.primary.span.clone();
+    let loc_info = compute_loc_info(&f.file.content, f.start, f.file.path);
     eprintln!("{}: {}", diag.severity, diag.message);
+    eprintln!(
+        "| {loc_info}: {}",
+        diag.primary
+            .message
+            .as_ref()
+            .cloned()
+            .unwrap_or("[Error here]".to_string())
+    )
 }
 
 pub fn print_function_result(result: &FunctionResult) {
