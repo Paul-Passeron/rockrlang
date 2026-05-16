@@ -20,7 +20,7 @@ impl<T> Vec<T> {
         // todo
     }
 
-    fun unsafe_idx(&self, idx: int): *T {
+    fun unsafe_idx(&self, idx: usize): *T {
         // todo
     }
 
@@ -38,10 +38,10 @@ impl <T> Iter for VecIter<T> {
     type Item = T;
 
     fun next(&mut self): opt<T> {
-        if self$.idx >= self.vec.len() {
+        if self.idx >= self.vec$.len() {
             return opt::None;
         }
-        let res = self.vec.unsafe_idx(self.idx)$;
+        let res = self.vec$.unsafe_idx(self.idx)$;
         self.idx += 1;
         return opt::Some(res);
     }
