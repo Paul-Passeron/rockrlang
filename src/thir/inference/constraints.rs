@@ -1094,7 +1094,12 @@ impl<'db> InferenceCtx<'db> {
         op: BinaryOperator,
     ) -> ConstraintSolveResult {
         match op {
-            BinaryOperator::Diff => {
+            BinaryOperator::Diff
+            | BinaryOperator::Eq
+            | BinaryOperator::Geq
+            | BinaryOperator::Leq
+            | BinaryOperator::Gt
+            | BinaryOperator::Lt => {
                 // We know they are int like, so it is safe to just say
                 // that res_ty must be bool
                 if let Err(err) = self.unify(InferTy::Var(res_ty), self.bool_ty()) {
