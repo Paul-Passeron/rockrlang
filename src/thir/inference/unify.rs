@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use ena::unify::{InPlace, UnificationTable};
 use itertools::Itertools;
 
 use crate::thir::inference::InferenceCtx;
@@ -193,5 +194,24 @@ impl<'db> InferenceCtx<'db> {
             },
             InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
         }
+    }
+
+    pub fn find_const(&self, ty: &InferTy) -> InferTy {
+        fn _find(ty: &InferTy, table: &mut UnificationTable<InPlace<InferVar>>) -> InferTy {
+            match ty {
+                InferTy::Var(infer_var) => {
+                    let infer_var = table.find(*infer_var);
+                    table.probe_value(infer_var).unwrap_or(ty.clone())
+                }
+                InferTy::Adt { def, fields } => InferTy::Adt {
+                    def: *def,
+                    fields: fields.iter().map(|ty| _find(ty, table)).collect(),
+                },
+                InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
+            }
+        }
+        // For the moment, ena does not let us find the value without the table being mutable for path-compression reason I believe. We might want to find an alternative.
+        let mut tbl = self.table.clone();
+        _find(ty, &mut tbl)
     }
 }
