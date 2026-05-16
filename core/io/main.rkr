@@ -16,25 +16,25 @@ impl str {
         };
     }
 
-    // @[inline]
-    // fun as_ptr(&self): *char {
-    //     return self$.data;
-    // }
+    @[inline]
+    fun as_ptr(&self): *char {
+        return self$.data;
+    }
 
-    // @[inline]
-    // fun len(&self): usize {
-    //     return self$.len;
-    // }
+    @[inline]
+    fun len(&self): usize {
+        return self$.len;
+    }
 
-    // @[inline]
-    // fun println(&self): void {
-    //     printf("%s\n", self.data);
-    // }
+    @[inline]
+    fun println(&self): void {
+        printf("%s\n", self.data);
+    }
 
-    // @[inline]
-    // fun print(&self): void {
-    //     printf("%s", self.data);
-    // }
+    @[inline]
+    fun print(&self): void {
+        printf("%s", self.data);
+    }
 }
 
 @extern {
