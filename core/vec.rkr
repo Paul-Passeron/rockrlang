@@ -22,6 +22,7 @@ impl<T> Vec<T> {
 
     fun unsafe_idx(&self, idx: usize): *T {
         // todo
+        return 0;
     }
 
     fun len(&self): usize {
