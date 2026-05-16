@@ -22,6 +22,8 @@ use crate::{
     compiler::{FileModuleInfo, FunctionResult, PackageInfo, Report, diagnostic::Diagnostic},
 };
 
+pub mod type_printer;
+
 fn print_file_module(file_module: &FileModuleInfo, indent: usize) {
     let prefix = "    ".repeat(indent);
     println!(
