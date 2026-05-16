@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::{collections::BTreeMap, mem, panic, sync::Arc};
 
+use crate::compiler::get_pretty_function;
 use crate::thir::inference::constraints::InferenceConstraintKind;
 use crate::{
     Db,
@@ -142,6 +143,7 @@ impl<'db> TyCtx<'db> {
 
         let unsolveds = self.inf_ctx.unsolved_constraints();
         if !unsolveds.is_empty() {
+            println!("{}", get_pretty_function(self.db, self.function));
             println!("-- Constraints not solved ----------------------");
             for c in unsolveds {
                 println!("Constraint not solved:\n    {}", c.kind.display(self.db))
