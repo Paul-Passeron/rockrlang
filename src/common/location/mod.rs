@@ -163,7 +163,10 @@ pub fn get_loc_info<'db>(
     file: SourceFile<'db>,
     offset: usize,
 ) -> LocationInfo {
-    let s = file.content(db);
+    compute_loc_info(file.content(db).as_ref(), offset, file.path(db))
+}
+
+pub fn compute_loc_info(s: &str, offset: usize, file: PathBuf) -> LocationInfo {
     let mut line = 1;
     let mut column = 1;
     for i in 0..offset {
@@ -179,7 +182,7 @@ pub fn get_loc_info<'db>(
         }
     }
     LocationInfo {
-        file: file.path(db),
+        file,
         line,
         column,
         offset,
