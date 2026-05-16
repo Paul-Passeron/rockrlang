@@ -34,6 +34,7 @@ use crate::{
         type_expr::{templates_of_enum, templates_of_struct},
     },
     parse_tree::top_level::{AstImplItem, AstTemplateArg, AstTopLevelItemDesc},
+    printer::type_printer::TypePrinter,
 };
 
 #[salsa::tracked]
@@ -116,6 +117,12 @@ pub enum TypeRef {
     Unknown,
 }
 
+impl TypeRef {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().type_ref_to_string(db, *self)
+    }
+}
+
 #[salsa::interned]
 pub struct InternedImplId {
     pub parent: ModuleId,
@@ -172,6 +179,10 @@ pub enum TypeDefId {
 }
 
 impl TypeDefId {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().type_def_id_to_string(db, *self)
+    }
+
     pub fn is_int_like(self, db: &dyn Db) -> Option<BuiltinTypeId> {
         match self {
             Self::Builtin(b) => b.is_int_like(db),
@@ -196,6 +207,12 @@ pub struct ModuleId(salsa::Id);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FunctionId(salsa::Id);
 
+impl FunctionId {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().function_id_to_string(db, *self)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructId(salsa::Id);
 
@@ -207,6 +224,24 @@ pub struct ImplId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceId(salsa::Id);
+
+impl InterfaceId {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().interface_id_to_string(db, *self)
+    }
+}
+
+impl InterfaceRef {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().interface_ref_to_string(db, *self)
+    }
+}
+
+impl ImplId {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().impl_id_to_string(db, *self)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeId(salsa::Id);

@@ -32,10 +32,10 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstImplItem, AstInterfaceItem, AstMethodsig},
     },
+    printer::type_printer::{TypePrinter, TypePrinterOptionSet},
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
-        display::{Display, RilDisplay},
+        TypeDefId, TypeId, TypeRef, display::Display,
     },
     thir::{
         ExprId, InferCallInfos,
@@ -123,7 +123,7 @@ pub enum InferenceConstraintKind {
 impl InferenceConstraintKind {
     pub fn has_default_behaviour(&self) -> bool {
         match self {
-            InferenceConstraintKind::IntLike { .. } => true,
+            InferenceConstraintKind::Deref { .. } | InferenceConstraintKind::IntLike { .. } => true,
             _ => false,
         }
     }
@@ -272,7 +272,10 @@ impl<'db> InferenceCtx<'db> {
         } else if let Some((def, _)) = found.is_adt() {
             ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField { def, field })
         } else {
-            println!("Pending here ! found type to be {}", found.display(self.db));
+            println!(
+                "Pending here ! found type to be {}",
+                found.to_string(self.db)
+            );
             ConstraintSolveResult::Pending
         }
     }
@@ -464,12 +467,12 @@ impl<'db> InferenceCtx<'db> {
                 "Could not find an implementation for {} with arity {} on {}",
                 method.display(self.db),
                 args.len(),
-                self.find(receiver).display(self.db)
+                self.find(receiver).to_string(self.db)
             )));
         } else if possible_blocks.len() > 1 {
             for possible in possible_blocks {
                 let src = possible.0;
-                println!("Here: {}", src.id(self.db).display(self.db))
+                println!("Here: {}", src.id(self.db).to_string(self.db))
             }
             return ConstraintSolveResult::Pending;
         }
@@ -754,9 +757,19 @@ impl<'db> InferenceCtx<'db> {
                 "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
             )
         }
-        match constraint.kind {
+        match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
-                match self.unify(InferTy::Var(res_ty), self.int_ty()) {
+                match self.unify(InferTy::Var(*res_ty), self.int_ty()) {
+                    Ok(()) => ConstraintSolveResult::Solved,
+                    Err(err) => ConstraintSolveResult::Error(err),
+                }
+            }
+            InferenceConstraintKind::Deref { var, target } => {
+                let adt = InferTy::Adt {
+                    def: TypeDefId::Builtin(BuiltinTypeId::ref_(self.db)),
+                    fields: Box::new([target.clone()]),
+                };
+                match self.unify(InferTy::Var(*var), adt) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
                 }
@@ -1087,8 +1100,8 @@ impl<'db> InferenceCtx<'db> {
             }
             (lhs_ty, rhs_ty) => todo!(
                 "Implement non arithmetic binops: `{} {op} {}`",
-                lhs_ty.display(self.db),
-                rhs_ty.display(self.db)
+                lhs_ty.to_string(self.db),
+                rhs_ty.to_string(self.db)
             ),
         }
     }
@@ -1128,7 +1141,17 @@ impl<'db> InferenceCtx<'db> {
                     todo!()
                 }
             }
-            op => todo!("{} {op} {}", lid.display(self.db), rid.display(self.db)),
+            op => {
+                let printer = TypePrinter {
+                    options: TypePrinterOptionSet::default()
+                        .with(crate::printer::type_printer::TypePrinterOption::PrintPath),
+                };
+                todo!(
+                    "{} {op} {}",
+                    printer.type_def_id_to_string(self.db, TypeDefId::Builtin(lid)),
+                    printer.type_def_id_to_string(self.db, TypeDefId::Builtin(rid))
+                )
+            }
         }
     }
 }
@@ -1145,18 +1168,18 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             InferenceConstraintKind::Deref { var, target } => {
                 write!(
                     f,
-                    "Defer {{var: {}, target: {}}}",
-                    InferTy::Var(*var).display(self.db),
-                    target.display(self.db)
+                    "Deref {{var: {}, target: {}}}",
+                    InferTy::Var(*var).to_string(self.db),
+                    target.to_string(self.db)
                 )
             }
             InferenceConstraintKind::BindsLike { ty, inner, like } => {
                 write!(
                     f,
                     "BindsLike {{ty: {}, inner: {}, like: {}}}",
-                    InferTy::Var(*ty).display(self.db),
-                    inner.display(self.db),
-                    InferTy::Var(*like).display(self.db)
+                    InferTy::Var(*ty).to_string(self.db),
+                    inner.to_string(self.db),
+                    InferTy::Var(*like).to_string(self.db)
                 )
             }
             InferenceConstraintKind::IndexedBy {
@@ -1167,9 +1190,9 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "IndexedBy {{elem_var: {}, base_ty: {}, index_ty: {}}}",
-                    InferTy::Var(*elem_var).display(self.db),
-                    base_ty.display(self.db),
-                    index_ty.display(self.db)
+                    InferTy::Var(*elem_var).to_string(self.db),
+                    base_ty.to_string(self.db),
+                    index_ty.to_string(self.db)
                 )
             }
             InferenceConstraintKind::Tuple {
@@ -1180,8 +1203,8 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Tuple {{elem_var: {}, tuple_ty: {}, has_index: {has_index}}}",
-                    InferTy::Var(*elem_var).display(self.db),
-                    tuple_ty.display(self.db),
+                    InferTy::Var(*elem_var).to_string(self.db),
+                    tuple_ty.to_string(self.db),
                 )
             }
             InferenceConstraintKind::StructField {
@@ -1192,8 +1215,8 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "StructField {{elem_var: {}, struct_ty: {}, field: {}}}",
-                    InferTy::Var(*elem_var).display(self.db),
-                    struct_ty.display(self.db),
+                    InferTy::Var(*elem_var).to_string(self.db),
+                    struct_ty.to_string(self.db),
                     field.display(self.db)
                 )
             }
@@ -1209,13 +1232,13 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Method {{ret_var: {}, ty: {}, id: ExprId({:?}), method: {}, args: [{}], interface_hint: {}, is_static: {is_static}}}",
-                    InferTy::Var(*ret_var).display(self.db),
-                    ty.display(self.db),
+                    InferTy::Var(*ret_var).to_string(self.db),
+                    ty.to_string(self.db),
                     id.0,
                     method.display(self.db),
-                    args.iter().map(|a| a.display(self.db)).join(", "),
+                    args.iter().map(|a| a.to_string(self.db)).join(", "),
                     match interface_hint {
-                        Some(hint) => hint.display(self.db).to_string(),
+                        Some(hint) => hint.to_string(self.db).to_string(),
                         None => "".to_string(),
                     }
                 )
@@ -1224,17 +1247,17 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Implements {{ty: {}, id: {}, args: [{}]}}",
-                    ty.display(self.db),
-                    id.display(self.db),
-                    args.iter().map(|a| a.display(self.db)).join(", "),
+                    ty.to_string(self.db),
+                    id.to_string(self.db),
+                    args.iter().map(|a| a.to_string(self.db)).join(", "),
                 )
             }
             InferenceConstraintKind::Unify { a, b } => {
                 write!(
                     f,
                     "Unify {{a: {}, b: {}}}",
-                    a.display(self.db),
-                    b.display(self.db),
+                    a.to_string(self.db),
+                    b.to_string(self.db),
                 )
             }
             InferenceConstraintKind::Binop {
@@ -1246,8 +1269,8 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Binop<{op}> {{lhs: {}, rhs: {}, res_ty: {res_ty}}}",
-                    lhs_ty.display(self.db),
-                    rhs_ty.display(self.db),
+                    lhs_ty.to_string(self.db),
+                    rhs_ty.to_string(self.db),
                 )
             }
             InferenceConstraintKind::IntLike { res_ty } => {
@@ -1256,8 +1279,8 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             InferenceConstraintKind::IsInner { inner, ref_ty } => write!(
                 f,
                 "IsInner {{ inner: {}, ref_ty: {} }}",
-                inner.display(self.db),
-                ref_ty.display(self.db)
+                inner.to_string(self.db),
+                ref_ty.to_string(self.db)
             ),
         }
     }

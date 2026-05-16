@@ -45,7 +45,7 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
-        display::RilDisplay, get_template_param_count,
+        get_template_param_count,
     },
 };
 
@@ -213,8 +213,8 @@ impl<'db> LowerFundef<'db> {
 
                 let type_def_id = match resolution {
                     Definition::Type(type_def_id) => type_def_id,
-                    Definition::Interface(id) => todo!("Interface {} here", id.display(self.db)),
-                    other_def => panic!("todo {}", other_def.display(self.db)),
+                    Definition::Interface(id) => todo!("Interface {} here", id.to_string(self.db)),
+                    other_def => panic!("todo {}", other_def.to_string(self.db)),
                 };
 
                 if args.is_empty() {

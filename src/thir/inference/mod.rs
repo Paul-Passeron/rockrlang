@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod canon;
 pub mod constraints;
-mod display;
 pub mod expr;
 mod implems;
 pub mod implicit;
@@ -40,6 +39,7 @@ use crate::{
         implems::resolve_type_expr_as_interface,
         type_expr::{get_templates_of_fun, get_templates_of_fun_only},
     },
+    printer::type_printer::TypePrinter,
     ril::{
         FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef,
         display::Display,
@@ -65,6 +65,12 @@ pub enum InferTy {
         fields: Box<[InferTy]>,
     },
     Param(TypeParamId),
+}
+
+impl InferTy {
+    pub fn to_string<'a>(&'a self, db: &'a dyn crate::Db) -> String {
+        TypePrinter::new().infer_ty_to_string(db, self.clone(), None)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -290,7 +296,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
             UnificationError::RecursiveDefinition(infer_var) => write!(
                 f,
                 "Recursive definition: {}",
-                InferTy::Var(*infer_var).display(self.db)
+                InferTy::Var(*infer_var).to_string(self.db)
             ),
             UnificationError::UnmetConstraint(inference_constraint, unification_error) => {
                 write!(
@@ -358,12 +364,15 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 write!(
                     f,
                     "No implementation candidate found for type {} with interface {}{}",
-                    infer_ty.display(self.db),
+                    infer_ty.to_string(self.db),
                     interface_id.name(self.db).display(self.db),
                     if items.is_empty() {
                         String::new()
                     } else {
-                        format!("<{}>", items.iter().map(|i| i.display(self.db)).join(", "))
+                        format!(
+                            "<{}>",
+                            items.iter().map(|i| i.to_string(self.db)).join(", ")
+                        )
                     }
                 )
             }

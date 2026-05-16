@@ -15,14 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt::{self};
-
 use crate::{
-    Db,
-    ril::{
-        TypeDefId,
-        display::{Display, RilDisplay},
-    },
+    ril::TypeDefId,
     thir::inference::{InferTy, InferenceCtx},
 };
 
@@ -42,35 +36,6 @@ impl<'db> InferenceCtx<'db> {
                 args: fields.iter().map(|f| self.canonize(f)).collect(),
             },
             InferTy::Param(type_param_id) => CanonTy::Param(type_param_id.0),
-        }
-    }
-}
-
-impl CanonTy {
-    pub fn display(&self, db: &dyn Db) -> impl fmt::Display {
-        Display { value: self, db }
-    }
-}
-
-impl fmt::Display for Display<'_, &CanonTy> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.value {
-            CanonTy::Hole => write!(f, "_"),
-            CanonTy::Adt { id, args } => {
-                write!(f, "{}", id.display(self.db))?;
-                if !args.is_empty() {
-                    write!(
-                        f,
-                        "({})",
-                        args.iter()
-                            .map(|a| a.display(self.db).to_string())
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )?;
-                }
-                Ok(())
-            }
-            CanonTy::Param(n) => write!(f, "T{}", n),
         }
     }
 }

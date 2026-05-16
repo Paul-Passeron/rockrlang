@@ -21,15 +21,13 @@ use crate::{
     name_resolve::{builtin_module, core_module, core_package, module_items, std_module},
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
+    printer::type_printer::TypePrinter,
     ril::{
         EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
-        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
-        display::{Display, RilDisplay},
-        int_id, never_id, usize_id, void_id,
+        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id, int_id, never_id, usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
-use std::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -38,6 +36,12 @@ pub enum Definition {
     Interface(InterfaceId),
     Module(ModuleId),
     Type(TypeDefId), // ... TODO
+}
+
+impl Definition {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().definition_to_string(db, *self)
+    }
 }
 
 impl TypeDefId {
@@ -336,16 +340,4 @@ pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -
         String::new()
     };
     Arc::new(format!("{}{}", prefix, id.name(db).interned().contents(db)))
-}
-
-impl RilDisplay for Definition {}
-
-impl fmt::Display for Display<'_, Definition> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.value.name(self.db).interned().contents(self.db)
-        )
-    }
 }

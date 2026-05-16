@@ -433,8 +433,8 @@ impl<'db> TyCtx<'db> {
                                 self.push_regular_diagnostic_with_message_and_primary(
                                     format!(
                                         "Cannot assign {} to {}",
-                                        lhs_ty.display(self.db),
-                                        rhs_ty.display(self.db)
+                                        lhs_ty.to_string(self.db),
+                                        rhs_ty.to_string(self.db)
                                     ),
                                     Some(err.display(self.db).to_string()),
                                     stmt.span.clone(),
@@ -465,8 +465,8 @@ impl<'db> TyCtx<'db> {
                             if let Err(err) = self.inf_ctx.unify(ret_ty.clone(), infer_ty.clone()) {
                                 let fmt = format!(
                                     "Cannot return {} form a function expected to return {}",
-                                    self.inf_ctx.find(&infer_ty).display(self.db),
-                                    self.inf_ctx.find(&ret_ty).display(self.db)
+                                    self.inf_ctx.find(&infer_ty).to_string(self.db),
+                                    self.inf_ctx.find(&ret_ty).to_string(self.db)
                                 );
                                 self.push_regular_diagnostic_with_message_and_primary(
                                     fmt,
@@ -479,7 +479,7 @@ impl<'db> TyCtx<'db> {
                             self.push_regular_diagnostic_with_message(
                                 format!(
                                     "Cannot return error type form a function expected to return {}",
-                                    ret_ty.display(self.db)
+                                    ret_ty.to_string(self.db)
                                 ),
                                 stmt.span.clone(),
                             );
@@ -491,7 +491,7 @@ impl<'db> TyCtx<'db> {
                         self.push_regular_diagnostic_with_message(
                             format!(
                                 "Cannot have an empty return from a function expected to return {}",
-                                ret_ty.display(self.db)
+                                ret_ty.to_string(self.db)
                             ),
                             stmt.span.clone(),
                         );
