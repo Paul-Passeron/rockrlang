@@ -204,14 +204,14 @@ impl<'db> InferenceCtx<'db> {
     ) -> ConstraintSolveResult {
         let found = self.find(base_ty);
         if let Some(elem_ty) = self.is_builtin_indexed_by_int(&found) {
-            if let Err(err) = self
-                .unify(InferTy::Var(elem_var), elem_ty)
-                .and_then(|_| self.unify(index_ty.clone(), self.int_ty()))
-            {
-                ConstraintSolveResult::Error(err)
-            } else {
-                ConstraintSolveResult::Solved
+            if let Err(err) = self.unify(InferTy::Var(elem_var), elem_ty) {
+                return ConstraintSolveResult::Error(err);
             }
+            let idx = self.emit_intlike_constraint();
+            if let Err(err) = self.unify(index_ty.clone(), InferTy::Var(idx)) {
+                return ConstraintSolveResult::Error(err);
+            }
+            ConstraintSolveResult::Solved
         } else if found.is_adt().is_some() {
             todo!("Trait-based indexing")
         } else {
