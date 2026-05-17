@@ -14,3 +14,13 @@ regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
 salsa = {version = "0.26.0", features = []}
 salsa-macros = "0.26.0"
+
+[[test]]
+name = "examples"
+path = "tests/examples.rs"
+harness = false
+
+[dev-dependencies]
+insta = { version = "1.47.2", features = ["filters"] }
+libtest-mimic = "0.8.2"
+walkdir = "2.5.0"
