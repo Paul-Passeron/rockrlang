@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use libtest_mimic::{Arguments, Failed, Trial};
-use rockr::{self, run_rkr};
+use rockr::{self, RunStatus, run_rkr};
 use std::{
     path::{Path, PathBuf},
     process::ExitCode,
@@ -103,7 +103,7 @@ fn run_fail_case(path: &Path, snap_name: &str) -> Result<(), Failed> {
     snapshot(snap_name, &output);
     Ok(())
 }
-fn snapshot(snap_name: &str, output: &impl std::fmt::Debug) {
+fn snapshot(snap_name: &str, output: &RunStatus) {
     insta::with_settings!({
         snapshot_path => "snapshots",
         prepend_module_to_snapshot => false,
@@ -112,6 +112,6 @@ fn snapshot(snap_name: &str, output: &impl std::fmt::Debug) {
             (r"[^\s]*?/examples/", "[EXAMPLES]/"),
         ],
     }, {
-        insta::assert_debug_snapshot!(snap_name, output);
+        insta::assert_snapshot!(snap_name, format!("stdout:\n{}\n\nstderr:\n{}",output.stdout,output.stderr));
     });
 }
