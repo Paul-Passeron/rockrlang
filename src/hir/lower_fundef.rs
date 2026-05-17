@@ -469,21 +469,24 @@ impl<'db> LowerFundef<'db> {
                                     symbol.interned().contents(self.db)
                                 )
                             }
+                            let args = args
+                                .iter()
+                                .map(|a| self.lower_expr(a, scope, module))
+                                .collect();
+
                             // Module-level: must be a free function
                             match resolve_in_module(self.db, symbol.interned(), module.interned()) {
                                 Some(Definition::Function(fid)) => {
-                                    let args = args
-                                        .iter()
-                                        .map(|a| self.lower_expr(a, scope, module))
-                                        .collect();
                                     HirExprDesc::CallDirect { target: fid, args }
                                 }
-                                other => todo!(
-                                    "{}: Call callee `{}` resolved to {:?}",
-                                    callee.span.start().loc_info(self.db, self.module).unwrap(),
-                                    symbol.interned().contents(self.db),
-                                    other
-                                ),
+                                _ => HirExprDesc::UnresolvedCallDirect {
+                                    target: FunctionId::new(
+                                        self.db,
+                                        *symbol,
+                                        ScopeOwnerId::Module(module),
+                                    ),
+                                    args,
+                                },
                             }
                         }
                         AstExprDesc::NameResolved { from, to } => {

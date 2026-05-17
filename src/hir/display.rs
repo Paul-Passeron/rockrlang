@@ -336,6 +336,16 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             }
             write_place(f, place, db)
         }
+        HirExprDesc::UnresolvedCallDirect { target, args } => {
+            write!(f, "#<unresolved>{}(", target.name(db).to_string(db))?;
+            for (i, arg) in args.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write_expr(f, arg, db)?;
+            }
+            write!(f, ")")
+        }
 
         HirExprDesc::CallDirect { target, args } => {
             write!(f, "{}(", target.to_string(db))?;
@@ -374,6 +384,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                 write!(f, ")")
             }
         },
+
         HirExprDesc::CallStatic { ty, method, args } => {
             write_partial_type(f, ty, db)?;
             write!(f, "::{}(", method.display(db))?;

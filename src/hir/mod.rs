@@ -163,6 +163,12 @@ pub enum HirExprDesc {
         args: Vec<HirExpr>,
     },
 
+    UnresolvedCallDirect {
+        // The function id here is not valid
+        target: FunctionId,
+        args: Vec<HirExpr>,
+    },
+
     CallMethod {
         receiver: Box<HirExpr>,
         method: Symbol,
