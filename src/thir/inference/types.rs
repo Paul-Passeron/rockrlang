@@ -182,16 +182,6 @@ impl<'db> InferenceCtx<'db> {
                 Some(res) => res.clone(),
                 None => {
                     todo!("Diagnostics");
-                    // let templates = ctx.get_ast_templates();
-                    // self.diagnostics.push(Diagnostic {
-                    //     kind: DiagnosticKind::Custom(format!("")),
-                    //     span: if let Some(ast) = templates.first() {
-                    //         ast.span.clone()
-                    //     } else {
-                    //         ctx.owning_module(self.db).get_span(self.db)
-                    //     },
-                    // });
-                    // InferTy::Var(self.fresh_var())
                 }
             },
             TypeRef::Error => panic!(),

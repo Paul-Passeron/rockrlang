@@ -18,21 +18,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::{collections::BTreeMap, panic, sync::Arc};
 
-use crate::compiler::diagnostic::Diagnostic;
-use crate::hir::function_ast;
-
-use crate::thir::inference::constraints::InferenceConstraintKind;
 use crate::{
     Db,
+    compiler::diagnostic::Diagnostic,
     hir::{
         self, HirBody, HirExpr, HirId, HirPattern, HirPatternDesc, HirStmt, HirStmtKind, LocalId,
-        LocalInfo, hir_body,
+        LocalInfo, function_ast, hir_body,
     },
     name_resolve::type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
     parse_tree::top_level::{AstEnumVariantKind, AstTemplateArg},
     ril::{self, FunctionId, InternedFunctionId, Package, TypeDefId, TypeRef},
     thir::inference::{
-        InferTy, InferenceCtx, UnificationError, implicit::ImplicitContext, var::InferVar,
+        InferTy, InferenceCtx, UnificationError, constraints::InferenceConstraintKind,
+        implicit::ImplicitContext, var::InferVar,
     },
 };
 
@@ -259,11 +257,12 @@ impl<'db> TyCtx<'db> {
                                 );
                                 return InferTy::Var(self.inf_ctx.fresh_var());
                             };
-                            self.inf_ctx
-                                .emit_constraint(InferenceConstraintKind::Unify {
-                                    a: pat_ty,
-                                    b: ast_ty,
-                                });
+
+                            if let Err(err) = self.inf_ctx.unify(pat_ty, ast_ty) {
+                                self.inf_ctx
+                                    .diagnostics
+                                    .push_regular_diagnostic(err, pattern.span.clone());
+                            }
                         }
                     }
                     _ => unreachable!("Mismatch between AST variant kind decl and case"),
@@ -336,11 +335,14 @@ impl<'db> TyCtx<'db> {
                     }
                 };
                 let typeof_scrut_var = self.inf_ctx.fresh_var();
-                self.inf_ctx
-                    .emit_constraint(InferenceConstraintKind::Unify {
-                        a: typeof_scrut.clone(),
-                        b: InferTy::Var(typeof_scrut_var),
-                    });
+                if let Err(err) = self
+                    .inf_ctx
+                    .unify(typeof_scrut.clone(), InferTy::Var(typeof_scrut_var))
+                {
+                    self.inf_ctx
+                        .diagnostics
+                        .push_regular_diagnostic(err, scrutinee.span.clone());
+                }
 
                 for branch in branches {
                     let mut loc_inners = HashMap::new();

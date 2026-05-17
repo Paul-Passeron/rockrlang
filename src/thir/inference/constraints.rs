@@ -32,7 +32,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstImplItem, AstInterfaceItem, AstMethodsig},
     },
-    printer::type_printer::{TypePrinter, TypePrinterOptionSet},
+    printer::type_printer::{TypePrinter, TypePrinterOption, TypePrinterOptionSet},
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef, display::Display,
@@ -759,6 +759,14 @@ impl<'db> InferenceCtx<'db> {
         }
         match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
+                // FIXME: We should not have to check that here
+                let found = self.find(&InferTy::Var(*res_ty));
+                if found
+                    .is_adt()
+                    .is_some_and(|val| val.0.is_int_like(self.db).is_some())
+                {
+                    return ConstraintSolveResult::Solved;
+                }
                 match self.unify(InferTy::Var(*res_ty), self.int_ty()) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
@@ -1143,8 +1151,7 @@ impl<'db> InferenceCtx<'db> {
             }
             op => {
                 let printer = TypePrinter {
-                    options: TypePrinterOptionSet::default()
-                        .with(crate::printer::type_printer::TypePrinterOption::PrintPath),
+                    options: TypePrinterOptionSet::default().with(TypePrinterOption::PrintPath),
                 };
                 todo!(
                     "{} {op} {}",
