@@ -67,6 +67,7 @@ impl<'db> FileModule<'db> {
 }
 
 #[salsa::tracked]
+#[derive(PartialOrd, Ord)]
 pub struct Package<'db> {
     pub root: FileModule<'db>,
 }

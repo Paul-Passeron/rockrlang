@@ -484,6 +484,7 @@ pub fn check(root: impl AsRef<Path>, config: Config) -> Result<Report, CompilerE
     packages
         .iter()
         .filter(|package| !db.config.skip_core || **package != core_package(&db))
+        .sorted()
         .for_each(|package| check_package(&db, *package, &packages, &mut report));
 
     Ok(report)
