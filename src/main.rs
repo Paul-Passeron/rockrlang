@@ -15,28 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![feature(bool_to_result, option_into_flat_iter)]
-
-use clap::Parser;
+use clap::Parser as _;
 use clap_derive::Parser;
-pub use common::location::OwnedSourceFile;
-pub use common::location::SourceFile;
-pub use db::*;
-use std::path::PathBuf;
-
-mod common;
-mod compiler;
-mod db;
-mod driver;
-mod hir;
-mod lexer;
-mod name_resolve;
-mod parse_tree;
-mod parser;
-mod printer;
-mod ril;
-mod tests;
-mod thir;
+use rockr::{RunStatus, compiler, printer, run_rkr};
+use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Debug, Parser)]
 pub struct CliArgs {
@@ -48,27 +30,39 @@ pub struct CliArgs {
 }
 
 fn main() -> std::process::ExitCode {
-    let args = CliArgs::parse();
-    let cfg = compiler::Config {
-        no_std: args.no_std,
-        skip_core: args.skip_core,
-    };
-    let root = args
-        .file
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
-    match compiler::check(&root, cfg) {
-        Ok(report) => {
-            printer::print(&report);
-            if report.has_errors() {
-                eprintln!("Could not compile, errors were encountered.");
-                std::process::ExitCode::FAILURE
-            } else {
-                std::process::ExitCode::SUCCESS
-            }
-        }
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::ExitCode::FAILURE
-        }
+    // let args = CliArgs::parse();
+    // let cfg = compiler::Config {
+    //     no_std: args.no_std,
+    //     skip_core: args.skip_core,
+    // };
+    // let root = args
+    //     .file
+    //     .unwrap_or_else(|| std::env::current_dir().unwrap());
+    // match compiler::check(&root, cfg) {
+    //     Ok(report) => {
+    //         printer::print(&report);
+    //         if report.has_errors() {
+    //             eprintln!("Could not compile, errors were encountered.");
+    //             std::process::ExitCode::FAILURE
+    //         } else {
+    //             std::process::ExitCode::SUCCESS
+    //         }
+    //     }
+    //     Err(e) => {
+    //         eprintln!("error: {e}");
+    //         std::process::ExitCode::FAILURE
+    //     }
+    // }
+    loop {
+        let RunStatus {
+            exit_code,
+            stderr,
+            stdout,
+        } = run_rkr(&PathBuf::from("examples/match.rkr"));
+        if exit_code == ExitCode::FAILURE {
+            println!("{}", stdout);
+            println!("{}", stderr);
+            return std::process::ExitCode::FAILURE;
+        };
     }
 }
