@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::BTreeMap, iter};
 
+use itertools::Itertools;
+
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -704,6 +706,118 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
+    fn compute_template_hints(&mut self, ty: PartialTypeRef) -> Vec<PartialTypeArg> {
+        match ty {
+            PartialTypeRef::Resolved(type_ref) => match type_ref {
+                TypeRef::Concrete(type_id) => type_id
+                    .args(self.db)
+                    .into_iter()
+                    .map(PartialTypeArg::Known)
+                    .collect(),
+                TypeRef::Param(_) => {
+                    unreachable!()
+                }
+                TypeRef::Unknown | TypeRef::Error => {
+                    vec![]
+                }
+                TypeRef::Zelf => todo!(),
+                TypeRef::Associated(_symbol) => todo!(),
+            },
+            PartialTypeRef::WithHoles { args, .. } => args,
+        }
+    }
+
+    fn lower_constructor_or_static_call(
+        &mut self,
+        type_def_id: TypeDefId,
+        symbol: Symbol,
+        args: Vec<HirExpr>,
+    ) -> HirExprDesc {
+        let ty = self.instantiate_holed(type_def_id);
+        if let TypeDefId::Enum(enum_id) = type_def_id {
+            let items = enum_item(self.db, enum_id.interned());
+            if items.variants.iter().any(|variant| {
+                variant.name == symbol && matches!(&variant.kind, AstEnumVariantKind::TupleLike(_))
+            }) {
+                HirExprDesc::Constructor {
+                    enum_def: enum_id,
+                    name: symbol,
+                    args: HirConstructorArgs::TupleLike(args),
+                    template_hints: self.compute_template_hints(ty),
+                }
+            } else {
+                HirExprDesc::CallStatic {
+                    ty,
+                    method: symbol,
+                    args,
+                }
+            }
+        } else {
+            HirExprDesc::CallStatic {
+                ty,
+                method: symbol,
+                args,
+            }
+        }
+    }
+
+    fn lower_name_resolved_from_type_call(
+        &mut self,
+        type_def_id: TypeDefId,
+        callee: &AstExpr,
+        args: &[AstExpr],
+        scope: &Scope,
+        module: ModuleId,
+    ) -> HirExprDesc {
+        let AstExprDesc::Name(method) = callee.data else {
+            unreachable!()
+        };
+        let args = args
+            .iter()
+            .map(|a| self.lower_expr(a, scope, module))
+            .collect_vec();
+        self.lower_constructor_or_static_call(type_def_id, method, args)
+    }
+
+    fn lower_structlit_that_is_actually_enum_variant(
+        &mut self,
+        type_def_id: TypeDefId,
+        ty: &AstTypeExpr,
+        variant: Option<Symbol>,
+        fields: &[AstStructField],
+        scope: &Scope,
+    ) -> HirExprDesc {
+        if let TypeDefId::Enum(enum_def) = type_def_id {
+            let variant_name = if let Some(v) = variant {
+                v
+            } else {
+                match &ty.data {
+                    AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
+                    _ => unreachable!("NameResolved+StructLit with no variant and complex ty"),
+                }
+            };
+            let mut lowered_fields = vec![];
+            for AstStructField { name, value } in fields {
+                let expr = self.lower_expr(value, scope, self.module);
+                lowered_fields.push((*name, expr));
+            }
+            let args = HirConstructorArgs::StructLike {
+                fields: lowered_fields,
+            };
+            let mut template_hints = vec![];
+            for _ in 0..templates_of_enum(self.db, enum_def.interned()).len() {
+                template_hints.push(PartialTypeArg::Infer);
+            }
+            return HirExprDesc::Constructor {
+                enum_def,
+                name: variant_name,
+                args,
+                template_hints,
+            };
+        }
+        todo!("Push diagnostic for bad type here")
+    }
+
     fn lower_name_resolved_expr_from_type(
         &mut self,
         scope: &Scope,
@@ -713,89 +827,19 @@ impl<'db> LowerFundef<'db> {
     ) -> HirExprDesc {
         match &to.data {
             AstExprDesc::Call { callee, args } => {
-                let ty = self.instantiate_holed(type_def_id);
-                let AstExprDesc::Name(method) = callee.data else {
-                    unreachable!()
-                };
-                let args = args
-                    .iter()
-                    .map(|a| self.lower_expr(a, scope, module))
-                    .collect();
-                match type_def_id {
-                    TypeDefId::Enum(enum_id) => {
-                        let items = enum_item(self.db, enum_id.interned());
-                        if items.variants.iter().any(|variant| {
-                            variant.name == method
-                                && matches!(&variant.kind, AstEnumVariantKind::TupleLike(_))
-                        }) {
-                            HirExprDesc::Constructor {
-                                enum_def: enum_id,
-                                name: method,
-                                args: HirConstructorArgs::TupleLike(args),
-                                template_hints: match ty {
-                                    PartialTypeRef::Resolved(type_ref) => match type_ref {
-                                        TypeRef::Concrete(type_id) => type_id
-                                            .args(self.db)
-                                            .into_iter()
-                                            .map(PartialTypeArg::Known)
-                                            .collect(),
-                                        TypeRef::Param(_) => {
-                                            unreachable!()
-                                        }
-                                        TypeRef::Unknown | TypeRef::Error => {
-                                            vec![]
-                                        }
-                                        TypeRef::Zelf => todo!(),
-                                        TypeRef::Associated(_symbol) => todo!(),
-                                    },
-                                    PartialTypeRef::WithHoles { args, .. } => args,
-                                },
-                            }
-                        } else {
-                            HirExprDesc::CallStatic { ty, method, args }
-                        }
-                    }
-                    _ => HirExprDesc::CallStatic { ty, method, args },
-                }
+                self.lower_name_resolved_from_type_call(type_def_id, callee, args, scope, module)
             }
             AstExprDesc::StructLit {
                 ty,
                 variant,
                 fields,
-            } => match type_def_id {
-                TypeDefId::Builtin(_builtin_type_id) => todo!(),
-                TypeDefId::Struct(_struct_id) => todo!(),
-                TypeDefId::Enum(enum_def) => {
-                    let variant_name = if let Some(v) = variant {
-                        *v
-                    } else {
-                        match &ty.data {
-                            AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
-                            _ => unreachable!(
-                                "NameResolved+StructLit with no variant and complex ty"
-                            ),
-                        }
-                    };
-                    let mut lowered_fields = vec![];
-                    for AstStructField { name, value } in fields {
-                        let expr = self.lower_expr(value, scope, self.module);
-                        lowered_fields.push((*name, expr));
-                    }
-                    let args = HirConstructorArgs::StructLike {
-                        fields: lowered_fields,
-                    };
-                    let mut template_hints = vec![];
-                    for _ in 0..templates_of_enum(self.db, enum_def.interned()).len() {
-                        template_hints.push(PartialTypeArg::Infer);
-                    }
-                    HirExprDesc::Constructor {
-                        enum_def,
-                        name: variant_name,
-                        args,
-                        template_hints,
-                    }
-                }
-            },
+            } => self.lower_structlit_that_is_actually_enum_variant(
+                type_def_id,
+                ty,
+                *variant,
+                fields,
+                scope,
+            ),
             AstExprDesc::Name(variant) => match type_def_id {
                 TypeDefId::Builtin(_builtin_type_id) => todo!(),
                 TypeDefId::Struct(_struct_id) => todo!(),
