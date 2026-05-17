@@ -202,7 +202,6 @@ pub fn check_interface<'a>(
 }
 
 pub struct FunctionResult {
-    pub id: FunctionId,
     pub name: String,
     pub hir: String,
     pub typed_exprs: Vec<(ExprId, String)>,
@@ -387,7 +386,6 @@ pub fn check_function<'a>(
                 })
                 .collect()
         }),
-        id: function_id,
     });
 }
 

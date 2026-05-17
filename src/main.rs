@@ -17,8 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use clap::Parser as _;
 use clap_derive::Parser;
-use rockr::{compiler, printer};
-use std::path::PathBuf;
+use rockr::{RunStatus, compiler, printer, run_rkr};
+use std::{path::PathBuf, process::ExitCode};
 
 #[derive(Debug, Parser)]
 pub struct CliArgs {

@@ -45,13 +45,13 @@ fn print_file_module(
 fn get_package_path_from_env_var(env_var: &str) -> Option<PathBuf> {
     let path = std::env::var(env_var).ok()?;
     let root = std::path::Path::new(&path).join("main.rkr");
-    // let root = root.canonicalize().unwrap_or(root);
+    let root = root.canonicalize().unwrap_or(root);
     Some(root)
 }
 
 fn is_builtin_file_module(file_module: &FileModuleInfo) -> bool {
     let p = file_module.file.path.to_path_buf();
-    // let p = p.canonicalize().unwrap_or(p);
+    let p = p.canonicalize().unwrap_or(p);
 
     let builtin_modules = [
         get_package_path_from_env_var("ROCKR_STD").unwrap_or_default(),

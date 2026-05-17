@@ -28,7 +28,7 @@ pub mod var;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     fmt, mem,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -134,14 +134,13 @@ impl<'db> DiagnosticEngine<'db> {
     }
 
     fn find_file(&self, path: impl AsRef<Path>) -> Option<OwnedSourceFile> {
-        // let canon = path.as_ref().canonicalize().ok()?;
+        let canon = path.as_ref().canonicalize().ok()?;
         fn handle_submodule(
             this: &DiagnosticEngine,
             sub: &FileModule,
-            path: impl AsRef<Path>,
+            path: &PathBuf,
         ) -> Option<OwnedSourceFile> {
-            let path = path.as_ref();
-            if sub.file(this.db).path(this.db).as_path() == path {
+            if &sub.file(this.db).path(this.db) == path {
                 return Some(sub.file(this.db).to_owned(this.db));
             }
             for submodule in sub.submodules(this.db) {
@@ -152,7 +151,7 @@ impl<'db> DiagnosticEngine<'db> {
             None
         }
         for package in self.packages.iter() {
-            if let Some(res) = handle_submodule(self, &package.root(self.db), &path) {
+            if let Some(res) = handle_submodule(self, &package.root(self.db), &canon) {
                 return Some(res);
             }
         }
