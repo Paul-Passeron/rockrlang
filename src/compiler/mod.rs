@@ -181,63 +181,6 @@ pub struct FunctionResult {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-// pub fn get_pretty_owner<'a>(db: &'a dyn Db, owner: ScopeOwnerId) -> String {
-//     let res = match owner {
-//         ScopeOwnerId::Module(module_id) => {
-//             get_module_pretty_name(db, module_id.interned()).to_string()
-//         }
-//         ScopeOwnerId::Impl(impl_id) => {
-//             let parent = get_module_pretty_name(db, impl_id.parent(db).interned());
-//             format!(
-//                 "{parent}::`impl{} {}{}`",
-//                 if impl_id.templates(db).is_empty() {
-//                     String::new()
-//                 } else {
-//                     format!(
-//                         " <{}>",
-//                         impl_id
-//                             .templates(db)
-//                             .iter()
-//                             .enumerate()
-//                             .map(|(i, t)| {
-//                                 format!(
-//                                     "T{i}{}",
-//                                     if !t.is_empty() {
-//                                         format!(
-//                                             ": {}",
-//                                             t.iter()
-//                                                 .map(|it| it.display(db).to_string())
-//                                                 .collect_vec()
-//                                                 .join(" + ")
-//                                         )
-//                                     } else {
-//                                         String::new()
-//                                     }
-//                                 )
-//                             })
-//                             .collect_vec()
-//                             .join(", ")
-//                     )
-//                 },
-//                 match impl_id.interface(db) {
-//                     Some(interface_ref) => format!("{} for ", interface_ref.display(db)),
-//                     _ => "".into(),
-//                 },
-//                 impl_id.implemented(db).display(db)
-//             )
-//         }
-//         ScopeOwnerId::Interface(interface_ref) => {
-//             let parent = get_module_pretty_name(db, interface_ref.def(db).parent(db).interned());
-//             format!("{parent}::{}", interface_ref.def(db).display(db))
-//         }
-//     };
-
-//     if let Some(res) = res.strip_prefix("@builtin::") {
-//         return res.into();
-//     }
-//     res
-// }
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ZelfArg {
     mutability: Mutability,
@@ -466,11 +409,14 @@ pub fn check_module<'a>(
     report: &mut Report,
 ) {
     module_definitions(db, module.interned())
-        .into_values()
+        .into_iter()
+        .sorted_by_key(|(x, _)| *x)
+        .map(|(_, x)| x)
         .for_each(|def| check_definition(db, def, package, packages, report));
 
     module_impls(db, module.interned())
         .into_iter()
+        .sorted()
         .for_each(|implem| check_implem(db, implem, packages, report));
 
     module.file_submodules(db).iter().for_each(|submodule| {

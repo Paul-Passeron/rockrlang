@@ -38,6 +38,7 @@ use crate::{
 };
 
 #[salsa::tracked]
+#[derive(PartialOrd, Ord)]
 pub struct FileModule<'db> {
     pub file: SourceFile<'db>,
     #[returns(ref)]

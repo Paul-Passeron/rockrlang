@@ -64,6 +64,7 @@ fn get_source_file<'db>(
 }
 
 #[salsa::interned]
+#[derive(PartialOrd, Ord)]
 pub struct SourceFile {
     pub path: PathBuf,
     pub content: Arc<String>,

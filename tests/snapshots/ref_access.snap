@@ -227,7 +227,7 @@ fn core::vec::`impl <T0>core::iter::Iter `::next<T0>(&mut self): core::opt::opt<
             {
                 return opt<_>::None;
             }
-
+        
         let res/*_1*/ = *<tmp:*_0.vec.unsafe_idx(_0.idx)>;
         _0.idx = (_0.idx + 1);
         return opt<_>::Some(_1);
@@ -271,7 +271,7 @@ fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
             {
                 return opt<_>::None;
             }
-
+        
         let res/*_1*/ = *_0.start;
         *_0.start = (*_0.start + 1);
         return opt<_>::Some(_1);
@@ -402,7 +402,7 @@ fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
             {
                 return opt<_>::None;
             }
-
+        
         let res/*_1*/ = *_0.start;
         *_0.start = (*_0.start + 1);
         return opt<_>::Some(_1);
@@ -711,7 +711,7 @@ fn core::vec::`impl <T0>core::iter::Iter `::next<T0>(&mut self): core::opt::opt<
             {
                 return opt<_>::None;
             }
-
+        
         let res/*_1*/ = *<tmp:*_0.vec.unsafe_idx(_0.idx)>;
         _0.idx = (_0.idx + 1);
         return opt<_>::Some(_1);
