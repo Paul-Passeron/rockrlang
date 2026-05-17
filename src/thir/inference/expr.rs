@@ -110,7 +110,7 @@ impl<'db> InferenceCtx<'db> {
                 });
                 self.diagnostics.push_regular_diagnostic_with_message(
                     format!(
-                        "Function `{}` not found in current scope.",
+                        "function `{}` not found in current scope.",
                         target.name(self.db).to_string(self.db)
                     ),
                     expr.span.clone(),
