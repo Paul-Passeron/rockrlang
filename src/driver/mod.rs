@@ -37,7 +37,7 @@ pub struct DiscoveredModule {
 }
 
 pub fn discover_package(p: &Path) -> Option<DiscoveredModule> {
-    let p = p.canonicalize().ok()?;
+    // let p = p.canonicalize().ok()?;
     if p.is_dir() {
         discover_dir(&p)
     } else if p.file_name()? == ANCHOR_FILE_NAME {
@@ -45,7 +45,7 @@ pub fn discover_package(p: &Path) -> Option<DiscoveredModule> {
     } else {
         // Standalone file — no submodules
         Some(DiscoveredModule {
-            path: p,
+            path: p.to_path_buf(),
             submodules: vec![],
         })
     }

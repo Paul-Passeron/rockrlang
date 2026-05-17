@@ -98,6 +98,12 @@ impl<'a> PackageInfo {
     }
 }
 
+pub struct ReportBuilder {
+    pub packages: Box<[PackageInfo]>,
+    pub diagnostics: Vec<Diagnostic>,
+    pub funcs: Vec<FunctionResult>,
+}
+
 pub struct Report {
     pub packages: Box<[PackageInfo]>,
     pub diagnostics: Vec<Diagnostic>,
@@ -120,6 +126,24 @@ impl Report {
             packages,
             diagnostics: Default::default(),
             funcs: Default::default(),
+        }
+    }
+}
+
+impl ReportBuilder {
+    pub fn new(packages: Box<[PackageInfo]>) -> Self {
+        Self {
+            packages,
+            diagnostics: Default::default(),
+            funcs: Default::default(),
+        }
+    }
+
+    pub fn build(self) -> Report {
+        Report {
+            packages: self.packages,
+            diagnostics: self.diagnostics,
+            funcs: self.funcs.into_iter().sorted_by_key(|f| f.id).collect(),
         }
     }
 }
@@ -158,7 +182,7 @@ pub fn check_type_def<'a>(
     _type_def_id: TypeDefId,
     _package: Package<'a>,
     _packages: &[Package<'a>],
-    _report: &mut Report,
+    _report: &mut ReportBuilder,
 ) {
     // Nothing to do, I think ?
 }
@@ -168,12 +192,13 @@ pub fn check_interface<'a>(
     _interface_id: InterfaceId,
     _package: Package<'a>,
     _packages: &[Package<'a>],
-    _report: &mut Report,
+    _report: &mut ReportBuilder,
 ) {
     // Is there anything to do here ?
 }
 
 pub struct FunctionResult {
+    pub id: FunctionId,
     pub name: String,
     pub hir: String,
     pub typed_exprs: Vec<(ExprId, String)>,
@@ -330,7 +355,7 @@ pub fn check_function<'a>(
     db: &'a dyn Db,
     function_id: FunctionId,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     let name = function_id.to_string(db);
     let thir = type_check_function(db, function_id.interned(), packages.into());
@@ -358,6 +383,7 @@ pub fn check_function<'a>(
                 })
                 .collect()
         }),
+        id: function_id,
     });
 }
 
@@ -366,7 +392,7 @@ pub fn check_definition<'a>(
     def: Definition,
     package: Package<'a>,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     match def {
         Definition::Function(function_id) => check_function(db, function_id, packages, report),
@@ -382,7 +408,7 @@ pub fn check_implem<'a>(
     db: &'a dyn Db,
     implem: ImplSource<'a>,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     for item in implem.items(db) {
         match item {
@@ -406,17 +432,14 @@ pub fn check_module<'a>(
     module: ModuleId,
     package: Package<'a>,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     module_definitions(db, module.interned())
-        .into_iter()
-        .sorted_by_key(|(x, _)| *x)
-        .map(|(_, x)| x)
+        .into_values()
         .for_each(|def| check_definition(db, def, package, packages, report));
 
     module_impls(db, module.interned())
         .into_iter()
-        .sorted()
         .for_each(|implem| check_implem(db, implem, packages, report));
 
     module.file_submodules(db).iter().for_each(|submodule| {
@@ -446,7 +469,7 @@ pub fn check_file_module<'a>(
     parent: Option<ModuleId>,
     package: Package<'a>,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     let module = file_module_id(db, file_module, parent, package);
     let parse_errors: Vec<&ParseError> =
@@ -463,7 +486,7 @@ pub fn check_package<'a>(
     db: &'a dyn Db,
     package: Package<'a>,
     packages: &[Package<'a>],
-    report: &mut Report,
+    report: &mut ReportBuilder,
 ) {
     check_file_module(db, package.root(db), None, package, packages, report);
 }
@@ -474,7 +497,7 @@ pub fn check(root: impl AsRef<Path>, config: Config) -> Result<Report, CompilerE
     let package = driver::load_package(&db, root)
         .ok_or_else(|| CompilerError::NoCompilationUnitFound(root.to_path_buf()))?;
     let packages = build_package_set(&db, package)?;
-    let mut report = Report::new(
+    let mut report = ReportBuilder::new(
         packages
             .iter()
             .map(|p| PackageInfo::from(&db, *p))
@@ -484,8 +507,7 @@ pub fn check(root: impl AsRef<Path>, config: Config) -> Result<Report, CompilerE
     packages
         .iter()
         .filter(|package| !db.config.skip_core || **package != core_package(&db))
-        .sorted()
         .for_each(|package| check_package(&db, *package, &packages, &mut report));
 
-    Ok(report)
+    Ok(report.build())
 }
