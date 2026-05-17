@@ -311,7 +311,7 @@ impl<'db> InferenceCtx<'db> {
         this
     }
 
-    pub fn drain_call_infos(&mut self) -> BTreeMap<ExprId, InferCallInfos> {
+    pub(super) fn drain_call_infos(&mut self) -> BTreeMap<ExprId, InferCallInfos> {
         mem::take(&mut self.call_infos)
     }
 
