@@ -5,162 +5,36 @@ expression: "format!(\"stdout:\\n{}\\n\\nstderr:\\n{}\",output.stdout,output.std
 stdout:
 [empty] [EXAMPLES]/empty.rkr
 [FUNC]======================
-core::sys::exit(code: int): never
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::sys::exit(code: int): never
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int>
+core::io::`impl `::as_ptr(&self): *char
 [HIR]=======================
-fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
-  params: []
-  locals:
-    _0: mut self
-    _1: res
-  body:
-        if (*_0.start >= *_0.end)
-            {
-                return opt<_>::None;
-            }
-        
-        let res/*_1*/ = *_0.start;
-        *_0.start = (*_0.start + 1);
-        return opt<_>::Some(_1);
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => int
-ExprId(HirId(2)) => int
-ExprId(HirId(3)) => bool
-ExprId(HirId(6)) => core::opt::opt<int>
-ExprId(HirId(8)) => int
-ExprId(HirId(11)) => int
-ExprId(HirId(12)) => int
-ExprId(HirId(13)) => int
-ExprId(HirId(15)) => int
-ExprId(HirId(16)) => core::opt::opt<int>
-[LOCALS]====================
-_0 => &mut core::iter::IntIter
-_1 => int
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int>
-[HIR]=======================
-fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
-  params: []
-  locals:
-    _0: mut self
-    _1: res
-  body:
-        if (*_0.start >= *_0.end)
-            {
-                return opt<_>::None;
-            }
-        
-        let res/*_1*/ = *_0.start;
-        *_0.start = (*_0.start + 1);
-        return opt<_>::Some(_1);
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => int
-ExprId(HirId(2)) => int
-ExprId(HirId(3)) => bool
-ExprId(HirId(6)) => core::opt::opt<int>
-ExprId(HirId(8)) => int
-ExprId(HirId(11)) => int
-ExprId(HirId(12)) => int
-ExprId(HirId(13)) => int
-ExprId(HirId(15)) => int
-ExprId(HirId(16)) => core::opt::opt<int>
-[LOCALS]====================
-_0 => &mut core::iter::IntIter
-_1 => int
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter
-[HIR]=======================
-fn core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter {
+fn core::io::`impl `::as_ptr(&self): *char {
   params: []
   locals:
     _0: self
   body:
-        return _0;
+        return *_0.data;
 }
 [EXPRS]=====================
-ExprId(HirId(1)) => core::iter::IntIter
+ExprId(HirId(1)) => *char
 [LOCALS]====================
-_0 => core::iter::IntIter
+_0 => &core::io::str
 [DIAGS]=====================
 ============================
 
 [FUNC]======================
-core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter
+core::io::`impl `::as_ptr(&self): *char
 [HIR]=======================
-fn core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter {
+fn core::io::`impl `::as_ptr(&self): *char {
   params: []
   locals:
     _0: self
   body:
-        return _0;
+        return *_0.data;
 }
 [EXPRS]=====================
-ExprId(HirId(1)) => core::iter::IntIter
+ExprId(HirId(1)) => *char
 [LOCALS]====================
-_0 => core::iter::IntIter
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::panic::panic(message: core::io::str): never
-[HIR]=======================
-fn core::panic::panic(message: core::io::str): never {
-  params: [_0]
-  locals:
-    _0: message
-  body:
-        core::sys::exit(code: int): never(1);
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => int
-ExprId(HirId(3)) => never
-[LOCALS]====================
-_0 => core::io::str
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::panic::panic(message: core::io::str): never
-[HIR]=======================
-fn core::panic::panic(message: core::io::str): never {
-  params: [_0]
-  locals:
-    _0: message
-  body:
-        core::sys::exit(code: int): never(1);
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => int
-ExprId(HirId(3)) => never
-[LOCALS]====================
-_0 => core::io::str
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::io::printf(fmt: *char): void
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::io::printf(fmt: *char): void
+_0 => &core::io::str
 [DIAGS]=====================
 ============================
 
@@ -235,40 +109,6 @@ _1 => usize
 ============================
 
 [FUNC]======================
-core::io::`impl `::as_ptr(&self): *char
-[HIR]=======================
-fn core::io::`impl `::as_ptr(&self): *char {
-  params: []
-  locals:
-    _0: self
-  body:
-        return *_0.data;
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => *char
-[LOCALS]====================
-_0 => &core::io::str
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::io::`impl `::as_ptr(&self): *char
-[HIR]=======================
-fn core::io::`impl `::as_ptr(&self): *char {
-  params: []
-  locals:
-    _0: self
-  body:
-        return *_0.data;
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => *char
-[LOCALS]====================
-_0 => &core::io::str
-[DIAGS]=====================
-============================
-
-[FUNC]======================
 core::io::`impl `::len(&self): usize
 [HIR]=======================
 fn core::io::`impl `::len(&self): usize {
@@ -297,6 +137,44 @@ fn core::io::`impl `::len(&self): usize {
 }
 [EXPRS]=====================
 ExprId(HirId(1)) => usize
+[LOCALS]====================
+_0 => &core::io::str
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::io::`impl `::print(&self): void
+[HIR]=======================
+fn core::io::`impl `::print(&self): void {
+  params: []
+  locals:
+    _0: self
+  body:
+        core::io::printf(fmt: *char): void(c"%s", _0.data);
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => *char
+ExprId(HirId(2)) => *char
+ExprId(HirId(3)) => void
+[LOCALS]====================
+_0 => &core::io::str
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::io::`impl `::print(&self): void
+[HIR]=======================
+fn core::io::`impl `::print(&self): void {
+  params: []
+  locals:
+    _0: self
+  body:
+        core::io::printf(fmt: *char): void(c"%s", _0.data);
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => *char
+ExprId(HirId(2)) => *char
+ExprId(HirId(3)) => void
 [LOCALS]====================
 _0 => &core::io::str
 [DIAGS]=====================
@@ -341,40 +219,172 @@ _0 => &core::io::str
 ============================
 
 [FUNC]======================
-core::io::`impl `::print(&self): void
-[HIR]=======================
-fn core::io::`impl `::print(&self): void {
-  params: []
-  locals:
-    _0: self
-  body:
-        core::io::printf(fmt: *char): void(c"%s", _0.data);
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => *char
-ExprId(HirId(2)) => *char
-ExprId(HirId(3)) => void
-[LOCALS]====================
-_0 => &core::io::str
+core::io::printf(fmt: *char): void
 [DIAGS]=====================
 ============================
 
 [FUNC]======================
-core::io::`impl `::print(&self): void
+core::io::printf(fmt: *char): void
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter
 [HIR]=======================
-fn core::io::`impl `::print(&self): void {
+fn core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter {
   params: []
   locals:
     _0: self
   body:
-        core::io::printf(fmt: *char): void(c"%s", _0.data);
+        return _0;
 }
 [EXPRS]=====================
-ExprId(HirId(1)) => *char
-ExprId(HirId(2)) => *char
-ExprId(HirId(3)) => void
+ExprId(HirId(1)) => core::iter::IntIter
 [LOCALS]====================
-_0 => &core::io::str
+_0 => core::iter::IntIter
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter
+[HIR]=======================
+fn core::iter::`impl core::iter::IntoIterator `::into_iter(self): core::iter::IntIter {
+  params: []
+  locals:
+    _0: self
+  body:
+        return _0;
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => core::iter::IntIter
+[LOCALS]====================
+_0 => core::iter::IntIter
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int>
+[HIR]=======================
+fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
+  params: []
+  locals:
+    _0: mut self
+    _1: res
+  body:
+        if (*_0.start >= *_0.end)
+            {
+                return opt<_>::None;
+            }
+        
+        let res/*_1*/ = *_0.start;
+        *_0.start = (*_0.start + 1);
+        return opt<_>::Some(_1);
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => int
+ExprId(HirId(2)) => int
+ExprId(HirId(3)) => bool
+ExprId(HirId(6)) => core::opt::opt<int>
+ExprId(HirId(8)) => int
+ExprId(HirId(11)) => int
+ExprId(HirId(12)) => int
+ExprId(HirId(13)) => int
+ExprId(HirId(15)) => int
+ExprId(HirId(16)) => core::opt::opt<int>
+[LOCALS]====================
+_0 => &mut core::iter::IntIter
+_1 => int
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int>
+[HIR]=======================
+fn core::iter::`impl core::iter::Iter `::next(&mut self): core::opt::opt<int> {
+  params: []
+  locals:
+    _0: mut self
+    _1: res
+  body:
+        if (*_0.start >= *_0.end)
+            {
+                return opt<_>::None;
+            }
+        
+        let res/*_1*/ = *_0.start;
+        *_0.start = (*_0.start + 1);
+        return opt<_>::Some(_1);
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => int
+ExprId(HirId(2)) => int
+ExprId(HirId(3)) => bool
+ExprId(HirId(6)) => core::opt::opt<int>
+ExprId(HirId(8)) => int
+ExprId(HirId(11)) => int
+ExprId(HirId(12)) => int
+ExprId(HirId(13)) => int
+ExprId(HirId(15)) => int
+ExprId(HirId(16)) => core::opt::opt<int>
+[LOCALS]====================
+_0 => &mut core::iter::IntIter
+_1 => int
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0>
+[HIR]=======================
+fn core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0> {
+  params: []
+  locals:
+    _0: self
+    _1: value
+  body:
+        match _0 {
+            core::opt::opt::None =>
+                {
+                    return opt<_>::None;
+                }
+            core::opt::opt::Some(value/*_1*/) =>
+                {
+                    return opt<_>::Some(_1);
+                }
+        }
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => &core::opt::opt<T0>
+[LOCALS]====================
+_0 => &core::opt::opt<T0>
+_1 => &T0
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0>
+[HIR]=======================
+fn core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0> {
+  params: []
+  locals:
+    _0: self
+    _1: value
+  body:
+        match _0 {
+            core::opt::opt::None =>
+                {
+                    return opt<_>::None;
+                }
+            core::opt::opt::Some(value/*_1*/) =>
+                {
+                    return opt<_>::Some(_1);
+                }
+        }
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => &core::opt::opt<T0>
+[LOCALS]====================
+_0 => &core::opt::opt<T0>
+_1 => &T0
 [DIAGS]=====================
 ============================
 
@@ -435,58 +445,82 @@ _1 => T0
 ============================
 
 [FUNC]======================
-core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0>
+core::panic::panic(message: core::io::str): never
 [HIR]=======================
-fn core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0> {
-  params: []
+fn core::panic::panic(message: core::io::str): never {
+  params: [_0]
   locals:
-    _0: self
-    _1: value
+    _0: message
   body:
-        match _0 {
-            core::opt::opt::None =>
-                {
-                    return opt<_>::None;
-                }
-            core::opt::opt::Some(value/*_1*/) =>
-                {
-                    return opt<_>::Some(_1);
-                }
-        }
+        core::sys::exit(code: int): never(1);
 }
 [EXPRS]=====================
-ExprId(HirId(1)) => &core::opt::opt<T0>
+ExprId(HirId(1)) => int
+ExprId(HirId(3)) => never
 [LOCALS]====================
-_0 => &core::opt::opt<T0>
-_1 => &T0
+_0 => core::io::str
 [DIAGS]=====================
 ============================
 
 [FUNC]======================
-core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0>
+core::panic::panic(message: core::io::str): never
 [HIR]=======================
-fn core::opt::`impl <T0>`::as_ref<T0>(&self): core::opt::opt<&T0> {
+fn core::panic::panic(message: core::io::str): never {
+  params: [_0]
+  locals:
+    _0: message
+  body:
+        core::sys::exit(code: int): never(1);
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => int
+ExprId(HirId(3)) => never
+[LOCALS]====================
+_0 => core::io::str
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::sys::exit(code: int): never
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::sys::exit(code: int): never
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::vec::`impl <T0>`::len<T0>(&self): usize
+[HIR]=======================
+fn core::vec::`impl <T0>`::len<T0>(&self): usize {
   params: []
   locals:
     _0: self
-    _1: value
   body:
-        match _0 {
-            core::opt::opt::None =>
-                {
-                    return opt<_>::None;
-                }
-            core::opt::opt::Some(value/*_1*/) =>
-                {
-                    return opt<_>::Some(_1);
-                }
-        }
+        return _0.len;
 }
 [EXPRS]=====================
-ExprId(HirId(1)) => &core::opt::opt<T0>
+ExprId(HirId(1)) => usize
 [LOCALS]====================
-_0 => &core::opt::opt<T0>
-_1 => &T0
+_0 => &core::vec::Vec<T0>
+[DIAGS]=====================
+============================
+
+[FUNC]======================
+core::vec::`impl <T0>`::len<T0>(&self): usize
+[HIR]=======================
+fn core::vec::`impl <T0>`::len<T0>(&self): usize {
+  params: []
+  locals:
+    _0: self
+  body:
+        return _0.len;
+}
+[EXPRS]=====================
+ExprId(HirId(1)) => usize
+[LOCALS]====================
+_0 => &core::vec::Vec<T0>
 [DIAGS]=====================
 ============================
 
@@ -595,40 +629,6 @@ ExprId(HirId(1)) => *T0
 [LOCALS]====================
 _0 => &core::vec::Vec<T0>
 _1 => usize
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::vec::`impl <T0>`::len<T0>(&self): usize
-[HIR]=======================
-fn core::vec::`impl <T0>`::len<T0>(&self): usize {
-  params: []
-  locals:
-    _0: self
-  body:
-        return _0.len;
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => usize
-[LOCALS]====================
-_0 => &core::vec::Vec<T0>
-[DIAGS]=====================
-============================
-
-[FUNC]======================
-core::vec::`impl <T0>`::len<T0>(&self): usize
-[HIR]=======================
-fn core::vec::`impl <T0>`::len<T0>(&self): usize {
-  params: []
-  locals:
-    _0: self
-  body:
-        return _0.len;
-}
-[EXPRS]=====================
-ExprId(HirId(1)) => usize
-[LOCALS]====================
-_0 => &core::vec::Vec<T0>
 [DIAGS]=====================
 ============================
 

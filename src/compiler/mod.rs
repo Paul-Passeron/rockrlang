@@ -143,7 +143,11 @@ impl ReportBuilder {
         Report {
             packages: self.packages,
             diagnostics: self.diagnostics,
-            funcs: self.funcs.into_iter().sorted_by_key(|f| f.id).collect(),
+            funcs: self
+                .funcs
+                .into_iter()
+                .sorted_by_key(|f| f.name.clone())
+                .collect(),
         }
     }
 }
