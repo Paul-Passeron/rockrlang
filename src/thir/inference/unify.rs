@@ -121,25 +121,22 @@ impl<'db> InferenceCtx<'db> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
-            (InferTy::Var(a), InferTy::Var(b)) => {
-                let res = self.table.unify_var_var(*a, *b);
-                if res.is_ok() {
-                    self.merge_listeners(*a, *b);
-                }
-                res
-            }
+            (InferTy::Var(a), InferTy::Var(b)) => self
+                .table
+                .unify_var_var(*a, *b)
+                .inspect(|_| self.merge_listeners(*a, *b)),
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
                 let res = self
                     .table
                     .unify_var_value(*infer_var, Some(value.clone()))?;
-                let root = self.table.find(*infer_var);
-                if let Some(listeners) = self.listeners.remove(&root) {
-                    for l in listeners {
+                self.listeners
+                    .remove(&self.table.find(*infer_var))
+                    .into_flat_iter()
+                    .for_each(|l| {
                         if self.ready_set.insert(l) {
                             self.ready.push_back(l);
                         }
-                    }
-                }
+                    });
                 Ok(res)
             }
             (
@@ -168,11 +165,7 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
             (InferTy::Param(pa), InferTy::Param(pb)) => {
-                if pa == pb {
-                    Ok(())
-                } else {
-                    Err(UnificationError::TemplateConstraining(*pa))
-                }
+                (pa == pb).ok_or(UnificationError::TemplateConstraining(*pa))
             }
             (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
                 Err(UnificationError::TemplateConstraining(*p))

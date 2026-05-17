@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#![feature(bool_to_result, option_into_flat_iter)]
+
 use clap::Parser;
 use clap_derive::Parser;
 pub use common::location::OwnedSourceFile;

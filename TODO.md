@@ -4,7 +4,7 @@ This can be a great starting point for contributors looking for something to do.
 
 ## Short-term
 - [ ] Better diagnostics
-  - [ ] Display diagnostics
+  - [x] Display diagnostics
   - [ ] Handle constraint solver output gracefully
     - That might mean adding some sort of metadata for the constraint or have a side-table that keeps track of that for them in a non-intrusive way
   - [ ] Turn `ParseError`s into diagnostics
