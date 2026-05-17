@@ -106,13 +106,15 @@ impl UnifyValue for InferTy {
 
 impl<'db> InferenceCtx<'db> {
     fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
+        let root = self.table.find(a);
+        let other = if root == a { b } else { a };
         let flattened = self
             .listeners
-            .remove(&b)
+            .remove(&other)
             .into_iter()
             .flatten()
             .collect_vec();
-        self.listeners.entry(a).or_default().extend(flattened);
+        self.listeners.entry(root).or_default().extend(flattened);
     }
 
     fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
