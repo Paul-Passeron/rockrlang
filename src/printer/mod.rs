@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use crate::{
     common::location::compute_loc_info,
@@ -24,17 +24,22 @@ use crate::{
 
 pub mod type_printer;
 
-fn print_file_module(file_module: &FileModuleInfo, indent: usize) {
+fn print_file_module(
+    f: &mut impl fmt::Write,
+    file_module: &FileModuleInfo,
+    indent: usize,
+) -> std::fmt::Result {
     let prefix = "    ".repeat(indent);
-    println!(
+    writeln!(
+        f,
         "{prefix}[{}] {}",
         file_module.name(),
         file_module.file.path.display()
-    );
+    )?;
     file_module
         .submodules
         .iter()
-        .for_each(|submodule| print_file_module(submodule, indent + 1));
+        .try_for_each(|submodule| print_file_module(f, submodule, indent + 1))
 }
 
 fn get_package_path_from_env_var(env_var: &str) -> Option<PathBuf> {
@@ -62,20 +67,29 @@ fn is_builtin_file_module(file_module: &FileModuleInfo) -> bool {
     false
 }
 
-fn print_packages_structure<'a>(packages: impl IntoIterator<Item = &'a PackageInfo>) {
+fn print_packages_structure<'a>(
+    f: &mut impl fmt::Write,
+    packages: impl IntoIterator<Item = &'a PackageInfo>,
+) -> std::fmt::Result {
     for p in packages {
         if is_builtin_file_module(&p.root) {
             continue;
         }
-        print_file_module(&p.root, 0);
+        print_file_module(f, &p.root, 0)?;
     }
+    Ok(())
 }
 
-pub fn print_diagnostic(diag: &Diagnostic) {
-    let f = diag.primary.span.clone();
-    let loc_info = compute_loc_info(&f.file.content, f.start, f.file.path);
-    eprintln!("{}: {}", diag.severity, diag.message);
-    eprintln!(
+pub fn print_diagnostic(f: &mut impl std::fmt::Write, diag: &Diagnostic) -> std::fmt::Result {
+    let span_info = diag.primary.span.clone();
+    let loc_info = compute_loc_info(
+        &span_info.file.content,
+        span_info.start,
+        span_info.file.path,
+    );
+    writeln!(f, "{}: {}", diag.severity, diag.message)?;
+    writeln!(
+        f,
         "| {loc_info}: {}",
         diag.primary
             .message
@@ -85,32 +99,48 @@ pub fn print_diagnostic(diag: &Diagnostic) {
     )
 }
 
-pub fn print_function_result(result: &FunctionResult) {
-    println!("[FUNC]======================");
-    println!("{}", result.name);
+pub fn print_function_result(
+    f: &mut impl std::fmt::Write,
+    result: &FunctionResult,
+) -> std::fmt::Result {
+    writeln!(f, "[FUNC]======================")?;
+    writeln!(f, "{}", result.name)?;
     if !result.hir.is_empty() {
-        println!("[HIR]=======================");
-        print!("{}", result.hir);
-        println!("[EXPRS]=====================");
+        writeln!(f, "[HIR]=======================")?;
+        write!(f, "{}", result.hir)?;
+        writeln!(f, "[EXPRS]=====================")?;
         for (expr, ty) in &result.typed_exprs {
-            println!("{expr:?} => {ty}")
+            writeln!(f, "{expr:?} => {ty}")?;
         }
-        println!("[LOCALS]====================");
+        writeln!(f, "[LOCALS]====================")?;
         for (local, ty) in &result.locals {
-            println!("_{} => {ty}", local.0)
+            writeln!(f, "_{} => {ty}", local.0)?;
         }
     }
-    println!("[DIAGS]=====================");
+    writeln!(f, "[DIAGS]=====================")?;
     for diag in &result.diagnostics {
-        print_diagnostic(diag)
+        print_diagnostic(f, diag)?;
     }
-    println!("============================\n");
+    writeln!(f, "============================\n")
 }
 
-pub fn print(report: &Report) {
-    print_packages_structure(&report.packages);
+pub fn print_to_writer(f: &mut impl fmt::Write, report: &Report) -> std::fmt::Result {
+    print_packages_structure(f, &report.packages)?;
+
     report
         .funcs
         .iter()
-        .for_each(|func| print_function_result(func));
+        .try_for_each(|func| print_function_result(f, func))
+}
+
+impl ToString for Report {
+    fn to_string(&self) -> String {
+        let mut s = String::new();
+        print_to_writer(&mut s, self).unwrap();
+        s
+    }
+}
+
+pub fn print(report: &Report) {
+    println!("{}", report.to_string())
 }
