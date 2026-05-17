@@ -1392,10 +1392,11 @@ impl InferenceConstraintKind {
             InferenceConstraintKind::IntLike { res_ty } => {
                 ctx.find(&InferTy::Var(*res_ty)).listeners()
             }
-            InferenceConstraintKind::IsInner { inner, ref_ty } => inner
+            InferenceConstraintKind::IsInner { inner, ref_ty } => ctx
+                .find(inner)
                 .listeners()
-                .union(&ref_ty.listeners())
-                .copied()
+                .into_iter()
+                .chain(ctx.find(ref_ty).listeners())
                 .collect(),
         }
     }
