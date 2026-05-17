@@ -430,12 +430,10 @@ impl<'db> TyCtx<'db> {
                     Ok(lhs_ty) => match rhs_ty {
                         TyRef::Inf(rhs_ty) => {
                             if let Err(err) = self.inf_ctx.unify(lhs_ty.clone(), rhs_ty.clone()) {
+                                let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
+                                let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
                                 self.push_regular_diagnostic_with_message_and_primary(
-                                    format!(
-                                        "Cannot assign {} to {}",
-                                        lhs_ty.to_string(self.db),
-                                        rhs_ty.to_string(self.db)
-                                    ),
+                                    format!("cannot assign {lstr} to {rstr}"),
                                     Some(err.display(self.db).to_string()),
                                     stmt.span.clone(),
                                 );
