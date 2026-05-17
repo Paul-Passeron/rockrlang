@@ -1097,7 +1097,6 @@ impl<'db> LowerFundef<'db> {
                         .map(|AstMatchBranch { pat, guard, body }| {
                             let mut branch_scope = scope.clone();
                             let (pattern, locals) = self.lower_pattern(pat, &mut branch_scope);
-                            println!("Locals: {:?}", locals);
                             let guard = guard
                                 .as_ref()
                                 .map(|expr| self.lower_expr(expr, &branch_scope, self.module));

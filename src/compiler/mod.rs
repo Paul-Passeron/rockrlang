@@ -418,8 +418,7 @@ pub fn check_implem<'a>(
         match item {
             AstImplItem::Type { .. } => {
                 if let Some(_interface_ref) = implem.id(db).interface(db) {
-                    println!("Warning: not checking if types inside impl are well conforming")
-                    // todo!("Check that the type conforms to everything as it should")
+                    // todo
                 }
             }
             AstImplItem::Fundef(spanned) => {
