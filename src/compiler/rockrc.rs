@@ -17,8 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use clap::Parser as _;
 use clap_derive::Parser;
-use rockr::{compiler, printer};
 use std::path::PathBuf;
+
+use rockr::{
+    compiler::{Config, check},
+    printer,
+};
 
 #[derive(Debug, Parser)]
 pub struct CliArgs {
@@ -31,14 +35,14 @@ pub struct CliArgs {
 
 fn main() -> std::process::ExitCode {
     let args = CliArgs::parse();
-    let cfg = compiler::Config {
+    let cfg = Config {
         no_std: args.no_std,
         skip_core: args.skip_core,
     };
     let root = args
         .file
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-    match compiler::check(&root, cfg) {
+    match check(&root, cfg) {
         Ok(report) => {
             printer::print(&report);
             if report.has_errors() {

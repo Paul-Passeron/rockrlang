@@ -2,6 +2,11 @@
 name = "rockr"
 version = "0.1.0"
 edition = "2024"
+doctest = false
+default-run = "rockrc"
+
+[lib]
+bench = false
 
 [dependencies]
 clap = "4.5.60"
@@ -15,6 +20,15 @@ rustc-literal-escaper = "0.0.7"
 salsa = {version = "0.26.0", features = []}
 salsa-macros = "0.26.0"
 
+[[bin]]
+name = "rockr-lsp"
+path = "src/lsp/server.rs"
+
+[[bin]]
+name = "rockrc"
+path = "src/compiler/rockrc.rs"
+
+
 [[test]]
 name = "examples"
 path = "tests/examples.rs"
@@ -24,7 +38,3 @@ harness = false
 insta = { version = "1.47.2", features = ["filters"] }
 libtest-mimic = "0.8.2"
 walkdir = "2.5.0"
-
-[[bin]]
-name = "rockr-lsp"
-path = "src/lsp/server.rs"
