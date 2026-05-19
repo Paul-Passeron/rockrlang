@@ -23,10 +23,18 @@ This can be a great starting point for contributors looking for something to do.
       - [ ] Speculative execution / make constraints aware of each other: This will allow things like `This type has fields a and b, Foo is the only struct having both fields so it is Foo` which isn't possible for the moment
 - [ ] Parsing
   - [ ] We have no turbofish for the moment, which can make some struct / enum literals impossible to express without type hints. Look into either adding turbofish or some other syntax to remove ambiguity
-
+- [ ] Create typed IR from HIR + type inference
+- [ ] Create mid-level IR from typed IR
+  - [ ] Run borrow-checker on it
+  - [ ] Run path analysis (Do all path return, etc...)
+  - [ ] Maybe some language-specific optimizations ?
+- [ ] Codegen
+  - [ ] Figure out what backend to use: Inkwell (LLVM), cranelift, ...
+  - [ ] Do we want our own SSA IR before backend or will the mid-level IR be enough
+  
 ## Long-term
 - [ ] Make it expr-based instead of stmt-based. The language is statement-based for the moment, more like C than Rust. This is because this is simpler to implement for the moment. I can see us moving to expressions once the architecture is a bit more mature.
-
-
+- [ ] Implement the lsp
+= [ ] Write a solid Zed extension (and other IDEs but I use Zed)
 ## Ideas
 - [ ] Make use of salsa's serialization to have a compilation cache and look into incremental compilation.
