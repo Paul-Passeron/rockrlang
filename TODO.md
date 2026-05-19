@@ -35,6 +35,6 @@ This can be a great starting point for contributors looking for something to do.
 ## Long-term
 - [ ] Make it expr-based instead of stmt-based. The language is statement-based for the moment, more like C than Rust. This is because this is simpler to implement for the moment. I can see us moving to expressions once the architecture is a bit more mature.
 - [ ] Implement the lsp
-= [ ] Write a solid Zed extension (and other IDEs but I use Zed)
+- [ ] Write a solid Zed extension (and other IDEs but I use Zed)
 ## Ideas
 - [ ] Make use of salsa's serialization to have a compilation cache and look into incremental compilation.
