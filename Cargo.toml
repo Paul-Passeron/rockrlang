@@ -24,3 +24,7 @@ harness = false
 insta = { version = "1.47.2", features = ["filters"] }
 libtest-mimic = "0.8.2"
 walkdir = "2.5.0"
+
+[[bin]]
+name = "rockr-lsp"
+path = "src/lsp/server.rs"
