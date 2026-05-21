@@ -17,9 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fmt;
 
-use crate::compiler::SourceFileInfo;
+use crate::common::location::Span;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Diagnostic {
     pub severity: Severity,
     pub message: String,
@@ -29,30 +29,30 @@ pub struct Diagnostic {
     pub help: Vec<String>,
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SpanInfo {
-    pub file: SourceFileInfo,
-    pub start: usize,
-    pub end: usize,
-}
+// #[allow(dead_code)]
+// #[derive(Clone, PartialEq, Eq, Hash)]
+// pub struct SpanInfo {
+//     pub file: SourceFile,
+//     pub start: usize,
+//     pub end: usize,
+// }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Label {
-    pub span: SpanInfo,
+    pub span: Span,
     pub message: Option<String>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DiagnosticCode {
     pub code: u32,
     pub category: &'static str,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Severity {
     Error,
     Warning,

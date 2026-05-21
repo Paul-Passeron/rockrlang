@@ -19,7 +19,6 @@ use std::{
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use crate::{
@@ -87,10 +86,10 @@ pub struct SalsaPath<'db> {
     pub value: PathBuf,
 }
 
-fn read_source_file<'db>(db: &'db dyn Db, path: &Path) -> Option<SourceFile<'db>> {
+fn read_source_file<'db>(db: &'db dyn Db, path: &Path) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
-    Some(SourceFile::new(db, path.to_path_buf(), Arc::new(s)))
+    Some(SourceFile::new(db, path.to_path_buf(), s))
 }
 
 #[salsa::tracked]
