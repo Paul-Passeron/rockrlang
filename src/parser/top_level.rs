@@ -54,7 +54,7 @@ impl<'db> Parser<'db> {
                 Ok(AstAnyTopLevelItem::new(
                     AstAnyTopLevelItemDesc::Include(include_path),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             _ => self.parse_toplevel_item().map(|item| {
@@ -99,7 +99,7 @@ impl<'db> Parser<'db> {
                 includes,
             },
             annotations,
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -137,7 +137,7 @@ impl<'db> Parser<'db> {
         Ok(AstFundefArg {
             name: name.data,
             ty,
-            span: start.span(&end),
+            span: start.span(end),
         })
     }
 
@@ -163,7 +163,7 @@ impl<'db> Parser<'db> {
         Ok(AstTemplateArg {
             name,
             constraints,
-            span: start.span(&self.get_end()),
+            span: start.span(self.get_end()),
         })
     }
 
@@ -214,11 +214,11 @@ impl<'db> Parser<'db> {
                 TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "mut") => {
                     self.consume();
                     self.expect_self()?;
-                    Some(AstReceiver::MutZelf(start.span(&self.get_end())))
+                    Some(AstReceiver::MutZelf(start.span(self.get_end())))
                 }
                 TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "self") => {
                     self.consume();
-                    Some(AstReceiver::Zelf(start.span(&self.get_end())))
+                    Some(AstReceiver::Zelf(start.span(self.get_end())))
                 }
                 TokenKind::BitAnd => {
                     self.consume();
@@ -227,10 +227,10 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutRefZelf(start.span(&self.get_end())))
+                        Some(AstReceiver::MutRefZelf(start.span(self.get_end())))
                     } else {
                         self.expect_self()?;
-                        Some(AstReceiver::RefZelf(start.span(&self.get_end())))
+                        Some(AstReceiver::RefZelf(start.span(self.get_end())))
                     }
                 }
                 TokenKind::Mult => {
@@ -240,10 +240,10 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutPtrZelf(start.span(&self.get_end())))
+                        Some(AstReceiver::MutPtrZelf(start.span(self.get_end())))
                     } else {
                         self.expect_self()?;
-                        Some(AstReceiver::PtrZelf(start.span(&self.get_end())))
+                        Some(AstReceiver::PtrZelf(start.span(self.get_end())))
                     }
                 }
                 _ => None,
@@ -364,7 +364,7 @@ impl<'db> Parser<'db> {
                     return_type,
                 },
                 annotations,
-                start.span(&end),
+                start.span(end),
             ),
             receiver,
             variadic,
@@ -389,7 +389,7 @@ impl<'db> Parser<'db> {
 
         let body = self.parse_block()?;
 
-        let span = span.start().span(&self.get_end());
+        let span = span.start().span(self.get_end());
         Ok(AstMethodDef::new(
             AstMethodDefDesc {
                 name,
@@ -424,7 +424,7 @@ impl<'db> Parser<'db> {
 
         let body = self.parse_block()?;
 
-        let span = span.start().span(&self.get_end());
+        let span = span.start().span(self.get_end());
 
         Ok(AstFundef::new(
             AstFundefDesc {
@@ -570,7 +570,7 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::CloseBra)?;
         self.consume();
 
-        let span = start.span(&self.get_end());
+        let span = start.span(self.get_end());
 
         Ok(AstImplBlock {
             template_args,
@@ -709,8 +709,8 @@ impl<'db> Parser<'db> {
                     found: x,
                 },
                 file: self.file.clone(),
-                start: self.current_token()?.location.start,
-                end: self.current_token()?.location.end,
+                start: self.current_token()?.location.start_offset,
+                end: self.current_token()?.location.end_offset,
             }),
         }
     }
@@ -746,14 +746,14 @@ impl<'db> Parser<'db> {
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Impl(impl_block),
                     annotations,
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             TokenKind::Struct => {
                 let start = self.get_start();
                 let struct_def = self.parse_struct_def()?;
                 let end = self.get_end();
-                let span = start.span(&end);
+                let span = start.span(end);
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::StructDef(struct_def),
                     annotations,
@@ -764,7 +764,7 @@ impl<'db> Parser<'db> {
                 let start = self.get_start();
                 let enum_def = self.parse_enum_def()?;
                 let end = self.get_end();
-                let span = start.span(&end);
+                let span = start.span(end);
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::EnumDef(enum_def),
                     annotations,
@@ -811,7 +811,7 @@ impl<'db> Parser<'db> {
                         items,
                     }),
                     vec![],
-                    start.span(&self.get_end()),
+                    start.span(self.get_end()),
                 ))
             }
             TokenKind::Meta => {
@@ -835,7 +835,7 @@ impl<'db> Parser<'db> {
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::ExternDef(funsig, variadic),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             x => todo!("{:?}: {}", self.get_start(), x.display(self.db)),

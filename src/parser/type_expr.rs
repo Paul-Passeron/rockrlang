@@ -65,11 +65,11 @@ impl<'db> Parser<'db> {
                                     pointee: Box::new(inner),
                                 },
                                 vec![],
-                                start.advance(1).span(&end),
+                                start.advance(1).span(end),
                             )),
                         },
                         vec![],
-                        start.span(&end),
+                        start.span(end),
                     ))
                 } else {
                     Ok(Spanned::new(
@@ -85,7 +85,7 @@ impl<'db> Parser<'db> {
                             }
                         },
                         vec![],
-                        start.span(&end),
+                        start.span(end),
                     ))
                 }
             }
@@ -108,7 +108,7 @@ impl<'db> Parser<'db> {
                         len,
                     },
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
 
@@ -138,7 +138,7 @@ impl<'db> Parser<'db> {
                 Ok(AstTypeExpr::new(
                     AstTypeExprDesc::Tuple(tys),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
 
@@ -156,7 +156,7 @@ impl<'db> Parser<'db> {
                                 to: Box::new(rhs),
                             },
                             vec![],
-                            start.span(&end),
+                            start.span(end),
                         ))
                     }
 
@@ -169,7 +169,7 @@ impl<'db> Parser<'db> {
                         Ok(Spanned::new(
                             AstTypeExprDesc::Named { name, args },
                             vec![],
-                            start.span(&end),
+                            start.span(end),
                         ))
                     }
 
@@ -178,7 +178,7 @@ impl<'db> Parser<'db> {
                         Ok(Spanned::new(
                             AstTypeExprDesc::Named { name, args: vec![] },
                             vec![],
-                            start.span(&end),
+                            start.span(end),
                         ))
                     }
                 }
@@ -201,7 +201,7 @@ impl<'db> Parser<'db> {
             return Ok(Spanned::new(
                 AstAnyTypeExprDesc::Any,
                 vec![],
-                start.span(&end),
+                start.span(end),
             ));
         }
 

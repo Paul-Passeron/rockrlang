@@ -97,7 +97,7 @@ impl<'db> Parser<'db> {
                 }
                 self.consume();
                 let rhs = self.parse_binop(rbp)?;
-                let span = lhs.span.start().span(&self.get_end());
+                let span = lhs.span.start().span(self.get_end());
                 lhs = Spanned::new(
                     AstExprDesc::Range {
                         from: Box::new(lhs),
@@ -118,7 +118,7 @@ impl<'db> Parser<'db> {
 
                 if let Some(op) = token_to_binop(&op_kind) {
                     let rhs = self.parse_binop(rbp)?;
-                    let span = lhs.span.start().span(&self.get_end());
+                    let span = lhs.span.start().span(self.get_end());
                     lhs = Spanned::new(
                         AstExprDesc::BinOp {
                             lhs: Box::new(lhs),
@@ -148,7 +148,7 @@ impl<'db> Parser<'db> {
                 Ok(Spanned::new(
                     AstExprDesc::Neg(Box::new(operand)),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             TokenKind::Not => {
@@ -158,7 +158,7 @@ impl<'db> Parser<'db> {
                 Ok(Spanned::new(
                     AstExprDesc::Not(Box::new(operand)),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             TokenKind::BitAnd => {
@@ -177,7 +177,7 @@ impl<'db> Parser<'db> {
                 Ok(Spanned::new(
                     AstExprDesc::Ref(mutable, Box::new(operand)),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             _ => self.parse_postfix(),
@@ -192,14 +192,14 @@ impl<'db> Parser<'db> {
                 Some(TokenKind::AddressOf) => {
                     self.consume();
                     let end = self.get_end();
-                    let span = expr.span.start().span(&end);
+                    let span = expr.span.start().span(end);
                     expr = Spanned::new(AstExprDesc::AddressOf(Box::new(expr)), vec![], span);
                 }
 
                 Some(TokenKind::Deref) => {
                     self.consume();
                     let end = self.get_end();
-                    let span = expr.span.start().span(&end);
+                    let span = expr.span.start().span(end);
                     expr = Spanned::new(AstExprDesc::PostfixDeref(Box::new(expr)), vec![], span);
                 }
 
@@ -208,7 +208,7 @@ impl<'db> Parser<'db> {
                     if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind) {
                         self.consume();
                         let end = self.get_end();
-                        let span = expr.span.start().span(&end);
+                        let span = expr.span.start().span(end);
                         expr = Spanned::new(
                             AstExprDesc::TupleAccess {
                                 object: Box::new(expr),
@@ -226,7 +226,7 @@ impl<'db> Parser<'db> {
                         self.expect(TokenKind::ClosePar)?;
                         self.consume();
                         let end = self.get_end();
-                        let span = expr.span.start().span(&end);
+                        let span = expr.span.start().span(end);
                         expr = Spanned::new(
                             AstExprDesc::MethodCall {
                                 object: Box::new(expr),
@@ -238,7 +238,7 @@ impl<'db> Parser<'db> {
                         );
                     } else {
                         let end = self.get_end();
-                        let span = expr.span.start().span(&end);
+                        let span = expr.span.start().span(end);
                         expr = Spanned::new(
                             AstExprDesc::FieldAccess {
                                 object: Box::new(expr),
@@ -256,7 +256,7 @@ impl<'db> Parser<'db> {
                     self.expect(TokenKind::CloseSqr)?;
                     self.consume();
                     let end = self.get_end();
-                    let span = expr.span.start().span(&end);
+                    let span = expr.span.start().span(end);
                     expr = Spanned::new(
                         AstExprDesc::Index {
                             object: Box::new(expr),
@@ -273,7 +273,7 @@ impl<'db> Parser<'db> {
                     self.expect(TokenKind::ClosePar)?;
                     self.consume();
                     let end = self.get_end();
-                    let span = expr.span.start().span(&end);
+                    let span = expr.span.start().span(end);
                     expr = Spanned::new(
                         AstExprDesc::Call {
                             callee: Box::new(expr),
@@ -322,7 +322,7 @@ impl<'db> Parser<'db> {
                         self.consume();
 
                         let end = self.get_end();
-                        let span = expr.span.start().span(&end);
+                        let span = expr.span.start().span(end);
 
                         let (ty, variant) = match expr.data.clone() {
                             AstExprDesc::QualifiedPath { ty, name } => (ty, Some(name)),
@@ -477,7 +477,7 @@ impl<'db> Parser<'db> {
                 Ok(Spanned::new(
                     AstExprDesc::Tuple(exprs),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
             TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
@@ -496,7 +496,7 @@ impl<'db> Parser<'db> {
                 Ok(AstExpr::new(
                     AstExprDesc::SizeOf(ty),
                     vec![],
-                    start.span(&end),
+                    start.span(end),
                 ))
             }
 
@@ -514,7 +514,7 @@ impl<'db> Parser<'db> {
                                 to: Box::new(rhs),
                             },
                             vec![],
-                            start.span(&end),
+                            start.span(end),
                         ))
                     }
 
@@ -525,7 +525,7 @@ impl<'db> Parser<'db> {
                             self.expect(TokenKind::CloseBra)?;
                             self.consume();
                             let end = self.get_end();
-                            let ty_span = start.span(&start);
+                            let ty_span = start.span(start);
                             let ty = Spanned::new(
                                 AstTypeExprDesc::Named { name, args: vec![] },
                                 vec![],
@@ -538,14 +538,14 @@ impl<'db> Parser<'db> {
                                     fields,
                                 },
                                 vec![],
-                                start.span(&end),
+                                start.span(end),
                             ))
                         } else {
                             let end = self.get_end();
                             Ok(Spanned::new(
                                 AstExprDesc::Name(name),
                                 vec![],
-                                start.span(&end),
+                                start.span(end),
                             ))
                         }
                     }
@@ -561,7 +561,7 @@ impl<'db> Parser<'db> {
                         Ok(Spanned::new(
                             AstExprDesc::Name(name),
                             vec![],
-                            start.span(&end),
+                            start.span(end),
                         ))
                     }
                 }
@@ -603,7 +603,7 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::Access)?;
         self.consume();
 
-        let ty_span = start.span(&self.get_end());
+        let ty_span = start.span(self.get_end());
         let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
 
         let method_sym = self.parse_symbol()?;
@@ -622,7 +622,7 @@ impl<'db> Parser<'db> {
                 args,
             },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -676,7 +676,7 @@ impl<'db> Parser<'db> {
         //   Type<Args>::(Variant { .fields })
         let variant_sym = self.parse_symbol()?;
 
-        let ty_span = start.span(&self.get_end());
+        let ty_span = start.span(self.get_end());
         let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
 
         if self
@@ -695,7 +695,7 @@ impl<'db> Parser<'db> {
                     fields,
                 },
                 vec![],
-                start.span(&end),
+                start.span(end),
             ))
         } else if self
             .peek_n(0)
@@ -713,7 +713,7 @@ impl<'db> Parser<'db> {
                     args,
                 },
                 vec![],
-                start.span(&end),
+                start.span(end),
             ))
         } else {
             let end = self.get_end();
@@ -723,7 +723,7 @@ impl<'db> Parser<'db> {
                     name: variant_sym.data,
                 },
                 vec![],
-                start.span(&end),
+                start.span(end),
             ))
         }
     }

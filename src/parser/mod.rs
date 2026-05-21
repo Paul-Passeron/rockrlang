@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
-
 mod expr;
 mod pattern;
 mod stmt;
@@ -26,7 +24,7 @@ mod type_expr;
 use salsa::Accumulator;
 
 use crate::{
-    SourceFile,
+    Db, SourceFile,
     common::{
         location::{Location, Span},
         symbols::Symbol,
@@ -40,10 +38,10 @@ use crate::{
 };
 
 pub struct Parser<'db> {
-    pub file: PathBuf,
+    pub file: SourceFile,
     pub position: usize,
     pub tokens: &'db [Token],
-    pub db: &'db dyn crate::Db,
+    pub db: &'db dyn Db,
     pub annotations: Vec<AstAnnotation>,
 }
 
@@ -52,7 +50,7 @@ pub struct Parser<'db> {
 #[derive(Debug)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
-    pub file: PathBuf,
+    pub file: SourceFile,
     pub start: usize,
     pub end: usize,
 }
@@ -72,7 +70,7 @@ pub enum ParseErrorKind {
 }
 
 impl<'db> Parser<'db> {
-    pub fn new(db: &'db dyn crate::Db, tokens: &'db [Token], file: PathBuf) -> Self {
+    pub fn new(db: &'db dyn Db, tokens: &'db [Token], file: SourceFile) -> Self {
         Self {
             position: 0,
             tokens,
@@ -91,13 +89,9 @@ impl<'db> Parser<'db> {
             (0, 0)
         } else {
             let span = &self.tokens[self.position].location;
-            (span.start, span.end)
+            (span.start_offset, span.end_offset)
         };
-        Span {
-            file: self.file.clone(),
-            start,
-            end,
-        }
+        Span::new(self.file, start, end)
     }
 
     pub fn current_token(&self) -> Result<&Token, ParseError> {
@@ -106,42 +100,36 @@ impl<'db> Parser<'db> {
             Err(ParseError {
                 kind: ParseErrorKind::UnexpectedEOF,
                 file: last_span.file,
-                start: last_span.start,
-                end: last_span.end,
+                start: last_span.start_offset,
+                end: last_span.end_offset,
             })
         } else {
             Ok(&self.tokens[self.position])
         }
     }
 
+    fn get_last_token(&self) -> Option<&Token> {
+        self.tokens.last()
+    }
+
     fn get_start(&self) -> Location {
-        if self.position >= self.tokens.len() {
-            Location {
-                offset: 0,
-                file: self.file.clone(),
-            }
-        } else {
-            let offset = self.tokens[self.position].location.start;
-            Location {
-                offset,
-                file: self.file.clone(),
-            }
-        }
+        Location::new(
+            self.file,
+            self.tokens
+                .get(self.position)
+                .or_else(|| self.get_last_token())
+                .map_or(0, |tok| tok.location.start_offset),
+        )
     }
 
     fn get_end(&self) -> Location {
-        if self.position > self.tokens.len() || self.position == 0 {
-            Location {
-                offset: 0,
-                file: self.file.clone(),
-            }
-        } else {
-            let offset = self.tokens[self.position - 1].location.end;
-            Location {
-                offset,
-                file: self.file.clone(),
-            }
-        }
+        Location::new(
+            self.file,
+            self.tokens
+                .get(self.position - 1)
+                .or_else(|| self.get_last_token())
+                .map_or(0, |tok| tok.location.end_offset),
+        )
     }
 
     fn consume(&mut self) {
@@ -154,8 +142,8 @@ impl<'db> Parser<'db> {
         ParseError {
             kind,
             file: s.file,
-            start: s.start,
-            end: s.end,
+            start: s.start_offset,
+            end: s.end_offset,
         }
     }
 
@@ -189,7 +177,7 @@ impl<'db> Parser<'db> {
 }
 
 #[salsa::tracked]
-pub fn parse_file<'db>(db: &'db dyn crate::Db, file: SourceFile<'db>) -> Ast<'db> {
+pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
     let lex_res = lex_file(db, file);
     let tokens = match lex_res {
         Ok(tokens) => tokens,
@@ -197,7 +185,7 @@ pub fn parse_file<'db>(db: &'db dyn crate::Db, file: SourceFile<'db>) -> Ast<'db
             let offset = lex_error.offset;
             let error = ParseError {
                 kind: ParseErrorKind::LexError(lex_error),
-                file: file.path(db),
+                file,
                 start: offset,
                 end: offset + 1,
             };
@@ -206,7 +194,7 @@ pub fn parse_file<'db>(db: &'db dyn crate::Db, file: SourceFile<'db>) -> Ast<'db
         }
     };
 
-    let mut parser = Parser::new(db, &tokens, file.path(db));
+    let mut parser = Parser::new(db, &tokens, file);
 
     let mut items = vec![];
     let mut includes = vec![];

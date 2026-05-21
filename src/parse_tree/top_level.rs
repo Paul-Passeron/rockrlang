@@ -338,7 +338,7 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
         symbols.into_iter().fold(
             AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
             |acc, symb| {
-                let total_span = start_loc.span(&symb.span.end());
+                let total_span = start_loc.span(symb.span.end());
                 AstIncludePath::new(
                     AstIncludePathDesc::NameResolved {
                         from: symb.data,

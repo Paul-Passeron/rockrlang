@@ -47,7 +47,7 @@ impl<'db> Parser<'db> {
         Ok(AstStmt::new(
             AstStmtDesc::Block { stmts },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -77,7 +77,7 @@ impl<'db> Parser<'db> {
                 value,
             },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -98,7 +98,7 @@ impl<'db> Parser<'db> {
                 body: Box::new(body),
             },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -120,7 +120,7 @@ impl<'db> Parser<'db> {
         Ok(AstStmt::new(
             AstStmtDesc::Return { value },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -137,7 +137,7 @@ impl<'db> Parser<'db> {
                 body: Box::new(body),
             },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -193,7 +193,7 @@ impl<'db> Parser<'db> {
         } else {
             AstStmtDesc::Assign { lhs, rhs }
         };
-        Some(AstStmt::new(desc, vec![], start.span(&end)))
+        Some(AstStmt::new(desc, vec![], start.span(end)))
     }
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, ParseError> {
@@ -236,7 +236,7 @@ impl<'db> Parser<'db> {
                 branches,
             },
             vec![],
-            start.span(&self.get_end()),
+            start.span(self.get_end()),
         ))
     }
 
@@ -262,7 +262,7 @@ impl<'db> Parser<'db> {
                 else_: else_.map(Box::new),
             },
             vec![],
-            start.span(&end),
+            start.span(end),
         ))
     }
 
@@ -280,14 +280,14 @@ impl<'db> Parser<'db> {
                 self.consume();
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
-                let span = start.span(&self.get_end());
+                let span = start.span(self.get_end());
                 Ok(AstStmt::new(AstStmtDesc::Break, vec![], span))
             }
             TokenKind::Defer => {
                 let start = self.get_start();
                 self.consume();
                 let stmt = self.parse_stmt()?;
-                let span = start.span(&stmt.span.end());
+                let span = start.span(stmt.span.end());
                 Ok(AstStmt::new(
                     AstStmtDesc::Defer(Box::new(stmt)),
                     vec![],
