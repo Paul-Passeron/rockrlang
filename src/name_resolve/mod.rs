@@ -30,11 +30,10 @@ pub mod interfaces;
 pub mod type_expr;
 
 #[salsa::tracked]
-pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> SourceFile<'db> {
-    match module.file(db) {
-        Some(file) => file.to_source_file(db),
-        None => module_to_file(db, module.parent(db).unwrap().interned()),
-    }
+pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> SourceFile {
+    module
+        .file(db)
+        .unwrap_or_else(|| module_to_file(db, module.parent(db).unwrap().interned()))
 }
 
 #[salsa::tracked]
@@ -56,7 +55,7 @@ pub fn file_module_id<'db>(
         db,
         file_module.name(db),
         Some(actual_parent),
-        Some(file_module.file(db).to_owned(db)),
+        Some(file_module.file(db)),
         file_module.submodules(db).clone(),
         Some(package),
     );
@@ -95,7 +94,7 @@ pub fn root_module<'db>(
         db,
         name,
         Some(builtin_module(db)),
-        Some(file.to_owned(db)),
+        Some(file),
         file_module.submodules(db).clone(),
         Some(package),
     )
@@ -108,7 +107,7 @@ pub fn module_items<'db>(
     module: InternedModuleId<'db>,
 ) -> Option<Vec<AstTopLevelItem>> {
     if let Some(file) = module.file(db) {
-        let ast = parse_file(db, file.to_source_file(db));
+        let ast = parse_file(db, file);
         return Some(ast.items(db).clone());
     }
     module

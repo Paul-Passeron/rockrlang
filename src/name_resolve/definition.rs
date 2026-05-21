@@ -179,7 +179,7 @@ pub fn file_module_id<'db>(
         db,
         fm.name(db),
         parent,
-        Some(fm.file(db).to_owned(db)),
+        Some(fm.file(db)),
         fm.submodules(db).clone(),
         Some(package),
     )
@@ -243,7 +243,7 @@ pub fn module_includes<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> V
     let Some(file) = module.file(db) else {
         return vec![];
     };
-    let ast = parse_file(db, file.to_source_file(db));
+    let ast = parse_file(db, file);
     ast.includes(db)
         .iter()
         .map(|include| Segments::new(db, include.data.to_segments()))
