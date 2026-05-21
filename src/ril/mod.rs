@@ -24,11 +24,7 @@ pub use plumbing::*;
 
 use crate::{
     Db, OwnedSourceFile, SourceFile,
-    common::{
-        location::{Location, Span},
-        symbols::Symbol,
-        unord::Set,
-    },
+    common::{location::Span, symbols::Symbol, unord::Set},
     name_resolve::{
         module_items,
         type_expr::{templates_of_enum, templates_of_struct},
