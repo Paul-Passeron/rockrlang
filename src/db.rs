@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use salsa::StorageHandle;
 
-use crate::compiler;
+use crate::compiler::{self, Workspace};
 
 #[salsa::db]
 pub struct RockrDb {
@@ -30,7 +30,7 @@ pub struct RockrDb {
 #[salsa::db]
 pub trait Db: salsa::Database {
     fn config(&self) -> Arc<compiler::Config> {
-        compiler::CompilerConfig::get(self).inner(self)
+        Workspace::get(self).inner(self)
     }
 }
 

@@ -23,7 +23,7 @@ pub mod plumbing;
 pub use plumbing::*;
 
 use crate::{
-    Db, OwnedSourceFile, SourceFile,
+    Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
     name_resolve::{
         module_items,

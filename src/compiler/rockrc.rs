@@ -42,15 +42,10 @@ fn main() -> std::process::ExitCode {
     let root = args
         .file
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-    match check(&root, cfg) {
-        Ok(report) => {
-            printer::print(&report);
-            if report.has_errors() {
-                eprintln!("Could not compile, errors were encountered.");
-                std::process::ExitCode::FAILURE
-            } else {
-                std::process::ExitCode::SUCCESS
-            }
+    match crate::check(root, cfg) {
+        Ok(()) => {
+            println!("Compilation finished :)");
+            std::process::ExitCode::SUCCESS
         }
         Err(e) => {
             eprintln!("error: {e}");

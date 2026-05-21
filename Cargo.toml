@@ -14,11 +14,16 @@ clap_derive = "4.5.55"
 ena = "0.14.4"
 itertools = "0.14.0"
 nonempty = "0.12.0"
+parking_lot = "0.12.5"
 pathdiff = "0.2.3"
 regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
 salsa = {version = "0.26.0", features = []}
 salsa-macros = "0.26.0"
+serde = "1.0.228"
+serde_json = "1.0.149"
+tokio = {version = "1.52.3", features = ["full"] }
+tower-lsp = "0.20.0"
 
 [[bin]]
 name = "rockr-lsp"

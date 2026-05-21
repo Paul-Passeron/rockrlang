@@ -45,7 +45,7 @@ impl ModuleId {
         db: &'db dyn crate::Db,
         name: Symbol,
         parent: Option<ModuleId>,
-        file: Option<OwnedSourceFile>,
+        file: Option<SourceFile>,
         file_submodules: Vec<FileModule<'db>>,
         package: Option<Package<'db>>,
     ) -> Self {

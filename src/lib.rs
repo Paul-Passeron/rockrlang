@@ -17,11 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![feature(bool_to_result, option_into_flat_iter)]
 
-use std::fmt::Write as _;
 use std::path::Path;
 use std::process::ExitCode;
 
-pub use common::location::OwnedSourceFile;
 pub use common::location::SourceFile;
 pub use db::*;
 
@@ -49,20 +47,12 @@ pub struct RunStatus {
 pub fn run_rkr(p: &Path) -> RunStatus {
     let mut stderr = String::new();
     let mut stdout = String::new();
-    let cfg = compiler::Config {
-        no_std: false,
-        skip_core: false,
-    };
+    let cfg = compiler::Config::default();
 
     let exit_code = match compiler::check(p, cfg) {
-        Ok(report) => {
-            write!(&mut stdout, "{}", report.to_string()).unwrap();
-            if report.has_errors() {
-                writeln!(&mut stderr, "Could not compile, errors were encountered.").unwrap();
-                std::process::ExitCode::FAILURE
-            } else {
-                std::process::ExitCode::SUCCESS
-            }
+        Ok(()) => {
+            println!("Compilation finished :)");
+            std::process::ExitCode::SUCCESS
         }
         Err(e) => {
             eprintln!("error: {e}");

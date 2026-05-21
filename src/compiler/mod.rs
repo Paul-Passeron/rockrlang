@@ -165,23 +165,23 @@ impl Default for Config {
 //     }
 // }
 
-// pub enum CompilerError {
-//     NoCompilationUnitFound(PathBuf),
-//     STDLibNotFound,
-// }
+pub enum CompilerError {
+    NoCompilationUnitFound(PathBuf),
+    STDLibNotFound,
+}
 
-// impl fmt::Display for CompilerError {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             CompilerError::NoCompilationUnitFound(path_buf) => {
-//                 write!(f, "No compilation unit found at `{}`", path_buf.display())
-//             }
-//             CompilerError::STDLibNotFound => {
-//                 write!(f, "Standard library (`std`) package not found.")
-//             }
-//         }
-//     }
-// }
+impl fmt::Display for CompilerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CompilerError::NoCompilationUnitFound(path_buf) => {
+                write!(f, "No compilation unit found at `{}`", path_buf.display())
+            }
+            CompilerError::STDLibNotFound => {
+                write!(f, "Standard library (`std`) package not found.")
+            }
+        }
+    }
+}
 
 // fn build_package_set<'a>(
 //     db: &'a dyn Db,
@@ -505,23 +505,24 @@ pub fn get_sig_of_function(
 //     check_file_module(db, package.root(db), None, package, packages, report);
 // }
 
-// pub fn check(root: impl AsRef<Path>, config: Config) -> Result<Report, CompilerError> {
-//     let db = RockrDb::new();
-//     let root = root.as_ref();
-//     let package = driver::load_package(&db, root)
-//         .ok_or_else(|| CompilerError::NoCompilationUnitFound(root.to_path_buf()))?;
-//     let packages = build_package_set(&db, package)?;
-//     let mut report = ReportBuilder::new(
-//         packages
-//             .iter()
-//             .map(|p| PackageInfo::from(&db, *p))
-//             .collect(),
-//     );
+pub fn check(root: impl AsRef<Path>, config: Config) -> Result<(), CompilerError> {
+    let db = RockrDb::new();
+    let root = root.as_ref();
+    todo!("Build workspace, populate the DB and run the checks")
+    // let package = driver::load_package(&db, root)
+    //     .ok_or_else(|| CompilerError::NoCompilationUnitFound(root.to_path_buf()))?;
+    // let packages = build_package_set(&db, package)?;
+    // let mut report = ReportBuilder::new(
+    //     packages
+    //         .iter()
+    //         .map(|p| PackageInfo::from(&db, *p))
+    //         .collect(),
+    // );
 
-//     packages
-//         .iter()
-//         .filter(|package| !db.config().skip_core || **package != core_package(&db))
-//         .for_each(|package| check_package(&db, *package, &packages, &mut report));
+    // packages
+    //     .iter()
+    //     .filter(|package| !db.config().skip_core || **package != core_package(&db))
+    //     .for_each(|package| check_package(&db, *package, &packages, &mut report));
 
-//     Ok(report.build())
-// }
+    // Ok(report.build())
+}

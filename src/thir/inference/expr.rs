@@ -333,7 +333,7 @@ impl<'db> InferenceCtx<'db> {
                 Some(InferTy::Var(zelf)),
             )
             .inspect_err(|err| {
-                let loc_info = span.start().loc_info(self.db, module).unwrap();
+                let loc_info = span.start().loc_info(self.db);
                 println!("{loc_info}: {err:#?}")
             })
             .unwrap();

@@ -33,10 +33,10 @@ use std::{
 };
 
 use crate::{
-    Db, OwnedSourceFile,
+    Db, SourceFile,
     common::{location::Span, symbols::Symbol},
-    compiler::diagnostic::{Label, Severity, SpanInfo},
-    hir::{LocalId, PartialTypeRef, function_ast, owning_module},
+    compiler::diagnostic::{Label, Severity},
+    hir::{LocalId, PartialTypeRef, function_ast},
     name_resolve::{
         implems::resolve_type_expr_as_interface,
         type_expr::{get_templates_of_fun, get_templates_of_fun_only},
@@ -112,11 +112,7 @@ impl<'db> DiagnosticEngine<'db> {
             severity: Severity::Error,
             message: err,
             primary: Label {
-                span: SpanInfo {
-                    file: self.find_file(span.file).unwrap(),
-                    start: span.start,
-                    end: span.end,
-                },
+                span,
                 message: primary,
             },
             secondary: vec![],
@@ -133,15 +129,15 @@ impl<'db> DiagnosticEngine<'db> {
         self.push_regular_diagnostic_with_message(err.display(self.db).to_string(), span);
     }
 
-    fn find_file(&self, path: impl AsRef<Path>) -> Option<OwnedSourceFile> {
+    fn find_file(&self, path: impl AsRef<Path>) -> Option<SourceFile> {
         let canon = path.as_ref().canonicalize().ok()?;
         fn handle_submodule(
             this: &DiagnosticEngine,
             sub: &FileModule,
             path: &PathBuf,
-        ) -> Option<OwnedSourceFile> {
-            if &sub.file(this.db).path(this.db) == path {
-                return Some(sub.file(this.db).to_owned(this.db));
+        ) -> Option<SourceFile> {
+            if sub.file(this.db).path(this.db) == path {
+                return Some(sub.file(this.db));
             }
             for submodule in sub.submodules(this.db) {
                 if let Some(res) = handle_submodule(this, submodule, path) {
@@ -260,11 +256,7 @@ impl<'db> InferenceCtx<'db> {
             let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).expect(
                 format!(
                     "Top level items should already have valid and resolved types ({})",
-                    ast.ty
-                        .span
-                        .start()
-                        .loc_info(db, owning_module(db, func.parent(db)))
-                        .unwrap()
+                    ast.ty.span.start().loc_info(db)
                 )
                 .as_str(),
             );
