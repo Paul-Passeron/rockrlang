@@ -268,22 +268,22 @@ fn build_workspace(root: impl AsRef<Path>, config: Config) -> Result<RockrDb, Co
             files.insert(sf);
         })
     };
-    let mut to_err =
-        |opt: Option<_>, p| opt.ok_or_else(|| CompilerError::NoCompilationUnitFound(p));
-    let main_module = discover_package(root.as_ref())
-        .ok_or_else(|| CompilerError::NoCompilationUnitFound(root.as_ref().to_path_buf()))?;
+    let to_err = |opt: Option<_>, p| opt.ok_or_else(|| CompilerError::NoCompilationUnitFound(p));
+    let mut add_path = |p: PathBuf| -> Result<(), CompilerError> {
+        let m = to_err(discover_package(p.as_path()), p.to_path_buf())?;
+        append(get_all_files_in_discovered_module(&db, m)?);
+        Ok(())
+    };
 
-    append(get_all_files_in_discovered_module(&db, main_module)?);
+    add_path(root.as_ref().to_path_buf())?;
+
+    let core_path = std::env::var("ROCKR_CORE").map_err(|_| CompilerError::STDLibNotFound)?;
+    add_path(PathBuf::from(core_path))?;
+
     if !config.no_std {
-        let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
-        let std_root = std::path::Path::new(&std_path);
-        let std_module = to_err(discover_package(std_root), std_root.to_path_buf())?;
-        append(get_all_files_in_discovered_module(&db, std_module)?);
+        let std_path = std::env::var("ROCKR_STD").map_err(|_| CompilerError::STDLibNotFound)?;
+        add_path(PathBuf::from(std_path))?;
     }
-    let core_path = std::env::var("ROCKR_CORE").unwrap_or_default();
-    let core_root = std::path::Path::new(&core_path);
-    let core_module = to_err(discover_package(core_root), core_root.to_path_buf())?;
-    append(get_all_files_in_discovered_module(&db, core_module)?);
 
     Workspace::new(&db, Arc::new(config), files.into_iter().collect_vec());
     Ok(db)

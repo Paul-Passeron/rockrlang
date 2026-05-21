@@ -89,7 +89,11 @@ pub struct SalsaPath<'db> {
 pub fn read_source_file<'db>(db: &'db dyn Db, path: &Path) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
-    Some(SourceFile::new(db, path.to_path_buf(), s))
+    Some(SourceFile::new(
+        db,
+        path.canonicalize().unwrap_or_else(|_| path.to_path_buf()),
+        s,
+    ))
 }
 
 #[salsa::tracked]
