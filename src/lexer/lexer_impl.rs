@@ -19,12 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #![allow(unused_variables)]
 
 use core::fmt;
-use std::{path::PathBuf, sync::Arc};
-
 use regex::Regex;
 
 use crate::{
-    SourceFile,
+    Db, SourceFile,
     common::location::{Location, Span},
     lexer::{
         Token,
@@ -35,7 +33,7 @@ use crate::{
 #[derive(Debug)]
 pub struct LexError {
     pub message: String,
-    pub file: PathBuf,
+    pub file: SourceFile,
     pub offset: usize,
 }
 
@@ -46,8 +44,7 @@ pub type TokenPattern<'db, T> = (
 
 pub struct Lexer<'db, T> {
     pub db: &'db dyn crate::Db,
-    pub file: PathBuf,
-    pub contents: Arc<String>,
+    pub file: SourceFile,
     pub offset: usize,
     pub token_patterns: Vec<TokenPattern<'db, T>>,
     pub skip_patterns: Vec<Regex>,
@@ -64,7 +61,7 @@ impl<'a, T: fmt::Debug> Iterator for Lexer<'a, T> {
 impl<'db, T> Lexer<'db, T> {
     fn advance(&mut self) -> Option<char> {
         if !self.is_done() {
-            let c = self.contents[self.offset..].chars().next()?;
+            let c = self.file.content(self.db)[self.offset..].chars().next()?;
             self.offset += 1;
             Some(c)
         } else {
@@ -79,7 +76,7 @@ impl<'db, T> Lexer<'db, T> {
     }
 
     pub fn is_done(&mut self) -> bool {
-        self.offset >= self.contents.len()
+        self.offset >= self.file.content(self.db).len()
     }
 
     fn skip(&mut self) {
@@ -90,7 +87,7 @@ impl<'db, T> Lexer<'db, T> {
             let mut skip_count = 0;
             let mut could_skip = false;
             for regex in &self.skip_patterns {
-                let to_match: &str = &self.contents[self.offset..];
+                let to_match: &str = &self.file.content(self.db)[self.offset..];
                 if let Some(mat) = regex.find(to_match)
                     && mat.start() == 0
                 {
@@ -107,8 +104,8 @@ impl<'db, T> Lexer<'db, T> {
     }
 
     pub fn new_blank(
-        source: SourceFile<'db>,
-        db: &'db dyn crate::Db,
+        source: SourceFile,
+        db: &'db dyn Db,
         token_patterns: Vec<TokenPattern<'db, T>>,
         skip_patterns: Vec<Regex>,
     ) -> Lexer<'db, T> {
@@ -116,15 +113,14 @@ impl<'db, T> Lexer<'db, T> {
         Self {
             db,
             offset: 0,
-            contents,
-            file: source.path(db),
+            file: source,
             token_patterns,
             skip_patterns,
         }
     }
 
     pub fn loc(&self) -> Location {
-        Location::new(self.offset, self.file.clone())
+        Location::new(self.file, self.offset)
     }
 
     pub fn next_token(&mut self) -> Result<T, LexError> {
@@ -132,20 +128,13 @@ impl<'db, T> Lexer<'db, T> {
         if self.is_done() {
             Err(LexError {
                 message: String::from("EOF"),
-                file: self.file.clone(),
+                file: self.file,
                 offset: self.offset,
             })
         } else {
             let mut token_length = 0;
-            let contents = Arc::clone(&self.contents);
-            let mut res: Result<T, LexError> = Err(LexError {
-                message: format!(
-                    "Unexpected character `{}`",
-                    contents.chars().nth(self.offset).unwrap_or('\0')
-                ),
-                file: self.file.clone(),
-                offset: self.offset,
-            });
+            let contents = self.file.content(self.db);
+            let mut res: Option<Result<T, LexError>> = None;
             for i in 0..self.token_patterns.len() {
                 let start = self.offset;
                 let to_match = &contents[self.offset..];
@@ -159,19 +148,28 @@ impl<'db, T> Lexer<'db, T> {
                     for _ in 0..token_length {
                         end += 1;
                     }
-                    let span = Span::new(start, end, self.file.clone());
-                    res = func(self.db, token_string, span);
+                    let span = Span::new(self.file, start, end);
+                    res = Some(func(self.db, token_string, span));
                     break;
                 }
             }
             self.advance_n(token_length);
-            res
+            res.unwrap_or_else(|| {
+                Err(LexError {
+                    message: format!(
+                        "Unexpected character `{}`",
+                        contents.chars().nth(self.offset).unwrap_or('\0')
+                    ),
+                    file: self.file.clone(),
+                    offset: self.offset,
+                })
+            })
         }
     }
 }
 
 impl<'db> Lexer<'db, Token> {
-    pub fn new(db: &'db dyn crate::Db, source: SourceFile<'db>) -> Self {
+    pub fn new(db: &'db dyn crate::Db, source: SourceFile) -> Self {
         Self::new_blank(source, db, get_token_rules(), get_skip_rules())
     }
 }
