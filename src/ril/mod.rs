@@ -40,7 +40,7 @@ use crate::{
 #[salsa::tracked]
 #[derive(PartialOrd, Ord)]
 pub struct FileModule<'db> {
-    pub file: SourceFile<'db>,
+    pub file: SourceFile,
     #[returns(ref)]
     pub submodules: Vec<FileModule<'db>>,
 }
@@ -76,7 +76,7 @@ pub struct Package<'db> {
 pub struct InternedModuleId {
     pub name: Symbol,
     pub parent: Option<ModuleId>,
-    pub file: Option<OwnedSourceFile>,
+    pub file: Option<SourceFile>,
     pub file_submodules: Vec<FileModule<'db>>,
     pub package: Option<Package<'db>>,
 }
@@ -262,9 +262,9 @@ pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
     }
 }
 
-impl SourceFile<'_> {
-    pub fn span(&self, db: &dyn Db) -> Span {
-        Location::new(0, self.path(db)).span(&Location::new(self.content(db).len(), self.path(db)))
+impl SourceFile {
+    pub fn span(self, db: &dyn Db) -> Span {
+        Span::new(self, 0, self.content(db).len())
     }
 }
 impl ModuleId {
