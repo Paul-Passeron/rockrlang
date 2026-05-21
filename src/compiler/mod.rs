@@ -18,15 +18,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, RockrDb, SourceFile,
     common::symbols::Symbol,
+    driver::{DiscoveredModule, discover_package, read_source_file},
     hir::{Mutability, function_ast},
-    name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner},
+    name_resolve::{
+        std_module,
+        type_expr::{get_templates_of_fun_only, get_templates_of_owner},
+    },
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     ril::{BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeRef},
     thir::inference::{InferTy, implicit::AstImplicitContext},
 };
 use itertools::Itertools;
 use std::{
+    collections::HashSet,
     fmt,
+    iter::{empty, once},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -36,7 +42,20 @@ pub mod diagnostic;
 #[salsa::input(singleton)]
 pub struct Workspace {
     pub inner: Arc<Config>,
-    pub files: Vec<Arc<SourceFile>>,
+    pub files: Vec<SourceFile>,
+}
+
+impl Workspace {
+    pub fn to_string(&self, db: &dyn Db) -> String {
+        format!(
+            "Workspace {{\n    config: {:?},\n     files:{}}}",
+            self.inner(db),
+            self.files(db)
+                .iter()
+                .map(|f| f.path(db).display().to_string())
+                .join("\n        ")
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,8 +236,62 @@ pub fn get_sig_of_function(
     })
 }
 
-pub fn check(root: impl AsRef<Path>, config: Config) -> Result<(), CompilerError> {
+fn get_all_files_in_discovered_module<'db>(
+    db: &'db dyn Db,
+    module: DiscoveredModule,
+) -> Result<Vec<SourceFile>, CompilerError> {
+    fn _aux(
+        db: &dyn Db,
+        module: DiscoveredModule,
+        v: &mut Vec<SourceFile>,
+    ) -> Result<(), CompilerError> {
+        v.push(
+            read_source_file(db, &module.path)
+                .ok_or_else(|| CompilerError::NoCompilationUnitFound(module.path))?,
+        );
+        module
+            .submodules
+            .into_iter()
+            .try_for_each(|m| _aux(db, m, v))?;
+        Ok(())
+    }
+    let mut v = vec![];
+    _aux(db, module, &mut v)?;
+    Ok(v)
+}
+
+fn build_workspace(root: impl AsRef<Path>, config: Config) -> Result<RockrDb, CompilerError> {
     let db = RockrDb::new();
-    let root = root.as_ref();
-    todo!("Build workspace, populate the DB and run the checks")
+    let mut files = HashSet::new();
+    let mut append = |sfs: Vec<SourceFile>| {
+        sfs.into_iter().for_each(|sf| {
+            files.insert(sf);
+        })
+    };
+    let mut to_err =
+        |opt: Option<_>, p| opt.ok_or_else(|| CompilerError::NoCompilationUnitFound(p));
+    let main_module = discover_package(root.as_ref())
+        .ok_or_else(|| CompilerError::NoCompilationUnitFound(root.as_ref().to_path_buf()))?;
+
+    append(get_all_files_in_discovered_module(&db, main_module)?);
+    if !config.no_std {
+        let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
+        let std_root = std::path::Path::new(&std_path);
+        let std_module = to_err(discover_package(std_root), std_root.to_path_buf())?;
+        append(get_all_files_in_discovered_module(&db, std_module)?);
+    }
+    let core_path = std::env::var("ROCKR_CORE").unwrap_or_default();
+    let core_root = std::path::Path::new(&core_path);
+    let core_module = to_err(discover_package(core_root), core_root.to_path_buf())?;
+    append(get_all_files_in_discovered_module(&db, core_module)?);
+
+    Workspace::new(&db, Arc::new(config), files.into_iter().collect_vec());
+    Ok(db)
+}
+
+pub fn check(root: impl AsRef<Path>, config: Config) -> Result<(), CompilerError> {
+    let db = build_workspace(root, config)?;
+    let workspace = Workspace::get(&db);
+    println!("Workspace: {}", workspace.to_string(&db));
+    todo!("Run the checks")
 }
