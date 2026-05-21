@@ -390,7 +390,7 @@ impl<'db> LowerFundef<'db> {
                 }
                 _ => todo!(
                     "error: {}, badly name-resolved item ({})",
-                    to.span.start().loc_info(self.db, self.module).unwrap(),
+                    to.span.start().loc_info(self.db),
                     from.interned().contents(self.db)
                 ),
             }
@@ -857,11 +857,7 @@ impl<'db> LowerFundef<'db> {
                 }
             },
             unhandled => {
-                todo!(
-                    "{}: {:?}",
-                    to.span.start().loc_info(self.db, self.module).unwrap(),
-                    unhandled
-                )
+                todo!("{}: {:?}", to.span.start().loc_info(self.db), unhandled)
             }
         }
     }

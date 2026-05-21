@@ -498,7 +498,7 @@ impl FunctionId {
             crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => type_ref,
             _ => panic!(
                 "{}: Unresolved type in function {}",
-                type_expr.span.start().loc_info(db, owning_module).unwrap(),
+                type_expr.span.start().loc_info(db),
                 self.name(db).display(db)
             ),
         }
