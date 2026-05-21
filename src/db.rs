@@ -15,34 +15,51 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::sync::Arc;
+
+use salsa::StorageHandle;
+
 use crate::compiler;
 
 #[salsa::db]
-#[derive(Clone)]
 pub struct RockrDb {
     pub storage: salsa::Storage<Self>,
-    pub config: compiler::Config,
+    // pub config: compiler::Config,
 }
 
 #[salsa::db]
 pub trait Db: salsa::Database {
-    fn config(&self) -> &compiler::Config;
+    fn config(&self) -> Arc<compiler::Config> {
+        compiler::CompilerConfig::get(self).inner(self)
+    }
 }
 
 #[salsa::db]
-impl Db for RockrDb {
-    fn config(&self) -> &compiler::Config {
-        &self.config
-    }
-}
+impl Db for RockrDb {}
 
+#[derive(Clone)]
+pub struct RockrHandle {
+    storage: StorageHandle<RockrDb>,
+}
 impl RockrDb {
-    pub fn new(config: compiler::Config) -> Self {
+    pub fn new() -> Self {
         Self {
             storage: salsa::Storage::default(),
-            config,
         }
     }
+
+    // pub fn handle(&self) -> RockrHandle {
+    //     RockrHandle {
+    //         storage: self.storage.clone().into_zalsa_handle(),
+    //     }
+    // }
+
+    // pub fn from_handle(handle: &RockrHandle) -> Self {
+    //     Self {
+    //         storage: handle.storage.clone().into_storage(),
+    //         config: handle.config,
+    //     }
+    // }
 }
 
 #[salsa::db]
