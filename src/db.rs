@@ -15,52 +15,94 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
+use std::path::PathBuf;
 
-use salsa::StorageHandle;
+use dashmap::DashMap;
+use salsa::Setter;
 
-use crate::compiler::{self, Workspace};
+use crate::{
+    SourceFile,
+    compiler::{self, CompilerError, Config, Workspace},
+};
 
 #[salsa::db]
+#[derive(Default)]
 pub struct RockrDb {
     pub storage: salsa::Storage<Self>,
-    // pub config: compiler::Config,
+    pub files: DashMap<PathBuf, SourceFile>,
 }
 
 #[salsa::db]
 pub trait Db: salsa::Database {
-    fn config(&self) -> Arc<compiler::Config> {
-        Workspace::get(self).inner(self)
+    fn config(&self) -> compiler::Config {
+        Workspace::get(self).config(self)
     }
+
+    fn get_ref_files<'a>(&'a self) -> &'a DashMap<PathBuf, SourceFile>;
+
+    fn get_mut_ref_files<'a>(&'a mut self) -> &'a mut DashMap<PathBuf, SourceFile>;
 }
 
 #[salsa::db]
-impl Db for RockrDb {}
-
-#[derive(Clone)]
-pub struct RockrHandle {
-    storage: StorageHandle<RockrDb>,
-}
-impl RockrDb {
-    pub fn new() -> Self {
-        Self {
-            storage: salsa::Storage::default(),
-        }
+impl Db for RockrDb {
+    fn get_ref_files<'a>(&'a self) -> &'a DashMap<PathBuf, SourceFile> {
+        &self.files
     }
 
-    // pub fn handle(&self) -> RockrHandle {
-    //     RockrHandle {
-    //         storage: self.storage.clone().into_zalsa_handle(),
-    //     }
-    // }
+    fn get_mut_ref_files<'a>(&'a mut self) -> &'a mut DashMap<PathBuf, SourceFile> {
+        &mut self.files
+    }
+}
 
-    // pub fn from_handle(handle: &RockrHandle) -> Self {
-    //     Self {
-    //         storage: handle.storage.clone().into_storage(),
-    //         config: handle.config,
-    //     }
-    // }
+impl RockrDb {
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[salsa::db]
 impl salsa::Database for RockrDb {}
+
+impl dyn Db {
+    pub fn _open_workspace(&mut self, config: Config) -> Workspace {
+        Workspace::initialize(self, config)
+    }
+
+    pub fn _add_source_file(
+        &mut self,
+        path: PathBuf,
+        text: String,
+    ) -> Result<SourceFile, CompilerError> {
+        let path = path
+            .canonicalize()
+            .map_err(|_| CompilerError::NoFileFoundAt(path))?;
+        if let Some(existing) = self.get_ref_files().get(&path) {
+            return Ok(*existing); // We do not change the contents here. If that's the intent use this in cunjunction with set_source_file_text.
+        }
+        let sf = SourceFile::new(self, path.clone(), text.into());
+        self.get_mut_ref_files().insert(path, sf);
+        let ws = Workspace::get(self);
+        let mut files = ws.files(self).clone();
+        files.insert(sf);
+        ws.set_files(self).to(files);
+        Ok(sf)
+    }
+
+    pub fn _find_source_file(&self, path: PathBuf) -> Option<SourceFile> {
+        let path = path.canonicalize().ok()?;
+        self.get_ref_files().get(&path).map(|val| *val)
+    }
+
+    pub fn _set_source_file_text(&mut self, file: SourceFile, text: String) {
+        file.set_content(self).to(text.into());
+    }
+
+    pub fn remove_source_file(&mut self, file: SourceFile) {
+        let path = file.path(self).clone();
+        self.get_mut_ref_files().remove(&path);
+        let ws = Workspace::get(self);
+        let mut files = ws.files(self).clone();
+        files.remove(&file);
+        ws.set_files(self).to(files);
+    }
+}
