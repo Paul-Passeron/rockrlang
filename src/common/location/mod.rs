@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use crate::{
@@ -68,7 +69,7 @@ pub struct SourceFile {
     #[returns(ref)]
     pub path: PathBuf,
     #[returns(ref)]
-    pub content: String,
+    pub content: Arc<str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
