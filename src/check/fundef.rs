@@ -18,11 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     check::{Diag, Diagnostics},
+    hir::hir_body,
     ril::FunctionId,
 };
 
 pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) -> Diagnostics<'db> {
     let span = fdef.name_span(db);
+    if let Some(hir) = hir_body(db, fdef) {
+        println!("{}", hir.display(db));
+    }
     Diagnostics::new(
         db,
         vec![Diag::todo(db, "implement check_fundef".into(), span)],

@@ -72,7 +72,11 @@ impl fmt::Display for BinaryOperator {
 
 impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        writeln!(f, "fn {} {{", self.value.owner(self.db).to_string(self.db))?;
+        writeln!(
+            f,
+            "fn {} {{",
+            self.value.owner(self.db).sig_to_string(self.db)
+        )?;
         writeln!(
             f,
             "  params: [{}]",
@@ -348,7 +352,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
         }
 
         HirExprDesc::CallDirect { target, args } => {
-            write!(f, "{}(", target.to_string(db))?;
+            write!(f, "{}(", target.called_to_string(db))?;
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;

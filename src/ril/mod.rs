@@ -206,8 +206,12 @@ pub struct ModuleId(salsa::Id);
 pub struct FunctionId(salsa::Id);
 
 impl FunctionId {
-    pub fn to_string(&self, db: &dyn Db) -> String {
+    pub fn sig_to_string(&self, db: &dyn Db) -> String {
         TypePrinter::new().function_id_to_string(db, *self)
+    }
+
+    pub fn called_to_string(&self, db: &dyn Db) -> String {
+        TypePrinter::new().called_function_to_string(db, *self)
     }
 }
 

@@ -333,6 +333,14 @@ impl TypePrinter {
         )
     }
 
+    pub fn called_function_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
+        format!(
+            "{}::{}",
+            self.scope_owner_to_string(db, function_id.parent(db)),
+            function_id.name(db).display(db)
+        )
+    }
+
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {
         match def {
             Definition::Function(function_id) => self.function_id_to_string(db, function_id),

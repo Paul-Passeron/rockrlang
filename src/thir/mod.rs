@@ -525,10 +525,10 @@ fn type_check_hir<'db>(
 }
 
 #[salsa::tracked]
-pub fn type_check_function<'db>(
+pub fn _type_check_function<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
     packages: Box<[Package<'db>]>,
 ) -> Option<TypeCheckResults<'db>> {
-    hir_body(db, function).map(|hir| type_check_hir(db, hir, packages.into()))
+    hir_body(db, function.into()).map(|hir| type_check_hir(db, hir, packages.into()))
 }

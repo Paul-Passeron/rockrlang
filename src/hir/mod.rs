@@ -448,8 +448,12 @@ pub fn function_ast<'db>(
     panic!("[INTERNAL COMPILER ERROR] FunctionId's Ast not found")
 }
 
+pub fn hir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<HirBody<'db>> {
+    _hir_body(db, function.interned())
+}
+
 #[salsa::tracked]
-pub fn hir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<HirBody<'db>> {
+fn _hir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<HirBody<'db>> {
     let ast = function_ast(db, function);
 
     match ast.inner(db) {
