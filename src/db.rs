@@ -64,11 +64,11 @@ impl RockrDb {
 impl salsa::Database for RockrDb {}
 
 impl dyn Db {
-    pub fn _open_workspace(&mut self, config: Config) -> Workspace {
+    pub fn open_workspace(&mut self, config: Config) -> Workspace {
         Workspace::initialize(self, config)
     }
 
-    pub fn _add_source_file(
+    pub fn add_source_file(
         &mut self,
         path: PathBuf,
         text: String,
@@ -88,12 +88,12 @@ impl dyn Db {
         Ok(sf)
     }
 
-    pub fn _find_source_file(&self, path: PathBuf) -> Option<SourceFile> {
+    pub fn find_source_file(&self, path: &PathBuf) -> Option<SourceFile> {
         let path = path.canonicalize().ok()?;
         self.get_ref_files().get(&path).map(|val| *val)
     }
 
-    pub fn _set_source_file_text(&mut self, file: SourceFile, text: String) {
+    pub fn set_source_file_text(&mut self, file: SourceFile, text: String) {
         file.set_content(self).to(text.into());
     }
 
@@ -101,7 +101,7 @@ impl dyn Db {
         let path = file.path(self).clone();
         self.get_mut_ref_files().remove(&path);
         let ws = Workspace::get(self);
-        let mut files = ws.files(self).clone();
+        let files = ws.files(self).clone();
         files.remove(&file);
         ws.set_files(self).to(files);
     }

@@ -20,125 +20,114 @@
 //     FileModuleInfo, FunctionResult, PackageInfo, Report, diagnostic::Diagnostic,
 // };
 
+use std::{collections::HashMap, io};
+
+use codespan_reporting::diagnostic::{
+    Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle, Severity as CrSeverity,
+};
+use codespan_reporting::files::SimpleFiles;
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
+use codespan_reporting::term::{self, Config, termcolor::WriteColor};
+
+use crate::check::{Diag, DiagLabel, Diagnostics};
+use crate::compiler::diagnostic::Severity;
+use crate::{Db, SourceFile};
+
 pub mod type_printer;
 
-// fn print_file_module(
-//     f: &mut impl fmt::Write,
-//     file_module: &FileModuleInfo,
-//     indent: usize,
-// ) -> std::fmt::Result {
-//     let prefix = "    ".repeat(indent);
-//     writeln!(
-//         f,
-//         "{prefix}[{}] {}",
-//         file_module.name(),
-//         file_module.file.path.display()
-//     )?;
-//     file_module
-//         .submodules
-//         .iter()
-//         .try_for_each(|submodule| print_file_module(f, submodule, indent + 1))
-// }
+pub fn render_diagnostics<'db>(db: &'db dyn Db, diags: Diagnostics<'db>) {
+    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+    _render_diagnostics(db, &diags.diagnostics(db), &mut stderr).unwrap();
+}
 
-// fn get_package_path_from_env_var(env_var: &str) -> Option<PathBuf> {
-//     let path = std::env::var(env_var).ok()?;
-//     let root = std::path::Path::new(&path).join("main.rkr");
-//     let root = root.canonicalize().unwrap_or(root);
-//     Some(root)
-// }
+pub fn _render_diagnostics<W: WriteColor>(
+    db: &dyn Db,
+    diags: &[Diag<'_>],
+    out: &mut W,
+) -> io::Result<()> {
+    let mut files = SimpleFiles::new();
+    let mut file_ids: HashMap<SourceFile, usize> = HashMap::new();
 
-// fn is_builtin_file_module(file_module: &FileModuleInfo) -> bool {
-//     let p = file_module.file.path.to_path_buf();
-//     let p = p.canonicalize().unwrap_or(p);
+    let config = Config::default();
 
-//     let builtin_modules = [
-//         get_package_path_from_env_var("ROCKR_STD").unwrap_or_default(),
-//         get_package_path_from_env_var("ROCKR_CORE").unwrap_or_default(),
-//     ];
+    for diag in diags {
+        let cr = build_diagnostic(db, *diag, &mut files, &mut file_ids);
 
-//     for module in builtin_modules {
-//         if p == module {
-//             return true;
-//         }
-//     }
+        term::emit_to_write_style(out, &config, &files, &cr).map_err(io_error)?;
+    }
 
-//     false
-// }
+    Ok(())
+}
 
-// fn print_packages_structure<'a>(
-//     f: &mut impl fmt::Write,
-//     packages: impl IntoIterator<Item = &'a PackageInfo>,
-// ) -> std::fmt::Result {
-//     for p in packages {
-//         if is_builtin_file_module(&p.root) {
-//             continue;
-//         }
-//         print_file_module(f, &p.root, 0)?;
-//     }
-//     Ok(())
-// }
+fn build_diagnostic<'db>(
+    db: &'db dyn Db,
+    diag: Diag<'db>,
+    files: &mut SimpleFiles<String, &'db str>,
+    file_ids: &mut HashMap<SourceFile, usize>,
+) -> CrDiagnostic<usize> {
+    let primary = label_for(db, diag.primary(db), LabelStyle::Primary, files, file_ids);
+    let secondary: Vec<_> = diag
+        .secondary(db)
+        .iter()
+        .map(|&l| label_for(db, l, LabelStyle::Secondary, files, file_ids))
+        .collect();
 
-// pub fn print_diagnostic(f: &mut impl std::fmt::Write, diag: &Diagnostic) -> std::fmt::Result {
-//     let span_info = diag.primary.span.clone();
-//     let loc_info = compute_loc_info(
-//         &span_info.file.content,
-//         span_info.start,
-//         span_info.file.path,
-//     );
-//     writeln!(f, "{}: {}", diag.severity, diag.message)?;
-//     writeln!(
-//         f,
-//         "| {loc_info}: {}",
-//         diag.primary
-//             .message
-//             .as_ref()
-//             .cloned()
-//             .unwrap_or("[Error here]".to_string())
-//     )
-// }
+    let mut labels = Vec::with_capacity(1 + secondary.len());
+    labels.push(primary);
+    labels.extend(secondary);
 
-// pub fn print_function_result(
-//     f: &mut impl std::fmt::Write,
-//     result: &FunctionResult,
-// ) -> std::fmt::Result {
-//     writeln!(f, "[FUNC]======================")?;
-//     writeln!(f, "{}", result.name)?;
-//     if !result.hir.is_empty() {
-//         writeln!(f, "[HIR]=======================")?;
-//         write!(f, "{}", result.hir)?;
-//         writeln!(f, "[EXPRS]=====================")?;
-//         for (expr, ty) in &result.typed_exprs {
-//             writeln!(f, "{expr:?} => {ty}")?;
-//         }
-//         writeln!(f, "[LOCALS]====================")?;
-//         for (local, ty) in &result.locals {
-//             writeln!(f, "_{} => {ty}", local.0)?;
-//         }
-//     }
-//     writeln!(f, "[DIAGS]=====================")?;
-//     for diag in &result.diagnostics {
-//         print_diagnostic(f, diag)?;
-//     }
-//     writeln!(f, "============================\n")
-// }
+    let mut notes = diag.notes(db).clone();
+    notes.extend(diag.help(db).iter().map(|h| format!("help: {h}")));
 
-// pub fn print_to_writer(f: &mut impl fmt::Write, report: &Report) -> std::fmt::Result {
-//     print_packages_structure(f, &report.packages)?;
+    CrDiagnostic::new(severity_to_cr(diag.severity(db)))
+        .with_message(diag.message(db))
+        .with_labels(labels)
+        .with_notes(notes)
+}
 
-//     report
-//         .funcs
-//         .iter()
-//         .try_for_each(|func| print_function_result(f, func))
-// }
+fn label_for<'db>(
+    db: &'db dyn Db,
+    label: DiagLabel<'db>,
+    style: LabelStyle,
+    files: &mut SimpleFiles<String, &'db str>,
+    file_ids: &mut HashMap<SourceFile, usize>,
+) -> CrLabel<usize> {
+    let span = label.span(db);
+    let file_id = ensure_file(db, span.file, files, file_ids);
+    let range = (span.start_offset as usize)..(span.end_offset as usize);
 
-// impl ToString for Report {
-//     fn to_string(&self) -> String {
-//         let mut s = String::new();
-//         print_to_writer(&mut s, self).unwrap();
-//         s
-//     }
-// }
+    let mut l = CrLabel::new(style, file_id, range);
+    if let Some(msg) = label.message(db) {
+        l = l.with_message(msg);
+    }
+    l
+}
 
-// pub fn print(report: &Report) {
-//     println!("{}", report.to_string())
-// }
+fn ensure_file<'db>(
+    db: &'db dyn Db,
+    file: SourceFile,
+    files: &mut SimpleFiles<String, &'db str>,
+    file_ids: &mut HashMap<SourceFile, usize>,
+) -> usize {
+    if let Some(&id) = file_ids.get(&file) {
+        return id;
+    }
+    let name = file.path(db).display().to_string();
+    let text: &str = file.content(db);
+    let id = files.add(name, text);
+    file_ids.insert(file, id);
+    id
+}
+
+fn severity_to_cr(s: Severity) -> CrSeverity {
+    match s {
+        Severity::Error => CrSeverity::Error,
+        Severity::Warning => CrSeverity::Warning,
+        Severity::Note => CrSeverity::Note,
+        Severity::Help => CrSeverity::Help,
+    }
+}
+
+fn io_error(e: codespan_reporting::files::Error) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, e)
+}

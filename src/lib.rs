@@ -23,6 +23,7 @@ use std::process::ExitCode;
 pub use common::location::SourceFile;
 pub use db::*;
 
+pub mod check;
 pub mod common;
 pub mod compiler;
 pub mod db;
@@ -49,7 +50,7 @@ pub fn run_rkr(p: &Path) -> RunStatus {
     let mut stdout = String::new();
     let cfg = compiler::Config::default();
 
-    let exit_code = match compiler::check(p, cfg) {
+    let exit_code = match compiler::check_from_disk(p.to_path_buf(), cfg) {
         Ok(()) => {
             println!("Compilation finished :)");
             std::process::ExitCode::SUCCESS

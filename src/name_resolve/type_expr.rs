@@ -163,7 +163,7 @@ pub fn resolve_type_expr<'db>(
 pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Arc<AstStructDef> {
     for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
         if let AstTopLevelItemDesc::StructDef(ast) = item.data
-            && ast.name == struct_id.name(db)
+            && ast.name.data == struct_id.name(db)
         {
             return Arc::new(ast);
         }
@@ -175,7 +175,7 @@ pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Ar
 pub fn enum_item<'db>(db: &'db dyn Db, enum_id: InternedEnumId<'db>) -> Arc<AstEnumDef> {
     for item in module_items(db, enum_id.parent(db).interned()).unwrap_or_default() {
         if let AstTopLevelItemDesc::EnumDef(ast) = item.data
-            && ast.name == enum_id.name(db)
+            && ast.name.data == enum_id.name(db)
         {
             return Arc::new(ast);
         }

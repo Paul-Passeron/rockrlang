@@ -338,7 +338,7 @@ pub fn interface_items<'db>(
     Arc::new(
         module_interfaces(db, interface_id.parent(db).interned())
             .iter()
-            .find(|interface| interface.name == interface_id.name(db))
+            .find(|interface| interface.name.data == interface_id.name(db))
             .cloned()
             .into_iter()
             .flat_map(|interface| interface.items)
@@ -408,11 +408,13 @@ pub fn function_ast<'db>(
             let module_items = module_items(db, module_id.interned()).unwrap_or_default();
             for item in module_items {
                 match item.data {
-                    AstTopLevelItemDesc::Fundef(fdef) if fdef.data.name == function.name(db) => {
+                    AstTopLevelItemDesc::Fundef(fdef)
+                        if fdef.data.name.data == function.name(db) =>
+                    {
                         return InternedFunctionLikeAst::new(db, FunctionLikeAst::Fundef(fdef));
                     }
                     AstTopLevelItemDesc::ExternDef(fsig, variadic)
-                        if fsig.data.name == function.name(db) =>
+                        if fsig.data.name.data == function.name(db) =>
                     {
                         return InternedFunctionLikeAst::new(
                             db,
@@ -426,7 +428,7 @@ pub fn function_ast<'db>(
         ScopeOwnerId::Impl(impl_id) => {
             for item in impl_items(db, impl_id.interned()) {
                 if let AstImplItem::Fundef(fdef) = item
-                    && fdef.data.name == function.name(db)
+                    && fdef.data.name.data == function.name(db)
                 {
                     return InternedFunctionLikeAst::new(db, FunctionLikeAst::Method(fdef));
                 }

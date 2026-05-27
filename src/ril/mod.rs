@@ -269,7 +269,7 @@ impl ModuleId {
             Some(parent) => {
                 for item in module_items(db, parent.interned()).into_iter().flatten() {
                     if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
-                        && curr_mod.data.name == self.name(db)
+                        && curr_mod.data.name.data == self.name(db)
                     {
                         return curr_mod.span.clone();
                     }

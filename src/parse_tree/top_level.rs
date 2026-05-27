@@ -58,7 +58,7 @@ pub type AstModule = Spanned<AstModuleDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstModuleDesc {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub items: Vec<AstTopLevelItem>,
     pub includes: Vec<AstIncludePath>,
 }
@@ -67,7 +67,7 @@ pub type AstFundef = Spanned<AstFundefDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFundefDesc {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
     pub return_type: AstTypeExpr,
@@ -78,7 +78,7 @@ pub type AstMethodDef = Spanned<AstMethodDefDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstMethodDefDesc {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub receiver: AstReceiver,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
@@ -121,7 +121,7 @@ pub type AstFunsig = Spanned<AstFunsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFunsigDesc {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
     pub return_type: AstTypeExpr,
@@ -131,7 +131,7 @@ pub type AstMethodsig = Spanned<AstMethodsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstMethodsigDesc {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub receiver: AstReceiver,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
@@ -238,7 +238,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstInterface {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub supers: Vec<AstTypeExpr>,
     pub template_args: Vec<AstTemplateArg>,
     pub items: Vec<AstInterfaceItem>,
@@ -295,14 +295,14 @@ pub enum AstIncludePathDesc {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AstStructDef {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub fields: Vec<AstStructDefField>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AstEnumDef {
-    pub name: Symbol,
+    pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub variants: Vec<AstEnumVariant>,
 }

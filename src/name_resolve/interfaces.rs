@@ -148,7 +148,7 @@ pub fn interface_item<'db>(
     Arc::new(
         module_interfaces(db, interface.parent(db).interned())
             .iter()
-            .find(|inter| inter.name == interface.name(db))
+            .find(|inter| inter.name.data == interface.name(db))
             .unwrap()
             .clone(),
     )

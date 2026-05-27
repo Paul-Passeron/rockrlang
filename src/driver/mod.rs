@@ -26,7 +26,7 @@ use crate::{
     ril::{FileModule, Package},
 };
 
-const ANCHOR_FILE_NAME: &str = "main.rkr";
+pub const ANCHOR_FILE_NAME: &str = "main.rkr";
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -86,32 +86,28 @@ pub struct SalsaPath<'db> {
     pub value: PathBuf,
 }
 
-pub fn read_source_file<'db>(db: &'db dyn Db, path: &Path) -> Option<SourceFile> {
+pub fn read_source_file<'db>(db: &'db mut dyn Db, path: &Path) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
-    Some(SourceFile::new(
-        db,
-        path.canonicalize().unwrap_or_else(|_| path.to_path_buf()),
-        s,
-    ))
+    Some(db.add_source_file(path.to_path_buf(), s).ok()?)
 }
 
-#[salsa::tracked]
-pub fn load_file_module<'db>(db: &'db dyn Db, path: SalsaPath<'db>) -> Option<FileModule<'db>> {
-    let p = path.value(db);
-    let file = read_source_file(db, p)?;
+// #[salsa::tracked]
+// pub fn load_file_module<'db>(db: &'db dyn Db, path: SalsaPath<'db>) -> Option<FileModule<'db>> {
+//     let p = path.value(db);
+//     let file = read_source_file(db, p)?;
 
-    let submodule_paths = discover_direct_children(p);
-    let submodules = submodule_paths
-        .into_iter()
-        .filter_map(|child| {
-            let salsa_path = SalsaPath::new(db, child);
-            load_file_module(db, salsa_path)
-        })
-        .collect::<Vec<_>>();
+//     let submodule_paths = discover_direct_children(p);
+//     let submodules = submodule_paths
+//         .into_iter()
+//         .filter_map(|child| {
+//             let salsa_path = SalsaPath::new(db, child);
+//             load_file_module(db, salsa_path)
+//         })
+//         .collect::<Vec<_>>();
 
-    Some(FileModule::new(db, file, submodules))
-}
+//     Some(FileModule::new(db, file, submodules))
+// }
 
 fn discover_direct_children(path: &Path) -> Vec<PathBuf> {
     let is_anchor = path
@@ -152,14 +148,14 @@ fn discover_direct_children(path: &Path) -> Vec<PathBuf> {
     children
 }
 
-pub fn load_package<'db>(db: &'db dyn Db, p: &Path) -> Option<Package<'db>> {
-    let discovered = discover_package(p)?;
-    let salsa_path = SalsaPath::new(db, discovered.path);
-    load_package_tracked(db, salsa_path)
-}
+// pub fn load_package<'db>(db: &'db dyn Db, p: &Path) -> Option<Package<'db>> {
+//     let discovered = discover_package(p)?;
+//     let salsa_path = SalsaPath::new(db, discovered.path);
+//     load_package_tracked(db, salsa_path)
+// }
 
-#[salsa::tracked]
-fn load_package_tracked<'db>(db: &'db dyn Db, path: SalsaPath<'db>) -> Option<Package<'db>> {
-    let root = load_file_module(db, path)?;
-    Some(Package::new(db, root))
-}
+// #[salsa::tracked]
+// fn load_package_tracked<'db>(db: &'db dyn Db, path: SalsaPath<'db>) -> Option<Package<'db>> {
+//     let root = load_file_module(db, path)?;
+//     Some(Package::new(db, root))
+// }

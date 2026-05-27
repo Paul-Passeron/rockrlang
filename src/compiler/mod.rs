@@ -17,41 +17,97 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, RockrDb, SourceFile,
-    common::symbols::Symbol,
-    driver::{DiscoveredModule, discover_package, read_source_file},
+    check::check,
+    common::{frozen::Frozen, symbols::Symbol},
+    compiler::diagnostic::{Diagnostic, Severity},
+    driver::{ANCHOR_FILE_NAME, DiscoveredModule, discover_package, read_source_file},
     hir::{Mutability, function_ast},
     name_resolve::{
         std_module,
         type_expr::{get_templates_of_fun_only, get_templates_of_owner},
     },
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
-    ril::{BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeRef},
+    printer::render_diagnostics,
+    ril::{
+        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId, TypeRef,
+    },
     thir::inference::{InferTy, implicit::AstImplicitContext},
 };
+use dashmap::DashSet;
 use itertools::Itertools;
+use salsa::Setter;
 use std::{
     collections::HashSet,
+    convert::identity,
     fmt,
+    hash::Hash,
     iter::{empty, once},
     path::{Path, PathBuf},
     sync::Arc,
 };
+use walkdir::WalkDir;
 
 pub mod diagnostic;
 
 #[salsa::input(singleton)]
 pub struct Workspace {
-    pub inner: Arc<Config>,
-    pub files: Vec<SourceFile>,
+    pub config: Config,
+    #[returns(ref)]
+    pub files: DashSet<SourceFile>,
+    #[returns(ref)]
+    pub roots: DashSet<PackageRoot>,
+}
+
+#[salsa::input]
+pub struct PackageRoot {
+    pub name: String,
+    pub file: SourceFile,
 }
 
 impl Workspace {
-    pub fn to_string(&self, db: &dyn Db) -> String {
+    pub fn initialize(db: &dyn Db, config: Config) -> Self {
+        Self::new(db, config, DashSet::new(), DashSet::new())
+    }
+
+    pub fn add_file(self, db: &mut dyn Db, file: SourceFile) {
+        let mut files = self.files(db).clone();
+        if files.insert(file) {
+            self.set_files(db).to(files);
+        }
+    }
+
+    pub fn remove_file(self, db: &mut dyn Db, file: SourceFile) {
+        let files = self.files(db).clone();
+        if files.remove(&file).is_some() {
+            self.set_files(db).to(files);
+        }
+    }
+
+    pub fn add_package_root(self, db: &mut dyn Db, root: PackageRoot) {
+        let roots = self.roots(db).clone();
+        let new_name = root.name(db);
+        let new_file = root.file(db);
+        let ws = Workspace::get(db);
+        for known in roots.iter() {
+            if known.name(db) == new_name {
+                if known.file(db) == new_file {
+                    return;
+                }
+                // This should not happen, so we'll see what to do in this case
+                return;
+            }
+        }
+        roots.insert(root);
+        ws.set_roots(db).to(roots);
+    }
+
+    pub fn to_string(self, db: &dyn Db) -> String {
         format!(
-            "Workspace {{\n    config: {:?},\n     files:{}}}",
-            self.inner(db),
+            "Workspace {{\n    config: {:?},\n    files:\n        {}\n}}",
+            self.config(db),
             self.files(db)
                 .iter()
+                .sorted_by_key(|x| x.path(db))
                 .map(|f| f.path(db).display().to_string())
                 .join("\n        ")
         )
@@ -76,6 +132,8 @@ impl Default for Config {
 pub enum CompilerError {
     NoCompilationUnitFound(PathBuf),
     STDLibNotFound,
+    NoFileFoundAt(PathBuf),
+    CoreLibNotFound,
 }
 
 impl fmt::Display for CompilerError {
@@ -86,6 +144,12 @@ impl fmt::Display for CompilerError {
             }
             CompilerError::STDLibNotFound => {
                 write!(f, "Standard library (`std`) package not found.")
+            }
+            CompilerError::NoFileFoundAt(path_buf) => {
+                write!(f, "No file found at {}", path_buf.display())
+            }
+            CompilerError::CoreLibNotFound => {
+                write!(f, "Core library (`core`) package not found.")
             }
         }
     }
@@ -236,62 +300,161 @@ pub fn get_sig_of_function(
     })
 }
 
-fn get_all_files_in_discovered_module<'db>(
-    db: &'db dyn Db,
-    module: DiscoveredModule,
-) -> Result<Vec<SourceFile>, CompilerError> {
-    fn _aux(
-        db: &dyn Db,
-        module: DiscoveredModule,
-        v: &mut Vec<SourceFile>,
-    ) -> Result<(), CompilerError> {
-        v.push(
-            read_source_file(db, &module.path)
-                .ok_or_else(|| CompilerError::NoCompilationUnitFound(module.path))?,
-        );
-        module
-            .submodules
-            .into_iter()
-            .try_for_each(|m| _aux(db, m, v))?;
-        Ok(())
-    }
-    let mut v = vec![];
-    _aux(db, module, &mut v)?;
-    Ok(v)
+fn add_package_root_from_disk(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
+    let root = root
+        .canonicalize()
+        .map_err(|_| CompilerError::NoFileFoundAt(root))?;
+    let path_to_file = if root.is_dir() {
+        root.join(ANCHOR_FILE_NAME)
+    } else {
+        root.clone()
+    };
+    let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
+    let root_file =
+        read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
+    let root = PackageRoot::new(db, package_name, root_file);
+    Workspace::get(db).add_package_root(db, root);
+    Ok(())
 }
 
-fn build_workspace(root: impl AsRef<Path>, config: Config) -> Result<RockrDb, CompilerError> {
-    let db = RockrDb::new();
-    let mut files = HashSet::new();
-    let mut append = |sfs: Vec<SourceFile>| {
-        sfs.into_iter().for_each(|sf| {
-            files.insert(sf);
+fn core_path() -> Result<PathBuf, CompilerError> {
+    path_from_env("ROCKR_CORE")
+}
+
+fn std_path() -> Result<PathBuf, CompilerError> {
+    path_from_env("ROCKR_STD")
+}
+
+fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
+    std::env::var(env)
+        .map_err(|_| CompilerError::CoreLibNotFound)
+        .map(|path| {
+            PathBuf::from(path)
+                .canonicalize()
+                .map_err(|_| CompilerError::CoreLibNotFound)
         })
-    };
-    let to_err = |opt: Option<_>, p| opt.ok_or_else(|| CompilerError::NoCompilationUnitFound(p));
-    let mut add_path = |p: PathBuf| -> Result<(), CompilerError> {
-        let m = to_err(discover_package(p.as_path()), p.to_path_buf())?;
-        append(get_all_files_in_discovered_module(&db, m)?);
-        Ok(())
-    };
+        .flatten()
+}
 
-    add_path(root.as_ref().to_path_buf())?;
-
-    let core_path = std::env::var("ROCKR_CORE").map_err(|_| CompilerError::STDLibNotFound)?;
-    add_path(PathBuf::from(core_path))?;
-
-    if !config.no_std {
-        let std_path = std::env::var("ROCKR_STD").map_err(|_| CompilerError::STDLibNotFound)?;
-        add_path(PathBuf::from(std_path))?;
+fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
+    add_package_root_from_disk(db, root)?;
+    add_package_root_from_disk(db, core_path()?)?;
+    if !db.config().no_std {
+        add_package_root_from_disk(db, std_path()?)?;
     }
+    Ok(())
+}
 
-    Workspace::new(&db, Arc::new(config), files.into_iter().collect_vec());
+fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
+    fn walk(db: &mut dyn Db, p: PathBuf) -> Result<(), CompilerError> {
+        println!("Walking {}", p.display());
+        if p.is_dir() {
+            WalkDir::new(p.clone())
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|path| {
+                    if path.path() == &p {
+                        return false;
+                    }
+                    if path.file_type().is_file() {
+                        path.path().extension().is_some_and(|ext| ext == "rkr")
+                    } else {
+                        true
+                    }
+                })
+                .map(|e| e.into_path())
+                .try_for_each(|p| walk(db, p))?;
+        } else if db.find_source_file(&p).is_none() {
+            read_source_file(db, &p).ok_or_else(|| CompilerError::NoFileFoundAt(p.clone()))?;
+        }
+
+        Ok(())
+    }
+    let ws = Workspace::get(db);
+    for root in ws.roots(db).clone().iter() {
+        let path = root.file(db).path(db).clone();
+        walk(
+            db,
+            if path.is_file() && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME {
+                path.parent().unwrap().to_path_buf()
+            } else {
+                path
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn load_workspace_from_disk(root: PathBuf, config: Config) -> Result<RockrDb, CompilerError> {
+    let mut db = RockrDb::new();
+    Workspace::initialize(&mut db, config);
+    compute_package_roots(&mut db, root)?;
+    compute_all_files_from_roots(&mut db)?;
     Ok(db)
 }
 
-pub fn check(root: impl AsRef<Path>, config: Config) -> Result<(), CompilerError> {
-    let db = build_workspace(root, config)?;
-    let workspace = Workspace::get(&db);
-    println!("Workspace: {}", workspace.to_string(&db));
-    todo!("Run the checks")
+pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
+    let db = load_workspace_from_disk(root, config)?;
+    let ws = Workspace::get(&db);
+    println!("{}", ws.to_string(&db));
+    let diags = check(&db, ws);
+    render_diagnostics(&db, diags);
+    Ok(())
+}
+#[salsa::tracked]
+pub fn is_file_direct_submodule_of_file<'db>(
+    db: &'db dyn Db,
+    parent: SourceFile,
+    child: SourceFile,
+) -> bool {
+    if parent == child {
+        return false;
+    }
+    let p_path = parent.path(db);
+    if p_path.file_name().unwrap() != ANCHOR_FILE_NAME {
+        return false;
+    }
+    let c_path = child.path(db);
+    let parent_dir = p_path.parent().unwrap();
+    let child_dir = c_path.parent().unwrap();
+
+    if parent_dir == child_dir {
+        return true;
+    }
+
+    if c_path.file_name().unwrap() == ANCHOR_FILE_NAME && child_dir.parent() == Some(parent_dir) {
+        return true;
+    }
+
+    false
+}
+
+#[salsa::tracked]
+pub fn submodules_of_file<'db>(db: &'db dyn Db, file: SourceFile) -> Vec<FileModule<'db>> {
+    if file.path(db).file_name().unwrap() != ANCHOR_FILE_NAME {
+        return vec![];
+    }
+
+    let ws = Workspace::get(db);
+
+    ws.files(db)
+        .iter()
+        .map(|sf| *sf)
+        .filter(|sf| is_file_direct_submodule_of_file(db, file, *sf))
+        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf)))
+        .collect()
+}
+
+#[salsa::tracked]
+pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> {
+    let file = root.file(db);
+    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file)))
+}
+
+#[salsa::tracked]
+pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Vec<Package<'db>> {
+    ws.roots(db)
+        .iter()
+        .map(|root| package_of_root(db, *root))
+        .collect()
 }

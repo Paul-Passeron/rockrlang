@@ -64,7 +64,7 @@ fn get_source_file<'db>(
 }
 
 #[salsa::input]
-#[derive(Debug)]
+#[derive(Debug, PartialOrd, Ord)]
 pub struct SourceFile {
     #[returns(ref)]
     pub path: PathBuf,
@@ -78,7 +78,7 @@ pub struct Location {
     pub offset: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Span {
     pub file: SourceFile,
     pub start_offset: usize,

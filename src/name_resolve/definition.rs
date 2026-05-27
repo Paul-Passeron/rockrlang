@@ -17,8 +17,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::symbols::{InternedSymbol, Symbol},
-    name_resolve::{builtin_module, core_module, core_package, module_items, std_module},
+    common::{
+        location::Span,
+        symbols::{InternedSymbol, Symbol},
+    },
+    hir::{FunctionLikeAst, InternedFunctionLikeAst, function_ast},
+    name_resolve::{
+        builtin_module, core_module, core_package,
+        interfaces::interface_item,
+        module_items, std_module,
+        type_expr::{enum_item, struct_item},
+    },
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     printer::type_printer::TypePrinter,
@@ -39,8 +48,42 @@ pub enum Definition {
 }
 
 impl Definition {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().definition_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().definition_to_string(db, self)
+    }
+
+    // TODO: The current way we do things, we can't get the name span of other definitions of the same kind with the same name at top level.
+
+    pub fn name(self, db: &dyn Db) -> Symbol {
+        match self {
+            Definition::Function(func) => func.name(db),
+            Definition::Type(def) => def.name(db),
+            Definition::Interface(iface) => iface.name(db),
+            Definition::Module(module) => module.name(db),
+        }
+    }
+
+    pub fn name_span(self, db: &dyn Db) -> Option<Span> {
+        match self {
+            Definition::Function(function_id) => Some(function_id.name_span(db)),
+            Definition::Interface(interface_id) => Some(interface_id.name_span(db)),
+            Definition::Module(module_id) => module_id.name_span(db),
+            Definition::Type(type_def_id) => type_def_id.name_span(db),
+        }
+    }
+}
+
+impl ModuleId {
+    pub fn name_span(self, db: &dyn Db) -> Option<Span> {
+        let parent = self.parent(db)?;
+        for item in module_items(db, parent.interned()).into_iter().flatten() {
+            if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
+                && curr_mod.data.name.data == self.name(db)
+            {
+                return Some(curr_mod.data.name.span.clone());
+            }
+        }
+        unreachable!()
     }
 }
 
@@ -60,15 +103,47 @@ impl TypeDefId {
             TypeDefId::Enum(enum_id) => enum_id.parent(db),
         }
     }
+
+    pub fn name_span(&self, db: &dyn Db) -> Option<Span> {
+        match self {
+            TypeDefId::Builtin(_) => None,
+            TypeDefId::Struct(struct_id) => Some(struct_id.name_span(db)),
+            TypeDefId::Enum(enum_id) => Some(enum_id.name_span(db)),
+        }
+    }
 }
 
-impl Definition {
-    pub fn name(&self, db: &dyn Db) -> Symbol {
+impl StructId {
+    pub fn name_span(&self, db: &dyn Db) -> Span {
+        struct_item(db, self.interned()).name.span.clone()
+    }
+}
+
+impl EnumId {
+    pub fn name_span(&self, db: &dyn Db) -> Span {
+        enum_item(db, self.interned()).name.span.clone()
+    }
+}
+
+impl InterfaceId {
+    pub fn name_span(&self, db: &dyn Db) -> Span {
+        interface_item(db, self.interned()).name.span.clone()
+    }
+}
+
+impl FunctionId {
+    pub fn name_span(&self, db: &dyn Db) -> Span {
+        function_ast(db, self.interned()).inner(db).name_span(db)
+    }
+}
+
+impl FunctionLikeAst {
+    pub fn name_span(&self, db: &dyn Db) -> Span {
         match self {
-            Definition::Function(func) => func.name(db),
-            Definition::Type(def) => def.name(db),
-            Definition::Interface(iface) => iface.name(db),
-            Definition::Module(module) => module.name(db),
+            FunctionLikeAst::ExternDef(spanned, _) => spanned.data.name.span.clone(),
+            FunctionLikeAst::Fundef(spanned) => spanned.data.name.span.clone(),
+            FunctionLikeAst::Method(spanned) => spanned.data.name.span.clone(),
+            FunctionLikeAst::TraitMethod(spanned) => spanned.data.name.span.clone(),
         }
     }
 }
@@ -82,7 +157,7 @@ fn definition_of_item<'db>(
     match &item.data {
         AstTopLevelItemDesc::Module(module) => Some(Definition::Module(ModuleId::new(
             db,
-            module.data.name,
+            module.data.name.data,
             Some(m_id),
             None,
             vec![],
@@ -90,24 +165,24 @@ fn definition_of_item<'db>(
         ))),
         AstTopLevelItemDesc::Fundef(fundef) => Some(Definition::Function(FunctionId::new(
             db,
-            fundef.data.name,
+            fundef.data.name.data,
             ScopeOwnerId::Module(m_id),
         ))),
         AstTopLevelItemDesc::Interface(interface) => Some(Definition::Interface(InterfaceId::new(
             db,
-            interface.name,
+            interface.name.data,
             m_id,
         ))),
         AstTopLevelItemDesc::Impl(_) => None,
         AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(TypeDefId::Struct(
-            StructId::new(db, struct_def.name, m_id),
+            StructId::new(db, struct_def.name.data, m_id),
         ))),
         AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
-            EnumId::new(db, ast_enum_def.name, m_id),
+            EnumId::new(db, ast_enum_def.name.data, m_id),
         ))),
         AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(FunctionId::new(
             db,
-            funsig.data.name,
+            funsig.data.name.data,
             ScopeOwnerId::Module(m_id),
         ))),
     }
@@ -214,14 +289,14 @@ impl AstIncludePathDesc {
 pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
-) -> BTreeMap<Symbol, Definition> {
+) -> Vec<(Symbol, Definition)> {
     if module.package(db).is_none() {
-        builtin_definitions(db)
+        builtin_definitions(db).into_iter().collect()
     } else {
-        let mut res = BTreeMap::new();
+        let mut res = Vec::new();
         for sub in module.file_submodules(db) {
             let id = file_module_id(db, sub, Some(module.into()), module.package(db).unwrap());
-            res.insert(id.name(db), Definition::Module(id));
+            res.push((id.name(db), Definition::Module(id)));
         }
         let items = module_items(db, module);
         items.iter().for_each(|items| {
@@ -229,7 +304,7 @@ pub fn module_definitions<'db>(
                 definition_of_item(db, module, item)
                     .into_iter()
                     .for_each(|def| {
-                        res.insert(def.name(db), def);
+                        res.push((def.name(db), def));
                     })
             })
         });
@@ -250,12 +325,20 @@ pub fn module_includes<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> V
         .collect()
 }
 
+#[salsa::tracked]
+pub fn def_map_in_module<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> BTreeMap<Symbol, Definition> {
+    module_definitions(db, module).into_iter().collect()
+}
+
 fn find_module_in_chain<'db>(
     db: &'db dyn Db,
     name: Symbol,
     module: InternedModuleId<'db>,
 ) -> Option<ModuleId> {
-    let defs = module_definitions(db, module);
+    let defs = def_map_in_module(db, module);
     if let Some(Definition::Module(m)) = defs.get(&name) {
         return Some(*m);
     }
@@ -285,7 +368,7 @@ pub fn resolve_in_module<'db>(
     name: InternedSymbol<'db>,
     module: InternedModuleId<'db>,
 ) -> Option<Definition> {
-    let defs = module_definitions(db, module);
+    let defs = def_map_in_module(db, module);
     if let Some(def) = defs.get(&Symbol::from(name)) {
         return Some(*def);
     }
@@ -294,7 +377,7 @@ pub fn resolve_in_module<'db>(
     for included_module in includes {
         if let Some(included_id) = resolve_include_path(db, included_module, module)
             && let Some(def) =
-                module_definitions(db, included_id.interned()).get(&Symbol::from(name))
+                def_map_in_module(db, included_id.interned()).get(&Symbol::from(name))
         {
             return Some(*def);
         }

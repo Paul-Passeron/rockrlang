@@ -394,7 +394,7 @@ impl<'db> InferenceCtx<'db> {
                 }
                 for item in interface_items(self.db, iface_id.interned()).iter() {
                     if let AstInterfaceItem::Sig(sig) = item
-                        && sig.data.name == method
+                        && sig.data.name.data == method
                         && sig.data.args.len() == arity
                         && sig.data.receiver.is_static() == is_static
                     {
@@ -440,7 +440,7 @@ impl<'db> InferenceCtx<'db> {
                 let items = impl_items(self.db, src.id(self.db).interned());
                 for item in items {
                     if let AstImplItem::Fundef(def) = item
-                        && def.data.name == method
+                        && def.data.name.data == method
                         && def.data.receiver.is_static() == is_static
                         && def.data.args.len() == args.len()
                     {
@@ -493,7 +493,7 @@ impl<'db> InferenceCtx<'db> {
         let ast = impl_items(self.db, src.id(self.db).interned())
             .into_iter()
             .find_map(|item| match item {
-                AstImplItem::Fundef(def) if def.data.name == method => Some(def),
+                AstImplItem::Fundef(def) if def.data.name.data == method => Some(def),
                 _ => None,
             })
             .unwrap();

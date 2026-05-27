@@ -72,7 +72,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
         self.expect(TokenKind::Module)?;
         self.consume();
-        let name = self.parse_symbol()?.data;
+        let name = self.parse_symbol()?;
         self.expect(TokenKind::OpenBra)?;
         self.consume();
         let mut items = vec![];
@@ -358,7 +358,7 @@ impl<'db> Parser<'db> {
         Ok((
             AstFunsig::new(
                 AstFunsigDesc {
-                    name: name.data,
+                    name,
                     args,
                     template_args,
                     return_type,
@@ -655,7 +655,7 @@ impl<'db> Parser<'db> {
     fn parse_enum_def(&mut self) -> Result<AstEnumDef, ParseError> {
         self.expect(TokenKind::Enum)?;
         self.consume();
-        let name = self.parse_symbol()?.data;
+        let name = self.parse_symbol()?;
         let template_args = self.parse_optional_template_args()?;
         self.expect(TokenKind::OpenBra)?;
         self.consume();
@@ -672,7 +672,7 @@ impl<'db> Parser<'db> {
     fn parse_struct_def(&mut self) -> Result<AstStructDef, ParseError> {
         self.expect(TokenKind::Struct)?;
         self.consume();
-        let name = self.parse_symbol()?.data;
+        let name = self.parse_symbol()?;
         let template_args = self.parse_optional_template_args()?;
         self.expect(TokenKind::OpenBra)?;
         self.consume();
@@ -774,7 +774,7 @@ impl<'db> Parser<'db> {
             TokenKind::Interface => {
                 let start = self.get_start();
                 self.consume();
-                let name = self.parse_symbol()?.data;
+                let name = self.parse_symbol()?;
                 let template_args = self.parse_optional_template_args()?;
                 let supers = if let Some(t) = self.peek_n(0)
                     && t.kind == TokenKind::Colon

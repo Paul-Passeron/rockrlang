@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, SourceFile,
     common::{symbols::Symbol, unord::Set},
-    driver::load_package,
+    compiler::{Workspace, workspace_packages},
     parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     ril::{FileModule, InternedModuleId, ModuleId, Package},
@@ -115,7 +115,7 @@ pub fn module_items<'db>(
         .and_then(|parent| match module_items(db, parent.interned()) {
             Some(parent_ast) => parent_ast.iter().find_map(|item| match &item.data {
                 AstTopLevelItemDesc::Module(module_ast) => {
-                    if module_ast.data.name == module.name(db) {
+                    if module_ast.data.name.data == module.name(db) {
                         Some(module_ast.data.items.clone())
                     } else {
                         None
@@ -136,9 +136,14 @@ pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
     if db.config().no_std {
         None
     } else {
-        let std_path = std::env::var("ROCKR_STD").unwrap_or_default();
-        let std_root = std::path::Path::new(&std_path);
-        load_package(db, std_root)
+        let ws = Workspace::get(db);
+        let packages = workspace_packages(db, ws);
+        for pkg in packages {
+            if pkg.root(db).name(db).to_string(db) == "std" {
+                return Some(pkg);
+            }
+        }
+        None
     }
 }
 
@@ -151,9 +156,14 @@ pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
 
 #[salsa::tracked]
 pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
-    let core_path = std::env::var("ROCKR_CORE").unwrap_or_default();
-    let core_root = std::path::Path::new(&core_path);
-    load_package(db, core_root).unwrap()
+    let ws = Workspace::get(db);
+    let packages = workspace_packages(db, ws);
+    for pkg in packages {
+        if pkg.root(db).name(db).to_string(db) == "core" {
+            return pkg;
+        }
+    }
+    unreachable!()
 }
 
 #[salsa::tracked]
@@ -193,7 +203,7 @@ fn collect_modules_in_items<'db>(
         if let AstTopLevelItemDesc::Module(module_ast) = &item.data {
             let child_id = ModuleId::new(
                 db,
-                module_ast.data.name,
+                module_ast.data.name.data,
                 Some(parent),
                 None,
                 vec![],
