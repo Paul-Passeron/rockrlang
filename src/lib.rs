@@ -46,8 +46,8 @@ pub struct RunStatus {
 }
 
 pub fn run_rkr(p: &Path) -> RunStatus {
-    let mut stderr = String::new();
-    let mut stdout = String::new();
+    let stderr = String::new();
+    let stdout = String::new();
     let cfg = compiler::Config::default();
 
     let exit_code = match compiler::check_from_disk(p.to_path_buf(), cfg) {

@@ -82,7 +82,7 @@ impl dyn Db {
         let sf = SourceFile::new(self, path.clone(), text.into());
         self.get_mut_ref_files().insert(path, sf);
         let ws = Workspace::get(self);
-        let mut files = ws.files(self).clone();
+        let files = ws.files(self).clone();
         files.insert(sf);
         ws.set_files(self).to(files);
         Ok(sf)

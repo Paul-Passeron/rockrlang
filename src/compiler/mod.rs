@@ -18,14 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, RockrDb, SourceFile,
     check::check,
-    common::{frozen::Frozen, symbols::Symbol},
-    compiler::diagnostic::{Diagnostic, Severity},
-    driver::{ANCHOR_FILE_NAME, DiscoveredModule, discover_package, read_source_file},
+    common::symbols::Symbol,
+    driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
-    name_resolve::{
-        std_module,
-        type_expr::{get_templates_of_fun_only, get_templates_of_owner},
-    },
+    name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner},
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     printer::render_diagnostics,
     ril::{
@@ -36,15 +32,7 @@ use crate::{
 use dashmap::DashSet;
 use itertools::Itertools;
 use salsa::Setter;
-use std::{
-    collections::HashSet,
-    convert::identity,
-    fmt,
-    hash::Hash,
-    iter::{empty, once},
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt, hash::Hash, path::PathBuf, sync::Arc};
 use walkdir::WalkDir;
 
 pub mod diagnostic;
@@ -70,7 +58,7 @@ impl Workspace {
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: SourceFile) {
-        let mut files = self.files(db).clone();
+        let files = self.files(db).clone();
         if files.insert(file) {
             self.set_files(db).to(files);
         }

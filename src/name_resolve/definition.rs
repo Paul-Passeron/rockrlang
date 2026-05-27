@@ -21,7 +21,7 @@ use crate::{
         location::Span,
         symbols::{InternedSymbol, Symbol},
     },
-    hir::{FunctionLikeAst, InternedFunctionLikeAst, function_ast},
+    hir::{FunctionLikeAst, function_ast},
     name_resolve::{
         builtin_module, core_module, core_package,
         interfaces::interface_item,
@@ -133,12 +133,12 @@ impl InterfaceId {
 
 impl FunctionId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
-        function_ast(db, self.interned()).inner(db).name_span(db)
+        function_ast(db, self.interned()).inner(db).name_span()
     }
 }
 
 impl FunctionLikeAst {
-    pub fn name_span(&self, db: &dyn Db) -> Span {
+    pub fn name_span(&self) -> Span {
         match self {
             FunctionLikeAst::ExternDef(spanned, _) => spanned.data.name.span.clone(),
             FunctionLikeAst::Fundef(spanned) => spanned.data.name.span.clone(),
