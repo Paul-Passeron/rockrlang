@@ -15,53 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    fmt::Display,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
-use crate::{
-    Db,
-    ril::{FileModule, Package},
-};
-
-fn get_source_file_in_submodule<'db>(
-    db: &'db dyn Db,
-    file: impl AsRef<Path>,
-    submodule: FileModule<'db>,
-) -> Option<SourceFile> {
-    if submodule.file(db).path(db).as_path() == file.as_ref() {
-        return Some(submodule.file(db));
-    }
-    for submodule in submodule.submodules(db) {
-        if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
-            return Some(res);
-        }
-    }
-    None
-}
-
-fn get_source_file<'db>(
-    db: &'db dyn Db,
-    file: impl AsRef<Path>,
-    packages: &[Package<'db>],
-) -> Option<SourceFile> {
-    for package in packages {
-        let source_file = package.root(db).file(db);
-        if source_file.path(db) == file.as_ref() {
-            return Some(source_file);
-        }
-    }
-    for package in packages {
-        for submodule in package.root(db).submodules(db) {
-            if let Some(res) = get_source_file_in_submodule(db, file.as_ref(), *submodule) {
-                return Some(res);
-            }
-        }
-    }
-    None
-}
+use crate::Db;
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
 #[salsa::input]
 #[derive(Debug, PartialOrd, Ord)]

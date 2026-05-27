@@ -129,6 +129,7 @@ impl<'db> DiagnosticEngine<'db> {
         self.push_regular_diagnostic_with_message(err.display(self.db).to_string(), span);
     }
 
+    #[allow(unused)]
     fn find_file(&self, path: impl AsRef<Path>) -> Option<SourceFile> {
         let canon = path.as_ref().canonicalize().ok()?;
         fn handle_submodule(

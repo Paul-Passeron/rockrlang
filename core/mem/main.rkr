@@ -3,10 +3,10 @@ interface Clone {
     fun clone(&self): Self;
 }
 
-// @[builtin]
+@[builtin]
 interface Copy {} // Marker struct
 
-// @[builtin]
+@[builtin]
 interface Drop {
     fun drop(self): void;
 }

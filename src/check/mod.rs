@@ -1,4 +1,19 @@
-// rock_compiler/src/check.rs
+/* Rockr programming language
+Copyright (C) 2026  NoRezap
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 
 use std::collections::{HashMap, HashSet};
 
@@ -10,17 +25,13 @@ use crate::{
         fundef::check_fundef, implem::check_implem, interface::check_interface,
         types::check_typedef,
     },
-    common::{
-        location::{Location, Span},
-        symbols::Symbol,
-    },
+    common::{location::Span, symbols::Symbol},
     compiler::{Workspace, diagnostic::Severity, workspace_packages},
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},
         file_module_id,
         implems::module_impls,
-        modules_in_package,
     },
     ril::{FileModule, InternedModuleId, ModuleId, Package},
 };
@@ -150,7 +161,6 @@ pub fn check_duplicate_defs<'db>(
 ) -> Diagnostics<'db> {
     let mut map: HashMap<Symbol, HashSet<Definition>> = HashMap::new();
     for (name, def) in defs {
-        println!("Name: {}", name.display(db));
         map.entry(name).or_default().insert(def);
     }
 
