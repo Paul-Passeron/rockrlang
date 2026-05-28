@@ -15,16 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    check::{Diag, Diagnostics},
-    ril::ImplSource,
-};
+use salsa::Accumulator;
 
-pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) -> Diagnostics<'db> {
+use crate::{Db, check::Diag, ril::ImplSource};
+
+pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     let span = implem.span(db);
-    Diagnostics::new(
-        db,
-        vec![Diag::todo(db, "implement check_implem".into(), span)],
-    )
+    Diag::todo("implement check_implem".into(), span).accumulate(db);
 }

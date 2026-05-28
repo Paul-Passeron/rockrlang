@@ -19,6 +19,7 @@ use crate::{
     Db, RockrDb, SourceFile,
     check::check,
     common::symbols::Symbol,
+    compiler::diagnostic::Diag,
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
     name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner},
@@ -385,8 +386,9 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     println!("{}", ws.to_string(&db));
-    let diags = check(&db, ws);
-    render_diagnostics(&db, diags);
+    check(&db, ws);
+    let diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
+    render_diagnostics(&db, diags.into_iter());
     Ok(())
 }
 #[salsa::tracked]

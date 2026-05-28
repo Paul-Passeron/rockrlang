@@ -15,18 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    check::{Diag, Diagnostics},
-    ril::TypeDefId,
-};
+use salsa::Accumulator;
 
-pub fn check_typedef<'db>(db: &'db dyn Db, typedef: TypeDefId) -> Diagnostics<'db> {
+use crate::{Db, check::Diag, ril::TypeDefId};
+
+pub fn check_typedef<'db>(db: &'db dyn Db, typedef: TypeDefId) {
     if let Some(span) = typedef.name_span(db) {
-        return Diagnostics::new(
-            db,
-            vec![Diag::todo(db, "implement check_typedef".into(), span)],
-        );
+        Diag::todo("implement check_typedef".into(), span).accumulate(db);
     }
-    Diagnostics::new(db, vec![])
 }

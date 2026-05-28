@@ -15,20 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    check::{Diag, Diagnostics},
-    hir::hir_body,
-    ril::FunctionId,
-};
+use salsa::Accumulator;
 
-pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) -> Diagnostics<'db> {
+use crate::{Db, check::Diag, hir::hir_body, ril::FunctionId};
+
+pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) {
     let span = fdef.span(db);
     if let Some(hir) = hir_body(db, fdef) {
         println!("{}", hir.display(db));
     }
-    Diagnostics::new(
-        db,
-        vec![Diag::todo(db, "implement check_fundef".into(), span)],
-    )
+    Diag::todo("implement check_fundef".into(), span).accumulate(db);
 }

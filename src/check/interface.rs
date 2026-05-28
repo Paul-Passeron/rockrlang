@@ -15,16 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    check::{Diag, Diagnostics},
-    ril::InterfaceId,
-};
+use salsa::Accumulator;
 
-pub fn check_interface<'db>(db: &'db dyn Db, interface: InterfaceId) -> Diagnostics<'db> {
+use crate::{Db, check::Diag, ril::InterfaceId};
+
+pub fn check_interface<'db>(db: &'db dyn Db, interface: InterfaceId) {
     let span = interface.name_span(db);
-    Diagnostics::new(
-        db,
-        vec![Diag::todo(db, "implement check_interface".into(), span)],
-    )
+    Diag::todo("implement check_interface".into(), span).accumulate(db);
 }

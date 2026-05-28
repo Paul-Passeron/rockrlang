@@ -29,20 +29,19 @@ use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, Config, termcolor::WriteColor};
 
-use crate::check::{Diag, DiagLabel, Diagnostics};
-use crate::compiler::diagnostic::Severity;
+use crate::compiler::diagnostic::{Diag, DiagLabel, Severity};
 use crate::{Db, SourceFile};
 
 pub mod type_printer;
 
-pub fn render_diagnostics<'db>(db: &'db dyn Db, diags: Diagnostics<'db>) {
+pub fn render_diagnostics<'db, 'diag>(db: &'db dyn Db, diags: impl Iterator<Item = &'diag Diag>) {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    _render_diagnostics(db, &diags.diagnostics(db), &mut stderr).unwrap();
+    _render_diagnostics(db, diags, &mut stderr).unwrap();
 }
 
-pub fn _render_diagnostics<W: WriteColor>(
+pub fn _render_diagnostics<'a, W: WriteColor>(
     db: &dyn Db,
-    diags: &[Diag<'_>],
+    diags: impl Iterator<Item = &'a Diag>,
     out: &mut W,
 ) -> io::Result<()> {
     let mut files = SimpleFiles::new();
@@ -51,7 +50,7 @@ pub fn _render_diagnostics<W: WriteColor>(
     let config = Config::default();
 
     for diag in diags {
-        let cr = build_diagnostic(db, *diag, &mut files, &mut file_ids);
+        let cr = build_diagnostic(db, diag, &mut files, &mut file_ids);
 
         term::emit_to_write_style(out, &config, &files, &cr).map_err(io_error)?;
     }
@@ -61,43 +60,49 @@ pub fn _render_diagnostics<W: WriteColor>(
 
 fn build_diagnostic<'db>(
     db: &'db dyn Db,
-    diag: Diag<'db>,
+    diag: &Diag,
     files: &mut SimpleFiles<String, &'db str>,
     file_ids: &mut HashMap<SourceFile, usize>,
 ) -> CrDiagnostic<usize> {
-    let primary = label_for(db, diag.primary(db), LabelStyle::Primary, files, file_ids);
+    let primary = label_for(
+        db,
+        diag.primary.clone(),
+        LabelStyle::Primary,
+        files,
+        file_ids,
+    );
     let secondary: Vec<_> = diag
-        .secondary(db)
+        .secondary
         .iter()
-        .map(|&l| label_for(db, l, LabelStyle::Secondary, files, file_ids))
+        .map(|l| label_for(db, l.clone(), LabelStyle::Secondary, files, file_ids))
         .collect();
 
     let mut labels = Vec::with_capacity(1 + secondary.len());
     labels.push(primary);
     labels.extend(secondary);
 
-    let mut notes = diag.notes(db).clone();
-    notes.extend(diag.help(db).iter().map(|h| format!("help: {h}")));
+    let mut notes = diag.notes.clone();
+    notes.extend(diag.help.iter().map(|h| format!("help: {h}")));
 
-    CrDiagnostic::new(severity_to_cr(diag.severity(db)))
-        .with_message(diag.message(db))
+    CrDiagnostic::new(severity_to_cr(diag.severity))
+        .with_message(diag.message.clone())
         .with_labels(labels)
         .with_notes(notes)
 }
 
 fn label_for<'db>(
     db: &'db dyn Db,
-    label: DiagLabel<'db>,
+    label: DiagLabel,
     style: LabelStyle,
     files: &mut SimpleFiles<String, &'db str>,
     file_ids: &mut HashMap<SourceFile, usize>,
 ) -> CrLabel<usize> {
-    let span = label.span(db);
+    let span = label.span;
     let file_id = ensure_file(db, span.file, files, file_ids);
     let range = (span.start_offset as usize)..(span.end_offset as usize);
 
     let mut l = CrLabel::new(style, file_id, range);
-    if let Some(msg) = label.message(db) {
+    if let Some(msg) = label.message {
         l = l.with_message(msg);
     }
     l
