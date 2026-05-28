@@ -826,9 +826,11 @@ impl<'db> Parser<'db> {
                 self.expect(TokenKind::OpenBra)?;
                 self.consume();
                 self.collect_annotations()?;
+                let fun_start = self.get_start();
                 self.expect(TokenKind::Fun)?;
                 self.consume();
-                let (funsig, variadic) = self.parse_funsig(true)?;
+                let (mut funsig, variadic) = self.parse_funsig(true)?;
+                funsig.span.start_offset = fun_start.offset;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
                 self.expect(TokenKind::CloseBra)?;
