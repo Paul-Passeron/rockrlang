@@ -23,7 +23,7 @@ use crate::{
 };
 
 pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) -> Diagnostics<'db> {
-    let span = fdef.name_span(db);
+    let span = fdef.span(db);
     if let Some(hir) = hir_body(db, fdef) {
         println!("{}", hir.display(db));
     }

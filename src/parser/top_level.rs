@@ -372,6 +372,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_methoddef(&mut self) -> Result<AstMethodDef, ParseError> {
+        let start = self.get_start();
         self.expect(TokenKind::Fun)?;
         self.consume();
         let AstMethodsig {
@@ -384,12 +385,12 @@ impl<'db> Parser<'db> {
                     return_type,
                 },
             annotations,
-            span,
+            ..
         } = self.parse_methodsig()?;
 
         let body = self.parse_block()?;
 
-        let span = span.start().span(self.get_end());
+        let span = start.span(self.get_end());
         Ok(AstMethodDef::new(
             AstMethodDefDesc {
                 name,
@@ -405,6 +406,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_fundef(&mut self) -> Result<AstFundef, ParseError> {
+        let start = self.get_start();
         self.expect(TokenKind::Fun)?;
         self.consume();
         let (
@@ -417,14 +419,14 @@ impl<'db> Parser<'db> {
                         return_type,
                     },
                 annotations,
-                span,
+                ..
             },
             _,
         ) = self.parse_funsig(false)?;
 
         let body = self.parse_block()?;
 
-        let span = span.start().span(self.get_end());
+        let span = start.span(self.get_end());
 
         Ok(AstFundef::new(
             AstFundefDesc {

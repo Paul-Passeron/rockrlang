@@ -135,6 +135,10 @@ impl FunctionId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
         function_ast(db, self.interned()).inner(db).name_span()
     }
+
+    pub fn span(&self, db: &dyn Db) -> Span {
+        function_ast(db, self.interned()).inner(db).get_span()
+    }
 }
 
 impl FunctionLikeAst {
