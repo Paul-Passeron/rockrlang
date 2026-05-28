@@ -42,23 +42,6 @@ pub mod implem;
 pub mod interface;
 pub mod types;
 
-fn print_filemodule<'db>(db: &'db dyn Db, fm: FileModule<'db>, indent: usize) {
-    let name = fm.name(db).to_string(db);
-    let sms = fm.submodules(db);
-    println!(
-        "{}{name}{}",
-        "    ".repeat(indent),
-        if sms.is_empty() { "" } else { ":" }
-    );
-    for sm in sms {
-        print_filemodule(db, *sm, indent + 1);
-    }
-}
-
-fn print_package<'db>(db: &'db dyn Db, pkg: Package<'db>) {
-    print_filemodule(db, pkg.root(db), 0);
-}
-
 #[salsa::tracked]
 pub fn check<'db>(db: &'db dyn Db, ws: Workspace) {
     let pkgs = workspace_packages(db, ws);

@@ -336,7 +336,6 @@ fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerE
 
 fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
     fn walk(db: &mut dyn Db, p: PathBuf) -> Result<(), CompilerError> {
-        println!("Walking {}", p.display());
         if p.is_dir() {
             WalkDir::new(p.clone())
                 .into_iter()
