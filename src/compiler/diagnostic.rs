@@ -15,42 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt;
-
-use crate::common::location::Span;
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Diagnostic {
-    pub severity: Severity,
-    pub message: String,
-    pub primary: Label,
-    pub secondary: Vec<Label>,
-    pub notes: Vec<String>,
-    pub help: Vec<String>,
-}
-
-// #[allow(dead_code)]
-// #[derive(Clone, PartialEq, Eq, Hash)]
-// pub struct SpanInfo {
-//     pub file: SourceFile,
-//     pub start: usize,
-//     pub end: usize,
-// }
-
-#[allow(dead_code)]
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Label {
-    pub span: Span,
-    pub message: Option<String>,
-}
-
-#[allow(dead_code)]
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct DiagnosticCode {
-    pub code: u32,
-    pub category: &'static str,
-}
-
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Severity {
@@ -60,8 +24,8 @@ pub enum Severity {
     Help,
 }
 
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",

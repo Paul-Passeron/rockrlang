@@ -28,14 +28,12 @@ pub mod var;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     fmt, mem,
-    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use crate::{
-    Db, SourceFile,
-    common::{location::Span, symbols::Symbol},
-    compiler::diagnostic::{Label, Severity},
+    Db,
+    common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef, function_ast},
     name_resolve::{
         implems::resolve_type_expr_as_interface,
@@ -43,11 +41,11 @@ use crate::{
     },
     printer::type_printer::TypePrinter,
     ril::{
-        FileModule, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId,
-        TypeRef, display::Display,
+        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        display::Display,
     },
     thir::{
-        Diagnostic, ExprId, InferCallInfos,
+        ExprId, InferCallInfos,
         inference::{
             canon::CanonTy,
             constraints::{InferenceConstraint, InferenceConstraintId},
@@ -83,87 +81,12 @@ pub struct InterfaceImplem {
 }
 
 #[derive(Clone)]
-pub struct DiagnosticEngine<'db> {
-    pub diags: Vec<Diagnostic>,
-    pub db: &'db dyn Db,
-    pub packages: Arc<[Package<'db>]>,
-}
-
-impl<'db> DiagnosticEngine<'db> {
-    pub fn new(db: &'db dyn Db, packages: Arc<[Package<'db>]>) -> Self {
-        Self {
-            diags: Vec::new(),
-            db,
-            packages,
-        }
-    }
-
-    pub fn drain(&mut self) -> Vec<Diagnostic> {
-        std::mem::take(&mut self.diags)
-    }
-
-    pub fn push_regular_diagnostic_with_message_and_primary(
-        &mut self,
-        err: String,
-        primary: Option<String>,
-        span: Span,
-    ) {
-        self.diags.push(Diagnostic {
-            severity: Severity::Error,
-            message: err,
-            primary: Label {
-                span,
-                message: primary,
-            },
-            secondary: vec![],
-            notes: vec![],
-            help: vec![],
-        })
-    }
-
-    pub fn push_regular_diagnostic_with_message(&mut self, err: String, span: Span) {
-        self.push_regular_diagnostic_with_message_and_primary(err, None, span);
-    }
-
-    pub fn push_regular_diagnostic(&mut self, err: UnificationError, span: Span) {
-        self.push_regular_diagnostic_with_message(err.display(self.db).to_string(), span);
-    }
-
-    #[allow(unused)]
-    fn find_file(&self, path: impl AsRef<Path>) -> Option<SourceFile> {
-        let canon = path.as_ref().canonicalize().ok()?;
-        fn handle_submodule(
-            this: &DiagnosticEngine,
-            sub: &FileModule,
-            path: &PathBuf,
-        ) -> Option<SourceFile> {
-            if sub.file(this.db).path(this.db) == path {
-                return Some(sub.file(this.db));
-            }
-            for submodule in sub.submodules(this.db) {
-                if let Some(res) = handle_submodule(this, submodule, path) {
-                    return Some(res);
-                }
-            }
-            None
-        }
-        for package in self.packages.iter() {
-            if let Some(res) = handle_submodule(self, &package.root(self.db), &canon) {
-                return Some(res);
-            }
-        }
-        None
-    }
-}
-
-#[derive(Clone)]
 pub struct InferenceCtx<'a> {
     db: &'a dyn Db,
     table: UnificationTable<InPlace<InferVar>>,
     local_map: BTreeMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
-    // current_constraints: Vec<Arc<InferenceConstraint>>,
     all_constraints: BTreeMap<InferenceConstraintId, Arc<InferenceConstraint>>,
     solved_constraints: BTreeSet<InferenceConstraintId>,
     listeners: BTreeMap<InferVar, Vec<InferenceConstraintId>>,
@@ -178,7 +101,6 @@ pub struct InferenceCtx<'a> {
 
     pub inferred_exprs: BTreeMap<ExprId, InferTy>,
 
-    pub(super) diagnostics: DiagnosticEngine<'a>,
     in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
 }
 
@@ -243,7 +165,6 @@ impl<'db> InferenceCtx<'db> {
             implements: BTreeMap::new(),
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
-            diagnostics: DiagnosticEngine::new(db, packages),
             listeners: BTreeMap::new(),
             ready: VecDeque::new(),
             ready_set: HashSet::new(),

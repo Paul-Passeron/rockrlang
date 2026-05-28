@@ -104,17 +104,11 @@ impl<'db> InferenceCtx<'db> {
                 args,
                 template_hints,
             } => self.infer_constructor(*enum_def, *name, args, template_hints),
-            HirExprDesc::UnresolvedCallDirect { target, args } => {
+            HirExprDesc::UnresolvedCallDirect { args, .. } => {
                 args.iter().for_each(|arg| {
                     let _ = self._infer_expr(arg);
                 });
-                self.diagnostics.push_regular_diagnostic_with_message(
-                    format!(
-                        "function `{}` not found in current scope.",
-                        target.name(self.db).to_string(self.db)
-                    ),
-                    expr.span.clone(),
-                );
+                println!("TODO: function not found in current scope");
                 Ok(InferTy::Var(self.fresh_var()))
             }
         }
