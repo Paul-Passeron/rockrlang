@@ -27,7 +27,7 @@ use crate::{
     name_resolve::type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
     parse_tree::top_level::{AstEnumVariantKind, AstTemplateArg},
     ril::{self, FunctionId, InternedFunctionId, Package, TypeDefId, TypeRef},
-    thir::inference::{
+    typecheck::inference::{
         InferTy, InferenceCtx, UnificationError, constraints::InferenceConstraintKind,
         implicit::ImplicitContext, var::InferVar,
     },

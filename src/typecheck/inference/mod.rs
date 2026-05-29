@@ -44,7 +44,7 @@ use crate::{
         FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId, TypeRef,
         display::Display,
     },
-    thir::{
+    typecheck::{
         ExprId, InferCallInfos,
         inference::{
             canon::CanonTy,

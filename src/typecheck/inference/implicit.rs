@@ -36,7 +36,7 @@ use crate::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
         const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
     },
-    thir::inference::InferTy,
+    typecheck::inference::InferTy,
     unused,
 };
 

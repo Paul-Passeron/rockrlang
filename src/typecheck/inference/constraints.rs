@@ -37,7 +37,7 @@ use crate::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef, display::Display,
     },
-    thir::{
+    typecheck::{
         ExprId, InferCallInfos,
         inference::{
             InferenceCtx, InterfaceImplem, UnificationError, implicit::ImplicitContext,

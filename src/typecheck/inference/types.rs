@@ -24,7 +24,7 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     ril::{BuiltinTypeId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
-    thir::inference::{
+    typecheck::inference::{
         InferTy, InferenceCtx,
         implicit::{AsAstImplCtx, ImplicitContext},
     },

@@ -36,7 +36,7 @@ pub mod parser;
 pub mod printer;
 pub mod ril;
 pub mod tests;
-pub mod thir;
+pub mod typecheck;
 
 #[derive(Debug)]
 pub struct RunStatus {

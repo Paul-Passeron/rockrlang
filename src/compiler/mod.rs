@@ -28,7 +28,7 @@ use crate::{
     ril::{
         BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId, TypeRef,
     },
-    thir::inference::{InferTy, implicit::AstImplicitContext},
+    typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
 use dashmap::DashSet;
 use itertools::Itertools;

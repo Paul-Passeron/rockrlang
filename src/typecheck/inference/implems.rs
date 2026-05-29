@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     name_resolve::implems::impls_in_package,
     ril::{ImplSource, ScopeOwnerId},
-    thir::inference::{constraints::InferenceConstraintKind, implicit::ImplicitContext},
+    typecheck::inference::{constraints::InferenceConstraintKind, implicit::ImplicitContext},
 };
 
 use super::*;

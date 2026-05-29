@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use ena::unify::{InPlace, UnificationTable};
 use itertools::Itertools;
 
-use crate::thir::inference::InferenceCtx;
+use crate::typecheck::inference::InferenceCtx;
 
 use super::{InferTy, InferVar, UnificationError, UnifyValue};
 

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     ril::TypeDefId,
-    thir::inference::{InferTy, InferenceCtx},
+    typecheck::inference::{InferTy, InferenceCtx},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -36,7 +36,7 @@ use crate::{
         top_level::{AstEnumVariantKind, AstStructDef},
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
-    thir::{
+    typecheck::{
         ExprId,
         inference::{implicit::ImplicitContext, var::InferVar},
     },

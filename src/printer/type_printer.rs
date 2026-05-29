@@ -27,7 +27,7 @@ use crate::{
         BuiltinTypeId, FunctionId, ImplId, InterfaceId, InterfaceRef, ModuleId, PtrKind,
         ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },
-    thir::inference::{InferTy, InferenceCtx},
+    typecheck::inference::{InferTy, InferenceCtx},
 };
 
 pub struct TypePrinter {
