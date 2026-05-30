@@ -29,6 +29,7 @@ use crate::{
 pub type ExprId = Idx<ThirExpr>;
 pub type LocalId = Idx<ThirLocal>;
 pub type ScopeId = Idx<ThirScope>;
+pub type PlaceId = Idx<ThirPlace>;
 
 pub struct Thir {
     pub places: Arena<ThirPlace>,
@@ -108,13 +109,13 @@ pub enum ExprKind {
     BoolLit(bool),
 
     // Places
-    Use(Idx<ThirPlace>),
+    Use(PlaceId),
     AddressOf {
-        place: Idx<ThirPlace>,
+        place: PlaceId,
         mutability: Mutability,
     },
     Ref {
-        place: Idx<ThirPlace>,
+        place: PlaceId,
         mutability: Mutability,
     },
     Call {
@@ -143,15 +144,15 @@ pub enum ExprKind {
     Constructor {
         enum_def: EnumRef,
         idx: usize,
-        args: ThirConstructorArgs,
+        args: ThirConstructorArgs<ThirExpr>,
     },
 
     Error, // Todo: Add metadata maybe
 }
 
-pub enum ThirConstructorArgs {
-    Tuple(Vec<ExprId>),
-    Struct(Vec<(Symbol, ExprId)>),
+pub enum ThirConstructorArgs<T> {
+    Tuple(Vec<Idx<T>>),
+    Struct(Vec<(Symbol, Idx<T>)>),
     None,
 }
 
@@ -195,7 +196,7 @@ pub enum ThirPatternKind {
     Constructor {
         def: EnumRef,
         idx: usize,
-        args: ThirConstructorArgs,
+        args: ThirConstructorArgs<ThirPattern>,
     },
     IntLit(i64),
 }
