@@ -21,9 +21,10 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
-    hir::{self, Mutability},
+    hir::{self, Mutability, hir_body},
     parse_tree::expr::BinaryOperator,
     ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
+    typecheck::type_check_function,
 };
 use la_arena::{Arena, Idx};
 use std::sync::Arc;
@@ -244,7 +245,15 @@ impl PartialEq for ThirArc {
 }
 impl Eq for ThirArc {}
 
+pub fn thir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<ThirArc> {
+    _thir_body(db, function.interned())
+}
+
 #[salsa::tracked]
-pub fn thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
+pub fn _thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
+    let f_id: FunctionId = function.into();
+    let _hir = hir_body(db, function.into())?;
+    let _hir = hir_body(db, function.into())?;
+    let _tc_results = type_check_function(db, f_id)?;
     todo!()
 }
