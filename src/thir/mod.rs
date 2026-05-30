@@ -16,15 +16,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
+    Db,
     common::{
-        arena::{Arena, Idx},
         location::Span,
         symbols::{StrLit, Symbol},
     },
     hir::{self, Mutability},
     parse_tree::expr::BinaryOperator,
-    ril::{EnumId, FunctionId, InterfaceRef, StructId, TypeRef},
+    ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
 };
+use la_arena::{Arena, Idx};
+use std::sync::Arc;
 
 pub type ExprId = Idx<ThirExpr>;
 pub type LocalId = Idx<ThirLocal>;
@@ -230,4 +232,19 @@ pub struct ThirMatchBranch {
     pub pattern: ThirPattern,
     pub guard: ExprId,
     pub body: Vec<ThirStmt>,
+}
+
+#[derive(Clone)]
+pub struct ThirArc(Arc<Thir>);
+
+impl PartialEq for ThirArc {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+impl Eq for ThirArc {}
+
+#[salsa::tracked]
+pub fn thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
+    todo!()
 }
