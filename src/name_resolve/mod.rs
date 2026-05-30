@@ -138,9 +138,9 @@ pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
     } else {
         let ws = Workspace::get(db);
         let packages = workspace_packages(db, ws);
-        for pkg in packages {
+        for pkg in packages.iter() {
             if pkg.root(db).name(db).to_string(db) == "std" {
-                return Some(pkg);
+                return Some(*pkg);
             }
         }
         None
@@ -158,9 +158,9 @@ pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
 pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
     let ws = Workspace::get(db);
     let packages = workspace_packages(db, ws);
-    for pkg in packages {
+    for pkg in packages.iter() {
         if pkg.root(db).name(db).to_string(db) == "core" {
-            return pkg;
+            return *pkg;
         }
     }
     unreachable!()

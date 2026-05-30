@@ -94,7 +94,6 @@ pub struct InferenceCtx<'a> {
     ready_set: HashSet<InferenceConstraintId>,
 
     implements: BTreeMap<InterfaceId, HashSet<InterfaceImplem>>,
-    packages: Arc<[Package<'a>]>,
     call_infos: BTreeMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
     impl_depth: usize,
@@ -118,7 +117,6 @@ impl<'db> InferenceCtx<'db> {
         func: FunctionId,
         zelf: Option<LocalId>,
         params: &'db [LocalId],
-        packages: Arc<[Package<'db>]>,
     ) -> Self {
         let mut table = UnificationTable::new();
         let local_map = Self::create_local_map(&mut table, locals);
@@ -159,7 +157,6 @@ impl<'db> InferenceCtx<'db> {
             local_map,
             all_constraints: BTreeMap::new(),
             solved_constraints: BTreeSet::new(),
-            packages: packages.clone(),
             call_infos: BTreeMap::new(),
             next_constraint_id: 0,
             implements: BTreeMap::new(),

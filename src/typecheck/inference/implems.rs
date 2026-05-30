@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
+    compiler::{Workspace, workspace_packages},
     name_resolve::implems::impls_in_package,
     ril::{ImplSource, ScopeOwnerId},
     typecheck::inference::{constraints::InferenceConstraintKind, implicit::ImplicitContext},
@@ -124,11 +125,15 @@ impl<'a> InferenceCtx<'a> {
         })
     }
 
+    fn get_packages(db: &dyn Db) -> Arc<Vec<Package<'_>>> {
+        workspace_packages(db, Workspace::get(db))
+    }
+
     pub fn get_potential_blocks(
         &mut self,
         ty: &InferTy,
     ) -> HashMap<ImplSource<'a>, PotentialBlockRes> {
-        self.packages
+        Self::get_packages(self.db)
             .iter()
             .copied()
             .collect::<Box<[_]>>()

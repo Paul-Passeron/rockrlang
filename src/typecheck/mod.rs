@@ -26,7 +26,7 @@ use crate::{
     },
     name_resolve::type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
     parse_tree::top_level::{AstEnumVariantKind, AstTemplateArg},
-    ril::{self, FunctionId, InternedFunctionId, Package, TypeDefId, TypeRef},
+    ril::{self, FunctionId, InternedFunctionId, TypeDefId, TypeRef},
     typecheck::inference::{
         InferTy, InferenceCtx, UnificationError, constraints::InferenceConstraintKind,
         implicit::ImplicitContext, var::InferVar,
@@ -58,7 +58,6 @@ struct TyCtx<'db> {
     function: FunctionId,
     locals: &'db [LocalInfo],
     params: &'db [LocalId],
-    packages: Arc<[Package<'db>]>,
 
     templates: Arc<[AstTemplateArg]>,
 
@@ -81,11 +80,10 @@ impl<'db> TyCtx<'db> {
         locals: &'db [LocalInfo],
         params: &'db [LocalId],
         zelf: Option<LocalId>,
-        packages: Arc<[Package<'db>]>,
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned());
         let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
-        let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params, packages.clone());
+        let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params);
 
         Self {
             db,
@@ -93,7 +91,6 @@ impl<'db> TyCtx<'db> {
             locals,
             params,
             templates,
-            packages,
             inf_ctx,
         }
     }
@@ -447,18 +444,13 @@ pub struct TypeCheckResults<'db> {
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
 
-fn type_check_hir<'db>(
-    db: &'db dyn Db,
-    hir: HirBody<'db>,
-    packages: Arc<[Package<'db>]>,
-) -> TypeCheckResults<'db> {
+fn type_check_hir<'db>(db: &'db dyn Db, hir: HirBody<'db>) -> TypeCheckResults<'db> {
     TyCtx::new(
         db,
         hir.owner(db),
         hir.locals(db),
         hir.params(db),
         hir.zelf(db),
-        packages,
     )
     .type_check(hir.stmts(db))
 }
@@ -467,7 +459,13 @@ fn type_check_hir<'db>(
 pub fn _type_check_function<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-    packages: Box<[Package<'db>]>,
 ) -> Option<TypeCheckResults<'db>> {
-    hir_body(db, function.into()).map(|hir| type_check_hir(db, hir, packages.into()))
+    hir_body(db, function.into()).map(|hir| type_check_hir(db, hir))
+}
+
+pub fn type_check_function<'db>(
+    db: &'db dyn Db,
+    function: FunctionId,
+) -> Option<TypeCheckResults<'db>> {
+    _type_check_function(db, function.interned())
 }

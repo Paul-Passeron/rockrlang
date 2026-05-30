@@ -441,9 +441,11 @@ pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> 
 }
 
 #[salsa::tracked]
-pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Vec<Package<'db>> {
-    ws.roots(db)
-        .iter()
-        .map(|root| package_of_root(db, *root))
-        .collect()
+pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Arc<Vec<Package<'db>>> {
+    Arc::new(
+        ws.roots(db)
+            .iter()
+            .map(|root| package_of_root(db, *root))
+            .collect(),
+    )
 }
