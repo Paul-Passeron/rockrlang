@@ -69,7 +69,7 @@ pub struct Package<'db> {
 }
 
 #[salsa::interned]
-pub struct InternedModuleId {
+pub struct InternedModuleId<'db> {
     pub name: Symbol,
     pub parent: Option<ModuleId>,
     pub file: Option<SourceFile>,
