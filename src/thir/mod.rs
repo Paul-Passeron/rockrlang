@@ -173,7 +173,22 @@ pub enum StmtKind {
         cond: ExprId,
         body: Vec<ThirStmt>,
     },
-    // TODO: ALl the other statements
+    Let {
+        local: LocalId,
+        init: ExprId,
+    },
+    Assign {
+        place: PlaceId,
+        rhs: ExprId,
+    },
+    Return(Option<ExprId>),
+    Break(ScopeId),
+    Continue(ScopeId),
+    Match {
+        scrutinee: ExprId,
+        branches: Vec<ThirMatchBranch>,
+    },
+    Expr(ExprId),
 }
 
 pub struct ThirPattern {
@@ -209,4 +224,10 @@ pub struct ThirScope {
 pub enum ScopeKind {
     Loop,
     Block,
+}
+
+pub struct ThirMatchBranch {
+    pub pattern: ThirPattern,
+    pub guard: ExprId,
+    pub body: Vec<ThirStmt>,
 }
