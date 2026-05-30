@@ -86,3 +86,9 @@ impl<T> Index<Idx<T>> for Arena<T> {
             .expect("Out of bound index inside an arena. This should only ever happen if you index into a different arena than the one you got the Idx from.")
     }
 }
+
+impl<T> Idx<T> {
+    pub fn get<'a>(self, arena: &'a Arena<T>) -> &'a T {
+        &arena[self]
+    }
+}
