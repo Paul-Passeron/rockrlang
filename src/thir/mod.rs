@@ -21,10 +21,10 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
-    hir::{self, Mutability, hir_body},
+    hir::{self, HirBody, Mutability, hir_body},
     parse_tree::expr::BinaryOperator,
     ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
-    typecheck::type_check_function,
+    typecheck::{TypeCheckResults, type_check_function},
 };
 use la_arena::{Arena, Idx};
 use std::sync::Arc;
@@ -245,15 +245,26 @@ impl PartialEq for ThirArc {
 }
 impl Eq for ThirArc {}
 
-pub fn thir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<ThirArc> {
-    _thir_body(db, function.interned())
+pub fn thir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<Arc<Thir>> {
+    _thir_body(db, function.interned()).map(|arc| arc.0)
 }
 
 #[salsa::tracked]
 pub fn _thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
     let f_id: FunctionId = function.into();
-    let _hir = hir_body(db, function.into())?;
-    let _hir = hir_body(db, function.into())?;
-    let _tc_results = type_check_function(db, f_id)?;
+    let hir = hir_body(db, function.into())?;
+    let tc_results = type_check_function(db, f_id)?;
+    let thir = thir_body_from_hir(db, &hir, &tc_results);
+    Some(ThirArc(Arc::new(thir)))
+}
+
+pub fn thir_body_from_hir<'db>(
+    db: &'db dyn Db,
+    hir: &'db HirBody<'db>,
+    tc_results: &'db TypeCheckResults,
+) -> Thir {
+    let _ = db;
+    let _ = hir;
+    let _ = tc_results;
     todo!()
 }
