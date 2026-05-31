@@ -15,20 +15,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::Scope};
 
 use itertools::Itertools;
 use la_arena::{Arena, Idx};
 
 use crate::{
     Db,
-    hir::{self, HirBody, HirStmt},
+    common::location::Span,
+    hir::{self, HirBody, HirExpr, HirPattern, HirStmt, HirStmtKind},
     thir::{
         ExprId, LocalId, PlaceId, ScopeId, Thir, ThirExpr, ThirLocal, ThirPlace, ThirScope,
-        ThirStmt,
+        stmt::ThirStmt,
     },
     typecheck::TypeCheckResults,
 };
+
+use super::ScopeKind;
 
 struct ThirBuilder<'db> {
     db: &'db dyn Db,
@@ -36,7 +39,6 @@ struct ThirBuilder<'db> {
     exprs: Arena<ThirExpr>,
     places: Arena<ThirPlace>,
     scopes: Arena<ThirScope>,
-    root: Vec<ThirStmt>,
     local_map: HashMap<hir::LocalId, LocalId>,
 }
 
@@ -49,7 +51,6 @@ impl<'db> ThirBuilder<'db> {
             exprs: Arena::new(),
             places: Arena::new(),
             scopes: Arena::new(),
-            root: Vec::new(),
             local_map: HashMap::new(),
         }
     }
@@ -80,11 +81,12 @@ impl<'db> ThirBuilder<'db> {
         &self.scopes[idx]
     }
 
-    pub fn stmt(&mut self, stmt: ThirStmt) {
-        self.root.push(stmt);
-    }
-
-    pub fn finalize(self, params: Vec<LocalId>, zelf: Option<LocalId>) -> Thir {
+    pub fn finalize(
+        self,
+        params: Vec<LocalId>,
+        zelf: Option<LocalId>,
+        stmts: Vec<ThirStmt>,
+    ) -> Thir {
         Thir {
             places: self.places,
             exprs: self.exprs,
@@ -92,7 +94,7 @@ impl<'db> ThirBuilder<'db> {
             scopes: self.scopes,
             params,
             zelf,
-            root: self.root,
+            root: stmts,
         }
     }
 
@@ -100,7 +102,7 @@ impl<'db> ThirBuilder<'db> {
         &mut self,
         locals: &Vec<hir::LocalInfo>,
         param: hir::LocalId,
-        tc_results: &TypeCheckResults,
+        tc_results: TypeCheckResults<'_>,
     ) -> LocalId {
         let infos = &locals[param.0 as usize];
         let local = ThirLocal {
@@ -115,32 +117,184 @@ impl<'db> ThirBuilder<'db> {
     }
 }
 
-fn handle_stmt<'db>(
-    _b: &mut ThirBuilder,
-    _hir: &'db HirBody<'db>,
-    _tc_results: &'db TypeCheckResults,
-    _stmt: &HirStmt,
-) {
-    todo!()
-}
-
 pub fn thir_body_from_hir<'db>(
     db: &'db dyn Db,
-    hir: &'db HirBody<'db>,
-    tc_results: &'db TypeCheckResults,
+    hir: HirBody<'db>,
+    tc: TypeCheckResults<'db>,
 ) -> Thir {
-    let locals = hir.locals(db);
-    let mut b = ThirBuilder::new(db);
-    let params = hir
-        .params(db)
-        .iter()
-        .map(|param| b.hir_local_to_thir(locals, *param, tc_results))
-        .collect_vec();
-    let zelf = hir
-        .zelf(db)
-        .map(|param| b.hir_local_to_thir(locals, param, tc_results));
-    hir.stmts(db)
-        .iter()
-        .for_each(|stmt| handle_stmt(&mut b, hir, tc_results, stmt));
-    b.finalize(params, zelf)
+    ThirTranslator::new(db, hir, tc).translate()
+}
+
+pub struct ThirTranslator<'db> {
+    db: &'db dyn Db,
+    hir: HirBody<'db>,
+    tc: TypeCheckResults<'db>,
+    scope_stack: Vec<ScopeId>,
+}
+
+impl<'db> ThirTranslator<'db> {
+    pub fn new(db: &'db dyn Db, hir: HirBody<'db>, tc: TypeCheckResults<'db>) -> Self {
+        Self {
+            db,
+            hir,
+            tc,
+            scope_stack: Vec::new(),
+        }
+    }
+
+    pub fn translate(mut self) -> Thir {
+        let locals = self.hir.locals(self.db);
+        let mut b = ThirBuilder::new(self.db);
+        let params = self
+            .hir
+            .params(self.db)
+            .iter()
+            .map(|param| b.hir_local_to_thir(locals, *param, self.tc))
+            .collect_vec();
+        let zelf = self
+            .hir
+            .zelf(self.db)
+            .map(|param| b.hir_local_to_thir(locals, param, self.tc));
+        let stmts = self
+            .hir
+            .stmts(self.db)
+            .iter()
+            .flat_map(|stmt| self.handle_stmt(&mut b, stmt))
+            .collect_vec();
+        b.finalize(params, zelf, stmts)
+    }
+
+    fn innermost_loop_scope(&self) -> Option<ScopeId> {
+        todo!()
+    }
+
+    fn handle_break(&self, span: Span) -> ThirStmt {
+        match self.innermost_loop_scope() {
+            Some(scope_id) => ThirStmt::brk(scope_id, span),
+            None => {
+                if self.scope_stack.is_empty() {
+                    println!("Cannot break at function top-level")
+                } else {
+                    println!("Cannot break out of non-loop block")
+                }
+                ThirStmt::error(span)
+            }
+        }
+    }
+
+    fn destructure_pattern_init(
+        &mut self,
+        b: &mut ThirBuilder,
+        pat: &HirPattern,
+        value: ExprId,
+    ) -> Vec<ThirStmt> {
+        todo!()
+    }
+
+    fn expr(&mut self, b: &mut ThirBuilder, expr: &HirExpr) -> ExprId {
+        todo!()
+    }
+
+    fn handle_block(
+        &mut self,
+        b: &mut ThirBuilder,
+        stmts: &Vec<HirStmt>,
+        span: Span,
+    ) -> Vec<ThirStmt> {
+        let scope = b.new_scope(ThirScope {
+            kind: ScopeKind::Block,
+            span,
+        });
+        self.scope_stack.push(scope);
+        todo!()
+    }
+
+    fn handle_stmt(&mut self, b: &mut ThirBuilder, stmt: &HirStmt) -> Vec<ThirStmt> {
+        match &stmt.kind {
+            HirStmtKind::Let { pattern, init, .. } => {
+                let value = self.expr(b, init);
+                self.destructure_pattern_init(b, pattern, value)
+            }
+            HirStmtKind::Match {
+                scrutinee,
+                branches,
+            } => todo!(),
+            HirStmtKind::Assign { lhs, rhs } => todo!(),
+            HirStmtKind::Expr(hir_expr) => {
+                let expr = self.expr(b, hir_expr);
+                vec![ThirStmt::expr(expr, hir_expr.span)]
+            }
+            HirStmtKind::Return(hir_expr) => {
+                let expr = hir_expr.as_ref().map(|expr| self.expr(b, expr));
+                vec![ThirStmt::ret(expr, stmt.span)]
+            }
+            HirStmtKind::If { cond, then, else_ } => vec![self.handle_if_block(
+                b,
+                cond,
+                then,
+                else_.as_ref().map(Box::as_ref),
+                stmt.span,
+            )],
+            HirStmtKind::While { cond, body } => {
+                vec![self.handle_while(b, cond, body, stmt.span)]
+            }
+            HirStmtKind::Block(hir_stmts) => self.handle_block(b, hir_stmts, stmt.span),
+            HirStmtKind::Defer(_) => todo!("error diagnostic for unimplemented defer stmts"),
+            HirStmtKind::Break => vec![self.handle_break(stmt.span)],
+        }
+    }
+
+    fn push_scope(&mut self, b: &mut ThirBuilder, kind: ScopeKind, span: Span) -> ScopeId {
+        let scope_id = b.new_scope(ThirScope { kind, span });
+        self.scope_stack.push(scope_id);
+        scope_id
+    }
+
+    fn pop_scope(&mut self, b: &mut ThirBuilder) -> Option<ScopeId> {
+        self.scope_stack.pop()
+    }
+
+    fn handle_if_block(
+        &mut self,
+        b: &mut ThirBuilder<'_>,
+        cond: &HirExpr,
+        then: &HirStmt,
+        else_: Option<&HirStmt>,
+        span: Span,
+    ) -> ThirStmt {
+        let thir_cond = self.expr(b, cond);
+        let then_scope = self.push_scope(b, ScopeKind::Block, then.span);
+        let then_stmts = self.handle_stmt(b, then);
+        let popped = self.pop_scope(b);
+        assert_eq!(Some(then_scope), popped);
+        let (else_stmts, else_scope) = match else_ {
+            Some(stmt) => {
+                let else_scope = self.push_scope(b, ScopeKind::Block, stmt.span);
+                let else_stmts = self.handle_stmt(b, stmt);
+                let popped = self.pop_scope(b);
+                assert_eq!(Some(else_scope), popped);
+                (Some(else_stmts), Some(else_scope))
+            }
+            None => (None, None),
+        };
+
+        ThirStmt::ifte(
+            thir_cond, then_stmts, then_scope, else_stmts, else_scope, span,
+        )
+    }
+
+    fn handle_while(
+        &mut self,
+        b: &mut ThirBuilder<'_>,
+        cond: &HirExpr,
+        body: &HirStmt,
+        span: Span,
+    ) -> ThirStmt {
+        let cond = self.expr(b, cond);
+        let scope = self.push_scope(b, ScopeKind::Loop, span);
+        let body = self.handle_stmt(b, body);
+        let popped = self.pop_scope(b);
+        assert_eq!(Some(scope), popped);
+        ThirStmt::whl(cond, scope, body, span)
+    }
 }

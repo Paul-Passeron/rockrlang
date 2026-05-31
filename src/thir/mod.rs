@@ -24,13 +24,14 @@ use crate::{
     hir::{self, Mutability, hir_body},
     parse_tree::expr::BinaryOperator,
     ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
-    thir::hir_to_thir::thir_body_from_hir,
+    thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };
 use la_arena::{Arena, Idx};
 use std::sync::Arc;
 
 pub mod hir_to_thir;
+pub mod stmt;
 
 pub type ExprId = Idx<ThirExpr>;
 pub type LocalId = Idx<ThirLocal>;
@@ -75,11 +76,6 @@ pub enum Projection {
 pub struct ThirExpr {
     pub kind: ExprKind,
     pub ty: TypeRef,
-    pub span: Span,
-}
-
-pub struct ThirStmt {
-    pub kind: StmtKind,
     pub span: Span,
 }
 
@@ -162,41 +158,6 @@ pub enum ThirConstructorArgs<T> {
     None,
 }
 
-pub enum StmtKind {
-    Block {
-        scope: ScopeId,
-        stmts: Vec<ThirStmt>,
-    },
-    If {
-        cond: ExprId,
-        then: Vec<ThirStmt>,
-        then_scope: ScopeId,
-        else_: Option<Vec<ThirStmt>>,
-        else_scope: Option<ScopeId>,
-    },
-    While {
-        scope: ScopeId,
-        cond: ExprId,
-        body: Vec<ThirStmt>,
-    },
-    Let {
-        local: LocalId,
-        init: ExprId,
-    },
-    Assign {
-        place: PlaceId,
-        rhs: ExprId,
-    },
-    Return(Option<ExprId>),
-    Break(ScopeId),
-    Continue(ScopeId),
-    Match {
-        scrutinee: ExprId,
-        branches: Vec<ThirMatchBranch>,
-    },
-    Expr(ExprId),
-}
-
 pub struct ThirPattern {
     pub kind: ThirPatternKind,
     pub ty: TypeRef,
@@ -256,7 +217,7 @@ pub fn thir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<Arc<Thir>
 pub fn _thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
     let f_id: FunctionId = function.into();
     let hir = hir_body(db, function.into())?;
-    let tc_results = type_check_function(db, f_id)?;
-    let thir = thir_body_from_hir(db, &hir, &tc_results);
+    let tc = type_check_function(db, f_id)?;
+    let thir = thir_body_from_hir(db, hir, tc);
     Some(ThirArc(Arc::new(thir)))
 }
