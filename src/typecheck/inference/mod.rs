@@ -45,7 +45,7 @@ use crate::{
         display::Display,
     },
     typecheck::{
-        ExprId, InferCallInfos,
+        ExprId, InferCallInfos, PatternId,
         inference::{
             canon::CanonTy,
             constraints::{InferenceConstraint, InferenceConstraintId},
@@ -99,6 +99,7 @@ pub struct InferenceCtx<'a> {
     impl_depth: usize,
 
     pub inferred_exprs: BTreeMap<ExprId, InferTy>,
+    pub inferred_patterns: BTreeMap<PatternId, InferTy>,
 
     in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
 }
@@ -167,6 +168,7 @@ impl<'db> InferenceCtx<'db> {
             ready_set: HashSet::new(),
             in_flight_impls: HashSet::new(),
             inferred_exprs: BTreeMap::new(),
+            inferred_patterns: BTreeMap::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
@@ -380,6 +382,7 @@ impl<'db> InferenceCtx<'db> {
         let old_listeners = self.listeners.clone();
         let old_ready = self.ready.clone();
         let old_exprs = self.inferred_exprs.clone();
+        let old_patterns = self.inferred_patterns.clone();
         let snapshot = self.table.snapshot();
         match f(self) {
             Ok(res) => {
@@ -391,6 +394,7 @@ impl<'db> InferenceCtx<'db> {
                 self.listeners = old_listeners;
                 self.ready = old_ready;
                 self.inferred_exprs = old_exprs;
+                self.inferred_patterns = old_patterns;
                 Err(err)
             }
         }

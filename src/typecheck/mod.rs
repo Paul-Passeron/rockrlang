@@ -67,6 +67,9 @@ struct TyCtx<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ExprId(HirId);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PatternId(pub HirId);
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TyRef {
     Inf(InferTy),
@@ -128,6 +131,15 @@ impl<'db> TyCtx<'db> {
             .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
             .collect::<BTreeMap<_, _>>();
 
+        let drain = std::mem::take(&mut self.inf_ctx.inferred_patterns)
+            .into_iter()
+            .collect::<Box<[_]>>();
+
+        let pat_types = drain
+            .into_iter()
+            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
+            .collect::<BTreeMap<_, _>>();
+
         let call_infos = self
             .inf_ctx
             .drain_call_infos()
@@ -147,7 +159,7 @@ impl<'db> TyCtx<'db> {
             })
             .collect();
 
-        TypeCheckResults::new(self.db, node_types, call_infos, locals)
+        TypeCheckResults::new(self.db, node_types, pat_types, call_infos, locals)
     }
 
     fn type_check_expr(&mut self, expr: &'db HirExpr) -> (TyRef, Option<UnificationError>) {
@@ -439,7 +451,8 @@ impl<'db> TyCtx<'db> {
 
 #[salsa::tracked]
 pub struct TypeCheckResults<'db> {
-    pub node_types: BTreeMap<ExprId, TypeRef>,
+    pub expr_types: BTreeMap<ExprId, TypeRef>,
+    pub pat_types: BTreeMap<PatternId, TypeRef>,
     pub call_infos: BTreeMap<ExprId, CallInfos>,
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
