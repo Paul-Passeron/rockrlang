@@ -116,4 +116,28 @@ impl ThirStmt {
             span,
         }
     }
+
+    pub fn mtch(scrut: ExprId, branches: Vec<ThirMatchBranch>, span: Span) -> Self {
+        Self {
+            kind: StmtKind::Match {
+                scrutinee: scrut,
+                branches,
+            },
+            span: span,
+        }
+    }
+
+    pub fn block(scope: ScopeId, stmts: Vec<Self>, span: Span) -> Self {
+        Self {
+            kind: StmtKind::Block { scope, stmts },
+            span,
+        }
+    }
+
+    pub fn assign(place: PlaceId, expr: ExprId, span: Span) -> Self {
+        Self {
+            kind: StmtKind::Assign { place, rhs: expr },
+            span,
+        }
+    }
 }

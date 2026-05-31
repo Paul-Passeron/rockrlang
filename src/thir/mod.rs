@@ -146,15 +146,15 @@ pub enum ExprKind {
     Constructor {
         enum_def: EnumRef,
         idx: usize,
-        args: ThirConstructorArgs<ThirExpr>,
+        args: ThirConstructorArgs<ExprId>,
     },
 
     Error, // Todo: Add metadata maybe
 }
 
 pub enum ThirConstructorArgs<T> {
-    Tuple(Vec<Idx<T>>),
-    Struct(Vec<(Symbol, Idx<T>)>),
+    Tuple(Vec<T>),
+    Struct(Vec<(Symbol, T)>),
     None,
 }
 
@@ -181,6 +181,8 @@ pub enum ThirPatternKind {
         args: ThirConstructorArgs<ThirPattern>,
     },
     IntLit(i64),
+
+    Error,
 }
 
 pub struct ThirScope {
@@ -195,7 +197,8 @@ pub enum ScopeKind {
 
 pub struct ThirMatchBranch {
     pub pattern: ThirPattern,
-    pub guard: ExprId,
+    pub guard: Option<ExprId>,
+    pub body_scope: ScopeId,
     pub body: Vec<ThirStmt>,
 }
 
