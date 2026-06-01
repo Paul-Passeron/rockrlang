@@ -140,4 +140,11 @@ impl ThirStmt {
             span,
         }
     }
+
+    pub fn let_(local: LocalId, value: ExprId, span: Span) -> Self {
+        Self {
+            kind: StmtKind::Let { local, init: value },
+            span,
+        }
+    }
 }

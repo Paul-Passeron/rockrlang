@@ -17,29 +17,30 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, ops::Index};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use la_arena::{Arena, Idx};
 
 use crate::{
     Db,
-    common::location::Span,
+    common::{location::Span, symbols::Symbol},
     hir::{
         self, HirBody, HirExpr, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
         HirPatternDesc, HirPlace, HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo,
         Mutability,
     },
     name_resolve::type_expr::enum_item,
-    ril::{TypeDefId, TypeRef},
+    ril::{TypeDefId, TypeId, TypeRef},
     thir::{
-        EnumRef, ExprId, LocalId, PlaceId, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
+        EnumRef, ExprId, LocalId, PlaceBase, PlaceId, Projection, ScopeId, StructRef, Thir,
+        ThirConstructorArgs, ThirExpr, ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace,
+        ThirScope, stmt::ThirStmt,
     },
     typecheck::{PatternId, TypeCheckResults},
 };
 
 use super::{ScopeKind, ThirPatternKind};
 
-struct ThirBuilder<'db> {
+pub struct ThirBuilder<'db> {
     db: &'db dyn Db,
     locals: Arena<ThirLocal>,
     exprs: Arena<ThirExpr>,
@@ -114,6 +115,27 @@ impl<'db> ThirBuilder<'db> {
         let res = self.new_local(local);
         self.local_map.insert(infos.id, res);
     }
+
+    fn with_synthetic_projection(
+        &mut self,
+        place: PlaceId,
+        proj: Projection,
+        ty: TypeRef,
+    ) -> PlaceId {
+        let mut place = self.get_place(place).clone();
+        place.projections.push(proj);
+        place.ty = ty;
+        self.new_place(place)
+    }
+
+    fn new_synthetic_local(&mut self, ty: TypeRef, mutability: Mutability, span: Span) -> LocalId {
+        self.new_local(ThirLocal {
+            ty,
+            mutability,
+            span,
+            source: None, // Synthetic local
+        })
+    }
 }
 
 pub fn thir_body_from_hir<'db>(
@@ -163,12 +185,8 @@ impl<'db> ThirTranslator<'db> {
         b.finalize(params, zelf, stmts)
     }
 
-    fn innermost_loop_scope(&self) -> Option<ScopeId> {
-        todo!()
-    }
-
-    fn handle_break(&self, span: Span) -> ThirStmt {
-        match self.innermost_loop_scope() {
+    fn handle_break(&self, b: &ThirBuilder, span: Span) -> ThirStmt {
+        match self.innermost_loop_scope(b) {
             Some(scope_id) => ThirStmt::brk(scope_id, span),
             None => {
                 if self.scope_stack.is_empty() {
@@ -228,7 +246,7 @@ impl<'db> ThirTranslator<'db> {
             }
             HirStmtKind::Block(hir_stmts) => vec![self.handle_block(b, hir_stmts, stmt.span)],
             HirStmtKind::Defer(_) => todo!("error diagnostic for unimplemented defer stmts"),
-            HirStmtKind::Break => vec![self.handle_break(stmt.span)],
+            HirStmtKind::Break => vec![self.handle_break(b, stmt.span)],
         }
     }
 
@@ -315,10 +333,6 @@ impl<'db> ThirTranslator<'db> {
         ThirStmt::mtch(scrut, branches, span)
     }
 
-    fn place(&mut self, b: &mut ThirBuilder, place: &HirPlace) -> PlaceId {
-        todo!()
-    }
-
     fn pat_args(
         &mut self,
         b: &mut ThirBuilder,
@@ -330,17 +344,7 @@ impl<'db> ThirTranslator<'db> {
                 pats.iter()
                     .map(|pat| match pat {
                         HirStructFieldPattern::Name { id, name } => {
-                            let local_id = b.local_map[id];
-                            let local = b.get_local(local_id);
-                            let new_pattern = ThirPattern {
-                                kind: ThirPatternKind::Bind {
-                                    local: local_id,
-                                    mutable: false,
-                                },
-                                ty: local.ty,
-                                span: local.span,
-                            };
-                            (*name, new_pattern)
+                            (*name, self.pattern_of_local(b, *id))
                         }
                         HirStructFieldPattern::Rebind { name, pattern } => {
                             (*name, self.pat(b, pattern))
@@ -351,6 +355,19 @@ impl<'db> ThirTranslator<'db> {
             HirPatternConstructorArgs::TupleFields(hir_patterns) => ThirConstructorArgs::Tuple(
                 hir_patterns.iter().map(|pat| self.pat(b, pat)).collect(),
             ),
+        }
+    }
+
+    fn pattern_of_local(&mut self, b: &mut ThirBuilder, id: hir::LocalId) -> ThirPattern {
+        let local_id = b.local_map[&id];
+        let local = b.get_local(local_id);
+        ThirPattern {
+            kind: ThirPatternKind::Bind {
+                local: local_id,
+                mutable: false,
+            },
+            ty: local.ty,
+            span: local.span,
         }
     }
 
@@ -370,7 +387,21 @@ impl<'db> ThirTranslator<'db> {
             HirPatternDesc::Tuple(hir_patterns) => Some(ThirPatternKind::Tuple(
                 hir_patterns.iter().map(|pat| self.pat(b, pat)).collect(),
             )),
-            HirPatternDesc::DestructureBinding { resolution, fields } => todo!(),
+            HirPatternDesc::DestructureBinding { fields, .. } => {
+                let def = ty.as_struct_ref(self.db);
+                let fields = fields
+                    .iter()
+                    .map(|(symbol, hir_pattern)| {
+                        (*symbol, {
+                            match hir_pattern.as_ref() {
+                                Either::Left(pat) => self.pat(b, pat),
+                                Either::Right(id) => self.pattern_of_local(b, *id),
+                            }
+                        })
+                    })
+                    .collect();
+                def.map(|def| ThirPatternKind::Struct { def, fields })
+            }
             HirPatternDesc::Constructor {
                 resolution,
                 name,
@@ -381,19 +412,10 @@ impl<'db> ThirTranslator<'db> {
                     .iter()
                     .position(|variant| variant.name == *name);
                 if id.is_none() {
-                    todo!("Error diagnostic for bad variant name in constructor pattern")
+                    todo!("Error diagnostic for bad variant name in constructor patt()ern")
                 }
                 let args = self.pat_args(b, fields);
-                let def = match ty {
-                    TypeRef::Concrete(type_id) => match type_id.def(self.db) {
-                        TypeDefId::Enum(enum_id) => Some(EnumRef {
-                            def: enum_id,
-                            args: type_id.args(self.db),
-                        }),
-                        _ => None,
-                    },
-                    _ => None,
-                };
+                let def = ty.as_enum_ref(self.db);
                 match (id, def) {
                     (Some(id), Some(def)) => {
                         Some(ThirPatternKind::Constructor { def, idx: id, args })
@@ -411,13 +433,97 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
+    fn innermost_loop_scope(&self, b: &ThirBuilder) -> Option<ScopeId> {
+        self.scope_stack
+            .iter()
+            .rev()
+            .find(|k| b.get_scope(**k).kind == ScopeKind::Loop)
+            .copied()
+    }
+
+    fn place(&mut self, b: &mut ThirBuilder, place: &HirPlace) -> PlaceId {
+        todo!()
+    }
+
+    fn _destructure_pattern_init(
+        &mut self,
+        b: &mut ThirBuilder,
+        pat: &HirPattern,
+        value: ExprId,
+        v: &mut Vec<ThirStmt>,
+    ) {
+        match &pat.data {
+            HirPatternDesc::Bind { id, .. } => {
+                let thir_local = b.local_map[id];
+                // Better span maybe
+                v.push(ThirStmt::let_(thir_local, value, pat.span))
+            }
+            HirPatternDesc::Any => {
+                // Just compute the expression
+                v.push(ThirStmt::expr(value, b.get_expr(value).span));
+            }
+            HirPatternDesc::Tuple(hir_patterns) => {
+                let (ty, span) = {
+                    let expr = b.get_expr(value);
+                    (expr.ty, expr.span)
+                };
+                let the_tuple_local = b.new_synthetic_local(ty, Mutability::Const, span);
+                v.push(ThirStmt::let_(the_tuple_local, value, span));
+                let the_tuple_place = b.new_place(ThirPlace::local(the_tuple_local, b, span));
+                for (idx, pat) in hir_patterns.iter().enumerate() {
+                    let ty = self.tc.pat_types(self.db)[&PatternId(pat.id)];
+                    let idx_place = b.with_synthetic_projection(
+                        the_tuple_place,
+                        Projection::TupleField(idx as u32, ty),
+                        ty,
+                    );
+                    let idx_value = b.new_expr(ThirExpr::use_place(idx_place, b, pat.span));
+                    self._destructure_pattern_init(b, pat, idx_value, v);
+                }
+            }
+            HirPatternDesc::DestructureBinding { fields, .. } => {
+                let (ty, span) = {
+                    let expr = b.get_expr(value);
+                    (expr.ty, expr.span)
+                };
+                let fresh = b.new_synthetic_local(ty, Mutability::Const, pat.span);
+                let whole_span = pat.span.start().span(span.end());
+                v.push(ThirStmt::let_(fresh, value, whole_span));
+                let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
+                let def = ty.as_struct_ref(self.db).expect("TODO: handle bad case");
+                for (name, binding) in fields {
+                    let field_ty = def.typeof_field(*name).unwrap_or(TypeRef::Error);
+                    let field_place = b.with_synthetic_projection(
+                        place,
+                        Projection::Field(*name, field_ty),
+                        field_ty,
+                    );
+                    let field_value = b.new_expr(ThirExpr::use_place(field_place, b, span));
+                    match binding {
+                        Either::Left(pat) => {
+                            self._destructure_pattern_init(b, pat, field_value, v);
+                        }
+                        Either::Right(local) => {
+                            let thir_local = b.local_map[local];
+                            v.push(ThirStmt::let_(thir_local, field_value, whole_span));
+                        }
+                    }
+                }
+            }
+            HirPatternDesc::Constructor { .. } => todo!("Invalid lhs pattern"),
+            HirPatternDesc::IntLit(_) => todo!("Invalid lhs pattern"),
+        }
+    }
+
     fn destructure_pattern_init(
         &mut self,
         b: &mut ThirBuilder,
         pat: &HirPattern,
         value: ExprId,
     ) -> Vec<ThirStmt> {
-        todo!()
+        let mut v = vec![];
+        self._destructure_pattern_init(b, pat, value, &mut v);
+        v
     }
 
     fn expr(&mut self, b: &mut ThirBuilder, expr: &HirExpr) -> ExprId {
@@ -436,5 +542,54 @@ impl<'db> ThirTranslator<'db> {
         let popped = self.pop_scope();
         assert_eq!(Some(scope), popped);
         (scope, res)
+    }
+}
+
+impl TypeRef {
+    pub fn as_type_id(&self) -> Option<TypeId> {
+        match self {
+            TypeRef::Concrete(type_id) => Some(*type_id),
+            _ => None,
+        }
+    }
+
+    pub fn as_struct_ref(&self, db: &dyn Db) -> Option<StructRef> {
+        let type_id = self.as_type_id()?;
+        match type_id.def(db) {
+            TypeDefId::Struct(struct_id) => Some(StructRef {
+                def: struct_id,
+                args: type_id.args(db),
+            }),
+            _ => None,
+        }
+    }
+
+    pub fn as_enum_ref(&self, db: &dyn Db) -> Option<EnumRef> {
+        let type_id = self.as_type_id()?;
+        match type_id.def(db) {
+            TypeDefId::Enum(enum_id) => Some(EnumRef {
+                def: enum_id,
+                args: type_id.args(db),
+            }),
+            _ => None,
+        }
+    }
+}
+
+impl ThirPlace {
+    pub fn local(local: LocalId, b: &ThirBuilder, span: Span) -> Self {
+        let ty = b.get_local(local).ty;
+        Self {
+            base: PlaceBase::Local(local),
+            projections: vec![],
+            ty,
+            span: span,
+        }
+    }
+}
+
+impl StructRef {
+    pub fn typeof_field(&self, field: Symbol) -> Option<TypeRef> {
+        todo!()
     }
 }

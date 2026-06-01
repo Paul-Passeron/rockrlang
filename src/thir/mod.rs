@@ -30,6 +30,7 @@ use crate::{
 use la_arena::{Arena, Idx};
 use std::sync::Arc;
 
+pub mod expr;
 pub mod hir_to_thir;
 pub mod stmt;
 
@@ -55,10 +56,12 @@ pub struct ThirLocal {
     pub source: Option<(hir::LocalId, Symbol)>,
 }
 
+#[derive(Clone)]
 pub enum PlaceBase {
     Local(LocalId),
 }
 
+#[derive(Clone)]
 pub struct ThirPlace {
     pub base: PlaceBase,
     pub projections: Vec<Projection>,
@@ -66,6 +69,7 @@ pub struct ThirPlace {
     pub span: Span,
 }
 
+#[derive(Clone)]
 pub enum Projection {
     Deref,
     Field(Symbol, TypeRef),
@@ -190,6 +194,7 @@ pub struct ThirScope {
     pub span: Span,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum ScopeKind {
     Loop,
     Block,
