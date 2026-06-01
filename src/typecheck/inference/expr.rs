@@ -25,7 +25,7 @@ use itertools::Itertools;
 use crate::{
     common::{location::Span, symbols::Symbol},
     hir::{
-        FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, LocalId,
+        FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, HirPlaceKind, LocalId,
         PartialTypeArg, PartialTypeRef, function_ast,
     },
     name_resolve::type_expr::{
@@ -37,7 +37,7 @@ use crate::{
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
-        ExprId,
+        ExprId, PlaceId,
         inference::{implicit::ImplicitContext, var::InferVar},
     },
 };
@@ -115,33 +115,35 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn _infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
-        match place {
-            HirPlace::Local(local_id) => Ok(self.infer_local(*local_id)),
-            HirPlace::Field { base, field } => {
+        let val = match &place.kind {
+            HirPlaceKind::Local(local_id) => Ok(self.infer_local(*local_id)),
+            HirPlaceKind::Field { base, field } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_struct_field_constraint(base_ty, *field);
                 Ok(InferTy::Var(elem_var))
             }
-            HirPlace::TupleField { base, index } => {
+            HirPlaceKind::TupleField { base, index } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_tuple_constraint(base_ty, *index);
                 Ok(InferTy::Var(elem_var))
             }
-            HirPlace::Deref(hir_place) => {
+            HirPlaceKind::Deref(hir_place) => {
                 let ptr_ty = self.infer_place(hir_place)?;
                 let pointee_var = self.fresh_var();
                 let ptr_var = self.emit_deref_constraint(InferTy::Var(pointee_var));
                 self.unify(InferTy::Var(ptr_var), ptr_ty)?;
                 Ok(InferTy::Var(pointee_var))
             }
-            HirPlace::Index { base, index } => {
+            HirPlaceKind::Index { base, index } => {
                 let index_ty = self.infer_expr(index)?;
                 let base_ty = self.infer_place(base)?;
                 let element_var = self.emit_indexed_by_constraint(base_ty, index_ty);
                 Ok(InferTy::Var(element_var))
             }
-            HirPlace::Temporary(hir_expr) => self.infer_expr(hir_expr),
-        }
+            HirPlaceKind::Temporary(hir_expr) => self.infer_expr(hir_expr),
+        }?;
+        self.inferred_places.insert(PlaceId(place.id), val.clone());
+        Ok(val)
     }
 
     pub fn infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {

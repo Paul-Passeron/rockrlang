@@ -156,6 +156,11 @@ pub enum ExprKind {
     Error, // Todo: Add metadata maybe
 }
 
+pub struct ThirExprWithSetup {
+    pub stmts: Vec<ThirStmt>,
+    pub expr: ExprId,
+}
+
 pub enum ThirConstructorArgs<T> {
     Tuple(Vec<T>),
     Struct(Vec<(Symbol, T)>),
@@ -202,7 +207,7 @@ pub enum ScopeKind {
 
 pub struct ThirMatchBranch {
     pub pattern: ThirPattern,
-    pub guard: Option<ExprId>,
+    pub guard: Option<ThirExprWithSetup>,
     pub body_scope: ScopeId,
     pub body: Vec<ThirStmt>,
 }

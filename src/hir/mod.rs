@@ -102,7 +102,14 @@ pub enum HirPatternDesc {
 pub struct LocalId(pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum HirPlace {
+pub struct HirPlace {
+    pub id: HirId,
+    pub kind: HirPlaceKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HirPlaceKind {
     Local(LocalId),
     Field {
         base: Box<HirPlace>,

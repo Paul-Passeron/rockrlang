@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirMatchBranch},
+    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
 };
 
 pub struct ThirStmt {
@@ -31,7 +31,7 @@ pub enum StmtKind {
         stmts: Vec<ThirStmt>,
     },
     If {
-        cond: ExprId,
+        cond: ThirExprWithSetup,
         then: Vec<ThirStmt>,
         then_scope: ScopeId,
         else_: Option<Vec<ThirStmt>>,
@@ -39,7 +39,7 @@ pub enum StmtKind {
     },
     While {
         scope: ScopeId,
-        cond: ExprId,
+        cond: ThirExprWithSetup,
         body: Vec<ThirStmt>,
     },
     Let {
@@ -54,7 +54,7 @@ pub enum StmtKind {
     Break(ScopeId),
     Continue(ScopeId),
     Match {
-        scrutinee: ExprId,
+        scrutinee: ThirExprWithSetup,
         branches: Vec<ThirMatchBranch>,
     },
     Expr(ExprId),
@@ -77,7 +77,7 @@ impl ThirStmt {
     }
 
     pub fn ifte(
-        cond: ExprId,
+        cond: ThirExprWithSetup,
         then: Vec<ThirStmt>,
         then_scope: ScopeId,
         else_: Option<Vec<ThirStmt>>,
@@ -103,7 +103,7 @@ impl ThirStmt {
         }
     }
 
-    pub fn whl(cond: ExprId, scope: ScopeId, body: Vec<Self>, span: Span) -> Self {
+    pub fn whl(cond: ThirExprWithSetup, scope: ScopeId, body: Vec<Self>, span: Span) -> Self {
         Self {
             kind: StmtKind::While { scope, cond, body },
             span,
@@ -117,7 +117,7 @@ impl ThirStmt {
         }
     }
 
-    pub fn mtch(scrut: ExprId, branches: Vec<ThirMatchBranch>, span: Span) -> Self {
+    pub fn mtch(scrut: ThirExprWithSetup, branches: Vec<ThirMatchBranch>, span: Span) -> Self {
         Self {
             kind: StmtKind::Match {
                 scrutinee: scrut,

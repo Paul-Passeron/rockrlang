@@ -45,7 +45,7 @@ use crate::{
         display::Display,
     },
     typecheck::{
-        ExprId, InferCallInfos, PatternId,
+        ExprId, InferCallInfos, PatternId, PlaceId,
         inference::{
             canon::CanonTy,
             constraints::{InferenceConstraint, InferenceConstraintId},
@@ -100,6 +100,7 @@ pub struct InferenceCtx<'a> {
 
     pub inferred_exprs: BTreeMap<ExprId, InferTy>,
     pub inferred_patterns: BTreeMap<PatternId, InferTy>,
+    pub inferred_places: BTreeMap<PlaceId, InferTy>,
 
     in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
 }
@@ -169,6 +170,7 @@ impl<'db> InferenceCtx<'db> {
             in_flight_impls: HashSet::new(),
             inferred_exprs: BTreeMap::new(),
             inferred_patterns: BTreeMap::new(),
+            inferred_places: BTreeMap::new(),
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);

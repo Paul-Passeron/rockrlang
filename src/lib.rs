@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![feature(option_into_flat_iter)]
+#![feature(option_into_flat_iter, vec_try_remove)]
 
 use std::path::Path;
 use std::process::ExitCode;

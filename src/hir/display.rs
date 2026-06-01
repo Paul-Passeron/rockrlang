@@ -22,8 +22,8 @@ use crate::{
     common::symbols::{StrLit, Symbol},
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern, HirPatternConstructorArgs,
-        HirPatternDesc, HirPlace, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
-        PartialTypeArg, PartialTypeRef,
+        HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
+        Mutability, PartialTypeArg, PartialTypeRef,
     },
     parse_tree::expr::BinaryOperator,
     ril::{TypeDefId, display::Display},
@@ -289,27 +289,27 @@ fn write_pattern(
 }
 
 fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
-    match place {
-        HirPlace::Local(id) => write!(f, "_{}", id.0),
-        HirPlace::Field { base, field } => {
+    match &place.kind {
+        HirPlaceKind::Local(id) => write!(f, "_{}", id.0),
+        HirPlaceKind::Field { base, field } => {
             write_place(f, base, db)?;
             write!(f, ".{}", field.display(db))
         }
-        HirPlace::TupleField { base, index } => {
+        HirPlaceKind::TupleField { base, index } => {
             write_place(f, base, db)?;
             write!(f, ".{}", index)
         }
-        HirPlace::Deref(base) => {
+        HirPlaceKind::Deref(base) => {
             write!(f, "*")?;
             write_place(f, base, db)
         }
-        HirPlace::Index { base, index } => {
+        HirPlaceKind::Index { base, index } => {
             write_place(f, base, db)?;
             write!(f, "[")?;
             write_expr(f, index, db)?;
             write!(f, "]")
         }
-        HirPlace::Temporary(expr) => {
+        HirPlaceKind::Temporary(expr) => {
             write!(f, "<tmp:")?;
             write_expr(f, expr, db)?;
             write!(f, ">")

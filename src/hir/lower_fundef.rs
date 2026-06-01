@@ -24,7 +24,7 @@ use crate::{
     common::{location::Span, symbols::Symbol},
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc, HirMatchBranch, HirPattern,
-        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirStmt, HirStmtKind,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind,
         HirStructFieldPattern, LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef,
     },
     name_resolve::{
@@ -127,7 +127,11 @@ impl<'db> LowerFundef<'db> {
         match &expr.data {
             AstExprDesc::Name(symbol) => {
                 if let Some(id) = scope.map.get(symbol) {
-                    HirPlace::Local(*id)
+                    HirPlace {
+                        id: self.alloc.next(),
+                        kind: super::HirPlaceKind::Local(*id),
+                        span: expr.span,
+                    }
                 } else {
                     todo!(
                         "expr_as_place: Name `{}` not found in local scope",
@@ -140,38 +144,60 @@ impl<'db> LowerFundef<'db> {
                     Some(Definition::Module(inner)) => self.expr_as_place(to, scope, inner),
                     _ => {
                         let temp = self.lower_expr(expr, scope, module);
-                        HirPlace::Temporary(Box::new(temp))
+                        HirPlace {
+                            id: self.alloc.next(),
+                            kind: HirPlaceKind::Temporary(Box::new(temp)),
+                            span: expr.span,
+                        }
                     }
                 }
             }
-            AstExprDesc::PostfixDeref(inner) => {
-                HirPlace::Deref(Box::new(self.expr_as_place(inner, scope, module)))
-            }
+            AstExprDesc::PostfixDeref(inner) => HirPlace {
+                id: self.alloc.next(),
+                kind: HirPlaceKind::Deref(Box::new(self.expr_as_place(inner, scope, module))),
+                span: expr.span,
+            },
             AstExprDesc::FieldAccess { object, field } => {
                 let base = self.expr_as_place(object, scope, module);
-                HirPlace::Field {
-                    base: Box::new(base),
-                    field: *field,
+                HirPlace {
+                    id: self.alloc.next(),
+                    kind: HirPlaceKind::Field {
+                        base: Box::new(base),
+                        field: *field,
+                    },
+                    span: expr.span,
                 }
             }
             AstExprDesc::TupleAccess { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
-                HirPlace::TupleField {
-                    base: Box::new(base),
-                    index: *index,
+                HirPlace {
+                    id: self.alloc.next(),
+                    kind: HirPlaceKind::TupleField {
+                        base: Box::new(base),
+                        index: *index,
+                    },
+                    span: expr.span,
                 }
             }
             AstExprDesc::Index { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
                 let index = self.lower_expr(index, scope, self.module);
-                HirPlace::Index {
-                    base: Box::new(base),
-                    index: Box::new(index),
+                HirPlace {
+                    id: self.alloc.next(),
+                    kind: HirPlaceKind::Index {
+                        base: Box::new(base),
+                        index: Box::new(index),
+                    },
+                    span: expr.span,
                 }
             }
             _ => {
                 let temp = self.lower_expr(expr, scope, module);
-                HirPlace::Temporary(Box::new(temp))
+                HirPlace {
+                    id: self.alloc.next(),
+                    kind: HirPlaceKind::Temporary(Box::new(temp)),
+                    span: expr.span,
+                }
             }
         }
     }
@@ -343,9 +369,20 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
-    fn lower_name(&mut self, symbol: Symbol, scope: &Scope, module: ModuleId) -> HirExprDesc {
+    fn lower_name(
+        &mut self,
+        symbol: Symbol,
+        span: Span,
+        scope: &Scope,
+        module: ModuleId,
+    ) -> HirExprDesc {
         if let Some(id) = scope.map.get(&symbol) {
-            HirExprDesc::Use(HirPlace::Local(*id))
+            let place = HirPlace {
+                id: self.alloc.next(),
+                kind: HirPlaceKind::Local(*id),
+                span,
+            };
+            HirExprDesc::Use(place)
         } else {
             match resolve_in_module(self.db, symbol.interned(), module.interned()) {
                 Some(Definition::Function(_)) => {
@@ -489,7 +526,7 @@ impl<'db> LowerFundef<'db> {
                                 args: args.iter().cloned().collect(),
                             },
                             vec![],
-                            span.clone(),
+                            span,
                         )),
                     },
                     vec![],
@@ -654,7 +691,7 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::StrLit(strlit) => HirExprDesc::StrLit(*strlit),
             AstExprDesc::CStrLit(strlit) => HirExprDesc::CStrLit(*strlit),
             AstExprDesc::BoolLit(boollit) => HirExprDesc::BoolLit(*boollit),
-            AstExprDesc::Name(symbol) => self.lower_name(*symbol, scope, module),
+            AstExprDesc::Name(symbol) => self.lower_name(*symbol, expr.span, scope, module),
             AstExprDesc::NameResolved { from, to } => {
                 self.lower_name_resolved(*from, to, scope, module)
             }
@@ -674,7 +711,7 @@ impl<'db> LowerFundef<'db> {
                 mutability: Mutability::Const, // TODO: mut address-of
             },
             AstExprDesc::Call { callee, args } => {
-                self.lower_call(callee, args, scope, module, expr.span.clone())
+                self.lower_call(callee, args, scope, module, expr.span)
             }
             AstExprDesc::MethodCall {
                 object,
@@ -702,7 +739,7 @@ impl<'db> LowerFundef<'db> {
         HirExpr {
             id: self.alloc.next(),
             data,
-            span: expr.span.clone(),
+            span: expr.span,
         }
     }
 
@@ -873,13 +910,8 @@ impl<'db> LowerFundef<'db> {
             match &pat.data {
                 AstPatternDesc::Named(ast) => match ast {
                     AstNamedPattern::Mut { name } => {
-                        let local_id = this.allocate_local(
-                            scope,
-                            *name,
-                            Mutability::Mutable,
-                            None,
-                            pat.span.clone(),
-                        );
+                        let local_id =
+                            this.allocate_local(scope, *name, Mutability::Mutable, None, pat.span);
                         locals.push(local_id);
                         HirPattern {
                             id: this.alloc.next(),
@@ -888,7 +920,7 @@ impl<'db> LowerFundef<'db> {
                                 name: *name,
                                 mutable: true,
                             },
-                            span: pat.span.clone(),
+                            span: pat.span,
                         }
                     }
                     AstNamedPattern::Constructor { name, args } => {
@@ -907,7 +939,7 @@ impl<'db> LowerFundef<'db> {
                                     *name,
                                     Mutability::Const,
                                     None,
-                                    pat.span.clone(),
+                                    pat.span,
                                 );
                                 locals.push(local_id);
                                 HirPattern {
@@ -917,7 +949,7 @@ impl<'db> LowerFundef<'db> {
                                         name: *name,
                                         mutable: false,
                                     },
-                                    span: pat.span.clone(),
+                                    span: pat.span,
                                 }
                             }
                             (_, _) => {
@@ -934,14 +966,14 @@ impl<'db> LowerFundef<'db> {
                                 let inner_pat = AstPattern::new(
                                     AstPatternDesc::Named(*to.clone()),
                                     vec![],
-                                    pat.span.clone(),
+                                    pat.span,
                                 );
                                 _lower(this, &inner_pat, scope, locals, id)
                             }
                             Some(Definition::Type(TypeDefId::Enum(resolution))) => {
                                 let (name, fields) = this.lower_pattern_as_constructor_args(
                                     to.as_ref(),
-                                    pat.span.clone(),
+                                    pat.span,
                                     scope,
                                     locals,
                                 );
@@ -953,7 +985,7 @@ impl<'db> LowerFundef<'db> {
                                         name,
                                         fields,
                                     },
-                                    span: pat.span.clone(),
+                                    span: pat.span,
                                 }
                             }
                             Some(_) => todo!(
@@ -974,18 +1006,18 @@ impl<'db> LowerFundef<'db> {
                                 .map(|x| _lower(this, x, scope, locals, this.module))
                                 .collect(),
                         ),
-                        span: pat.span.clone(),
+                        span: pat.span,
                     },
                 },
                 AstPatternDesc::Any => HirPattern {
                     id: this.alloc.next(),
                     data: HirPatternDesc::Any,
-                    span: pat.span.clone(),
+                    span: pat.span,
                 },
                 AstPatternDesc::IntLiteral(x) => HirPattern {
                     id: this.alloc.next(),
                     data: HirPatternDesc::IntLit(*x),
-                    span: pat.span.clone(),
+                    span: pat.span,
                 },
             }
         }
@@ -1071,7 +1103,7 @@ impl<'db> LowerFundef<'db> {
                             op: binop,
                             rhs: Box::new(rhs_expr),
                         },
-                        span: stmt.span.clone(),
+                        span: stmt.span,
                     };
                     HirStmtKind::Assign {
                         lhs: place,
@@ -1115,7 +1147,7 @@ impl<'db> LowerFundef<'db> {
                 }
                 AstStmtDesc::Break => HirStmtKind::Break,
             },
-            span: stmt.span.clone(),
+            span: stmt.span,
         }
     }
 
@@ -1136,7 +1168,7 @@ impl<'db> LowerFundef<'db> {
         //     }
         // }
 
-        let iterator_span = iterator.span.clone();
+        let iterator_span = iterator.span;
         let iter_interface = core_iter_interface(self.db);
         let into_iter_interface = core_into_iterator_interface(self.db);
         let iterator_candidate = self.lower_expr(iterator, scope, self.module);
@@ -1148,7 +1180,7 @@ impl<'db> LowerFundef<'db> {
                 args: vec![],
                 interface_hint: Some(into_iter_interface),
             },
-            span: iterator_span.clone(),
+            span: iterator_span,
         };
         let iterator_id = LocalId(self.next_local_id);
         self.next_local_id += 1;
@@ -1160,7 +1192,7 @@ impl<'db> LowerFundef<'db> {
                 name: iterator_var_name,
                 mutability: Mutability::Mutable,
                 ty_annotation: None,
-                span: iterator_span.clone(),
+                span: iterator_span,
             },
         );
         let mut stmts = vec![];
@@ -1174,28 +1206,32 @@ impl<'db> LowerFundef<'db> {
                         name: iterator_var_name,
                         mutable: true,
                     },
-                    span: iterator_span.clone(),
+                    span: iterator_span,
                 },
                 locals: vec![iterator_id],
                 ty_annotation: None,
                 init: iterator,
             },
-            span: iterator_span.clone(),
+            span: iterator_span,
         });
-
+        let iterator_place = HirPlace {
+            id: self.alloc.next(),
+            kind: HirPlaceKind::Local(iterator_id),
+            span: iterator_span,
+        };
         let next_expr = HirExpr {
             id: self.alloc.next(),
             data: HirExprDesc::CallMethod {
                 receiver: Box::new(HirExpr {
                     id: self.alloc.next(),
-                    data: HirExprDesc::Use(HirPlace::Local(iterator_id)),
-                    span: iterator_span.clone(),
+                    data: HirExprDesc::Use(iterator_place),
+                    span: iterator_span,
                 }),
                 method: Symbol::new(self.db, "next"),
                 args: vec![],
                 interface_hint: Some(iter_interface),
             },
-            span: iterator_span.clone(),
+            span: iterator_span,
         };
 
         let mut iterator_scope = scope.clone();
@@ -1211,7 +1247,7 @@ impl<'db> LowerFundef<'db> {
                 name: Symbol::new(self.db, "Some"),
                 fields: HirPatternConstructorArgs::TupleFields(vec![lowered_pat]),
             },
-            span: element.span.clone(),
+            span: element.span,
         };
 
         stmts.push(HirStmt {
@@ -1220,7 +1256,7 @@ impl<'db> LowerFundef<'db> {
                 cond: HirExpr {
                     id: self.alloc.next(),
                     data: HirExprDesc::BoolLit(true),
-                    span: iterator_span.clone(),
+                    span: iterator_span,
                 },
                 body: Box::new(HirStmt {
                     id: self.alloc.next(),
@@ -1237,22 +1273,22 @@ impl<'db> LowerFundef<'db> {
                                 pattern: HirPattern {
                                     id: self.alloc.next(),
                                     data: HirPatternDesc::Any,
-                                    span: element.span.clone(),
+                                    span: element.span,
                                 },
                                 locals: vec![],
                                 guard: None,
                                 body: Box::new(HirStmt {
                                     id: self.alloc.next(),
                                     kind: HirStmtKind::Break,
-                                    span: element.span.clone(),
+                                    span: element.span,
                                 }),
                             },
                         ],
                     },
-                    span: body.span.clone(),
+                    span: body.span,
                 }),
             },
-            span: body.span.clone(),
+            span: body.span,
         });
 
         HirStmtKind::Block(stmts)
@@ -1266,7 +1302,7 @@ impl<'db> LowerFundef<'db> {
                     arg.name,
                     Mutability::Const, // TODO: be able to change that
                     Some(arg.ty.clone().into()),
-                    arg.span.clone(),
+                    arg.span,
                 )
             })
             .collect()
@@ -1311,7 +1347,7 @@ impl<'db> LowerFundef<'db> {
                 Symbol::new(self.db, "self"),
                 mutability,
                 None,
-                span.clone(),
+                *span,
             ));
         }
         let params = self.collect_args(&ast.data.args, &mut s);
@@ -1372,7 +1408,7 @@ impl<'db> LowerFundef<'db> {
                                         *symbol,
                                         Mutability::Const,
                                         None,
-                                        span.clone(),
+                                        span,
                                     );
                                     locals.push(new_local);
                                     HirStructFieldPattern::Name {

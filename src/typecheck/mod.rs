@@ -70,6 +70,9 @@ pub struct ExprId(HirId);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PatternId(pub HirId);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PlaceId(pub HirId);
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TyRef {
     Inf(InferTy),
@@ -134,8 +137,15 @@ impl<'db> TyCtx<'db> {
         let drain = std::mem::take(&mut self.inf_ctx.inferred_patterns)
             .into_iter()
             .collect::<Box<[_]>>();
-
         let pat_types = drain
+            .into_iter()
+            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
+            .collect::<BTreeMap<_, _>>();
+
+        let drain = std::mem::take(&mut self.inf_ctx.inferred_places)
+            .into_iter()
+            .collect::<Box<[_]>>();
+        let place_types = drain
             .into_iter()
             .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
             .collect::<BTreeMap<_, _>>();
@@ -159,7 +169,14 @@ impl<'db> TyCtx<'db> {
             })
             .collect();
 
-        TypeCheckResults::new(self.db, node_types, pat_types, call_infos, locals)
+        TypeCheckResults::new(
+            self.db,
+            node_types,
+            pat_types,
+            place_types,
+            call_infos,
+            locals,
+        )
     }
 
     fn type_check_expr(&mut self, expr: &'db HirExpr) -> (TyRef, Option<UnificationError>) {
@@ -453,6 +470,7 @@ impl<'db> TyCtx<'db> {
 pub struct TypeCheckResults<'db> {
     pub expr_types: BTreeMap<ExprId, TypeRef>,
     pub pat_types: BTreeMap<PatternId, TypeRef>,
+    pub place_types: BTreeMap<PlaceId, TypeRef>,
     pub call_infos: BTreeMap<ExprId, CallInfos>,
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
