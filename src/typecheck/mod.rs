@@ -65,7 +65,7 @@ struct TyCtx<'db> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ExprId(HirId);
+pub struct ExprId(pub HirId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PatternId(pub HirId);

@@ -145,7 +145,7 @@ pub enum ExprKind {
 
     Tuple(Vec<ExprId>),
     SliceLit(Vec<ExprId>),
-    Sizeof(TypeRef),
+    SizeOf(TypeRef),
 
     Constructor {
         enum_def: EnumRef,

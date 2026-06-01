@@ -24,18 +24,18 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::{
-        self, HirBody, HirExpr, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
+        self, HirBody, HirExpr, HirExprDesc, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
         HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
-        LocalInfo, Mutability,
+        LocalInfo, Mutability, PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
     ril::{BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{
-        EnumRef, ExprId, LocalId, PlaceBase, PlaceId, Projection, ScopeId, StructRef, Thir,
-        ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirLocal, ThirMatchBranch, ThirPattern,
-        ThirPlace, ThirScope, stmt::ThirStmt,
+        EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection, ScopeId, StructRef,
+        Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirLocal, ThirMatchBranch,
+        ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
     },
-    typecheck::{PatternId, TypeCheckResults, inference::implicit::AstImplicitContext},
+    typecheck::{self, PatternId, TypeCheckResults, inference::implicit::AstImplicitContext},
 };
 
 use super::{ScopeKind, ThirPatternKind};
@@ -548,7 +548,79 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn expr(&mut self, b: &mut ThirBuilder, expr: &HirExpr, stmts: &mut Vec<ThirStmt>) -> ExprId {
-        todo!()
+        let ty = self.tc.expr_types(self.db)[&typecheck::ExprId(expr.id)];
+        let kind = match &expr.data {
+            HirExprDesc::IntLit(x) => ExprKind::IntLit(*x),
+            HirExprDesc::CharLit(x) => ExprKind::Charlit(*x),
+            HirExprDesc::StrLit(str_lit) => ExprKind::StrLit(*str_lit),
+            HirExprDesc::CStrLit(str_lit) => ExprKind::CStrLit(*str_lit),
+            HirExprDesc::BoolLit(b) => ExprKind::BoolLit(*b),
+            HirExprDesc::Use(hir_place) => {
+                let place = self.place(b, hir_place, stmts);
+                ExprKind::Use(place)
+            }
+            HirExprDesc::AddressOf { place, mutability } => {
+                let place = self.place(b, place, stmts);
+                ExprKind::AddressOf {
+                    place,
+                    mutability: *mutability,
+                }
+            }
+            HirExprDesc::Ref { place, mutability } => {
+                let place = self.place(b, place, stmts);
+                ExprKind::Ref {
+                    place,
+                    mutability: *mutability,
+                }
+            }
+            HirExprDesc::CallDirect { target, args } => todo!(),
+            HirExprDesc::UnresolvedCallDirect { .. } => ExprKind::Error,
+            HirExprDesc::CallMethod {
+                receiver,
+                method,
+                args,
+                interface_hint,
+            } => todo!(),
+            HirExprDesc::CallStatic { ty, method, args } => todo!(),
+            HirExprDesc::BinOp { lhs, op, rhs } => todo!(),
+            HirExprDesc::StructLit { ty, fields } => todo!(),
+            HirExprDesc::Neg(hir_expr) => {
+                let operand = self.expr(b, hir_expr, stmts);
+                ExprKind::Neg(operand)
+            }
+            HirExprDesc::Not(hir_expr) => {
+                let operand = self.expr(b, hir_expr, stmts);
+                ExprKind::Not(operand)
+            }
+            HirExprDesc::Tuple(hir_exprs) => {
+                let fields = hir_exprs
+                    .iter()
+                    .map(|e| self.expr(b, e, stmts))
+                    .collect_vec();
+                ExprKind::Tuple(fields)
+            }
+            HirExprDesc::SliceLit(hir_exprs) => {
+                let exprs = hir_exprs
+                    .iter()
+                    .map(|e| self.expr(b, e, stmts))
+                    .collect_vec();
+                ExprKind::SliceLit(exprs)
+            }
+            HirExprDesc::SizeOf(partial_type_ref) => {
+                ExprKind::SizeOf(partial_type_ref.plugged_by_unknown(self.db))
+            }
+            HirExprDesc::Constructor {
+                enum_def,
+                name,
+                args,
+                template_hints,
+            } => todo!(),
+        };
+        b.new_expr(ThirExpr {
+            kind,
+            ty,
+            span: expr.span,
+        })
     }
 
     fn expr_with_setup(&mut self, b: &mut ThirBuilder, expr: &HirExpr) -> ThirExprWithSetup {
@@ -726,5 +798,24 @@ impl StructRef {
                 .unwrap();
         let value = ctx.resolve(db, &found.ty.data)?;
         value.with_substitution(db, &self.args)
+    }
+}
+
+impl PartialTypeRef {
+    pub fn plugged_by_unknown(&self, db: &dyn Db) -> TypeRef {
+        match self {
+            PartialTypeRef::Resolved(type_ref) => *type_ref,
+            PartialTypeRef::WithHoles { def, args } => TypeRef::Concrete(TypeId::new(
+                db,
+                *def,
+                args.iter()
+                    .map(|arg| match arg {
+                        hir::PartialTypeArg::Known(type_ref) => *type_ref,
+                        hir::PartialTypeArg::Partial(partial) => partial.plugged_by_unknown(db),
+                        hir::PartialTypeArg::Infer => TypeRef::Unknown,
+                    })
+                    .collect(),
+            )),
+        }
     }
 }
