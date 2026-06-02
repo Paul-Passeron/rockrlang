@@ -4,7 +4,6 @@ struct str {
 }
 
 impl str {
-    @[inline]
     fun from_cstr(data: *char): Self {
         let mut len: usize = 0;
         while data[len] != 0 {
@@ -16,22 +15,18 @@ impl str {
         };
     }
 
-    @[inline]
     fun as_ptr(&self): *char {
         return self$.data;
     }
 
-    @[inline]
     fun len(&self): usize {
         return self$.len;
     }
 
-    @[inline]
     fun println(&self): void {
         printf(c"%s\n", self.data);
     }
 
-    @[inline]
     fun print(&self): void {
         printf(c"%s", self.data);
     }
