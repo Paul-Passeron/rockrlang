@@ -234,3 +234,5 @@ pub fn _thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Op
     let thir = thir_body_from_hir(db, hir, tc);
     Some(ThirArc(Arc::new(thir)))
 }
+
+// TODO: I think during type inference etc, we should keep track of exprs substitutions ExprId -> ExprId (e.g. for automatic dereferences, `ref.field` becomes `(*ref).field`) and compute the actual HIR applying all the necessary substitutions.

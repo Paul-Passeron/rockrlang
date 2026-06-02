@@ -17,12 +17,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use salsa::Accumulator;
 
-use crate::{Db, check::Diag, hir::hir_body, ril::FunctionId};
+use crate::{Db, check::Diag, ril::FunctionId, thir::thir_body};
 
 pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) {
     let span = fdef.span(db);
-    if let Some(hir) = hir_body(db, fdef) {
-        println!("{}", hir.display(db));
+    let thir = thir_body(db, fdef);
+    if let Some(_) = thir {
+        Diag::todo("Check the thir output".into(), span).accumulate(db);
+    } else {
+        Diag::todo("Check something else I guess".into(), span).accumulate(db);
     }
-    Diag::todo("implement check_fundef".into(), span).accumulate(db);
 }
