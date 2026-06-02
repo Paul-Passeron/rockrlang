@@ -37,7 +37,7 @@ use crate::{
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
-        ExprId, PlaceId,
+        ExprId, InferCallInfos, PlaceId,
         inference::{implicit::ImplicitContext, var::InferVar},
     },
 };
@@ -57,7 +57,9 @@ impl<'db> InferenceCtx<'db> {
                 let place_ty = self.infer_place(place)?;
                 Ok(self.some_ptr_to(place_ty))
             }
-            HirExprDesc::CallDirect { target, args } => self.infer_direct(*target, args),
+            HirExprDesc::CallDirect { target, args } => {
+                self.infer_direct(ExprId(expr.id), *target, args)
+            }
             HirExprDesc::CallMethod {
                 receiver,
                 method,
@@ -570,6 +572,7 @@ impl<'db> InferenceCtx<'db> {
 
     fn infer_direct(
         &mut self,
+        id: ExprId,
         target: FunctionId,
         args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
@@ -597,6 +600,16 @@ impl<'db> InferenceCtx<'db> {
             .into_iter()
             .zip(inferred_args)
             .try_for_each(|(a, b)| self.unify(a, b))?;
+
+        self.call_infos.insert(
+            id,
+            InferCallInfos {
+                expr_id: id,
+                callee: target,
+                substitution: inferred_templates.iter().cloned().collect(),
+                variadic: false, // TODO: Actually compute this
+            },
+        );
 
         Ok(self.get_ret_ty(
             target,
