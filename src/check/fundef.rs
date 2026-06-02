@@ -19,6 +19,6 @@ use crate::{Db, check::thir::validate_thir, ril::FunctionId, thir::thir_body};
 
 pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
-        validate_thir(db, thir);
+        validate_thir(db, thir.as_ref());
     }
 }
