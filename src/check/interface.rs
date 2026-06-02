@@ -21,5 +21,9 @@ use crate::{Db, check::Diag, ril::InterfaceId};
 
 pub fn check_interface<'db>(db: &'db dyn Db, interface: InterfaceId) {
     let span = interface.name_span(db);
-    Diag::todo("implement check_interface".into(), span).accumulate(db);
+    Diag::todo(
+        format!("Implement check_interface ({}:{})", file!(), line!()),
+        span,
+    )
+    .accumulate(db);
 }

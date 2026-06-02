@@ -23,8 +23,10 @@ pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) {
     let span = fdef.span(db);
     let thir = thir_body(db, fdef);
     if let Some(_) = thir {
-        Diag::todo("Check the thir output".into(), span).accumulate(db);
-    } else {
-        Diag::todo("Check something else I guess".into(), span).accumulate(db);
+        Diag::todo(
+            format!("Check the thir output ({}:{})", file!(), line!()),
+            span,
+        )
+        .accumulate(db);
     }
 }

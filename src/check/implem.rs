@@ -21,5 +21,9 @@ use crate::{Db, check::Diag, ril::ImplSource};
 
 pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     let span = implem.span(db);
-    Diag::todo("implement check_implem".into(), span).accumulate(db);
+    Diag::todo(
+        format!("Implement check_implem ({}:{})", file!(), line!()),
+        span,
+    )
+    .accumulate(db);
 }
