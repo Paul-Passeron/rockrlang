@@ -298,6 +298,7 @@ pub struct AstStructDef {
     pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub fields: Vec<AstStructDefField>,
+    pub span: Span,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -305,6 +306,7 @@ pub struct AstEnumDef {
     pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub variants: Vec<AstEnumVariant>,
+    pub span: Span,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

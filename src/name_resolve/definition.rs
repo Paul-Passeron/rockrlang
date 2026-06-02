@@ -111,17 +111,33 @@ impl TypeDefId {
             TypeDefId::Enum(enum_id) => Some(enum_id.name_span(db)),
         }
     }
+
+    pub fn span(&self, db: &dyn Db) -> Option<Span> {
+        match self {
+            TypeDefId::Builtin(_) => None,
+            TypeDefId::Struct(struct_id) => Some(struct_id.span(db)),
+            TypeDefId::Enum(enum_id) => Some(enum_id.span(db)),
+        }
+    }
 }
 
 impl StructId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
-        struct_item(db, self.interned()).name.span.clone()
+        struct_item(db, self.interned()).name.span
+    }
+
+    pub fn span(&self, db: &dyn Db) -> Span {
+        struct_item(db, self.interned()).span
     }
 }
 
 impl EnumId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
         enum_item(db, self.interned()).name.span.clone()
+    }
+
+    pub fn span(&self, db: &dyn Db) -> Span {
+        enum_item(db, self.interned()).span
     }
 }
 

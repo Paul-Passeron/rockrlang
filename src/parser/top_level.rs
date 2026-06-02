@@ -655,6 +655,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_enum_def(&mut self) -> Result<AstEnumDef, ParseError> {
+        let start = self.get_start();
         self.expect(TokenKind::Enum)?;
         self.consume();
         let name = self.parse_symbol()?;
@@ -668,10 +669,12 @@ impl<'db> Parser<'db> {
             name,
             template_args,
             variants,
+            span: start.span(self.get_end()),
         })
     }
 
     fn parse_struct_def(&mut self) -> Result<AstStructDef, ParseError> {
+        let start = self.get_start();
         self.expect(TokenKind::Struct)?;
         self.consume();
         let name = self.parse_symbol()?;
@@ -686,6 +689,7 @@ impl<'db> Parser<'db> {
             name,
             template_args,
             fields,
+            span: start.span(self.get_end()),
         })
     }
 
