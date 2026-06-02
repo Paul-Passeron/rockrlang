@@ -40,6 +40,7 @@ pub type ScopeId = Idx<ThirScope>;
 pub type PlaceId = Idx<ThirPlace>;
 
 pub struct Thir {
+    pub id: FunctionId,
     pub places: Arena<ThirPlace>,
     pub exprs: Arena<ThirExpr>,
     pub locals: Arena<ThirLocal>,

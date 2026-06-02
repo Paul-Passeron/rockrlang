@@ -29,7 +29,7 @@ use crate::{
         HirStructFieldPattern, LocalInfo, Mutability, PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
-    ril::{BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
+    ril::{BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection, ScopeId,
         StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirLocal,
@@ -90,11 +90,13 @@ impl<'db> ThirBuilder<'db> {
 
     pub fn finalize(
         self,
+        id: FunctionId,
         params: Vec<LocalId>,
         zelf: Option<LocalId>,
         stmts: Vec<ThirStmt>,
     ) -> Thir {
         Thir {
+            id,
             places: self.places,
             exprs: self.exprs,
             locals: self.locals,
@@ -196,7 +198,7 @@ impl<'db> ThirTranslator<'db> {
             .iter()
             .flat_map(|stmt| self.handle_stmt(&mut b, stmt))
             .collect_vec();
-        b.finalize(params, zelf, stmts)
+        b.finalize(self.hir.owner(self.db), params, zelf, stmts)
     }
 
     fn handle_break(&self, b: &ThirBuilder, span: Span) -> ThirStmt {

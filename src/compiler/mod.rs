@@ -384,7 +384,6 @@ fn load_workspace_from_disk(root: PathBuf, config: Config) -> Result<RockrDb, Co
 pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
-    println!("{}", ws.to_string(&db));
     check(&db, ws);
     let diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
     render_diagnostics(&db, diags.into_iter());
