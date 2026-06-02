@@ -21,7 +21,8 @@ use crate::{
     parse_tree::{
         Spanned,
         pattern::{
-            AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc, StructFieldPattern,
+            AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc,
+            StructFieldPattern,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -41,7 +42,9 @@ impl<'db> Parser<'db> {
                     start.span(self.get_end()),
                 ))
             }
-            TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
+            TokenKind::Identifier(name)
+                if name == Symbol::new(self.db, "_") =>
+            {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(end)))
@@ -103,8 +106,9 @@ impl<'db> Parser<'db> {
 
             Some(TokenKind::OpenPar) => {
                 self.consume();
-                let args =
-                    AstConstructFields::TupleFields(self.parse_pattern_list(TokenKind::ClosePar)?);
+                let args = AstConstructFields::TupleFields(
+                    self.parse_pattern_list(TokenKind::ClosePar)?,
+                );
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 Ok(AstNamedPattern::Constructor { name, args })
@@ -153,7 +157,10 @@ impl<'db> Parser<'db> {
         }
     }
 
-    fn parse_pattern_list(&mut self, end_tok: TokenKind) -> Result<Vec<AstPattern>, ParseError> {
+    fn parse_pattern_list(
+        &mut self,
+        end_tok: TokenKind,
+    ) -> Result<Vec<AstPattern>, ParseError> {
         let mut pats = vec![];
 
         loop {

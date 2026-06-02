@@ -27,14 +27,16 @@ use crate::{
     },
     parse_tree::top_level::{AstInterface, AstTopLevelItemDesc},
     ril::{
-        EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId, StructId, TypeDefId,
+        EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId,
+        StructId, TypeDefId,
     },
 };
 
 #[salsa::tracked]
 pub fn core_iter_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
-    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "iter"), core_module);
+    let iter_module =
+        resolve_in_module(db, InternedSymbol::new(db, "iter"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::iter module not found"),
@@ -44,7 +46,8 @@ pub fn core_iter_module<'db>(db: &'db dyn Db) -> ModuleId {
 #[salsa::tracked]
 pub fn core_mem_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
-    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "mem"), core_module);
+    let iter_module =
+        resolve_in_module(db, InternedSymbol::new(db, "mem"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::mem module not found"),
@@ -54,7 +57,8 @@ pub fn core_mem_module<'db>(db: &'db dyn Db) -> ModuleId {
 #[salsa::tracked]
 pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
-    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "opt"), core_module);
+    let iter_module =
+        resolve_in_module(db, InternedSymbol::new(db, "opt"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::mem module not found"),
@@ -64,7 +68,11 @@ pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
 #[salsa::tracked]
 pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
     let opt_module = core_opt_module(db);
-    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "opt"), opt_module.interned());
+    let iter_module = resolve_in_module(
+        db,
+        InternedSymbol::new(db, "opt"),
+        opt_module.interned(),
+    );
     match iter_module {
         Some(Definition::Type(TypeDefId::Enum(id))) => id,
         _ => panic!("core::mem module not found"),
@@ -74,7 +82,8 @@ pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
 #[salsa::tracked]
 pub fn core_res_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
-    let iter_module = resolve_in_module(db, InternedSymbol::new(db, "opt"), core_module);
+    let iter_module =
+        resolve_in_module(db, InternedSymbol::new(db, "opt"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::mem module not found"),
@@ -133,7 +142,9 @@ pub fn module_interfaces<'db>(
             .into_iter()
             .flatten()
             .filter_map(|item| match item.data {
-                AstTopLevelItemDesc::Interface(ast_interface) => Some(ast_interface),
+                AstTopLevelItemDesc::Interface(ast_interface) => {
+                    Some(ast_interface)
+                }
                 _ => None,
             })
             .collect(),

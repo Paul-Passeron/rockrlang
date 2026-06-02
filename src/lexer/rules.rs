@@ -55,7 +55,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 let len = lexeme.len();
                 Ok(Token {
                     location,
-                    kind: TokenKind::CStrLit(StrLit::new(db, String::from(&lexeme[2..len - 1]))),
+                    kind: TokenKind::CStrLit(StrLit::new(
+                        db,
+                        String::from(&lexeme[2..len - 1]),
+                    )),
                 })
             },
         ),
@@ -103,7 +106,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
             |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
-                    kind: TokenKind::Hashed(Symbol::new(db, String::from(&lexeme[1..]))),
+                    kind: TokenKind::Hashed(Symbol::new(
+                        db,
+                        String::from(&lexeme[1..]),
+                    )),
                 })
             },
         ),
@@ -113,7 +119,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
             |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
-                    kind: TokenKind::Directive(Symbol::new(db, String::from(&lexeme[1..]))),
+                    kind: TokenKind::Directive(Symbol::new(
+                        db,
+                        String::from(&lexeme[1..]),
+                    )),
                 })
             },
         ),
@@ -147,7 +156,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                         "static" => TokenKind::Static,
                         "true" => TokenKind::True,
                         "false" => TokenKind::False,
-                        _ => TokenKind::Identifier(Symbol::new(db, String::from(lexeme))),
+                        _ => TokenKind::Identifier(Symbol::new(
+                            db,
+                            String::from(lexeme),
+                        )),
                     },
                 })
             },
@@ -158,7 +170,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 let len = lexeme.len();
                 Ok(Token {
                     location,
-                    kind: TokenKind::StrLit(StrLit::new(db, String::from(&lexeme[1..len - 1]))),
+                    kind: TokenKind::StrLit(StrLit::new(
+                        db,
+                        String::from(&lexeme[1..len - 1]),
+                    )),
                 })
             },
         ),
@@ -169,8 +184,10 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 Ok(Token {
                     location,
                     kind: TokenKind::CharLit(
-                        rustc_literal_escaper::unescape_char(&lexeme[1..len - 1])
-                            .map_err(|_| todo!())?,
+                        rustc_literal_escaper::unescape_char(
+                            &lexeme[1..len - 1],
+                        )
+                        .map_err(|_| todo!())?,
                     ),
                 })
             },

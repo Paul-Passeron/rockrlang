@@ -49,7 +49,8 @@ impl ModuleId {
         file_submodules: Vec<FileModule<'db>>,
         package: Option<Package<'db>>,
     ) -> Self {
-        InternedModuleId::new(db, name, parent, file, file_submodules, package).into()
+        InternedModuleId::new(db, name, parent, file, file_submodules, package)
+            .into()
     }
 
     pub fn interned(self) -> InternedModuleId<'static> {
@@ -73,8 +74,9 @@ impl ModuleId {
     }
 
     pub fn owning_package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
-        self.package(db)
-            .or_else(|| self.parent(db).and_then(|parent| parent.owning_package(db)))
+        self.package(db).or_else(|| {
+            self.parent(db).and_then(|parent| parent.owning_package(db))
+        })
     }
 }
 
@@ -160,7 +162,8 @@ impl ImplId {
         interface: Option<InterfaceRef>,
         templates: Vec<Set<InterfaceRef>>,
     ) -> Self {
-        InternedImplId::new(db, parent, implemented, interface, templates).into()
+        InternedImplId::new(db, parent, implemented, interface, templates)
+            .into()
     }
 
     pub fn interned(self) -> InternedImplId<'static> {
@@ -459,7 +462,11 @@ impl<'db> From<InterfaceRef> for InternedInterfaceRef<'db> {
 }
 
 impl InterfaceRef {
-    pub fn new(db: &dyn crate::Db, def: InterfaceId, args: Vec<TypeRef>) -> Self {
+    pub fn new(
+        db: &dyn crate::Db,
+        def: InterfaceId,
+        args: Vec<TypeRef>,
+    ) -> Self {
         InternedInterfaceRef::new(db, def, args).into()
     }
 

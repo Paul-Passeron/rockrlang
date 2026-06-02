@@ -34,13 +34,15 @@ fn main() {
     for path in rkr_files_in(&examples_dir, false) {
         let name = test_name(&examples_dir, &path);
         let snap_name = name.clone();
-        trials.push(Trial::test(name, move || run_pass_case(&path, &snap_name)));
+        trials
+            .push(Trial::test(name, move || run_pass_case(&path, &snap_name)));
     }
 
     for path in rkr_files_in(&fail_dir, true) {
         let name = test_name(&examples_dir, &path);
         let snap_name = name.clone();
-        trials.push(Trial::test(name, move || run_fail_case(&path, &snap_name)));
+        trials
+            .push(Trial::test(name, move || run_fail_case(&path, &snap_name)));
     }
 
     libtest_mimic::run(&args, trials).exit();

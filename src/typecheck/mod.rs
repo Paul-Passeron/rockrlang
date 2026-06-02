@@ -21,15 +21,18 @@ use std::{collections::BTreeMap, panic, sync::Arc};
 use crate::{
     Db,
     hir::{
-        self, HirBody, HirExpr, HirId, HirPattern, HirPatternDesc, HirStmt, HirStmtKind, LocalId,
-        LocalInfo, hir_body,
+        self, HirBody, HirExpr, HirId, HirPattern, HirPatternDesc, HirStmt,
+        HirStmtKind, LocalId, LocalInfo, hir_body,
     },
-    name_resolve::type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
+    name_resolve::type_expr::{
+        enum_item, get_templates_of_fun, templates_of_enum,
+    },
     parse_tree::top_level::{AstEnumVariantKind, AstTemplateArg},
     ril::{self, FunctionId, InternedFunctionId, TypeDefId, TypeRef},
     typecheck::inference::{
-        InferTy, InferenceCtx, UnificationError, constraints::InferenceConstraintKind,
-        implicit::ImplicitContext, var::InferVar,
+        InferTy, InferenceCtx, UnificationError,
+        constraints::InferenceConstraintKind, implicit::ImplicitContext,
+        var::InferVar,
     },
 };
 
@@ -88,7 +91,8 @@ impl<'db> TyCtx<'db> {
         zelf: Option<LocalId>,
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned());
-        let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
+        let local_ids =
+            locals.iter().map(|local| local.id).collect::<Box<[_]>>();
         let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params);
 
         Self {
@@ -131,7 +135,9 @@ impl<'db> TyCtx<'db> {
             .collect::<Box<[_]>>();
         let node_types = drain
             .into_iter()
-            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
+            .map(|(id, infer_ty)| {
+                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+            })
             .collect::<BTreeMap<_, _>>();
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_patterns)
@@ -139,7 +145,9 @@ impl<'db> TyCtx<'db> {
             .collect::<Box<[_]>>();
         let pat_types = drain
             .into_iter()
-            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
+            .map(|(id, infer_ty)| {
+                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+            })
             .collect::<BTreeMap<_, _>>();
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_places)
@@ -147,7 +155,9 @@ impl<'db> TyCtx<'db> {
             .collect::<Box<[_]>>();
         let place_types = drain
             .into_iter()
-            .map(|(id, infer_ty)| (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown)))
+            .map(|(id, infer_ty)| {
+                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+            })
             .collect::<BTreeMap<_, _>>();
 
         let call_infos = self
@@ -179,7 +189,10 @@ impl<'db> TyCtx<'db> {
         )
     }
 
-    fn type_check_expr(&mut self, expr: &'db HirExpr) -> (TyRef, Option<UnificationError>) {
+    fn type_check_expr(
+        &mut self,
+        expr: &'db HirExpr,
+    ) -> (TyRef, Option<UnificationError>) {
         let (ty, err) = match self.inf_ctx.infer_expr(expr) {
             Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
             Err(err) => (TyRef::Error, Some(err)),
@@ -201,11 +214,9 @@ impl<'db> TyCtx<'db> {
         match &pattern.data {
             HirPatternDesc::Bind { id, .. } => {
                 // TODO: is this right ?
-                InferTy::Var(
-                    *loc_inners
-                        .get(id)
-                        .expect("Internal error: local referenced in hir but not found"),
-                )
+                InferTy::Var(*loc_inners.get(id).expect(
+                    "Internal error: local referenced in hir but not found",
+                ))
             }
             HirPatternDesc::Any => InferTy::Var(self.inf_ctx.fresh_var()),
             HirPatternDesc::Tuple(_hir_patterns) => todo!(),
@@ -243,38 +254,56 @@ impl<'db> TyCtx<'db> {
                     .variants
                     .iter()
                     .find(|variant| variant.name == *name)
-                    .expect("Variants of enum should already have been checked");
+                    .expect(
+                        "Variants of enum should already have been checked",
+                    );
                 match (fields, &variant.kind) {
-                    (hir::HirPatternConstructorArgs::None, AstEnumVariantKind::Unit) => (),
                     (
-                        hir::HirPatternConstructorArgs::StructFields(_hir_fields),
+                        hir::HirPatternConstructorArgs::None,
+                        AstEnumVariantKind::Unit,
+                    ) => (),
+                    (
+                        hir::HirPatternConstructorArgs::StructFields(
+                            _hir_fields,
+                        ),
                         AstEnumVariantKind::StructLike(_ast_fields),
                     ) => todo!(),
                     (
-                        hir::HirPatternConstructorArgs::TupleFields(hir_patterns),
+                        hir::HirPatternConstructorArgs::TupleFields(
+                            hir_patterns,
+                        ),
                         AstEnumVariantKind::TupleLike(ast_patterns),
                     ) => {
                         assert!(hir_patterns.len() == ast_patterns.len());
                         for (hir_pattern, ast_pattern) in
                             hir_patterns.iter().zip(ast_patterns.iter())
                         {
-                            let pat_ty = self.typeof_pattern(hir_pattern, loc_inners);
+                            let pat_ty =
+                                self.typeof_pattern(hir_pattern, loc_inners);
                             let Some(ast_ty) =
-                                self.inf_ctx.allocate_ast_type_expr(&ast_pattern.data, &ctx)
+                                self.inf_ctx.allocate_ast_type_expr(
+                                    &ast_pattern.data,
+                                    &ctx,
+                                )
                             else {
                                 unreachable!()
                             };
 
-                            if let Err(err) = self.inf_ctx.unify(pat_ty, ast_ty) {
+                            if let Err(err) = self.inf_ctx.unify(pat_ty, ast_ty)
+                            {
                                 dbg!("TODO: err here !", err);
                             }
                         }
                     }
-                    _ => unreachable!("Mismatch between AST variant kind decl and case"),
+                    _ => unreachable!(
+                        "Mismatch between AST variant kind decl and case"
+                    ),
                 }
                 t_ref
             }
-            HirPatternDesc::IntLit(_) => InferTy::Var(self.inf_ctx.emit_intlike_constraint()),
+            HirPatternDesc::IntLit(_) => {
+                InferTy::Var(self.inf_ctx.emit_intlike_constraint())
+            }
         }
     }
 
@@ -293,15 +322,19 @@ impl<'db> TyCtx<'db> {
                 match self.inf_ctx.infer_pattern(pattern, None) {
                     Ok(pattern_ty) => match init_ty {
                         TyRef::Inf(infer_ty) => {
-                            if let Err(err) = self.inf_ctx.unify(infer_ty.clone(), pattern_ty) {
+                            if let Err(err) =
+                                self.inf_ctx.unify(infer_ty.clone(), pattern_ty)
+                            {
                                 dbg!("TODO: err here !", err);
                             } else if let Some(annotation) = ty_annotation
                                 && let Some(annotation) = annotation.as_known()
-                                && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
-                                    &annotation.data,
-                                    self.inf_ctx.implicit_ctx().as_ref(),
-                                )
-                                && let Err(err) = self.inf_ctx.unify(infer_ty, annotated)
+                                && let Some(annotated) =
+                                    self.inf_ctx.allocate_ast_type_expr(
+                                        &annotation.data,
+                                        self.inf_ctx.implicit_ctx().as_ref(),
+                                    )
+                                && let Err(err) =
+                                    self.inf_ctx.unify(infer_ty, annotated)
                             {
                                 dbg!("TODO: err here !", err);
                             }
@@ -343,22 +376,25 @@ impl<'db> TyCtx<'db> {
                     for local in &branch.locals {
                         let typeof_local = self.inf_ctx.local_var(*local);
                         let inner_var = self.inf_ctx.fresh_var();
-                        self.inf_ctx
-                            .emit_constraint(InferenceConstraintKind::BindsLike {
+                        self.inf_ctx.emit_constraint(
+                            InferenceConstraintKind::BindsLike {
                                 ty: typeof_local,
                                 inner: InferTy::Var(inner_var),
                                 like: typeof_scrut_var,
-                            });
+                            },
+                        );
                         loc_inners.insert(*local, inner_var);
                     }
 
-                    let typeof_pattern = self.typeof_pattern(&branch.pattern, &loc_inners);
+                    let typeof_pattern =
+                        self.typeof_pattern(&branch.pattern, &loc_inners);
 
-                    self.inf_ctx
-                        .emit_constraint(InferenceConstraintKind::IsInner {
+                    self.inf_ctx.emit_constraint(
+                        InferenceConstraintKind::IsInner {
                             inner: typeof_pattern,
                             ref_ty: typeof_scrut.clone(),
-                        });
+                        },
+                    );
                 }
             }
             HirStmtKind::Assign { lhs, rhs } => {
@@ -369,9 +405,18 @@ impl<'db> TyCtx<'db> {
                 match self.inf_ctx.infer_place(lhs) {
                     Ok(lhs_ty) => match rhs_ty {
                         TyRef::Inf(rhs_ty) => {
-                            if let Err(err) = self.inf_ctx.unify(lhs_ty.clone(), rhs_ty.clone()) {
-                                let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
-                                let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
+                            if let Err(err) = self
+                                .inf_ctx
+                                .unify(lhs_ty.clone(), rhs_ty.clone())
+                            {
+                                let lstr = self
+                                    .inf_ctx
+                                    .find(&lhs_ty)
+                                    .to_string(self.db);
+                                let rstr = self
+                                    .inf_ctx
+                                    .find(&rhs_ty)
+                                    .to_string(self.db);
                                 dbg!("TODO: err here !", err, lstr, rstr);
                             }
                         }
@@ -398,11 +443,18 @@ impl<'db> TyCtx<'db> {
 
                     match ty {
                         TyRef::Inf(infer_ty) => {
-                            if let Err(err) = self.inf_ctx.unify(ret_ty.clone(), infer_ty.clone()) {
+                            if let Err(err) = self
+                                .inf_ctx
+                                .unify(ret_ty.clone(), infer_ty.clone())
+                            {
                                 let fmt = format!(
                                     "Cannot return {} form a function expected to return {}",
-                                    self.inf_ctx.find(&infer_ty).to_string(self.db),
-                                    self.inf_ctx.find(&ret_ty).to_string(self.db)
+                                    self.inf_ctx
+                                        .find(&infer_ty)
+                                        .to_string(self.db),
+                                    self.inf_ctx
+                                        .find(&ret_ty)
+                                        .to_string(self.db)
                                 );
                                 dbg!("TODO: err here !", err, fmt);
                             }
@@ -428,12 +480,14 @@ impl<'db> TyCtx<'db> {
             }
             HirStmtKind::If { cond, then, else_ } => {
                 match self.inf_ctx.infer_expr(cond) {
-                    Ok(ty) => match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
-                        Ok(()) => (),
-                        Err(err) => {
-                            dbg!("TODO: err here !", err);
+                    Ok(ty) => {
+                        match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                            Ok(()) => (),
+                            Err(err) => {
+                                dbg!("TODO: err here !", err);
+                            }
                         }
-                    },
+                    }
                     Err(err) => {
                         dbg!("TODO: err here !", err);
                     }
@@ -441,20 +495,26 @@ impl<'db> TyCtx<'db> {
                 self.type_check_stmt(then);
                 else_.as_ref().inspect(|else_| self.type_check_stmt(else_));
             }
-            HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
-                Ok(ty) => {
-                    if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
-                        dbg!("TODO: err here !", err);
+            HirStmtKind::While { cond, body } => {
+                match self.inf_ctx.infer_expr(cond) {
+                    Ok(ty) => {
+                        if let Err(err) =
+                            self.inf_ctx.unify(ty, self.inf_ctx.bool_ty())
+                        {
+                            dbg!("TODO: err here !", err);
 
-                        return;
+                            return;
+                        }
+                        self.type_check_stmt(body);
                     }
-                    self.type_check_stmt(body);
+                    Err(err) => {
+                        dbg!("TODO: err here !", err);
+                    }
                 }
-                Err(err) => {
-                    dbg!("TODO: err here !", err);
-                }
-            },
-            HirStmtKind::Block(stmts) => stmts.iter().for_each(|stmt| self.type_check_stmt(stmt)),
+            }
+            HirStmtKind::Block(stmts) => {
+                stmts.iter().for_each(|stmt| self.type_check_stmt(stmt))
+            }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
             HirStmtKind::Break => todo!(),
         }
@@ -475,7 +535,10 @@ pub struct TypeCheckResults<'db> {
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
 
-fn type_check_hir<'db>(db: &'db dyn Db, hir: HirBody<'db>) -> TypeCheckResults<'db> {
+fn type_check_hir<'db>(
+    db: &'db dyn Db,
+    hir: HirBody<'db>,
+) -> TypeCheckResults<'db> {
     TyCtx::new(
         db,
         hir.owner(db),

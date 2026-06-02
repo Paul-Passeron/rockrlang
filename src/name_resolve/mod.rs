@@ -30,10 +30,13 @@ pub mod interfaces;
 pub mod type_expr;
 
 #[salsa::tracked]
-pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> SourceFile {
-    module
-        .file(db)
-        .unwrap_or_else(|| module_to_file(db, module.parent(db).unwrap().interned()))
+pub fn module_to_file<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> SourceFile {
+    module.file(db).unwrap_or_else(|| {
+        module_to_file(db, module.parent(db).unwrap().interned())
+    })
 }
 
 #[salsa::tracked]
@@ -110,25 +113,27 @@ pub fn module_items<'db>(
         let ast = parse_file(db, file);
         return Some(ast.items(db).clone());
     }
-    module
-        .parent(db)
-        .and_then(|parent| match module_items(db, parent.interned()) {
-            Some(parent_ast) => parent_ast.iter().find_map(|item| match &item.data {
-                AstTopLevelItemDesc::Module(module_ast) => {
-                    if module_ast.data.name.data == module.name(db) {
-                        Some(module_ast.data.items.clone())
-                    } else {
-                        None
+    module.parent(db).and_then(|parent| {
+        match module_items(db, parent.interned()) {
+            Some(parent_ast) => {
+                parent_ast.iter().find_map(|item| match &item.data {
+                    AstTopLevelItemDesc::Module(module_ast) => {
+                        if module_ast.data.name.data == module.name(db) {
+                            Some(module_ast.data.items.clone())
+                        } else {
+                            None
+                        }
                     }
-                }
-                _ => None,
-            }),
+                    _ => None,
+                })
+            }
             None => {
                 let file = module_to_file(db, module);
                 let ast: Ast<'db> = parse_file(db, file);
                 Some(ast.items(db).clone())
             }
-        })
+        }
+    })
 }
 
 #[salsa::tracked]
@@ -151,7 +156,10 @@ pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
 pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
     let package = std_package(db)?;
     let file_module = package.root(db);
-    Some(file_module_id(db, file_module, Some(builtin_module(db)), package).interned())
+    Some(
+        file_module_id(db, file_module, Some(builtin_module(db)), package)
+            .interned(),
+    )
 }
 
 #[salsa::tracked]
@@ -170,7 +178,8 @@ pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
 pub fn core_module<'db>(db: &'db dyn Db) -> InternedModuleId<'db> {
     let package = core_package(db);
     let file_module = package.root(db);
-    file_module_id(db, file_module, Some(builtin_module(db)), package).interned()
+    file_module_id(db, file_module, Some(builtin_module(db)), package)
+        .interned()
 }
 
 fn collect_modules_in_file_module<'db>(
@@ -210,16 +219,31 @@ fn collect_modules_in_items<'db>(
                 Some(package),
             );
             set.insert(child_id);
-            collect_modules_in_items(db, &module_ast.data.items, child_id, package, set);
+            collect_modules_in_items(
+                db,
+                &module_ast.data.items,
+                child_id,
+                package,
+                set,
+            );
         }
     }
 }
 
 #[salsa::tracked]
-pub fn modules_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ModuleId> {
+pub fn modules_in_package<'db>(
+    db: &'db dyn Db,
+    package: Package<'db>,
+) -> Set<ModuleId> {
     let root_id = file_module_id(db, package.root(db), None, package);
 
     let mut set = Set::new();
-    collect_modules_in_file_module(db, package.root(db), root_id, package, &mut set);
+    collect_modules_in_file_module(
+        db,
+        package.root(db),
+        root_id,
+        package,
+        &mut set,
+    );
     set
 }

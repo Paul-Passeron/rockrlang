@@ -112,7 +112,10 @@ pub struct TokenKindDisplay<'db, 'a> {
 }
 
 impl TokenKind {
-    pub fn display<'a, 'db>(&'a self, db: &'db dyn crate::Db) -> TokenKindDisplay<'db, 'a> {
+    pub fn display<'a, 'db>(
+        &'a self,
+        db: &'db dyn crate::Db,
+    ) -> TokenKindDisplay<'db, 'a> {
         TokenKindDisplay { kind: self, db }
     }
 }
@@ -120,13 +123,23 @@ impl TokenKind {
 impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
-            TokenKind::Identifier(name) => write!(f, "{}", name.interned().contents(self.db)),
+            TokenKind::Identifier(name) => {
+                write!(f, "{}", name.interned().contents(self.db))
+            }
             TokenKind::IntLit(value) => write!(f, "{}", value),
             TokenKind::CharLit(c) => write!(f, "{}", c),
-            TokenKind::StrLit(s) => write!(f, "\"{}\"", s.interned().contents(self.db)),
-            TokenKind::CStrLit(s) => write!(f, "c\"{}\"", s.interned().contents(self.db)),
-            TokenKind::Directive(d) => write!(f, "@{}", d.interned().contents(self.db)),
-            TokenKind::Hashed(symbol) => write!(f, "#{}", symbol.interned().contents(self.db)),
+            TokenKind::StrLit(s) => {
+                write!(f, "\"{}\"", s.interned().contents(self.db))
+            }
+            TokenKind::CStrLit(s) => {
+                write!(f, "c\"{}\"", s.interned().contents(self.db))
+            }
+            TokenKind::Directive(d) => {
+                write!(f, "@{}", d.interned().contents(self.db))
+            }
+            TokenKind::Hashed(symbol) => {
+                write!(f, "#{}", symbol.interned().contents(self.db))
+            }
             TokenKind::HashPound => write!(f, "#"),
             TokenKind::Let => write!(f, "let"),
             TokenKind::Mut => write!(f, "mut"),

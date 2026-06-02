@@ -40,7 +40,9 @@ pub trait Db: salsa::Database {
 
     fn get_ref_files<'a>(&'a self) -> &'a DashMap<PathBuf, SourceFile>;
 
-    fn get_mut_ref_files<'a>(&'a mut self) -> &'a mut DashMap<PathBuf, SourceFile>;
+    fn get_mut_ref_files<'a>(
+        &'a mut self,
+    ) -> &'a mut DashMap<PathBuf, SourceFile>;
 }
 
 #[salsa::db]
@@ -49,7 +51,9 @@ impl Db for RockrDb {
         &self.files
     }
 
-    fn get_mut_ref_files<'a>(&'a mut self) -> &'a mut DashMap<PathBuf, SourceFile> {
+    fn get_mut_ref_files<'a>(
+        &'a mut self,
+    ) -> &'a mut DashMap<PathBuf, SourceFile> {
         &mut self.files
     }
 }

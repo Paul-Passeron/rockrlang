@@ -168,7 +168,11 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_type_ref(&mut self, type_ref: &TypeRef, ctx: &ImplicitContext) -> InferTy {
+    pub fn allocate_type_ref(
+        &mut self,
+        type_ref: &TypeRef,
+        ctx: &ImplicitContext,
+    ) -> InferTy {
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
@@ -178,12 +182,14 @@ impl<'db> InferenceCtx<'db> {
                     .map(|ty| self.allocate_type_ref(ty, ctx))
                     .collect(),
             },
-            TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
-                Some(res) => res.clone(),
-                None => {
-                    todo!("Diagnostics");
+            TypeRef::Param(type_param_id) => {
+                match ctx.get_template(type_param_id.0) {
+                    Some(res) => res.clone(),
+                    None => {
+                        todo!("Diagnostics");
+                    }
                 }
-            },
+            }
             TypeRef::Error => panic!(),
             TypeRef::Zelf => {
                 if let Some(zelf) = ctx.zelf() {
@@ -203,7 +209,9 @@ impl<'db> InferenceCtx<'db> {
         ctx: &ImplicitContext,
     ) -> InferTy {
         match arg {
-            PartialTypeArg::Known(type_ref) => self.allocate_type_ref(type_ref, ctx),
+            PartialTypeArg::Known(type_ref) => {
+                self.allocate_type_ref(type_ref, ctx)
+            }
             PartialTypeArg::Partial(partial_type_ref) => {
                 self.allocate_partial_type_ref(partial_type_ref, ctx)
             }
@@ -217,7 +225,9 @@ impl<'db> InferenceCtx<'db> {
         ctx: &ImplicitContext,
     ) -> InferTy {
         match type_ref {
-            PartialTypeRef::Resolved(type_ref) => self.allocate_type_ref(type_ref, ctx),
+            PartialTypeRef::Resolved(type_ref) => {
+                self.allocate_type_ref(type_ref, ctx)
+            }
             PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
                 def: *def,
                 fields: args
@@ -237,26 +247,29 @@ impl<'db> InferenceCtx<'db> {
             .map(|type_ref| self.allocate_type_ref(&type_ref, ctx))
     }
 
-    pub fn is_struct(&mut self, ty: &InferTy) -> Option<(StructId, HashMap<Symbol, InferTy>)> {
+    pub fn is_struct(
+        &mut self,
+        ty: &InferTy,
+    ) -> Option<(StructId, HashMap<Symbol, InferTy>)> {
         if let InferTy::Adt { def, fields } = &ty {
             match *def {
                 TypeDefId::Struct(struct_id) => {
                     let templates = fields;
                     let ast = struct_item(self.db, struct_id.interned());
-                    let templates = if templates.len() != ast.template_args.len() {
-                        ast.template_args
-                            .iter()
-                            .enumerate()
-                            .map(|(i, _)| {
-                                templates
-                                    .get(i)
-                                    .cloned()
-                                    .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
-                            })
-                            .collect::<Arc<_>>()
-                    } else {
-                        templates.iter().cloned().collect::<Arc<_>>()
-                    };
+                    let templates =
+                        if templates.len() != ast.template_args.len() {
+                            ast.template_args
+                                .iter()
+                                .enumerate()
+                                .map(|(i, _)| {
+                                    templates.get(i).cloned().unwrap_or_else(
+                                        || InferTy::Var(self.fresh_var()),
+                                    )
+                                })
+                                .collect::<Arc<_>>()
+                        } else {
+                            templates.iter().cloned().collect::<Arc<_>>()
+                        };
                     let module = struct_id.parent(self.db);
                     let ctx = ImplicitContext::new(
                         self.db,
@@ -277,7 +290,9 @@ impl<'db> InferenceCtx<'db> {
                         .map(|fields| (struct_id, fields))
                 }
                 TypeDefId::Builtin(id) => {
-                    if id == BuiltinTypeId::mut_ref(self.db) || id == BuiltinTypeId::ref_(self.db) {
+                    if id == BuiltinTypeId::mut_ref(self.db)
+                        || id == BuiltinTypeId::ref_(self.db)
+                    {
                         // Auto-deref for ref to struct
                         self.is_struct(&fields[0])
                     } else {

@@ -17,7 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
+    thir::{
+        ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch,
+    },
 };
 
 pub struct ThirStmt {
@@ -103,7 +105,12 @@ impl ThirStmt {
         }
     }
 
-    pub fn whl(cond: ThirExprWithSetup, scope: ScopeId, body: Vec<Self>, span: Span) -> Self {
+    pub fn whl(
+        cond: ThirExprWithSetup,
+        scope: ScopeId,
+        body: Vec<Self>,
+        span: Span,
+    ) -> Self {
         Self {
             kind: StmtKind::While { scope, cond, body },
             span,
@@ -117,7 +124,11 @@ impl ThirStmt {
         }
     }
 
-    pub fn mtch(scrut: ThirExprWithSetup, branches: Vec<ThirMatchBranch>, span: Span) -> Self {
+    pub fn mtch(
+        scrut: ThirExprWithSetup,
+        branches: Vec<ThirMatchBranch>,
+        span: Span,
+    ) -> Self {
         Self {
             kind: StmtKind::Match {
                 scrutinee: scrut,

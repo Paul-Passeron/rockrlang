@@ -133,9 +133,9 @@ where
 {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         unsafe {
-            old_pointer
-                .as_mut()
-                .is_none_or(|val| Vec::<T>::maybe_update(&mut val.items, new_value.items))
+            old_pointer.as_mut().is_none_or(|val| {
+                Vec::<T>::maybe_update(&mut val.items, new_value.items)
+            })
         }
     }
 }

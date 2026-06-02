@@ -67,10 +67,18 @@ impl Diag {
             (head, defs)
         };
 
-        let primary = DiagLabel::new(first.name_span(db).unwrap(), Some(format!("Defined here")));
+        let primary = DiagLabel::new(
+            first.name_span(db).unwrap(),
+            Some(format!("Defined here")),
+        );
         let secondary = others
             .into_iter()
-            .map(|def| DiagLabel::new(def.name_span(db).unwrap(), Some(format!("Defined here"))))
+            .map(|def| {
+                DiagLabel::new(
+                    def.name_span(db).unwrap(),
+                    Some(format!("Defined here")),
+                )
+            })
             .collect();
 
         Diag::new(

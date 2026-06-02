@@ -18,7 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::HashMap, io};
 
 use codespan_reporting::diagnostic::{
-    Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle, Severity as CrSeverity,
+    Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle,
+    Severity as CrSeverity,
 };
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
@@ -29,7 +30,10 @@ use crate::{Db, SourceFile};
 
 pub mod type_printer;
 
-pub fn render_diagnostics<'db, 'diag>(db: &'db dyn Db, diags: impl Iterator<Item = &'diag Diag>) {
+pub fn render_diagnostics<'db, 'diag>(
+    db: &'db dyn Db,
+    diags: impl Iterator<Item = &'diag Diag>,
+) {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
     _render_diagnostics(db, diags, &mut stderr).unwrap();
 }
@@ -47,7 +51,8 @@ pub fn _render_diagnostics<'a, W: WriteColor>(
     for diag in diags {
         let cr = build_diagnostic(db, diag, &mut files, &mut file_ids);
 
-        term::emit_to_write_style(out, &config, &files, &cr).map_err(io_error)?;
+        term::emit_to_write_style(out, &config, &files, &cr)
+            .map_err(io_error)?;
     }
 
     Ok(())
@@ -69,7 +74,9 @@ fn build_diagnostic<'db>(
     let secondary: Vec<_> = diag
         .secondary
         .iter()
-        .map(|l| label_for(db, l.clone(), LabelStyle::Secondary, files, file_ids))
+        .map(|l| {
+            label_for(db, l.clone(), LabelStyle::Secondary, files, file_ids)
+        })
         .collect();
 
     let mut labels = Vec::with_capacity(1 + secondary.len());

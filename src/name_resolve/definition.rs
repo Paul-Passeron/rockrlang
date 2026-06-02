@@ -28,12 +28,15 @@ use crate::{
         module_items, std_module,
         type_expr::{enum_item, struct_item},
     },
-    parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
+    parse_tree::top_level::{
+        AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc,
+    },
     parser::parse_file,
     printer::type_printer::TypePrinter,
     ril::{
-        EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId, ModuleId, Package,
-        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id, int_id, never_id, usize_id, void_id,
+        EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId,
+        ModuleId, Package, ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
+        int_id, never_id, usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -65,8 +68,12 @@ impl Definition {
 
     pub fn name_span(self, db: &dyn Db) -> Option<Span> {
         match self {
-            Definition::Function(function_id) => Some(function_id.name_span(db)),
-            Definition::Interface(interface_id) => Some(interface_id.name_span(db)),
+            Definition::Function(function_id) => {
+                Some(function_id.name_span(db))
+            }
+            Definition::Interface(interface_id) => {
+                Some(interface_id.name_span(db))
+            }
             Definition::Module(module_id) => module_id.name_span(db),
             Definition::Type(type_def_id) => type_def_id.name_span(db),
         }
@@ -160,10 +167,14 @@ impl FunctionId {
 impl FunctionLikeAst {
     pub fn name_span(&self) -> Span {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => spanned.data.name.span.clone(),
+            FunctionLikeAst::ExternDef(spanned, _) => {
+                spanned.data.name.span.clone()
+            }
             FunctionLikeAst::Fundef(spanned) => spanned.data.name.span.clone(),
             FunctionLikeAst::Method(spanned) => spanned.data.name.span.clone(),
-            FunctionLikeAst::TraitMethod(spanned) => spanned.data.name.span.clone(),
+            FunctionLikeAst::TraitMethod(spanned) => {
+                spanned.data.name.span.clone()
+            }
         }
     }
 }
@@ -175,41 +186,51 @@ fn definition_of_item<'db>(
 ) -> Option<Definition> {
     let m_id = ModuleId::from(parent);
     match &item.data {
-        AstTopLevelItemDesc::Module(module) => Some(Definition::Module(ModuleId::new(
-            db,
-            module.data.name.data,
-            Some(m_id),
-            None,
-            vec![],
-            parent.package(db),
-        ))),
-        AstTopLevelItemDesc::Fundef(fundef) => Some(Definition::Function(FunctionId::new(
-            db,
-            fundef.data.name.data,
-            ScopeOwnerId::Module(m_id),
-        ))),
-        AstTopLevelItemDesc::Interface(interface) => Some(Definition::Interface(InterfaceId::new(
-            db,
-            interface.name.data,
-            m_id,
-        ))),
+        AstTopLevelItemDesc::Module(module) => {
+            Some(Definition::Module(ModuleId::new(
+                db,
+                module.data.name.data,
+                Some(m_id),
+                None,
+                vec![],
+                parent.package(db),
+            )))
+        }
+        AstTopLevelItemDesc::Fundef(fundef) => {
+            Some(Definition::Function(FunctionId::new(
+                db,
+                fundef.data.name.data,
+                ScopeOwnerId::Module(m_id),
+            )))
+        }
+        AstTopLevelItemDesc::Interface(interface) => {
+            Some(Definition::Interface(InterfaceId::new(
+                db,
+                interface.name.data,
+                m_id,
+            )))
+        }
         AstTopLevelItemDesc::Impl(_) => None,
-        AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(TypeDefId::Struct(
-            StructId::new(db, struct_def.name.data, m_id),
-        ))),
-        AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(TypeDefId::Enum(
-            EnumId::new(db, ast_enum_def.name.data, m_id),
-        ))),
-        AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(FunctionId::new(
-            db,
-            funsig.data.name.data,
-            ScopeOwnerId::Module(m_id),
-        ))),
+        AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(
+            TypeDefId::Struct(StructId::new(db, struct_def.name.data, m_id)),
+        )),
+        AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(
+            TypeDefId::Enum(EnumId::new(db, ast_enum_def.name.data, m_id)),
+        )),
+        AstTopLevelItemDesc::ExternDef(funsig, _) => {
+            Some(Definition::Function(FunctionId::new(
+                db,
+                funsig.data.name.data,
+                ScopeOwnerId::Module(m_id),
+            )))
+        }
     }
 }
 
 #[salsa::tracked]
-pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition> {
+pub fn builtin_definitions<'db>(
+    db: &'db dyn Db,
+) -> BTreeMap<Symbol, Definition> {
     let mut res = BTreeMap::from([
         (
             Symbol::new(db, "usize"),
@@ -315,17 +336,22 @@ pub fn module_definitions<'db>(
     } else {
         let mut res = Vec::new();
         for sub in module.file_submodules(db) {
-            let id = file_module_id(db, sub, Some(module.into()), module.package(db).unwrap());
+            let id = file_module_id(
+                db,
+                sub,
+                Some(module.into()),
+                module.package(db).unwrap(),
+            );
             res.push((id.name(db), Definition::Module(id)));
         }
         let items = module_items(db, module);
         items.iter().for_each(|items| {
             items.iter().for_each(|item| {
-                definition_of_item(db, module, item)
-                    .into_iter()
-                    .for_each(|def| {
+                definition_of_item(db, module, item).into_iter().for_each(
+                    |def| {
                         res.push((def.name(db), def));
-                    })
+                    },
+                )
             })
         });
 
@@ -334,7 +360,10 @@ pub fn module_definitions<'db>(
 }
 
 #[salsa::tracked]
-pub fn module_includes<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<Segments<'db>> {
+pub fn module_includes<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> Vec<Segments<'db>> {
     let Some(file) = module.file(db) else {
         return vec![];
     };
@@ -395,9 +424,10 @@ pub fn resolve_in_module<'db>(
     // Check includes declared on this module
     let includes = module_includes(db, module);
     for included_module in includes {
-        if let Some(included_id) = resolve_include_path(db, included_module, module)
-            && let Some(def) =
-                def_map_in_module(db, included_id.interned()).get(&Symbol::from(name))
+        if let Some(included_id) =
+            resolve_include_path(db, included_module, module)
+            && let Some(def) = def_map_in_module(db, included_id.interned())
+                .get(&Symbol::from(name))
         {
             return Some(*def);
         }
@@ -436,7 +466,10 @@ pub fn resolve_path<'db>(
 }
 
 #[salsa::tracked]
-pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -> Arc<String> {
+pub fn get_module_pretty_name<'db>(
+    db: &'db dyn Db,
+    id: InternedModuleId<'db>,
+) -> Arc<String> {
     let prefix = if let Some(parent) = id.parent(db) {
         format!("{}::", get_module_pretty_name(db, parent.interned()))
     } else {

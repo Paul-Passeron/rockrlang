@@ -24,8 +24,8 @@ use crate::{
     compiler::{FunctionSignature, get_sig_of_function},
     name_resolve::{builtin_module, definition::Definition},
     ril::{
-        BuiltinTypeId, FunctionId, ImplId, InterfaceId, InterfaceRef, ModuleId, PtrKind,
-        ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        BuiltinTypeId, FunctionId, ImplId, InterfaceId, InterfaceRef, ModuleId,
+        PtrKind, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },
     typecheck::inference::{InferTy, InferenceCtx},
 };
@@ -42,7 +42,9 @@ impl TypePrinter {
     }
 
     #[allow(dead_code)]
-    pub fn with_options(opts: impl IntoIterator<Item = TypePrinterOption>) -> Self {
+    pub fn with_options(
+        opts: impl IntoIterator<Item = TypePrinterOption>,
+    ) -> Self {
         Self {
             options: TypePrinterOptionSet::with_options(opts),
         }
@@ -55,10 +57,15 @@ impl TypePrinter {
         }
     }
 
-    fn is_builtin_pretty_print(db: &dyn Db, def: BuiltinTypeId) -> Option<(String, String)> {
+    fn is_builtin_pretty_print(
+        db: &dyn Db,
+        def: BuiltinTypeId,
+    ) -> Option<(String, String)> {
         if let Some(ptrkid) = def.is_ptr_like(db) {
             let muta = match ptrkid {
-                PtrKind::Ref(mutability) | PtrKind::RawPtr(mutability) => mutability,
+                PtrKind::Ref(mutability) | PtrKind::RawPtr(mutability) => {
+                    mutability
+                }
             };
             let muta_suffix = match muta {
                 crate::hir::Mutability::Const => "",
@@ -80,8 +87,15 @@ impl TypePrinter {
 
     pub fn module_to_string(&self, db: &dyn Db, module: ModuleId) -> String {
         let mut res = String::new();
-        fn _aux(db: &dyn Db, opts: &TypePrinterOptionSet, s: &mut String, module: ModuleId) {
-            if module == builtin_module(db) && !opts.has(TypePrinterOption::PrintBuiltin) {
+        fn _aux(
+            db: &dyn Db,
+            opts: &TypePrinterOptionSet,
+            s: &mut String,
+            module: ModuleId,
+        ) {
+            if module == builtin_module(db)
+                && !opts.has(TypePrinterOption::PrintBuiltin)
+            {
                 return;
             }
             if let Some(parent) = module.parent(db) {
@@ -137,20 +151,28 @@ impl TypePrinter {
                     .join(", ");
                 if self.options.has(TypePrinterOption::PrettyPrintBuiltinADTs)
                     && let Some(id) = Self::is_def_builtin(def)
-                    && let Some((prefix, suffix)) = Self::is_builtin_pretty_print(db, id)
+                    && let Some((prefix, suffix)) =
+                        Self::is_builtin_pretty_print(db, id)
                 {
                     format!("{}{}{}", prefix, fields_str, suffix)
                 } else if no_fields {
                     format!("{}", self.type_def_id_to_string(db, def))
                 } else {
-                    format!("{}<{fields_str}>", self.type_def_id_to_string(db, def),)
+                    format!(
+                        "{}<{fields_str}>",
+                        self.type_def_id_to_string(db, def),
+                    )
                 }
             }
             InferTy::Param(type_param_id) => format!("T{}", type_param_id.0),
         }
     }
 
-    pub fn interface_id_to_string(&self, db: &dyn Db, id: InterfaceId) -> String {
+    pub fn interface_id_to_string(
+        &self,
+        db: &dyn Db,
+        id: InterfaceId,
+    ) -> String {
         let mut res = self.module_to_string(db, id.parent(db));
         if !res.is_empty() {
             res.push_str("::");
@@ -179,7 +201,8 @@ impl TypePrinter {
                         format!(
                             ": {}",
                             s.iter()
-                                .map(|interface| self.interface_ref_to_string(db, *interface))
+                                .map(|interface| self
+                                    .interface_ref_to_string(db, *interface))
                                 .collect_vec()
                                 .join(" + ")
                         )
@@ -203,7 +226,11 @@ impl TypePrinter {
         res
     }
 
-    pub fn interface_ref_to_string(&self, db: &dyn Db, interface_ref: InterfaceRef) -> String {
+    pub fn interface_ref_to_string(
+        &self,
+        db: &dyn Db,
+        interface_ref: InterfaceRef,
+    ) -> String {
         let args = interface_ref.args(db);
         let args_str = args
             .iter()
@@ -232,7 +259,8 @@ impl TypePrinter {
             .join(", ");
         if self.options.has(TypePrinterOption::PrettyPrintBuiltinADTs)
             && let Some(id) = Self::is_def_builtin(def)
-            && let Some((prefix, suffix)) = Self::is_builtin_pretty_print(db, id)
+            && let Some((prefix, suffix)) =
+                Self::is_builtin_pretty_print(db, id)
         {
             format!("{}{}{}", prefix, fields_str, suffix)
         } else if no_fields {
@@ -242,24 +270,38 @@ impl TypePrinter {
         }
     }
 
-    pub fn type_param_id_to_string(&self, _db: &dyn Db, type_ref: TypeParamId) -> String {
+    pub fn type_param_id_to_string(
+        &self,
+        _db: &dyn Db,
+        type_ref: TypeParamId,
+    ) -> String {
         format!("T{}", type_ref.0)
     }
 
     pub fn type_ref_to_string(&self, db: &dyn Db, type_ref: TypeRef) -> String {
         match type_ref {
             TypeRef::Concrete(type_id) => self.type_id_to_string(db, type_id),
-            TypeRef::Associated(symbol) => format!("Self::{}", symbol.to_string(db)),
-            TypeRef::Param(type_param_id) => self.type_param_id_to_string(db, type_param_id),
+            TypeRef::Associated(symbol) => {
+                format!("Self::{}", symbol.to_string(db))
+            }
+            TypeRef::Param(type_param_id) => {
+                self.type_param_id_to_string(db, type_param_id)
+            }
             TypeRef::Zelf => format!("Self"),
             TypeRef::Error => format!("<ERROR>"),
             TypeRef::Unknown => format!("<???>"),
         }
     }
 
-    pub fn scope_owner_to_string(&self, db: &dyn Db, scope_owner: ScopeOwnerId) -> String {
+    pub fn scope_owner_to_string(
+        &self,
+        db: &dyn Db,
+        scope_owner: ScopeOwnerId,
+    ) -> String {
         match scope_owner {
-            ScopeOwnerId::Module(module_id) => self.module_to_string(db, module_id),
+            ScopeOwnerId::Module(module_id) => {
+                self.module_to_string(db, module_id)
+            }
             ScopeOwnerId::Impl(impl_id) => self.impl_id_to_string(db, impl_id),
             ScopeOwnerId::Interface(interface_ref) => {
                 self.interface_ref_to_string(db, interface_ref)
@@ -267,12 +309,18 @@ impl TypePrinter {
         }
     }
 
-    pub fn function_sig_to_string(&self, db: &dyn Db, sig: &FunctionSignature) -> String {
+    pub fn function_sig_to_string(
+        &self,
+        db: &dyn Db,
+        sig: &FunctionSignature,
+    ) -> String {
         let mut s = String::new();
         let f = &mut s;
         let mut aux = || -> std::fmt::Result {
             write!(f, "{}", sig.name.display(db))?;
-            if !sig.added_templates.is_empty() || !sig.implicit_templates.is_empty() {
+            if !sig.added_templates.is_empty()
+                || !sig.implicit_templates.is_empty()
+            {
                 write!(f, "<")?;
                 for (i, t) in sig
                     .implicit_templates
@@ -324,7 +372,11 @@ impl TypePrinter {
         s
     }
 
-    pub fn function_id_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
+    pub fn function_id_to_string(
+        &self,
+        db: &dyn Db,
+        function_id: FunctionId,
+    ) -> String {
         let sig = get_sig_of_function(db, function_id.interned());
         format!(
             "{}::{}",
@@ -333,7 +385,11 @@ impl TypePrinter {
         )
     }
 
-    pub fn called_function_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
+    pub fn called_function_to_string(
+        &self,
+        db: &dyn Db,
+        function_id: FunctionId,
+    ) -> String {
         format!(
             "{}::{}",
             self.scope_owner_to_string(db, function_id.parent(db)),
@@ -343,10 +399,18 @@ impl TypePrinter {
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {
         match def {
-            Definition::Function(function_id) => self.function_id_to_string(db, function_id),
-            Definition::Interface(interface_id) => self.interface_id_to_string(db, interface_id),
-            Definition::Module(module_id) => self.module_to_string(db, module_id),
-            Definition::Type(type_def_id) => self.type_def_id_to_string(db, type_def_id),
+            Definition::Function(function_id) => {
+                self.function_id_to_string(db, function_id)
+            }
+            Definition::Interface(interface_id) => {
+                self.interface_id_to_string(db, interface_id)
+            }
+            Definition::Module(module_id) => {
+                self.module_to_string(db, module_id)
+            }
+            Definition::Type(type_def_id) => {
+                self.type_def_id_to_string(db, type_def_id)
+            }
         }
     }
 }
@@ -361,7 +425,9 @@ impl TypePrinterOptionSet {
         self.options.contains(&opt)
     }
 
-    pub fn with_options(opts: impl IntoIterator<Item = TypePrinterOption>) -> Self {
+    pub fn with_options(
+        opts: impl IntoIterator<Item = TypePrinterOption>,
+    ) -> Self {
         Self {
             options: HashSet::from_iter(opts),
         }

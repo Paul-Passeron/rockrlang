@@ -40,7 +40,8 @@ pub fn resolve_type_expr_as_interface<'db>(
     match &interface.data {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty()
-                && let Some(_) = template_args.iter().position(|p| p.name == *name)
+                && let Some(_) =
+                    template_args.iter().position(|p| p.name == *name)
             {
                 return None;
             }
@@ -50,22 +51,38 @@ pub fn resolve_type_expr_as_interface<'db>(
                     let resolved_args = args
                         .iter()
                         .map(|arg| {
-                            match resolve_any_type_expr(db, arg, module, template_args, has_zelf) {
-                                TypeResolution::Type(type_ref) => Some(type_ref),
+                            match resolve_any_type_expr(
+                                db,
+                                arg,
+                                module,
+                                template_args,
+                                has_zelf,
+                            ) {
+                                TypeResolution::Type(type_ref) => {
+                                    Some(type_ref)
+                                }
                                 _ => None,
                             }
                         })
                         .collect::<Option<Vec<_>>>();
-                    resolved_args.map(|args| InterfaceRef::new(db, interface_id, args))
+                    resolved_args
+                        .map(|args| InterfaceRef::new(db, interface_id, args))
                 } else {
                     None
                 }
             })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
+            if let Some(Definition::Module(module)) =
+                resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr_as_interface(db, to, module.interned(), template_args, has_zelf)
+                resolve_type_expr_as_interface(
+                    db,
+                    to,
+                    module.interned(),
+                    template_args,
+                    has_zelf,
+                )
             } else {
                 None
             }
@@ -75,7 +92,10 @@ pub fn resolve_type_expr_as_interface<'db>(
 }
 
 #[salsa::tracked]
-pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<ImplSource<'db>> {
+pub fn module_impls<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> Vec<ImplSource<'db>> {
     let mut res = vec![];
     if let Some(items) = module_items(db, module) {
         for item in items.iter().filter_map(|item| match &item.data {
@@ -100,8 +120,13 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                 }
                 templates.push(constraints);
             }
-            if let TypeResolution::Type(implemented) =
-                resolve_type_expr(db, &item.implemented, module, &item.template_args, false)
+            if let TypeResolution::Type(implemented) = resolve_type_expr(
+                db,
+                &item.implemented,
+                module,
+                &item.template_args,
+                false,
+            )
             // Zelf types are not allowed here
             {
                 match item.interface.as_ref().map(|interface| {
@@ -114,8 +139,13 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                     )
                 }) {
                     Some(Some(value)) => {
-                        let impl_id =
-                            ImplId::new(db, module.into(), implemented, Some(value), templates);
+                        let impl_id = ImplId::new(
+                            db,
+                            module.into(),
+                            implemented,
+                            Some(value),
+                            templates,
+                        );
                         let src = ImplSource::new(
                             db,
                             impl_id,
@@ -127,7 +157,13 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                         res.push(src);
                     }
                     None => {
-                        let impl_id = ImplId::new(db, module.into(), implemented, None, templates);
+                        let impl_id = ImplId::new(
+                            db,
+                            module.into(),
+                            implemented,
+                            None,
+                            templates,
+                        );
                         let src = ImplSource::new(
                             db,
                             impl_id,
@@ -140,7 +176,9 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
                     }
                     Some(None) => {
                         // TODO: report error
-                        println!("Error: Could not resolve implementation because of interface");
+                        println!(
+                            "Error: Could not resolve implementation because of interface"
+                        );
                     }
                 }
             } else {
@@ -152,7 +190,10 @@ pub fn module_impls<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> Vec<
 }
 
 #[salsa::tracked]
-pub fn impls_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ImplSource<'db>> {
+pub fn impls_in_package<'db>(
+    db: &'db dyn Db,
+    package: Package<'db>,
+) -> Set<ImplSource<'db>> {
     Set::from_iter(
         modules_in_package(db, package)
             .into_iter()

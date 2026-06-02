@@ -41,7 +41,10 @@ impl LspBackend {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for LspBackend {
-    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(
+        &self,
+        _: InitializeParams,
+    ) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: None,
             capabilities: ServerCapabilities {

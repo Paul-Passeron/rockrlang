@@ -19,7 +19,9 @@ use crate::{
     compiler::{Workspace, workspace_packages},
     name_resolve::implems::impls_in_package,
     ril::{ImplSource, ScopeOwnerId},
-    typecheck::inference::{constraints::InferenceConstraintKind, implicit::ImplicitContext},
+    typecheck::inference::{
+        constraints::InferenceConstraintKind, implicit::ImplicitContext,
+    },
 };
 
 use super::*;
@@ -56,19 +58,22 @@ impl<'a> InferenceCtx<'a> {
                         return None;
                     }
                     let mut constraints = Vec::new();
-                    fields
-                        .iter()
-                        .zip(other_fields)
-                        .try_for_each(|(infer_ty, matcher)| {
-                            constraints.extend(self.matches_ty(infer_ty, matcher, ctx)?);
+                    fields.iter().zip(other_fields).try_for_each(
+                        |(infer_ty, matcher)| {
+                            constraints.extend(
+                                self.matches_ty(infer_ty, matcher, ctx)?,
+                            );
                             Some(())
-                        })?;
+                        },
+                    )?;
                     Some(constraints)
                 }
-                TypeRef::Param(id) => Some(vec![InferenceConstraintKind::Unify {
-                    a: ty.clone(),
-                    b: ctx.get_template(id.0)?.clone(),
-                }]),
+                TypeRef::Param(id) => {
+                    Some(vec![InferenceConstraintKind::Unify {
+                        a: ty.clone(),
+                        b: ctx.get_template(id.0)?.clone(),
+                    }])
+                }
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },
@@ -101,7 +106,8 @@ impl<'a> InferenceCtx<'a> {
         .inspect_err(|err| println!("{err:#?}"))
         .ok()?;
 
-        let mut constraints = self.matches_ty(ty, source.id(self.db).implemented(self.db), &ctx)?;
+        let mut constraints =
+            self.matches_ty(ty, source.id(self.db).implemented(self.db), &ctx)?;
 
         for (infer_ty, refs) in infer_templates.iter().zip(templates.iter()) {
             for interface_ref in refs.iter() {

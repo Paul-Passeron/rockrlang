@@ -20,13 +20,17 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+        type_expr::{
+            AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
+        },
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
 impl<'db> Parser<'db> {
-    pub(super) fn parse_type_expr(&mut self) -> Result<AstTypeExpr, ParseError> {
+    pub(super) fn parse_type_expr(
+        &mut self,
+    ) -> Result<AstTypeExpr, ParseError> {
         let start = self.get_start();
 
         match self.current_token()?.kind {
@@ -93,7 +97,9 @@ impl<'db> Parser<'db> {
             TokenKind::OpenSqr => {
                 self.consume();
                 let ty = self.parse_type_expr()?;
-                let len = if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Semicolon) {
+                let len = if self.peek_n(0).map(|t| t.kind)
+                    == Some(TokenKind::Semicolon)
+                {
                     self.consume();
                     Some(self.parse_int_lit()?.data)
                 } else {
@@ -190,7 +196,9 @@ impl<'db> Parser<'db> {
         }
     }
 
-    pub(super) fn parse_any_type_expr(&mut self) -> Result<AstAnyTypeExpr, ParseError> {
+    pub(super) fn parse_any_type_expr(
+        &mut self,
+    ) -> Result<AstAnyTypeExpr, ParseError> {
         let start = self.get_start();
 
         if let TokenKind::Identifier(name) = self.current_token()?.kind
@@ -214,7 +222,9 @@ impl<'db> Parser<'db> {
         ))
     }
 
-    fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
+    fn parse_any_type_args(
+        &mut self,
+    ) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
         let mut args = vec![];
 
         while let Some(t) = self.peek_n(0) {

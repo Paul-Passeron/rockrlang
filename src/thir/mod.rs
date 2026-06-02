@@ -23,7 +23,9 @@ use crate::{
     },
     hir::{self, Mutability, hir_body},
     parse_tree::expr::BinaryOperator,
-    ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
+    ril::{
+        EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef,
+    },
     thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };
@@ -223,12 +225,18 @@ impl PartialEq for ThirArc {
 }
 impl Eq for ThirArc {}
 
-pub fn thir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<Arc<Thir>> {
+pub fn thir_body<'db>(
+    db: &'db dyn Db,
+    function: FunctionId,
+) -> Option<Arc<Thir>> {
     _thir_body(db, function.interned()).map(|arc| arc.0)
 }
 
 #[salsa::tracked]
-pub fn _thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) -> Option<ThirArc> {
+pub fn _thir_body<'db>(
+    db: &'db dyn Db,
+    function: InternedFunctionId<'db>,
+) -> Option<ThirArc> {
     let f_id: FunctionId = function.into();
     let hir = hir_body(db, function.into())?;
     let tc = type_check_function(db, f_id)?;

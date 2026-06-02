@@ -27,12 +27,17 @@ use crate::{
         module_items,
     },
     parse_tree::{
-        top_level::{AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
-        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+        top_level::{
+            AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc,
+        },
+        type_expr::{
+            AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
+        },
     },
     ril::{
-        InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId, ScopeOwnerId,
-        TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of, tuple_of,
+        InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
+        ScopeOwnerId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of,
+        tuple_of,
     },
 };
 
@@ -72,43 +77,72 @@ pub fn resolve_type_expr_desc<'db>(
                 if *name == Symbol::new(db, "Self") {
                     return TypeResolution::Type(TypeRef::Zelf);
                 }
-                if let Some(idx) = template_args.iter().position(|p| p.name == *name) {
-                    return TypeResolution::Type(TypeRef::Param(TypeParamId(idx)));
+                if let Some(idx) =
+                    template_args.iter().position(|p| p.name == *name)
+                {
+                    return TypeResolution::Type(TypeRef::Param(TypeParamId(
+                        idx,
+                    )));
                 }
             }
 
-            resolve_in_module(db, name.interned(), module).map_or(TypeResolution::Error, |def| {
-                if let Definition::Type(type_def_id) = def {
-                    let resolved_args = args
-                        .iter()
-                        .map(|arg| {
-                            match resolve_any_type_expr(db, arg, module, template_args, has_zelf) {
-                                TypeResolution::Type(type_ref) => Some(type_ref),
-                                _ => None,
-                            }
-                        })
-                        .collect::<Option<Vec<_>>>();
-                    match resolved_args {
-                        Some(resolved_args) => {
-                            TypeResolution::Type(TypeId::new(db, type_def_id, resolved_args).into())
+            resolve_in_module(db, name.interned(), module).map_or(
+                TypeResolution::Error,
+                |def| {
+                    if let Definition::Type(type_def_id) = def {
+                        let resolved_args = args
+                            .iter()
+                            .map(|arg| {
+                                match resolve_any_type_expr(
+                                    db,
+                                    arg,
+                                    module,
+                                    template_args,
+                                    has_zelf,
+                                ) {
+                                    TypeResolution::Type(type_ref) => {
+                                        Some(type_ref)
+                                    }
+                                    _ => None,
+                                }
+                            })
+                            .collect::<Option<Vec<_>>>();
+                        match resolved_args {
+                            Some(resolved_args) => TypeResolution::Type(
+                                TypeId::new(db, type_def_id, resolved_args)
+                                    .into(),
+                            ),
+                            None => TypeResolution::Error,
                         }
-                        None => TypeResolution::Error,
+                    } else {
+                        TypeResolution::Error
                     }
-                } else {
-                    TypeResolution::Error
-                }
-            })
+                },
+            )
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, from.interned(), module)
+            if let Some(Definition::Module(module)) =
+                resolve_in_module(db, from.interned(), module)
             {
-                resolve_type_expr(db, to, module.interned(), template_args, has_zelf)
+                resolve_type_expr(
+                    db,
+                    to,
+                    module.interned(),
+                    template_args,
+                    has_zelf,
+                )
             } else {
                 TypeResolution::Error
             }
         }
         AstTypeExprDesc::Pointer { mutable, pointee } => {
-            match resolve_type_expr(db, pointee, module, template_args, has_zelf) {
+            match resolve_type_expr(
+                db,
+                pointee,
+                module,
+                template_args,
+                has_zelf,
+            ) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
                 }
@@ -116,7 +150,13 @@ pub fn resolve_type_expr_desc<'db>(
             }
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
-            match resolve_type_expr(db, pointee, module, template_args, has_zelf) {
+            match resolve_type_expr(
+                db,
+                pointee,
+                module,
+                template_args,
+                has_zelf,
+            ) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ref_of(db, pointee, *mutable).into())
                 }
@@ -126,19 +166,27 @@ pub fn resolve_type_expr_desc<'db>(
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
             match resolve_type_expr(db, ty, module, template_args, has_zelf) {
-                TypeResolution::Type(elem) => TypeResolution::Type(slice_of(db, elem).into()),
+                TypeResolution::Type(elem) => {
+                    TypeResolution::Type(slice_of(db, elem).into())
+                }
                 _ => TypeResolution::Infer,
             }
         }
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys
                 .iter()
-                .map(
-                    |ty| match resolve_type_expr(db, ty, module, template_args, has_zelf) {
+                .map(|ty| {
+                    match resolve_type_expr(
+                        db,
+                        ty,
+                        module,
+                        template_args,
+                        has_zelf,
+                    ) {
                         TypeResolution::Type(type_ref) => Some(type_ref),
                         _ => None,
-                    },
-                )
+                    }
+                })
                 .collect::<Option<_>>();
             match types {
                 Some(tys) => TypeResolution::Type(tuple_of(db, tys).into()),
@@ -160,8 +208,13 @@ pub fn resolve_type_expr<'db>(
 }
 
 #[salsa::tracked]
-pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Arc<AstStructDef> {
-    for item in module_items(db, struct_id.parent(db).interned()).unwrap_or_default() {
+pub fn struct_item<'db>(
+    db: &'db dyn Db,
+    struct_id: InternedStructId<'db>,
+) -> Arc<AstStructDef> {
+    for item in
+        module_items(db, struct_id.parent(db).interned()).unwrap_or_default()
+    {
         if let AstTopLevelItemDesc::StructDef(ast) = item.data
             && ast.name.data == struct_id.name(db)
         {
@@ -172,8 +225,13 @@ pub fn struct_item<'db>(db: &'db dyn Db, struct_id: InternedStructId<'db>) -> Ar
 }
 
 #[salsa::tracked]
-pub fn enum_item<'db>(db: &'db dyn Db, enum_id: InternedEnumId<'db>) -> Arc<AstEnumDef> {
-    for item in module_items(db, enum_id.parent(db).interned()).unwrap_or_default() {
+pub fn enum_item<'db>(
+    db: &'db dyn Db,
+    enum_id: InternedEnumId<'db>,
+) -> Arc<AstEnumDef> {
+    for item in
+        module_items(db, enum_id.parent(db).interned()).unwrap_or_default()
+    {
         if let AstTopLevelItemDesc::EnumDef(ast) = item.data
             && ast.name.data == enum_id.name(db)
         {
@@ -207,27 +265,38 @@ pub fn get_templates_of_fun_only<'db>(
     let mut res = vec![];
     let ast = function_ast(db, function);
     match ast.inner(db) {
-        FunctionLikeAst::ExternDef(sig, _) => res.extend(sig.data.template_args.clone()),
+        FunctionLikeAst::ExternDef(sig, _) => {
+            res.extend(sig.data.template_args.clone())
+        }
         FunctionLikeAst::Fundef(def) => {
             res.extend(def.data.template_args.clone());
         }
-        FunctionLikeAst::Method(def) => res.extend(def.data.template_args.clone()),
-        FunctionLikeAst::TraitMethod(sig) => res.extend(sig.data.template_args.clone()),
+        FunctionLikeAst::Method(def) => {
+            res.extend(def.data.template_args.clone())
+        }
+        FunctionLikeAst::TraitMethod(sig) => {
+            res.extend(sig.data.template_args.clone())
+        }
     }
     res.into()
 }
 
-pub fn get_templates_of_owner(db: &dyn Db, owner: ScopeOwnerId) -> Box<[AstTemplateArg]> {
+pub fn get_templates_of_owner(
+    db: &dyn Db,
+    owner: ScopeOwnerId,
+) -> Box<[AstTemplateArg]> {
     match owner {
         ScopeOwnerId::Module(_) => Box::new([]),
         ScopeOwnerId::Impl(impl_id) => {
             let sources = impl_sources(db, impl_id.interned());
             sources.into_iter().next().unwrap().templates(db).into()
         }
-        ScopeOwnerId::Interface(id) => interface_item(db, id.def(db).interned())
-            .template_args
-            .clone()
-            .into_boxed_slice(),
+        ScopeOwnerId::Interface(id) => {
+            interface_item(db, id.def(db).interned())
+                .template_args
+                .clone()
+                .into_boxed_slice()
+        }
     }
 }
 

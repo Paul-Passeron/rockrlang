@@ -21,9 +21,10 @@ use crate::{
     Db,
     common::symbols::{StrLit, Symbol},
     hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern, HirPatternConstructorArgs,
-        HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
-        Mutability, PartialTypeArg, PartialTypeRef,
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
+        PartialTypeArg, PartialTypeRef,
     },
     parse_tree::expr::BinaryOperator,
     ril::{TypeDefId, display::Display},
@@ -120,7 +121,12 @@ fn write_indent(f: &mut impl fmt::Write, depth: usize) -> fmt::Result {
     Ok(())
 }
 
-fn write_stmt(f: &mut impl fmt::Write, stmt: &HirStmt, db: &dyn Db, depth: usize) -> fmt::Result {
+fn write_stmt(
+    f: &mut impl fmt::Write,
+    stmt: &HirStmt,
+    db: &dyn Db,
+    depth: usize,
+) -> fmt::Result {
     write_indent(f, depth)?;
     match &stmt.kind {
         HirStmtKind::Let {
@@ -253,7 +259,9 @@ fn write_pattern(
             )?;
             match fields {
                 HirPatternConstructorArgs::None => Ok(()),
-                HirPatternConstructorArgs::StructFields(hir_struct_field_patterns) => {
+                HirPatternConstructorArgs::StructFields(
+                    hir_struct_field_patterns,
+                ) => {
                     writeln!(f, "{{")?;
                     for p in hir_struct_field_patterns.iter() {
                         write_indent(f, depth + 2)?;
@@ -288,7 +296,11 @@ fn write_pattern(
     }
 }
 
-fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
+fn write_place(
+    f: &mut impl fmt::Write,
+    place: &HirPlace,
+    db: &dyn Db,
+) -> fmt::Result {
     match &place.kind {
         HirPlaceKind::Local(id) => write!(f, "_{}", id.0),
         HirPlaceKind::Field { base, field } => {
@@ -317,7 +329,11 @@ fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::R
     }
 }
 
-fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Result {
+fn write_expr(
+    f: &mut impl fmt::Write,
+    expr: &HirExpr,
+    db: &dyn Db,
+) -> fmt::Result {
     match &expr.data {
         HirExprDesc::IntLit(n) => write!(f, "{}", n),
         HirExprDesc::CharLit(c) => write!(f, "'{}'", c),
@@ -469,8 +485,12 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                         write!(f, ", ")?;
                     }
                     match hint {
-                        PartialTypeArg::Known(tref) => write!(f, "{}", tref.to_string(db))?,
-                        PartialTypeArg::Partial(p) => write_partial_type(f, p, db)?,
+                        PartialTypeArg::Known(tref) => {
+                            write!(f, "{}", tref.to_string(db))?
+                        }
+                        PartialTypeArg::Partial(p) => {
+                            write_partial_type(f, p, db)?
+                        }
                         PartialTypeArg::Infer => write!(f, "_")?,
                     }
                 }
@@ -505,7 +525,11 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
     }
 }
 
-fn write_partial_type(f: &mut impl fmt::Write, ty: &PartialTypeRef, db: &dyn Db) -> fmt::Result {
+fn write_partial_type(
+    f: &mut impl fmt::Write,
+    ty: &PartialTypeRef,
+    db: &dyn Db,
+) -> fmt::Result {
     match ty {
         PartialTypeRef::Resolved(tref) => write!(f, "{}", tref.to_string(db)),
         PartialTypeRef::WithHoles { def, args } => {
@@ -517,8 +541,12 @@ fn write_partial_type(f: &mut impl fmt::Write, ty: &PartialTypeRef, db: &dyn Db)
                         write!(f, ", ")?;
                     }
                     match arg {
-                        PartialTypeArg::Known(tref) => write!(f, "{}", tref.to_string(db))?,
-                        PartialTypeArg::Partial(p) => write_partial_type(f, p, db)?,
+                        PartialTypeArg::Known(tref) => {
+                            write!(f, "{}", tref.to_string(db))?
+                        }
+                        PartialTypeArg::Partial(p) => {
+                            write_partial_type(f, p, db)?
+                        }
                         PartialTypeArg::Infer => write!(f, "_")?,
                     }
                 }
