@@ -18,9 +18,10 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
     if ret_ty == get_never_ty(db) || ret_ty == get_void_ty(db) {
         return;
     }
-    match check_stmts(db, thir, &thir.root) {
-        Completeness::AlwaysReturns => (),
-        Completeness::MayFallthrough { span } => Diag::todo(
+    if let Completeness::MayFallthrough { span } =
+        check_stmts(db, thir, &thir.root)
+    {
+        Diag::todo(
             format!(
                 "Emit real fallthrough diagnostic ({}:{})",
                 file!(),
@@ -28,7 +29,7 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
             ),
             span,
         )
-        .accumulate(db),
+        .accumulate(db)
     }
 }
 
