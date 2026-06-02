@@ -264,14 +264,6 @@ impl<'db> ThirTranslator<'db> {
                 res.extend(
                     self.destructure_pattern_init(b, pattern, value, stmt.span),
                 );
-                println!(
-                    "THIR: Start of span is: {}",
-                    stmt.span.start().loc_info(self.db)
-                );
-                println!(
-                    "THIR: End of span is: {}",
-                    stmt.span.end().loc_info(self.db)
-                );
                 res
             }
             HirStmtKind::Match {
