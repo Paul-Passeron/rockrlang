@@ -31,14 +31,14 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     ril::{BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{
-        EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection, ScopeId, StructRef,
-        Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirLocal, ThirMatchBranch,
-        ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
+        EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection, ScopeId,
+        StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirLocal,
+        ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::{self, PatternId, TypeCheckResults, inference::implicit::AstImplicitContext},
 };
 
-use super::{ScopeKind, ThirPatternKind};
+use super::{Dispatch, ScopeKind, ThirPatternKind};
 
 pub struct ThirBuilder<'db> {
     db: &'db dyn Db,
@@ -646,7 +646,20 @@ impl<'db> ThirTranslator<'db> {
                     args,
                 }
             }
-            HirExprDesc::CallDirect { .. } => todo!(),
+            HirExprDesc::CallDirect { target, args } => {
+                let args = args
+                    .iter()
+                    .map(|arg| self.expr(b, arg, stmts))
+                    .collect_vec();
+                let call_infos = &self.tc.call_infos(self.db)[&typecheck::ExprId(expr.id)];
+                let fref = FunctionRef {
+                    id: *target,
+                    args: call_infos.substitution.clone(),
+                    self_ty: None,
+                    dispatch: Dispatch::Direct,
+                };
+                ExprKind::Call { called: fref, args }
+            }
             HirExprDesc::CallMethod { .. } => todo!(),
             HirExprDesc::CallStatic { .. } => todo!(),
         };
