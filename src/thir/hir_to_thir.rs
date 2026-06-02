@@ -646,20 +646,34 @@ impl<'db> ThirTranslator<'db> {
                     args,
                 }
             }
-            HirExprDesc::CallDirect { target, args } => todo!(),
-            HirExprDesc::CallMethod {
-                receiver,
-                method,
-                args,
-                interface_hint,
-            } => todo!(),
-            HirExprDesc::CallStatic { ty, method, args } => todo!(),
+            HirExprDesc::CallDirect { .. } => todo!(),
+            HirExprDesc::CallMethod { .. } => todo!(),
+            HirExprDesc::CallStatic { .. } => todo!(),
         };
         b.new_expr(ThirExpr {
             kind,
             ty,
             span: expr.span,
         })
+    }
+
+    fn auto_deref_place_if_needed(&mut self, b: &mut ThirBuilder, place: PlaceId) -> PlaceId {
+        let (ty, span) = {
+            let place = b.get_place(place);
+            (place.ty, place.span)
+        };
+        let (proj, inner) = {
+            if let Some((_, inner)) = ty.as_ref(self.db) {
+                (Some(Projection::Deref), inner)
+            } else {
+                (None, ty)
+            }
+        };
+        if let Some(proj) = proj {
+            b.with_projection(place, proj, inner, span)
+        } else {
+            place
+        }
     }
 
     fn expr_with_setup(&mut self, b: &mut ThirBuilder, expr: &HirExpr) -> ThirExprWithSetup {
@@ -681,27 +695,25 @@ impl<'db> ThirTranslator<'db> {
             }
             HirPlaceKind::Field { base, field } => {
                 let base = self.place(b, base, stmts);
-                let ty = b.get_place(base).ty;
+                let place = self.auto_deref_place_if_needed(b, base);
+                let (ty, span) = {
+                    let place = b.get_place(place);
+                    (place.ty, place.span)
+                };
                 let struct_ref = ty.as_struct_ref(self.db).expect("TODO");
                 let field_ty = struct_ref.typeof_field(self.db, *field).expect("TODO");
-                b.with_projection(
-                    base,
-                    Projection::Field(*field, field_ty),
-                    field_ty,
-                    place.span,
-                )
+                b.with_projection(place, Projection::Field(*field, field_ty), field_ty, span)
             }
             HirPlaceKind::TupleField { base, index } => {
                 let base = self.place(b, base, stmts);
-                let ty = b.get_place(base).ty;
+                let place = self.auto_deref_place_if_needed(b, base);
+                let (ty, span) = {
+                    let place = b.get_place(place);
+                    (place.ty, place.span)
+                };
                 let mut tuple_ref = ty.as_tuple_ref(self.db).expect("TODO");
                 let idx_ty = tuple_ref.try_remove(*index as usize).expect("TODO");
-                b.with_projection(
-                    base,
-                    Projection::TupleField(*index, idx_ty),
-                    idx_ty,
-                    place.span,
-                )
+                b.with_projection(base, Projection::TupleField(*index, idx_ty), idx_ty, span)
             }
             HirPlaceKind::Deref(hir_place) => {
                 let base = self.place(b, hir_place, stmts);
@@ -766,7 +778,7 @@ impl TypeRef {
         }
     }
 
-    pub fn as_struct_ref(&self, db: &dyn Db) -> Option<StructRef> {
+    pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
             TypeDefId::Struct(struct_id) => Some(StructRef {
@@ -777,7 +789,7 @@ impl TypeRef {
         }
     }
 
-    pub fn as_enum_ref(&self, db: &dyn Db) -> Option<EnumRef> {
+    pub fn as_enum_ref(self, db: &dyn Db) -> Option<EnumRef> {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
             TypeDefId::Enum(enum_id) => Some(EnumRef {
@@ -788,10 +800,22 @@ impl TypeRef {
         }
     }
 
-    pub fn as_tuple_ref(&self, db: &dyn Db) -> Option<Vec<Self>> {
+    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
         let type_id = self.as_type_id()?;
         if type_id.def(db) == TypeDefId::Builtin(BuiltinTypeId::tuple(db)) {
             Some(type_id.args(db))
+        } else {
+            None
+        }
+    }
+
+    pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+        let type_id = self.as_type_id()?;
+        let def = type_id.def(db);
+        if def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)) {
+            Some((Mutability::Mutable, *type_id.args(db).get(0)?))
+        } else if def == TypeDefId::Builtin(BuiltinTypeId::ref_(db)) {
+            Some((Mutability::Const, *type_id.args(db).get(0)?))
         } else {
             None
         }
