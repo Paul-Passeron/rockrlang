@@ -24,9 +24,9 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::{
-        self, HirBody, HirExpr, HirExprDesc, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
-        HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
-        LocalInfo, Mutability, PartialTypeRef,
+        self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch, HirPattern,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind,
+        HirStructFieldPattern, LocalInfo, Mutability, PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
     ril::{BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
@@ -358,6 +358,26 @@ impl<'db> ThirTranslator<'db> {
         ThirStmt::mtch(scrut, branches, span)
     }
 
+    fn expr_args(
+        &mut self,
+        b: &mut ThirBuilder,
+        args: &HirConstructorArgs,
+        stmts: &mut Vec<ThirStmt>,
+    ) -> ThirConstructorArgs<ExprId> {
+        match args {
+            HirConstructorArgs::TupleLike(hir_exprs) => ThirConstructorArgs::Tuple(
+                hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect(),
+            ),
+            HirConstructorArgs::StructLike { fields } => ThirConstructorArgs::Struct(
+                fields
+                    .iter()
+                    .map(|f| (f.0, self.expr(b, &f.1, stmts)))
+                    .collect(),
+            ),
+            HirConstructorArgs::None => ThirConstructorArgs::None,
+        }
+    }
+
     fn pat_args(
         &mut self,
         b: &mut ThirBuilder,
@@ -573,17 +593,20 @@ impl<'db> ThirTranslator<'db> {
                     mutability: *mutability,
                 }
             }
-            HirExprDesc::CallDirect { target, args } => todo!(),
             HirExprDesc::UnresolvedCallDirect { .. } => ExprKind::Error,
-            HirExprDesc::CallMethod {
-                receiver,
-                method,
-                args,
-                interface_hint,
-            } => todo!(),
-            HirExprDesc::CallStatic { ty, method, args } => todo!(),
-            HirExprDesc::BinOp { lhs, op, rhs } => todo!(),
-            HirExprDesc::StructLit { ty, fields } => todo!(),
+            HirExprDesc::BinOp { lhs, op, rhs } => {
+                let lhs = self.expr(b, lhs, stmts);
+                let rhs = self.expr(b, rhs, stmts);
+                ExprKind::BinOp { op: *op, lhs, rhs }
+            }
+            HirExprDesc::StructLit { fields, .. } => {
+                let struct_def = ty.as_struct_ref(self.db).expect("TODO");
+                let fields = fields
+                    .iter()
+                    .map(|field| (field.0, self.expr(b, &field.1, stmts)))
+                    .collect_vec();
+                ExprKind::StructLit { struct_def, fields }
+            }
             HirExprDesc::Neg(hir_expr) => {
                 let operand = self.expr(b, hir_expr, stmts);
                 ExprKind::Neg(operand)
@@ -609,12 +632,28 @@ impl<'db> ThirTranslator<'db> {
             HirExprDesc::SizeOf(partial_type_ref) => {
                 ExprKind::SizeOf(partial_type_ref.plugged_by_unknown(self.db))
             }
-            HirExprDesc::Constructor {
-                enum_def,
-                name,
+            HirExprDesc::Constructor { name, args, .. } => {
+                let enum_def = ty.as_enum_ref(self.db).expect("TODO");
+                let idx = enum_item(self.db, enum_def.def.interned())
+                    .variants
+                    .iter()
+                    .position(|v| v.name == *name)
+                    .expect("TODO");
+                let args = self.expr_args(b, args, stmts);
+                ExprKind::Constructor {
+                    enum_def,
+                    idx,
+                    args,
+                }
+            }
+            HirExprDesc::CallDirect { target, args } => todo!(),
+            HirExprDesc::CallMethod {
+                receiver,
+                method,
                 args,
-                template_hints,
+                interface_hint,
             } => todo!(),
+            HirExprDesc::CallStatic { ty, method, args } => todo!(),
         };
         b.new_expr(ThirExpr {
             kind,
