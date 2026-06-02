@@ -133,10 +133,9 @@ fn compute_if_stmt_completeness(
     whole_span: Span,
 ) -> Completeness {
     match (then_check, else_check) {
-        (
-            Completeness::AlwaysReturns,
-            Some(Completeness::AlwaysReturns) | None,
-        ) => Completeness::AlwaysReturns,
+        (Completeness::AlwaysReturns, Some(Completeness::AlwaysReturns)) => {
+            Completeness::AlwaysReturns
+        }
         (
             Completeness::AlwaysReturns,
             Some(Completeness::MayFallthrough { span }),
@@ -145,10 +144,7 @@ fn compute_if_stmt_completeness(
             Completeness::MayFallthrough { span },
             Some(Completeness::AlwaysReturns) | None,
         ) => Completeness::MayFallthrough { span },
-        (
-            Completeness::MayFallthrough { .. },
-            Some(Completeness::MayFallthrough { .. }),
-        ) => Completeness::MayFallthrough { span: whole_span },
+        _ => Completeness::MayFallthrough { span: whole_span },
     }
 }
 
