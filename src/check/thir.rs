@@ -15,10 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, check::thir::validate_thir, ril::FunctionId, thir::thir_body};
+use std::sync::Arc;
 
-pub fn check_fundef<'db>(db: &'db dyn Db, fdef: FunctionId) {
-    if let Some(thir) = thir_body(db, fdef) {
-        validate_thir(db, thir);
-    }
+use salsa::Accumulator;
+
+use crate::{Db, compiler::diagnostic::Diag, thir::Thir};
+
+pub fn validate_thir(db: &dyn Db, thir: Arc<Thir>) {
+    let span = thir.id.span(db);
+    Diag::todo(
+        format!("Implement validate_thir ({}:{})", file!(), line!()),
+        span,
+    )
+    .accumulate(db);
 }

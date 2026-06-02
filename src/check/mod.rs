@@ -40,6 +40,7 @@ use crate::{
 pub mod fundef;
 pub mod implem;
 pub mod interface;
+pub mod thir;
 pub mod types;
 
 #[salsa::tracked]
