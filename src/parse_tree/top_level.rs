@@ -71,6 +71,7 @@ pub struct AstFundefDesc {
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
     pub return_type: AstTypeExpr,
+    pub body_span: Span,
     pub body: Vec<AstStmt>,
 }
 
@@ -83,6 +84,7 @@ pub struct AstMethodDefDesc {
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
     pub return_type: AstTypeExpr,
+    pub body_span: Span,
     pub body: Vec<AstStmt>,
 }
 
@@ -191,7 +193,12 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                 Ok(())
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                write!(f, "{}::{}", from.display(self.db), to.data.display(self.db))
+                write!(
+                    f,
+                    "{}::{}",
+                    from.display(self.db),
+                    to.data.display(self.db)
+                )
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
                 write!(
@@ -338,7 +345,11 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
         symbols.reverse();
 
         symbols.into_iter().fold(
-            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
+            AstIncludePath::new(
+                AstIncludePathDesc::Symbol(symbol),
+                vec![],
+                span,
+            ),
             |acc, symb| {
                 let total_span = start_loc.span(symb.span.end());
                 AstIncludePath::new(
