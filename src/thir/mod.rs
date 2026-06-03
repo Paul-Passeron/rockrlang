@@ -21,7 +21,7 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
-    hir::{self, Mutability, hir_body},
+    hir::{self, Mutability, function_ast, hir_body},
     parse_tree::expr::BinaryOperator,
     ril::{
         EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef,
@@ -244,4 +244,22 @@ pub fn _thir_body<'db>(
     Some(ThirArc(Arc::new(thir)))
 }
 
-// TODO: I think during type inference etc, we should keep track of exprs substitutions ExprId -> ExprId (e.g. for automatic dereferences, `ref.field` becomes `(*ref).field`) and compute the actual HIR applying all the necessary substitutions.
+fn get_thir_body_span(db: &dyn Db, thir: &Thir) -> Span {
+    // We return the body span of the thir without the braces if possible.
+    if let Some(fst) = thir.root.first()
+        && let Some(lst) = thir.root.last()
+    {
+        fst.span.start().span(lst.span.end())
+    } else {
+        function_ast(db, thir.id.interned())
+            .inner(db)
+            .body_span()
+            .unwrap_or_else(|| thir.id.span(db))
+    }
+}
+
+impl Thir {
+    pub fn body_span(&self, db: &dyn Db) -> Span {
+        get_thir_body_span(db, self)
+    }
+}

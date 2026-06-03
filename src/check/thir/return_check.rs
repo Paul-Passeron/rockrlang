@@ -4,7 +4,6 @@ use crate::{
     Db,
     common::location::Span,
     compiler::{diagnostic::Diag, get_sig_of_function},
-    hir::function_ast,
     ril::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
         ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup,
@@ -89,20 +88,6 @@ pub enum Completeness {
     MayFallthrough { span: Span },
 }
 
-fn get_thir_body_span(db: &dyn Db, thir: &Thir) -> Span {
-    // We return the body span of the thir without the braces if possible.
-    if let Some(fst) = thir.root.first()
-        && let Some(lst) = thir.root.last()
-    {
-        fst.span.start().span(lst.span.end())
-    } else {
-        function_ast(db, thir.id.interned())
-            .inner(db)
-            .body_span()
-            .unwrap_or_else(|| thir.id.span(db))
-    }
-}
-
 pub fn check_stmts(
     db: &dyn Db,
     thir: &Thir,
@@ -123,7 +108,7 @@ pub fn check_stmts(
     }
 
     Completeness::MayFallthrough {
-        span: get_thir_body_span(db, thir),
+        span: thir.body_span(db),
     }
 }
 

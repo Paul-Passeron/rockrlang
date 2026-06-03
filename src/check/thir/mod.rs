@@ -18,14 +18,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use salsa::Accumulator;
 
 use crate::{
-    Db, check::thir::return_check::check_return, compiler::diagnostic::Diag,
+    Db,
+    check::thir::{return_check::check_return, sanity_check::sanity_check},
+    compiler::diagnostic::Diag,
     thir::Thir,
 };
 
 pub mod return_check;
+pub mod sanity_check;
 
 pub fn validate_thir(db: &dyn Db, thir: &Thir) {
     check_return(db, thir);
+    sanity_check(db, thir);
     let span = thir.id.span(db);
     Diag::todo(
         format!("Implement validate_thir ({}:{})", file!(), line!()),
