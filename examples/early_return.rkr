@@ -1,0 +1,41 @@
+fun get_bool(): bool {
+    core::sys::exit(0);
+}
+
+fun foo(): int {
+    if get_bool() {
+        return 0;
+    }
+}
+
+fun foo2(): int {
+    if get_bool() {
+        return 0;
+    } else {
+        return 7;
+    }
+}
+
+fun foo3(): int {
+    if get_bool() {
+        return 0;
+    } else {
+        let y = 3;
+    }
+}
+
+fun foo4(): int {
+    if get_bool() {
+        return 0;
+    }
+    return 7;
+}
+
+fun get_never_bool<T>(arg: T): bool {
+    return true;
+}
+
+fun foo5(): int {
+    if get_never_bool(core::sys::exit(0)) {}
+    return 7;
+}
