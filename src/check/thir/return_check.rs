@@ -21,7 +21,7 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
     if let Completeness::MayFallthrough { span } =
         check_stmts(db, thir, &thir.root)
     {
-        Diag::todo(
+        Diag::generic_error(
             format!(
                 "Emit real fallthrough diagnostic ({}:{})",
                 file!(),

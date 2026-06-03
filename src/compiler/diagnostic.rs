@@ -107,6 +107,19 @@ impl Diag {
         )
     }
 
+    pub fn generic_error(message: String, span: Span) -> Self {
+        let primary = DiagLabel::new(span, Some(message));
+
+        Diag::new(
+            Severity::Error,
+            "not yet implemented.".to_string(),
+            primary,
+            vec![],
+            vec![],
+            vec![],
+        )
+    }
+
     pub fn new(
         severity: Severity,
         message: String,
