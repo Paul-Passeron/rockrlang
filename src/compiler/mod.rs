@@ -19,7 +19,7 @@ use crate::{
     Db, RockrDb, SourceFile,
     check::check,
     common::symbols::Symbol,
-    compiler::diagnostic::Diag,
+    compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
     name_resolve::type_expr::{
@@ -126,6 +126,7 @@ pub enum CompilerError {
     STDLibNotFound,
     NoFileFoundAt(PathBuf),
     CoreLibNotFound,
+    CompiledWithErrors,
 }
 
 impl fmt::Display for CompilerError {
@@ -146,6 +147,9 @@ impl fmt::Display for CompilerError {
             }
             CompilerError::CoreLibNotFound => {
                 write!(f, "Core library (`core`) package not found.")
+            }
+            CompilerError::CompiledWithErrors => {
+                write!(f, "Errors encountered, did not compile.")
             }
         }
     }
@@ -421,8 +425,13 @@ pub fn check_from_disk(
     let ws = Workspace::get(&db);
     check(&db, ws);
     let diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
+    let has_errors = diags.iter().any(|d| d.severity == Severity::Error);
     render_diagnostics(&db, diags.into_iter());
-    Ok(())
+    if has_errors {
+        Err(CompilerError::CompiledWithErrors)
+    } else {
+        Ok(())
+    }
 }
 #[salsa::tracked]
 pub fn is_file_direct_submodule_of_file<'db>(
