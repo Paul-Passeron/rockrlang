@@ -15,9 +15,9 @@ pub struct SanityError {
 }
 
 pub struct SanityChecker<'db> {
-    pub errs: Vec<SanityError>,
     pub db: &'db dyn Db,
     pub thir: &'db Thir,
+    pub errs: Vec<SanityError>,
 }
 
 impl<'db> SanityChecker<'db> {
@@ -69,6 +69,7 @@ impl<'db> SanityChecker<'db> {
                 self.check_expr_with_expected_type(*init, local_ty);
             }
             StmtKind::Assign { place, rhs } => {
+                self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
                 self.check_expr_with_expected_type(*rhs, place_ty);
             }
