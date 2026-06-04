@@ -991,22 +991,22 @@ impl ThirPlace {
 }
 
 impl TypeRef {
-    pub fn with_substitution(self, db: &dyn Db, sub: &[Self]) -> Option<Self> {
+    pub fn with_substitution(self, db: &dyn Db, sub: &[Self]) -> Self {
         match self {
-            Self::Concrete(type_id) => Some(Self::Concrete(TypeId::new(
+            Self::Concrete(type_id) => Self::Concrete(TypeId::new(
                 db,
                 type_id.def(db),
                 type_id
                     .args(db)
                     .iter()
                     .map(|t| t.with_substitution(db, sub))
-                    .collect::<Option<_>>()?,
-            ))),
-            Self::Param(id) => Some(sub[id.0]),
+                    .collect(),
+            )),
+            Self::Param(id) => sub[id.0],
             Self::Associated(_)
             | Self::Zelf
             | Self::Error
-            | TypeRef::Unknown => Some(self),
+            | TypeRef::Unknown => self,
         }
     }
 }
@@ -1021,8 +1021,10 @@ impl StructRef {
             Arc::new([]),
         )
         .unwrap();
-        let value = ctx.resolve(db, &found.ty.data)?;
-        value.with_substitution(db, &self.args)
+        Some(
+            ctx.resolve(db, &found.ty.data)?
+                .with_substitution(db, &self.args),
+        )
     }
 }
 

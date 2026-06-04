@@ -1,11 +1,18 @@
+use std::collections::HashMap;
+
+use itertools::Itertools;
+
 use crate::{
     Db,
-    common::location::Span,
-    ril::{TypeRef, bool_id, void_id},
+    common::{location::Span, symbols::Symbol},
+    name_resolve::type_expr::struct_item,
+    ril::{ScopeOwnerId, TypeRef, bool_id, tuple_of, void_id},
     thir::{
-        ExprId, PlaceId, Thir, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+        ExprId, PlaceId, StructRef, Thir, ThirExprWithSetup, ThirMatchBranch,
+        ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
+    typecheck::inference::implicit::AstImplicitContext,
 };
 
 pub struct SanityError {
@@ -121,7 +128,48 @@ impl<'db> SanityChecker<'db> {
     }
 
     fn check_pattern(&mut self, pat: &ThirPattern) {
-        todo!()
+        match &pat.kind {
+            ThirPatternKind::Error
+            | ThirPatternKind::Any
+            | ThirPatternKind::Bind { .. } => (),
+            ThirPatternKind::Tuple(thir_patterns) => {
+                let tys = thir_patterns
+                    .iter()
+                    .map(|pat| {
+                        self.check_pattern(pat);
+                        pat.ty
+                    })
+                    .collect_vec();
+                let expected = TypeRef::Concrete(tuple_of(self.db, tys));
+                if pat.ty != expected {
+                    self.errs.push(SanityError {
+                        expected,
+                        got: pat.ty,
+                        span: pat.span,
+                    });
+                }
+            }
+            ThirPatternKind::Struct { def, fields } => {
+                // All fields should be here, this is checked previously
+                let actual_fields = def.get_fields_ty(self.db);
+                for (symbol, thir_pattern) in fields {
+                    let actual_ty = actual_fields[symbol];
+                    if actual_ty != thir_pattern.ty {
+                        self.errs.push(SanityError {
+                            expected: actual_ty,
+                            got: thir_pattern.ty,
+                            span: thir_pattern.span,
+                        })
+                    }
+                }
+            }
+            ThirPatternKind::Constructor { def, idx, args } => {
+                todo!()
+            }
+            ThirPatternKind::IntLit(_) => {
+                // TODO: Do something here
+            }
+        }
     }
 
     fn check_branch(&mut self, scrut_ty: TypeRef, branch: &ThirMatchBranch) {
@@ -187,4 +235,25 @@ impl<'db> SanityChecker<'db> {
 pub fn sanity_check(db: &dyn Db, thir: &Thir) {
     let mismatches = SanityChecker::new(db, thir).check();
     assert!(mismatches.is_empty())
+}
+
+impl StructRef {
+    pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
+        let item = struct_item(db, self.def.interned());
+        let mut res = HashMap::new();
+        for field in &item.fields {
+            let ctx = AstImplicitContext::new(
+                db,
+                ScopeOwnerId::Module(self.def.parent(db)),
+                item.template_args.iter().cloned().collect(),
+            )
+            .unwrap();
+            let type_ref = ctx
+                .resolve(db, &field.ty.data)
+                .unwrap_or(TypeRef::Error)
+                .with_substitution(db, &self.args);
+            res.insert(field.name, type_ref);
+        }
+        res
+    }
 }
