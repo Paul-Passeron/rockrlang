@@ -3,7 +3,7 @@ use crate::{
     common::location::Span,
     ril::{TypeRef, bool_id, void_id},
     thir::{
-        ExprId, PlaceId, Thir, ThirExprWithSetup, ThirMatchBranch,
+        ExprId, PlaceId, Thir, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
         stmt::{StmtKind, ThirStmt},
     },
 };
@@ -23,9 +23,9 @@ pub struct SanityChecker<'db> {
 impl<'db> SanityChecker<'db> {
     pub fn new(db: &'db dyn Db, thir: &'db Thir) -> Self {
         Self {
-            errs: Vec::new(),
             db,
             thir,
+            errs: Vec::new(),
         }
     }
 
@@ -93,8 +93,47 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    fn check_branch(&mut self, scrut_ty: TypeRef, branch: &ThirMatchBranch) {
+    fn check_pattern_against_scrut_ty(
+        &mut self,
+        scrut_ty: TypeRef,
+        pat: &ThirPattern,
+    ) {
+        if let Some((mutability, inner_type)) = scrut_ty.as_ref(self.db) {
+            todo!()
+        } else {
+            self.check_pattern_with_expected_ty(pat, scrut_ty)
+        }
+    }
+
+    fn check_pattern_with_expected_ty(
+        &mut self,
+        pat: &ThirPattern,
+        expected: TypeRef,
+    ) {
+        self.check_pattern(pat);
+        if pat.ty != expected {
+            self.errs.push(SanityError {
+                expected,
+                got: pat.ty,
+                span: pat.span,
+            });
+        }
+    }
+
+    fn check_pattern(&mut self, pat: &ThirPattern) {
         todo!()
+    }
+
+    fn check_branch(&mut self, scrut_ty: TypeRef, branch: &ThirMatchBranch) {
+        self.check_pattern_against_scrut_ty(scrut_ty, &branch.pattern);
+        if let Some(guard) = &branch.guard {
+            self.check_stmts(&guard.stmts);
+            self.check_expr_with_expected_type(
+                guard.expr,
+                TypeRef::Concrete(bool_id(self.db)),
+            );
+        }
+        self.check_stmts(&branch.body);
     }
 
     fn check_expr(&mut self, expr: ExprId) {
