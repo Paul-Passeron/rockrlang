@@ -8,8 +8,8 @@ use crate::{
     name_resolve::type_expr::struct_item,
     ril::{ScopeOwnerId, TypeRef, bool_id, tuple_of, void_id},
     thir::{
-        ExprId, PlaceId, StructRef, Thir, ThirExprWithSetup, ThirMatchBranch,
-        ThirPattern, ThirPatternKind,
+        ExprId, PlaceBase, PlaceId, Projection, StructRef, Thir,
+        ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::AstImplicitContext,
@@ -188,8 +188,57 @@ impl<'db> SanityChecker<'db> {
         todo!()
     }
 
+    fn check_projection(
+        &mut self,
+        before: TypeRef,
+        projection: &Projection,
+        expected: TypeRef,
+        span: Span,
+    ) {
+        if let Some(ty) =
+            compute_type_after_projection(self.db, before, projection)
+        {
+            if ty != expected {
+                self.errs.push(SanityError {
+                    expected,
+                    got: ty,
+                    span,
+                });
+            }
+        } else {
+            todo!()
+        }
+    }
+
     fn check_place(&mut self, place: PlaceId) {
-        todo!()
+        let info = &self.thir.places[place];
+        let base_ty = match info.base {
+            PlaceBase::Local(idx) => self.thir.locals[idx].ty,
+        };
+        let end_ty =
+            info.projections.iter().fold(base_ty, |before, projection| {
+                let expected = match projection {
+                    Projection::Field(_, type_ref)
+                    | Projection::TupleField(_, type_ref) => Some(*type_ref),
+                    _ => None,
+                };
+                let expected = expected
+                    .or_else(|| {
+                        compute_type_after_projection(
+                            self.db, before, projection,
+                        )
+                    })
+                    .unwrap_or(TypeRef::Error);
+                self.check_projection(before, projection, expected, info.span);
+                expected
+            });
+        if end_ty != info.ty {
+            self.errs.push(SanityError {
+                expected: end_ty,
+                got: info.ty,
+                span: info.span,
+            });
+        }
     }
 
     pub fn check_return(&mut self, expr: Option<ExprId>, span: Span) {
@@ -255,5 +304,27 @@ impl StructRef {
             res.insert(field.name, type_ref);
         }
         res
+    }
+}
+
+fn compute_type_after_projection(
+    db: &dyn Db,
+    before: TypeRef,
+    projection: &Projection,
+) -> Option<TypeRef> {
+    match projection {
+        Projection::Deref => {
+            let before = before.as_type_id()?;
+            if before.def(db).is_ptr_like(db).is_none() {
+                None
+            } else {
+                let mut args = before.args(db);
+                assert_eq!(args.len(), 1);
+                args.pop()
+            }
+        }
+        Projection::Field(symbol, type_ref) => todo!(),
+        Projection::TupleField(_, type_ref) => todo!(),
+        Projection::Index(idx) => todo!(),
     }
 }
