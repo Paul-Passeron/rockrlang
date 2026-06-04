@@ -6,9 +6,12 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     name_resolve::type_expr::struct_item,
-    ril::{ScopeOwnerId, TypeRef, bool_id, tuple_of, void_id},
+    ril::{
+        ScopeOwnerId, TypeRef, bool_id, char_id, const_ptr_of, ref_of, str_id,
+        tuple_of, void_id,
+    },
     thir::{
-        ExprId, PlaceBase, PlaceId, Projection, StructRef, Thir,
+        ExprId, ExprKind, PlaceBase, PlaceId, Projection, StructRef, Thir,
         ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
@@ -118,13 +121,7 @@ impl<'db> SanityChecker<'db> {
         expected: TypeRef,
     ) {
         self.check_pattern(pat);
-        if pat.ty != expected {
-            self.errs.push(SanityError {
-                expected,
-                got: pat.ty,
-                span: pat.span,
-            });
-        }
+        self.check_types(expected, pat.ty, pat.span);
     }
 
     fn check_pattern(&mut self, pat: &ThirPattern) {
@@ -141,26 +138,18 @@ impl<'db> SanityChecker<'db> {
                     })
                     .collect_vec();
                 let expected = TypeRef::Concrete(tuple_of(self.db, tys));
-                if pat.ty != expected {
-                    self.errs.push(SanityError {
-                        expected,
-                        got: pat.ty,
-                        span: pat.span,
-                    });
-                }
+                self.check_types(expected, pat.ty, pat.span);
             }
             ThirPatternKind::Struct { def, fields } => {
                 // All fields should be here, this is checked previously
                 let actual_fields = def.get_fields_ty(self.db);
                 for (symbol, thir_pattern) in fields {
                     let actual_ty = actual_fields[symbol];
-                    if actual_ty != thir_pattern.ty {
-                        self.errs.push(SanityError {
-                            expected: actual_ty,
-                            got: thir_pattern.ty,
-                            span: thir_pattern.span,
-                        })
-                    }
+                    self.check_types(
+                        actual_ty,
+                        thir_pattern.ty,
+                        thir_pattern.span,
+                    );
                 }
             }
             ThirPatternKind::Constructor { def, idx, args } => {
@@ -185,7 +174,82 @@ impl<'db> SanityChecker<'db> {
     }
 
     fn check_expr(&mut self, expr: ExprId) {
-        todo!()
+        let infos = &self.thir.exprs[expr];
+        match &infos.kind {
+            ExprKind::SizeOf(_) | ExprKind::IntLit(_) => todo!(),
+            ExprKind::Charlit(_) => self.check_types(
+                TypeRef::Concrete(char_id(self.db)),
+                infos.ty,
+                infos.span,
+            ),
+            ExprKind::StrLit(_) => self.check_types(
+                TypeRef::Concrete(str_id(self.db)),
+                infos.ty,
+                infos.span,
+            ),
+            ExprKind::CStrLit(_) => self.check_types(
+                TypeRef::Concrete(const_ptr_of(
+                    self.db,
+                    TypeRef::Concrete(char_id(self.db)),
+                )),
+                infos.ty,
+                infos.span,
+            ),
+            ExprKind::BoolLit(_) => self.check_types(
+                TypeRef::Concrete(bool_id(self.db)),
+                infos.ty,
+                infos.span,
+            ),
+            ExprKind::Use(place) => {
+                self.check_place(*place);
+                let place_ty = self.thir.places[*place].ty;
+                self.check_types(infos.ty, place_ty, infos.span);
+            }
+            ExprKind::AddressOf { place, mutability } => todo!(),
+            ExprKind::Ref { place, mutability } => {
+                self.check_place(*place);
+                let place_ty = self.thir.places[*place].ty;
+                let ref_ty = TypeRef::Concrete(ref_of(
+                    self.db,
+                    place_ty,
+                    mutability.is_mut(),
+                ));
+                self.check_types(infos.ty, ref_ty, infos.span);
+            }
+            ExprKind::Call { called, args } => todo!(),
+            ExprKind::BinOp { op, lhs, rhs } => todo!(),
+            ExprKind::StructLit { struct_def, fields } => todo!(),
+            ExprKind::Neg(idx) => todo!(),
+            ExprKind::Not(idx) => todo!(),
+            ExprKind::Tuple(items) => {
+                let tys = items
+                    .iter()
+                    .map(|expr| {
+                        self.check_expr(*expr);
+                        self.thir.exprs[*expr].ty
+                    })
+                    .collect_vec();
+                let expected = TypeRef::Concrete(tuple_of(self.db, tys));
+                self.check_types(expected, infos.ty, infos.span);
+            }
+            ExprKind::SliceLit(items) => todo!(),
+            ExprKind::Constructor {
+                enum_def,
+                idx,
+                args,
+            } => todo!(),
+            ExprKind::Error => (),
+        }
+    }
+
+    fn check_types(&mut self, expected: TypeRef, got: TypeRef, span: Span) {
+        if expected != got {
+            self.errs.push(SanityError {
+                expected,
+                got,
+                span,
+            });
+        }
     }
 
     fn check_projection(
@@ -196,15 +260,9 @@ impl<'db> SanityChecker<'db> {
         span: Span,
     ) {
         if let Some(ty) =
-            compute_type_after_projection(self.db, before, projection)
+            self.compute_type_after_projection(before, projection, span)
         {
-            if ty != expected {
-                self.errs.push(SanityError {
-                    expected,
-                    got: ty,
-                    span,
-                });
-            }
+            self.check_types(expected, ty, span);
         } else {
             todo!()
         }
@@ -224,21 +282,15 @@ impl<'db> SanityChecker<'db> {
                 };
                 let expected = expected
                     .or_else(|| {
-                        compute_type_after_projection(
-                            self.db, before, projection,
+                        self.compute_type_after_projection(
+                            before, projection, info.span,
                         )
                     })
                     .unwrap_or(TypeRef::Error);
                 self.check_projection(before, projection, expected, info.span);
                 expected
             });
-        if end_ty != info.ty {
-            self.errs.push(SanityError {
-                expected: end_ty,
-                got: info.ty,
-                span: info.span,
-            });
-        }
+        self.check_types(end_ty, info.ty, info.span);
     }
 
     pub fn check_return(&mut self, expr: Option<ExprId>, span: Span) {
@@ -250,13 +302,7 @@ impl<'db> SanityChecker<'db> {
             }
             None => {
                 let void_ty = TypeRef::Concrete(void_id(self.db));
-                if ret_ty != void_ty {
-                    self.errs.push(SanityError {
-                        expected: ret_ty,
-                        got: void_ty,
-                        span: span,
-                    });
-                }
+                self.check_types(ret_ty, void_ty, span);
             }
         }
     }
@@ -271,12 +317,34 @@ impl<'db> SanityChecker<'db> {
             let expr = &self.thir.exprs[expr];
             (expr.ty, expr.span)
         };
-        if expected != got {
-            self.errs.push(SanityError {
-                expected,
-                got,
-                span,
-            });
+        self.check_types(expected, got, span);
+    }
+
+    fn compute_type_after_projection(
+        &mut self,
+        before: TypeRef,
+        projection: &Projection,
+        span: Span,
+    ) -> Option<TypeRef> {
+        match projection {
+            Projection::Deref => {
+                let before = before.as_type_id()?;
+                if before.def(self.db).is_ptr_like(self.db).is_none() {
+                    None
+                } else {
+                    let mut args = before.args(self.db);
+                    assert_eq!(args.len(), 1);
+                    args.pop()
+                }
+            }
+            Projection::Field(symbol, type_ref) => {
+                let struct_ref = before.as_struct_ref(self.db)?;
+                let typeof_field = struct_ref.typeof_field(self.db, *symbol)?;
+                self.check_types(typeof_field, *type_ref, span);
+                Some(typeof_field)
+            }
+            Projection::TupleField(_, type_ref) => todo!(),
+            Projection::Index(idx) => todo!(),
         }
     }
 }
@@ -304,27 +372,5 @@ impl StructRef {
             res.insert(field.name, type_ref);
         }
         res
-    }
-}
-
-fn compute_type_after_projection(
-    db: &dyn Db,
-    before: TypeRef,
-    projection: &Projection,
-) -> Option<TypeRef> {
-    match projection {
-        Projection::Deref => {
-            let before = before.as_type_id()?;
-            if before.def(db).is_ptr_like(db).is_none() {
-                None
-            } else {
-                let mut args = before.args(db);
-                assert_eq!(args.len(), 1);
-                args.pop()
-            }
-        }
-        Projection::Field(symbol, type_ref) => todo!(),
-        Projection::TupleField(_, type_ref) => todo!(),
-        Projection::Index(idx) => todo!(),
     }
 }
