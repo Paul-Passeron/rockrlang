@@ -5,14 +5,16 @@ use itertools::Itertools;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
+    compiler::get_sig_of_function,
     name_resolve::type_expr::struct_item,
     ril::{
         ScopeOwnerId, TypeRef, bool_id, char_id, const_ptr_of, ref_of, str_id,
         tuple_of, void_id,
     },
     thir::{
-        ExprId, ExprKind, PlaceBase, PlaceId, Projection, StructRef, Thir,
-        ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
+        ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
+        StructRef, Thir, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+        ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::AstImplicitContext,
@@ -176,7 +178,9 @@ impl<'db> SanityChecker<'db> {
     fn check_expr(&mut self, expr: ExprId) {
         let infos = &self.thir.exprs[expr];
         match &infos.kind {
-            ExprKind::SizeOf(_) | ExprKind::IntLit(_) => todo!(),
+            ExprKind::SizeOf(_) | ExprKind::IntLit(_) => {
+                // TODO
+            }
             ExprKind::Charlit(_) => self.check_types(
                 TypeRef::Concrete(char_id(self.db)),
                 infos.ty,
@@ -216,7 +220,27 @@ impl<'db> SanityChecker<'db> {
                 ));
                 self.check_types(infos.ty, ref_ty, infos.span);
             }
-            ExprKind::Call { called, args } => todo!(),
+            ExprKind::Call { called, args } => {
+                let args_ty = args
+                    .iter()
+                    .map(|arg| {
+                        self.check_expr(*arg);
+                        (self.thir.exprs[*arg].ty, *arg)
+                    })
+                    .collect_vec();
+                let ret = called.ret_ty(self.db);
+                let params = called.params(self.db);
+                params.into_iter().zip(args_ty).for_each(
+                    |((_, param), (arg_ty, arg))| {
+                        self.check_types(
+                            param,
+                            arg_ty,
+                            self.thir.exprs[arg].span,
+                        )
+                    },
+                );
+                self.check_types(ret, infos.ty, infos.span);
+            }
             ExprKind::BinOp { op, lhs, rhs } => todo!(),
             ExprKind::StructLit { struct_def, fields } => todo!(),
             ExprKind::Neg(idx) => todo!(),
@@ -372,5 +396,20 @@ impl StructRef {
             res.insert(field.name, type_ref);
         }
         res
+    }
+}
+
+impl FunctionRef {
+    pub fn ret_ty(&self, db: &dyn Db) -> TypeRef {
+        let sig = get_sig_of_function(db, self.id.interned());
+        sig.ret.with_substitution(db, &self.args)
+    }
+
+    pub fn params(&self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
+        let sig = get_sig_of_function(db, self.id.interned());
+        sig.args
+            .iter()
+            .map(|(symb, ty)| (*symb, ty.with_substitution(db, &self.args)))
+            .collect()
     }
 }
