@@ -676,9 +676,16 @@ impl<'db> ThirTranslator<'db> {
             }
             HirExprDesc::AddressOf { place, mutability } => {
                 let place = self.place(b, place, stmts);
-                ExprKind::AddressOf {
-                    place,
-                    mutability: *mutability,
+                if ty.as_ref(self.db).is_some() {
+                    ExprKind::Ref {
+                        place,
+                        mutability: *mutability,
+                    }
+                } else {
+                    ExprKind::AddressOf {
+                        place,
+                        mutability: *mutability,
+                    }
                 }
             }
             HirExprDesc::Ref { place, mutability } => {
