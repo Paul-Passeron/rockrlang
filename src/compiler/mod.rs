@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, RockrDb, SourceFile,
     check::check,
-    common::symbols::Symbol,
+    common::{location::LocationInfo, symbols::Symbol},
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
@@ -424,9 +424,23 @@ pub fn check_from_disk(
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
-    let diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
-    let has_errors = diags.iter().any(|d| d.severity == Severity::Error);
-    render_diagnostics(&db, diags.into_iter());
+    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
+    let has_errors = raw_diags.iter().any(|d| d.severity == Severity::Error);
+
+    let mut diags: Vec<(LocationInfo, &Diag)> = raw_diags
+        .into_iter()
+        .map(|d| (d.primary.span.start().loc_info(&db), d))
+        .collect();
+
+    diags.sort_by(|(loc_a, diag_a), (loc_b, diag_b)| {
+        diag_a.severity.cmp(&diag_b.severity).then_with(|| {
+            loc_a
+                .cmp(loc_b)
+                .then_with(|| diag_a.message.cmp(&diag_b.message))
+        })
+    });
+
+    render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
     if has_errors {
         Err(CompilerError::CompiledWithErrors)
     } else {

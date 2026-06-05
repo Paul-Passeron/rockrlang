@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{Db, common::location::Span, name_resolve::definition::Definition};
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Severity {
     Error,
     Warning,
@@ -42,7 +42,7 @@ impl std::fmt::Display for Severity {
 }
 
 #[salsa::accumulator]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diag {
     pub severity: Severity,
     pub message: String,
@@ -52,7 +52,7 @@ pub struct Diag {
     pub help: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiagLabel {
     pub span: Span,
     pub message: Option<String>,

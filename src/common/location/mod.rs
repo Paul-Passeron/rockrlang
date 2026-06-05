@@ -140,6 +140,20 @@ pub struct LocationInfo {
     pub offset: usize,
 }
 
+impl PartialOrd for LocationInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LocationInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.file
+            .cmp(&other.file)
+            .then_with(|| self.offset.cmp(&other.offset))
+    }
+}
+
 impl Display for LocationInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cwd = std::env::current_dir().unwrap_or_default();
