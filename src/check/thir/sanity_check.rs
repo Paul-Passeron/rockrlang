@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
@@ -8,8 +8,8 @@ use crate::{
     compiler::get_sig_of_function,
     name_resolve::type_expr::struct_item,
     ril::{
-        ScopeOwnerId, TypeRef, bool_id, char_id, const_ptr_of, ref_of, str_id,
-        tuple_of, void_id,
+        ScopeOwnerId, TypeRef, bool_id, char_id, const_ptr_of, ptr_of, ref_of,
+        slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -100,7 +100,9 @@ impl<'db> SanityChecker<'db> {
                     .iter()
                     .for_each(|branch| self.check_branch(scrut_ty, branch));
             }
-            StmtKind::Expr(expr) => self.check_expr(*expr),
+            StmtKind::Expr(expr) => {
+                let _ = self.check_expr(*expr);
+            }
             StmtKind::Break(_) | StmtKind::Continue(_) | StmtKind::Error => (),
         }
     }
@@ -154,9 +156,7 @@ impl<'db> SanityChecker<'db> {
                     );
                 }
             }
-            ThirPatternKind::Constructor { def, idx, args } => {
-                todo!()
-            }
+            ThirPatternKind::Constructor { .. } => todo!(),
             ThirPatternKind::IntLit(_) => {
                 // TODO: Do something here
             }
@@ -175,7 +175,7 @@ impl<'db> SanityChecker<'db> {
         self.check_stmts(&branch.body);
     }
 
-    fn check_expr(&mut self, expr: ExprId) {
+    fn check_expr(&mut self, expr: ExprId) -> TypeRef {
         let infos = &self.thir.exprs[expr];
         match &infos.kind {
             ExprKind::SizeOf(_) | ExprKind::IntLit(_) => {
@@ -209,7 +209,16 @@ impl<'db> SanityChecker<'db> {
                 let place_ty = self.thir.places[*place].ty;
                 self.check_types(infos.ty, place_ty, infos.span);
             }
-            ExprKind::AddressOf { place, mutability } => todo!(),
+            ExprKind::AddressOf { place, mutability } => {
+                self.check_place(*place);
+                let place_ty = self.thir.places[*place].ty;
+                let expected_ty = TypeRef::Concrete(ptr_of(
+                    self.db,
+                    place_ty,
+                    mutability.is_mut(),
+                ));
+                self.check_types(expected_ty, infos.ty, infos.span);
+            }
             ExprKind::Ref { place, mutability } => {
                 self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
@@ -223,10 +232,7 @@ impl<'db> SanityChecker<'db> {
             ExprKind::Call { called, args } => {
                 let args_ty = args
                     .iter()
-                    .map(|arg| {
-                        self.check_expr(*arg);
-                        (self.thir.exprs[*arg].ty, *arg)
-                    })
+                    .map(|arg| (self.check_expr(*arg), *arg))
                     .collect_vec();
                 let ret = called.ret_ty(self.db);
                 let params = called.params(self.db);
@@ -241,10 +247,21 @@ impl<'db> SanityChecker<'db> {
                 );
                 self.check_types(ret, infos.ty, infos.span);
             }
-            ExprKind::BinOp { op, lhs, rhs } => todo!(),
-            ExprKind::StructLit { struct_def, fields } => todo!(),
-            ExprKind::Neg(idx) => todo!(),
-            ExprKind::Not(idx) => todo!(),
+            ExprKind::BinOp { .. } => todo!(),
+            ExprKind::Neg(_) => todo!(),
+            ExprKind::Not(operand) => {
+                let operand_ty = self.check_expr(*operand);
+                self.check_types(
+                    TypeRef::Concrete(bool_id(self.db)),
+                    operand_ty,
+                    self.thir.exprs[*operand].span,
+                );
+                self.check_types(
+                    TypeRef::Concrete(bool_id(self.db)),
+                    infos.ty,
+                    infos.span,
+                );
+            }
             ExprKind::Tuple(items) => {
                 let tys = items
                     .iter()
@@ -256,14 +273,38 @@ impl<'db> SanityChecker<'db> {
                 let expected = TypeRef::Concrete(tuple_of(self.db, tys));
                 self.check_types(expected, infos.ty, infos.span);
             }
-            ExprKind::SliceLit(items) => todo!(),
-            ExprKind::Constructor {
-                enum_def,
-                idx,
-                args,
-            } => todo!(),
+            ExprKind::SliceLit(items) => {
+                if items.is_empty() {
+                    todo!()
+                } else {
+                    let tys = items
+                        .iter()
+                        .map(|expr| {
+                            self.check_expr(*expr);
+                            self.thir.exprs[*expr].ty
+                        })
+                        .collect::<HashSet<_>>();
+                    for (ty_a, ty_b) in tys.iter().tuple_combinations() {
+                        self.check_types(*ty_a, *ty_b, infos.span);
+                    }
+                    let witness_type = tys
+                        .iter()
+                        .find_or_first(|ty| {
+                            !matches!(ty, TypeRef::Error | TypeRef::Unknown)
+                        })
+                        .copied()
+                        .unwrap_or(TypeRef::Error);
+                    let expected =
+                        TypeRef::Concrete(slice_of(self.db, witness_type));
+                    self.check_types(expected, infos.ty, infos.span);
+                }
+            }
+            ExprKind::Constructor { .. } => todo!(),
+            ExprKind::StructLit { .. } => todo!(),
+
             ExprKind::Error => (),
-        }
+        };
+        infos.ty
     }
 
     fn check_types(&mut self, expected: TypeRef, got: TypeRef, span: Span) {
@@ -367,8 +408,16 @@ impl<'db> SanityChecker<'db> {
                 self.check_types(typeof_field, *type_ref, span);
                 Some(typeof_field)
             }
-            Projection::TupleField(_, type_ref) => todo!(),
-            Projection::Index(idx) => todo!(),
+            Projection::TupleField(idx, type_ref) => {
+                let as_tuple = before.as_tuple_ref(self.db)?;
+                let typeof_field = *as_tuple.get(*idx as usize)?;
+                self.check_types(typeof_field, *type_ref, span);
+                Some(typeof_field)
+            }
+            Projection::Index(expr) => {
+                self.check_expr(*expr);
+                todo!()
+            }
         }
     }
 }
