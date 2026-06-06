@@ -115,7 +115,6 @@ pub fn module_items<'db>(
         let ast = parse_file(db, file);
         let parse_errors: Vec<&ParseError> =
             parse_file::accumulated::<ParseError>(db, file);
-        println!("Parse errors in file: {:?}", parse_errors);
         for err in parse_errors {
             let span = Span::new(err.file, err.start, err.end);
             Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
@@ -141,7 +140,6 @@ pub fn module_items<'db>(
                 let ast: Ast<'db> = parse_file(db, file);
                 let parse_errors: Vec<&ParseError> =
                     parse_file::accumulated::<ParseError>(db, file);
-                println!("Parse errors in file: {:?}", parse_errors);
                 for err in parse_errors {
                     let span = Span::new(err.file, err.start, err.end);
                     Diag::generic_error(format!("{:?}", err.kind), span)
