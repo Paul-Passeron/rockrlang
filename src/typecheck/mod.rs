@@ -19,8 +19,9 @@ use std::collections::HashMap;
 use std::{collections::BTreeMap, panic, sync::Arc};
 
 use crate::common::symbols::Symbol;
-use crate::hir::HirStructFieldPattern;
+use crate::hir::{HirMatchBranch, HirStructFieldPattern};
 use crate::parse_tree::top_level::AstStructDefField;
+use crate::typecheck::inference::implicit::AsAstImplCtx;
 use crate::{
     Db,
     hir::{
@@ -122,8 +123,10 @@ impl<'db> TyCtx<'db> {
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
-        if let Err((_, err)) = self.inf_ctx.solve_constraints() {
-            dbg!("TODO: err here !", err);
+        if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
+            let err = err.display(self.db).to_string();
+            let kind = cstr.kind.display(self.db).to_string();
+            dbg!(err, kind);
         }
 
         // Temporary
@@ -209,10 +212,11 @@ impl<'db> TyCtx<'db> {
             .allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
     }
 
-    fn typeof_pattern(
+    fn inner_type_of_pattern(
         &mut self,
         pattern: &HirPattern,
         loc_inners: &HashMap<LocalId, InferVar>,
+        binds_like: InferVar,
     ) -> InferTy {
         if let Some(inferred) =
             self.inf_ctx.inferred_patterns.get(&PatternId(pattern.id))
@@ -285,22 +289,66 @@ impl<'db> TyCtx<'db> {
                             ast_fields.iter().for_each(|field| {
                                 fields.insert(field.name, field);
                             });
+
                             for hir in hir_fields {
                                 match hir {
                                     HirStructFieldPattern::Rebind {
                                         name,
                                         pattern,
                                     } => {
-                                        // todo!()
+                                        if let Some(ast) = fields.get(name) {
+                                            let ty = ctx
+                                                .resolve(self.db, &ast.ty.data)
+                                                .unwrap_or(TypeRef::Error);
+                                            let infer_ty = self
+                                                .inf_ctx
+                                                .allocate_type_ref(&ty, &ctx);
+                                            let pat_ty = self
+                                                .inner_type_of_pattern(
+                                                    pattern, loc_inners,
+                                                    binds_like,
+                                                );
+                                            let to_unify = self
+                                                .inf_ctx
+                                                .emit_binds_like_constraint(
+                                                    binds_like, infer_ty,
+                                                );
+                                            if let Err(_) = self.inf_ctx.unify(
+                                                InferTy::Var(to_unify),
+                                                pat_ty,
+                                            ) {
+                                                todo!()
+                                            }
+                                        } else {
+                                            todo!()
+                                        }
                                     }
                                     HirStructFieldPattern::Name {
                                         id,
                                         name,
                                     } => {
                                         if let Some(ast) = fields.get(name) {
-                                            // todo!()
+                                            let ty = ctx
+                                                .resolve(self.db, &ast.ty.data)
+                                                .unwrap_or(TypeRef::Error);
+                                            let infer_ty = self
+                                                .inf_ctx
+                                                .allocate_type_ref(&ty, &ctx);
+                                            let local_ty =
+                                                self.inf_ctx.infer_local(*id);
+                                            let to_unify = self
+                                                .inf_ctx
+                                                .emit_binds_like_constraint(
+                                                    binds_like, infer_ty,
+                                                );
+                                            if let Err(_) = self.inf_ctx.unify(
+                                                InferTy::Var(to_unify),
+                                                local_ty,
+                                            ) {
+                                                todo!()
+                                            }
                                         } else {
-                                            // todo!()
+                                            todo!()
                                         }
                                     }
                                 }
@@ -316,8 +364,11 @@ impl<'db> TyCtx<'db> {
                             for (hir_pattern, ast_pattern) in
                                 hir_patterns.iter().zip(ast_patterns.iter())
                             {
-                                let pat_ty = self
-                                    .typeof_pattern(hir_pattern, loc_inners);
+                                let pat_ty = self.inner_type_of_pattern(
+                                    hir_pattern,
+                                    loc_inners,
+                                    binds_like,
+                                );
                                 let Some(ast_ty) =
                                     self.inf_ctx.allocate_ast_type_expr(
                                         &ast_pattern.data,
@@ -350,6 +401,61 @@ impl<'db> TyCtx<'db> {
             .inferred_patterns
             .insert(PatternId(pattern.id), res.clone());
         res
+    }
+
+    fn type_check_match(
+        &mut self,
+        scrutinee: &'db HirExpr,
+        branches: &[HirMatchBranch],
+    ) {
+        let (typeof_scrut, err) = self.type_check_expr(scrutinee);
+        if let Some(err) = err {
+            dbg!("TODO: err here !", err);
+        }
+        let typeof_scrut = match typeof_scrut {
+            TyRef::Inf(infer_ty) => infer_ty,
+            TyRef::Error => {
+                println!(
+                    "TODO: handle this but I don't want to make it terminate the program"
+                );
+                return;
+            }
+        };
+        let typeof_scrut_var = self.inf_ctx.fresh_var();
+        if let Err(err) = self
+            .inf_ctx
+            .unify(typeof_scrut.clone(), InferTy::Var(typeof_scrut_var))
+        {
+            dbg!("TODO: err here !", err);
+        }
+
+        for branch in branches {
+            let mut loc_inners = HashMap::new();
+            for local in &branch.locals {
+                let typeof_local = self.inf_ctx.local_var(*local);
+                let inner_var = self.inf_ctx.fresh_var();
+                self.inf_ctx.emit_constraint(
+                    InferenceConstraintKind::BindsLike {
+                        ty: typeof_local,
+                        inner: InferTy::Var(inner_var),
+                        like: typeof_scrut_var,
+                    },
+                );
+                loc_inners.insert(*local, inner_var);
+            }
+
+            let inner_type_of_pattern = self.inner_type_of_pattern(
+                &branch.pattern,
+                &loc_inners,
+                typeof_scrut_var,
+            );
+
+            self.inf_ctx
+                .emit_constraint(InferenceConstraintKind::IsInner {
+                    inner: inner_type_of_pattern,
+                    ref_ty: typeof_scrut.clone(),
+                });
+        }
     }
 
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
@@ -395,52 +501,7 @@ impl<'db> TyCtx<'db> {
                 scrutinee,
                 branches,
             } => {
-                let (typeof_scrut, err) = self.type_check_expr(scrutinee);
-                if let Some(err) = err {
-                    dbg!("TODO: err here !", err);
-                }
-                let typeof_scrut = match typeof_scrut {
-                    TyRef::Inf(infer_ty) => infer_ty,
-                    TyRef::Error => {
-                        println!(
-                            "TODO: handle this but I don't want to make it terminate the program"
-                        );
-                        return;
-                    }
-                };
-                let typeof_scrut_var = self.inf_ctx.fresh_var();
-                if let Err(err) = self
-                    .inf_ctx
-                    .unify(typeof_scrut.clone(), InferTy::Var(typeof_scrut_var))
-                {
-                    dbg!("TODO: err here !", err);
-                }
-
-                for branch in branches {
-                    let mut loc_inners = HashMap::new();
-                    for local in &branch.locals {
-                        let typeof_local = self.inf_ctx.local_var(*local);
-                        let inner_var = self.inf_ctx.fresh_var();
-                        self.inf_ctx.emit_constraint(
-                            InferenceConstraintKind::BindsLike {
-                                ty: typeof_local,
-                                inner: InferTy::Var(inner_var),
-                                like: typeof_scrut_var,
-                            },
-                        );
-                        loc_inners.insert(*local, inner_var);
-                    }
-
-                    let typeof_pattern =
-                        self.typeof_pattern(&branch.pattern, &loc_inners);
-
-                    self.inf_ctx.emit_constraint(
-                        InferenceConstraintKind::IsInner {
-                            inner: typeof_pattern,
-                            ref_ty: typeof_scrut.clone(),
-                        },
-                    );
-                }
+                self.type_check_match(scrutinee, branches);
             }
             HirStmtKind::Assign { lhs, rhs } => {
                 let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
