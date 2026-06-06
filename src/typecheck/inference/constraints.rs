@@ -1151,6 +1151,20 @@ impl<'db> InferenceCtx<'db> {
         res_ty
     }
 
+    pub fn emit_binds_like_constraint(
+        &mut self,
+        like: InferVar,
+        ty: InferTy,
+    ) -> InferVar {
+        let res_ty = self.fresh_var();
+        self.emit_constraint(InferenceConstraintKind::BindsLike {
+            ty: res_ty,
+            inner: ty,
+            like,
+        });
+        res_ty
+    }
+
     fn solve_binop_constraint(
         &mut self,
         res_ty: InferVar,
