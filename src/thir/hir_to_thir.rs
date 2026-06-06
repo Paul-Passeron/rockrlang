@@ -121,7 +121,7 @@ impl<'db> ThirBuilder<'db> {
     ) {
         let local = ThirLocal {
             ty: tc_results.locals(self.db)[&infos.id]
-                .unwrap_or(crate::ril::TypeRef::Unknown),
+                .unwrap_or(TypeRef::Unknown),
             mutability: infos.mutability,
             span: infos.span,
             source: Some((infos.id, infos.name)),

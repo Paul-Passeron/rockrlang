@@ -198,7 +198,7 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_expr(
         &mut self,
-        expr: &'db HirExpr,
+        expr: &HirExpr,
     ) -> (TyRef, Option<UnificationError>) {
         let (ty, err) = match self.inf_ctx.infer_expr(expr) {
             Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
@@ -406,7 +406,7 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_match(
         &mut self,
-        scrutinee: &'db HirExpr,
+        scrutinee: &HirExpr,
         branches: &[HirMatchBranch],
     ) {
         let (typeof_scrut, err) = self.type_check_expr(scrutinee);
@@ -456,14 +456,16 @@ impl<'db> TyCtx<'db> {
                     inner: inner_type_of_pattern,
                     ref_ty: typeof_scrut.clone(),
                 });
+
+            self.type_check_stmt(&branch.body);
         }
     }
 
     fn type_check_let(
         &mut self,
-        pattern: &'db HirPattern,
-        ty_annotation: Option<&'db AstAnyTypeExpr>,
-        init: &'db HirExpr,
+        pattern: &HirPattern,
+        ty_annotation: Option<&AstAnyTypeExpr>,
+        init: &HirExpr,
     ) {
         let (init_ty, err) = self.type_check_expr(init);
         if let Some(err) = err {
@@ -476,7 +478,8 @@ impl<'db> TyCtx<'db> {
                         self.inf_ctx.unify(infer_ty.clone(), pattern_ty)
                     {
                         dbg!("TODO: err here !", err);
-                    } else if let Some(annotation) = ty_annotation
+                    };
+                    if let Some(annotation) = ty_annotation
                         && let Some(annotation) = annotation.as_known()
                         && let Some(annotated) =
                             self.inf_ctx.allocate_ast_type_expr(
@@ -497,7 +500,7 @@ impl<'db> TyCtx<'db> {
         }
     }
 
-    fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
+    fn type_check_stmt(&mut self, stmt: &HirStmt) {
         match &stmt.kind {
             HirStmtKind::Let {
                 pattern,
