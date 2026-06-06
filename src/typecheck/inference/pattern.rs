@@ -25,6 +25,19 @@ impl<'a> InferenceCtx<'a> {
         pattern: &HirPattern,
         binds_like: Option<InferTy>,
     ) -> Result<InferTy, UnificationError> {
+        self.snapshot(|this| {
+            let ty = this._infer_pattern(pattern, binds_like.clone())?;
+            this.inferred_patterns
+                .insert(PatternId(pattern.id), ty.clone());
+            Ok(ty)
+        })
+    }
+
+    fn _infer_pattern(
+        &mut self,
+        pattern: &HirPattern,
+        binds_like: Option<InferTy>,
+    ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
             HirPatternDesc::Bind { id, .. } => {
                 let var = *self.local_map.get(id).expect(
