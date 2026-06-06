@@ -15,7 +15,7 @@ use crate::{
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
+        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
@@ -470,10 +470,13 @@ impl<'db> SanityChecker<'db> {
                 for field in field_tys {
                     let matching_field =
                         pat_tys.iter().find(|p| p.0 == field.0).unwrap();
+                    let _ = matching_field;
                     todo!()
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
+                let _ = tys;
+                let _ = pats;
                 todo!()
             }
             _ => todo!(),
