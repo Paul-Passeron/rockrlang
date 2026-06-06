@@ -15,16 +15,29 @@ fun foo(f: Foo): void {
             let a: *Foo = x;
             let b: str = y;
         }
-        Foo::quux(a, b, x) => {}
+        Foo::quux(a, b, c) => {
+            let x: int = a;
+            let y: int = b;
+            let z: int = c;
+        }
     }
 }
 
 fun bar(f: Foo): void {
     match f {
         Foo::bar => {}
-        Foo::baz(x) => {}
-        Foo::qux { x: z, y } => {}
-        Foo::quux(a, b, x) => {}
+        Foo::baz(x) => {
+            let a: int = x;
+        }
+        Foo::qux { x: z, y } => {
+            let a: *Foo = z;
+            let b: str = y;
+        }
+        Foo::quux(a, b, c) => {
+            let x: int = a;
+            let y: int = b;
+            let z: int = c;
+        }
     }
 }
 
@@ -32,17 +45,35 @@ fun bar(f: Foo): void {
 fun ref_foo(f: &Foo): void {
     match f {
         Foo::bar => {}
-        Foo::baz(x) => {}
-        Foo::qux { x, y } => {}
-        Foo::quux(a, b, x) => {}
+        Foo::baz(x) => {
+            let a: &int = x;
+        }
+        Foo::qux { x, y } => {
+            let a: &*Foo = x;
+            let b: &str = y;
+        }
+        Foo::quux(a, b, c) => {
+            let x: &int = a;
+            let y: &int = b;
+            let z: &int = c;
+        }
     }
 }
 
 fun ref_bar(f: &Foo): void {
     match f {
         Foo::bar => {}
-        Foo::baz(x) => {}
-        Foo::qux { x: z,  y } => {}
-        Foo::quux(a, b, x) => {}
+        Foo::baz(x) => {
+            let a: &int = x;
+        }
+        Foo::qux { x: z, y } => {
+            let a: &*Foo = z;
+            let b: &str = y;
+        }
+        Foo::quux(a, b, c) => {
+            let x: &int = a;
+            let y: &int = b;
+            let z: &int = c;
+        }
     }
 }
