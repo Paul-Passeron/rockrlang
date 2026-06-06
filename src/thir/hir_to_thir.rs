@@ -663,7 +663,12 @@ impl<'db> ThirTranslator<'db> {
         expr: &HirExpr,
         stmts: &mut Vec<ThirStmt>,
     ) -> ExprId {
-        let ty = self.tc.expr_types(self.db)[&typecheck::ExprId(expr.id)];
+        let ty = self
+            .tc
+            .expr_types(self.db)
+            .get(&typecheck::ExprId(expr.id))
+            .copied()
+            .unwrap_or(TypeRef::Unknown);
         let kind = match &expr.data {
             HirExprDesc::IntLit(x) => ExprKind::IntLit(*x),
             HirExprDesc::CharLit(x) => ExprKind::Charlit(*x),
@@ -785,6 +790,7 @@ impl<'db> ThirTranslator<'db> {
                 }
             }
             HirExprDesc::CallStatic { .. } => todo!(),
+            HirExprDesc::Error => ExprKind::Error,
         };
         b.new_expr(ThirExpr {
             kind,

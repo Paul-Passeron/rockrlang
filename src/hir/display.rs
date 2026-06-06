@@ -522,6 +522,7 @@ fn write_expr(
                 HirConstructorArgs::None => Ok(()),
             }
         }
+        HirExprDesc::Error => write!(f, "<ERROR>"),
     }
 }
 

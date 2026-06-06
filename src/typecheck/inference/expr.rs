@@ -131,6 +131,7 @@ impl<'db> InferenceCtx<'db> {
                 println!("TODO: function not found in current scope");
                 Ok(InferTy::Var(self.fresh_var()))
             }
+            HirExprDesc::Error => Ok(InferTy::Var(self.fresh_var())),
         }
     }
 

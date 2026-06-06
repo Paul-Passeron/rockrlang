@@ -217,6 +217,7 @@ pub enum HirExprDesc {
         args: HirConstructorArgs,
         template_hints: Vec<PartialTypeArg>,
     },
+    Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

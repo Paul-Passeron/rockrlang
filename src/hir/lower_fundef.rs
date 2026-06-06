@@ -18,10 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::BTreeMap, iter};
 
 use itertools::Itertools;
+use salsa::Accumulator;
 
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
+    compiler::diagnostic::Diag,
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc,
@@ -460,10 +462,17 @@ impl<'db> LowerFundef<'db> {
                         symbol.interned().contents(self.db)
                     )
                 }
-                _ => todo!(
-                    "Name `{}` not found in scope or module",
-                    symbol.interned().contents(self.db)
-                ),
+                _ => {
+                    Diag::generic_error(
+                        format!(
+                            "Name `{}` not found in the current scope.",
+                            symbol.display(self.db)
+                        ),
+                        span,
+                    )
+                    .accumulate(self.db);
+                    HirExprDesc::Error
+                }
             }
         }
     }

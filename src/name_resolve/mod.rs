@@ -15,12 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use salsa::Accumulator;
+
 use crate::{
     Db, SourceFile,
-    common::{symbols::Symbol, unord::Set},
-    compiler::{Workspace, workspace_packages},
+    common::{location::Span, symbols::Symbol, unord::Set},
+    compiler::{Workspace, diagnostic::Diag, workspace_packages},
     parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
-    parser::parse_file,
+    parser::{ParseError, parse_file},
     ril::{FileModule, InternedModuleId, ModuleId, Package},
 };
 
@@ -111,6 +113,13 @@ pub fn module_items<'db>(
 ) -> Option<Vec<AstTopLevelItem>> {
     if let Some(file) = module.file(db) {
         let ast = parse_file(db, file);
+        let parse_errors: Vec<&ParseError> =
+            parse_file::accumulated::<ParseError>(db, file);
+        println!("Parse errors in file: {:?}", parse_errors);
+        for err in parse_errors {
+            let span = Span::new(err.file, err.start, err.end);
+            Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
+        }
         return Some(ast.items(db).clone());
     }
     module.parent(db).and_then(|parent| {
@@ -130,6 +139,14 @@ pub fn module_items<'db>(
             None => {
                 let file = module_to_file(db, module);
                 let ast: Ast<'db> = parse_file(db, file);
+                let parse_errors: Vec<&ParseError> =
+                    parse_file::accumulated::<ParseError>(db, file);
+                println!("Parse errors in file: {:?}", parse_errors);
+                for err in parse_errors {
+                    let span = Span::new(err.file, err.start, err.end);
+                    Diag::generic_error(format!("{:?}", err.kind), span)
+                        .accumulate(db);
+                }
                 Some(ast.items(db).clone())
             }
         }
