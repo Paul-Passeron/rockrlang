@@ -121,7 +121,7 @@ impl<'db> ThirBuilder<'db> {
     ) {
         let local = ThirLocal {
             ty: tc_results.locals(self.db)[&infos.id]
-                .unwrap_or(crate::ril::TypeRef::Error),
+                .unwrap_or(crate::ril::TypeRef::Unknown),
             mutability: infos.mutability,
             span: infos.span,
             source: Some((infos.id, infos.name)),
@@ -487,7 +487,7 @@ impl<'db> ThirTranslator<'db> {
             .pat_types(self.db)
             .get(&PatternId(pat.id))
             .copied()
-            .unwrap_or(TypeRef::Error);
+            .unwrap_or(TypeRef::Unknown);
         let kind = match &pat.data {
             HirPatternDesc::Bind { id, mutable, .. } => {
                 Some(ThirPatternKind::Bind {
