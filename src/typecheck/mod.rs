@@ -305,10 +305,9 @@ impl<'db> TyCtx<'db> {
                                                 .inf_ctx
                                                 .allocate_type_ref(&ty, &ctx);
                                             let pat_ty = self
-                                                .inner_type_of_pattern(
-                                                    pattern, loc_inners,
-                                                    binds_like,
-                                                );
+                                                .inf_ctx
+                                                .infer_pattern(pattern, None)
+                                                .unwrap();
                                             let to_unify = self
                                                 .inf_ctx
                                                 .emit_binds_like_constraint(
