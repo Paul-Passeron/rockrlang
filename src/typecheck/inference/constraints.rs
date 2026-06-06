@@ -941,7 +941,10 @@ impl<'db> InferenceCtx<'db> {
                 }
                 let ref_ty = self.find(ref_ty);
                 let inner = self.find(inner);
-                if let Some(ty) = get_ref_inner(self, ref_ty) {
+                if ref_ty == inner {
+                    // We're done
+                    ConstraintSolveResult::Solved
+                } else if let Some(ty) = get_ref_inner(self, ref_ty) {
                     if let Err(err) = self.unify(inner, ty) {
                         ConstraintSolveResult::Error(err)
                     } else {
