@@ -1,15 +1,20 @@
 enum Foo {
     bar,
     baz(int),
-    qux { x: *Foo, y: str },
+    qux { x: *Foo; y: str },
     quux(int, int, int),
 }
 
 fun foo(f: Foo): void {
     match f {
         Foo::bar => {}
-        Foo::baz(x) => {}
-        Foo::qux { x } => {}
+        Foo::baz(x) => {
+            let a: int = x;
+        }
+        Foo::qux { x, y } => {
+            let a: *Foo = x;
+            let b: str = y;
+        }
         Foo::quux(a, b, x) => {}
     }
 }
@@ -18,7 +23,7 @@ fun bar(f: Foo): void {
     match f {
         Foo::bar => {}
         Foo::baz(x) => {}
-        Foo::qux { x: y } => {}
+        Foo::qux { x: z, y } => {}
         Foo::quux(a, b, x) => {}
     }
 }
@@ -28,7 +33,7 @@ fun ref_foo(f: &Foo): void {
     match f {
         Foo::bar => {}
         Foo::baz(x) => {}
-        Foo::qux { x } => {}
+        Foo::qux { x, y } => {}
         Foo::quux(a, b, x) => {}
     }
 }
@@ -37,7 +42,7 @@ fun ref_bar(f: &Foo): void {
     match f {
         Foo::bar => {}
         Foo::baz(x) => {}
-        Foo::qux { x: y } => {}
+        Foo::qux { x: z,  y } => {}
         Foo::quux(a, b, x) => {}
     }
 }
