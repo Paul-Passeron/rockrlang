@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 use std::{collections::BTreeMap, panic, sync::Arc};
 
+use crate::common::symbols::Symbol;
+use crate::hir::HirStructFieldPattern;
+use crate::parse_tree::top_level::AstStructDefField;
 use crate::{
     Db,
     hir::{
@@ -211,100 +214,142 @@ impl<'db> TyCtx<'db> {
         pattern: &HirPattern,
         loc_inners: &HashMap<LocalId, InferVar>,
     ) -> InferTy {
-        match &pattern.data {
-            HirPatternDesc::Bind { id, .. } => {
-                // TODO: is this right ?
-                InferTy::Var(*loc_inners.get(id).expect(
-                    "Internal error: local referenced in hir but not found",
-                ))
-            }
-            HirPatternDesc::Any => InferTy::Var(self.inf_ctx.fresh_var()),
-            HirPatternDesc::Tuple(_hir_patterns) => todo!(),
-            HirPatternDesc::DestructureBinding { .. } => todo!(),
-            HirPatternDesc::Constructor {
-                resolution,
-                name,
-                fields,
-            } => {
-                let item = enum_item(self.db, resolution.interned());
-                let infer_template_vars: Arc<[InferVar]> =
-                    templates_of_enum(self.db, resolution.interned())
+        if let Some(inferred) =
+            self.inf_ctx.inferred_patterns.get(&PatternId(pattern.id))
+        {
+            return inferred.clone();
+        }
+        let mut compute = || {
+            match &pattern.data {
+                HirPatternDesc::Bind { id, .. } => {
+                    // TODO: is this right ?
+                    InferTy::Var(*loc_inners.get(id).expect(
+                        "Internal error: local referenced in hir but not found",
+                    ))
+                }
+                HirPatternDesc::Any => InferTy::Var(self.inf_ctx.fresh_var()),
+                HirPatternDesc::Tuple(_hir_patterns) => todo!(),
+                HirPatternDesc::DestructureBinding { .. } => todo!(),
+                HirPatternDesc::Constructor {
+                    resolution,
+                    name,
+                    fields,
+                } => {
+                    let item = enum_item(self.db, resolution.interned());
+                    let infer_template_vars: Arc<[InferVar]> =
+                        templates_of_enum(self.db, resolution.interned())
+                            .iter()
+                            .map(|_| self.inf_ctx.fresh_var())
+                            .collect();
+                    let infer_templates: Arc<[InferTy]> = infer_template_vars
                         .iter()
-                        .map(|_| self.inf_ctx.fresh_var())
+                        .copied()
+                        .map(InferTy::Var)
                         .collect();
-                let infer_templates: Arc<[InferTy]> = infer_template_vars
-                    .iter()
-                    .copied()
-                    .map(InferTy::Var)
-                    .collect();
-                let Ok(ctx) = ImplicitContext::new(
-                    self.db,
-                    ril::ScopeOwnerId::Module(resolution.parent(self.db)),
-                    item.template_args.iter().cloned().collect(),
-                    infer_templates.clone(),
-                    None, // TODO: Is this right ?
-                ) else {
-                    todo!("Diagnostics")
-                };
-                let t_ref = InferTy::Adt {
-                    def: TypeDefId::Enum(*resolution),
-                    fields: infer_templates.iter().cloned().collect(),
-                };
-                let variant = item
-                    .variants
-                    .iter()
-                    .find(|variant| variant.name == *name)
-                    .expect(
-                        "Variants of enum should already have been checked",
-                    );
-                match (fields, &variant.kind) {
-                    (
-                        hir::HirPatternConstructorArgs::None,
-                        AstEnumVariantKind::Unit,
-                    ) => (),
-                    (
-                        hir::HirPatternConstructorArgs::StructFields(
-                            _hir_fields,
-                        ),
-                        AstEnumVariantKind::StructLike(_ast_fields),
-                    ) => todo!(),
-                    (
-                        hir::HirPatternConstructorArgs::TupleFields(
-                            hir_patterns,
-                        ),
-                        AstEnumVariantKind::TupleLike(ast_patterns),
-                    ) => {
-                        assert!(hir_patterns.len() == ast_patterns.len());
-                        for (hir_pattern, ast_pattern) in
-                            hir_patterns.iter().zip(ast_patterns.iter())
-                        {
-                            let pat_ty =
-                                self.typeof_pattern(hir_pattern, loc_inners);
-                            let Some(ast_ty) =
-                                self.inf_ctx.allocate_ast_type_expr(
-                                    &ast_pattern.data,
-                                    &ctx,
-                                )
-                            else {
-                                unreachable!()
-                            };
-
-                            if let Err(err) = self.inf_ctx.unify(pat_ty, ast_ty)
-                            {
-                                dbg!("TODO: err here !", err);
+                    let Ok(ctx) = ImplicitContext::new(
+                        self.db,
+                        ril::ScopeOwnerId::Module(resolution.parent(self.db)),
+                        item.template_args.iter().cloned().collect(),
+                        infer_templates.clone(),
+                        None, // TODO: Is this right ?
+                    ) else {
+                        todo!("Diagnostics")
+                    };
+                    let t_ref = InferTy::Adt {
+                        def: TypeDefId::Enum(*resolution),
+                        fields: infer_templates.iter().cloned().collect(),
+                    };
+                    let variant = item
+                        .variants
+                        .iter()
+                        .find(|variant| variant.name == *name)
+                        .expect(
+                            "Variants of enum should already have been checked",
+                        );
+                    match (fields, &variant.kind) {
+                        (
+                            hir::HirPatternConstructorArgs::None,
+                            AstEnumVariantKind::Unit,
+                        ) => (),
+                        (
+                            hir::HirPatternConstructorArgs::StructFields(
+                                hir_fields,
+                            ),
+                            AstEnumVariantKind::StructLike(ast_fields),
+                        ) => {
+                            assert_eq!(hir_fields.len(), ast_fields.len());
+                            let mut fields: HashMap<
+                                Symbol,
+                                &AstStructDefField,
+                            > = HashMap::new();
+                            ast_fields.iter().for_each(|field| {
+                                fields.insert(field.name, field);
+                            });
+                            for hir in hir_fields {
+                                match hir {
+                                    HirStructFieldPattern::Rebind {
+                                        name,
+                                        pattern,
+                                    } => {
+                                        // todo!()
+                                    }
+                                    HirStructFieldPattern::Name {
+                                        id,
+                                        name,
+                                    } => {
+                                        if let Some(ast) = fields.get(name) {
+                                            // todo!()
+                                        } else {
+                                            // todo!()
+                                        }
+                                    }
+                                }
                             }
                         }
+                        (
+                            hir::HirPatternConstructorArgs::TupleFields(
+                                hir_patterns,
+                            ),
+                            AstEnumVariantKind::TupleLike(ast_patterns),
+                        ) => {
+                            assert!(hir_patterns.len() == ast_patterns.len());
+                            for (hir_pattern, ast_pattern) in
+                                hir_patterns.iter().zip(ast_patterns.iter())
+                            {
+                                let pat_ty = self
+                                    .typeof_pattern(hir_pattern, loc_inners);
+                                let Some(ast_ty) =
+                                    self.inf_ctx.allocate_ast_type_expr(
+                                        &ast_pattern.data,
+                                        &ctx,
+                                    )
+                                else {
+                                    unreachable!()
+                                };
+
+                                if let Err(err) =
+                                    self.inf_ctx.unify(pat_ty, ast_ty)
+                                {
+                                    dbg!("TODO: err here !", err);
+                                }
+                            }
+                        }
+                        _ => unreachable!(
+                            "Mismatch between AST variant kind decl and case"
+                        ),
                     }
-                    _ => unreachable!(
-                        "Mismatch between AST variant kind decl and case"
-                    ),
+                    t_ref
                 }
-                t_ref
+                HirPatternDesc::IntLit(_) => {
+                    InferTy::Var(self.inf_ctx.emit_intlike_constraint())
+                }
             }
-            HirPatternDesc::IntLit(_) => {
-                InferTy::Var(self.inf_ctx.emit_intlike_constraint())
-            }
-        }
+        };
+        let res = compute();
+        self.inf_ctx
+            .inferred_patterns
+            .insert(PatternId(pattern.id), res.clone());
+        res
     }
 
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
@@ -388,11 +433,6 @@ impl<'db> TyCtx<'db> {
 
                     let typeof_pattern =
                         self.typeof_pattern(&branch.pattern, &loc_inners);
-
-                    self.inf_ctx.inferred_patterns.insert(
-                        PatternId(branch.pattern.id),
-                        typeof_pattern.clone(),
-                    );
 
                     self.inf_ctx.emit_constraint(
                         InferenceConstraintKind::IsInner {
