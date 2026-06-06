@@ -389,6 +389,11 @@ impl<'db> TyCtx<'db> {
                     let typeof_pattern =
                         self.typeof_pattern(&branch.pattern, &loc_inners);
 
+                    self.inf_ctx.inferred_patterns.insert(
+                        PatternId(branch.pattern.id),
+                        typeof_pattern.clone(),
+                    );
+
                     self.inf_ctx.emit_constraint(
                         InferenceConstraintKind::IsInner {
                             inner: typeof_pattern,
