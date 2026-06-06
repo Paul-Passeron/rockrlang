@@ -1,20 +1,22 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
+use salsa::Accumulator;
 
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
-    compiler::get_sig_of_function,
-    name_resolve::type_expr::struct_item,
+    compiler::{diagnostic::Diag, get_sig_of_function},
+    name_resolve::type_expr::{enum_item, struct_item},
+    parse_tree::top_level::AstEnumVariantKind,
     ril::{
-        ScopeOwnerId, TypeRef, bool_id, char_id, const_ptr_of, ptr_of, ref_of,
-        slice_of, str_id, tuple_of, void_id,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
+        const_ptr_of, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
-        ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        StructRef, Thir, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
-        ThirPatternKind,
+        EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
+        StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
+        ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::AstImplicitContext,
@@ -107,13 +109,20 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
+    fn check_ref_binded_pattern_to(&mut self, ty: TypeRef, pat: &ThirPattern) {
+        self.check_types(ty, pat.ty, pat.span);
+    }
+
     fn check_pattern_against_scrut_ty(
         &mut self,
         scrut_ty: TypeRef,
         pat: &ThirPattern,
     ) {
-        if let Some((mutability, inner_type)) = scrut_ty.as_ref(self.db) {
-            todo!()
+        if let Some((_, mut inner_type)) = scrut_ty.as_ref(self.db) {
+            while let Some((_, inner)) = inner_type.as_ref(self.db) {
+                inner_type = inner;
+            }
+            self.check_ref_binded_pattern_to(inner_type, pat);
         } else {
             self.check_pattern_with_expected_ty(pat, scrut_ty)
         }
@@ -156,7 +165,19 @@ impl<'db> SanityChecker<'db> {
                     );
                 }
             }
-            ThirPatternKind::Constructor { .. } => todo!(),
+            ThirPatternKind::Constructor { def, idx, args } => {
+                let expected = TypeRef::Concrete(TypeId::new(
+                    self.db,
+                    TypeDefId::Enum(def.def),
+                    def.args.clone(),
+                ));
+                self.check_types(expected, pat.ty, pat.span);
+                if let Some(constructor_ty) = def.get_cons(self.db, *idx) {
+                    self.check_constructor_pat(&constructor_ty, args);
+                } else {
+                    todo!()
+                }
+            }
             ThirPatternKind::IntLit(_) => {
                 // TODO: Do something here
             }
@@ -299,7 +320,20 @@ impl<'db> SanityChecker<'db> {
                     self.check_types(expected, infos.ty, infos.span);
                 }
             }
-            ExprKind::Constructor { .. } => todo!(),
+            ExprKind::Constructor {
+                enum_def,
+                idx,
+                args,
+            } => {
+                let ty = TypeRef::Concrete(TypeId::new(
+                    self.db,
+                    TypeDefId::Enum(enum_def.def),
+                    enum_def.args.clone(),
+                ));
+                self.check_types(infos.ty, ty, infos.span);
+                let constructor_ty = enum_def.get_cons(self.db, *idx).unwrap();
+                self.check_constructor_expr(&constructor_ty, args);
+            }
             ExprKind::StructLit { .. } => todo!(),
 
             ExprKind::Error => (),
@@ -420,11 +454,133 @@ impl<'db> SanityChecker<'db> {
             }
         }
     }
+
+    pub fn check_constructor_expr(
+        &mut self,
+        ty: &ConstructorType,
+        pat: &ThirConstructorArgs<ExprId>,
+    ) {
+        match (ty, pat) {
+            (ConstructorType::None, ThirConstructorArgs::None) => (),
+            (
+                ConstructorType::Struct(field_tys),
+                ThirConstructorArgs::Struct(pat_tys),
+            ) => {
+                assert_eq!(field_tys.len(), pat_tys.len());
+                for field in field_tys {
+                    let matching_field =
+                        pat_tys.iter().find(|p| p.0 == field.0).unwrap();
+                    todo!()
+                }
+            }
+            (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
+                todo!()
+            }
+            _ => todo!(),
+        }
+    }
+
+    pub fn check_constructor_pat(
+        &mut self,
+        ty: &ConstructorType,
+        pat: &ThirConstructorArgs<ThirPattern>,
+    ) {
+        match (ty, pat) {
+            (ConstructorType::None, ThirConstructorArgs::None) => (),
+            (
+                ConstructorType::Struct(tys),
+                ThirConstructorArgs::Struct(pats),
+            ) => {
+                assert_eq!(tys.len(), pats.len());
+                pats.iter().for_each(|pat| self.check_pattern(&pat.1));
+                for field in tys {
+                    let matching_field =
+                        &pats.iter().find(|p| p.0 == field.0).unwrap().1;
+                    self.check_types(
+                        field.1,
+                        matching_field.ty,
+                        matching_field.span,
+                    );
+                }
+            }
+            (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
+                assert_eq!(tys.len(), pats.len());
+                tys.iter().zip(pats).for_each(|(ty, pat)| {
+                    self.check_pattern(pat);
+                    self.check_types(*ty, pat.ty, pat.span);
+                });
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+pub enum ConstructorType {
+    Tuple(Vec<TypeRef>),
+    Struct(Vec<(Symbol, TypeRef)>),
+    None,
+}
+
+impl EnumRef {
+    pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
+        let item = enum_item(db, self.def.interned());
+        let variant = item.variants.get(idx)?;
+        match &variant.kind {
+            AstEnumVariantKind::Unit => Some(ConstructorType::None),
+            AstEnumVariantKind::StructLike(fields) => {
+                let ctx = AstImplicitContext::new(
+                    db,
+                    ScopeOwnerId::Module(self.def.parent(db)),
+                    item.template_args.iter().cloned().collect(),
+                )
+                .unwrap();
+                Some(ConstructorType::Struct(
+                    fields
+                        .iter()
+                        .map(|field| {
+                            (
+                                field.name,
+                                ctx.resolve(db, &field.ty.data)
+                                    .unwrap_or(TypeRef::Error),
+                            )
+                        })
+                        .collect(),
+                ))
+            }
+            AstEnumVariantKind::TupleLike(spanneds) => {
+                let ctx = AstImplicitContext::new(
+                    db,
+                    ScopeOwnerId::Module(self.def.parent(db)),
+                    item.template_args.iter().cloned().collect(),
+                )
+                .unwrap();
+                Some(ConstructorType::Tuple(
+                    spanneds
+                        .iter()
+                        .map(|ast| {
+                            ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error)
+                        })
+                        .collect(),
+                ))
+            }
+        }
+    }
 }
 
 pub fn sanity_check(db: &dyn Db, thir: &Thir) {
     let mismatches = SanityChecker::new(db, thir).check();
-    assert!(mismatches.is_empty())
+    for mismatch in &mismatches {
+        Diag::generic_error(
+            format!(
+                "Type mismatch: Expected {} but got {}",
+                mismatch.expected.to_string(db),
+                mismatch.got.to_string(db),
+            ),
+            mismatch.span,
+        )
+        .accumulate(db);
+    }
+    // assert!(mismatches.is_empty())
 }
 
 impl StructRef {
