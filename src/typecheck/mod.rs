@@ -21,6 +21,7 @@ use std::{collections::BTreeMap, panic, sync::Arc};
 use crate::common::symbols::Symbol;
 use crate::hir::{HirMatchBranch, HirStructFieldPattern};
 use crate::parse_tree::top_level::AstStructDefField;
+use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::typecheck::inference::implicit::AsAstImplCtx;
 use crate::{
     Db,
@@ -458,6 +459,44 @@ impl<'db> TyCtx<'db> {
         }
     }
 
+    fn type_check_let(
+        &mut self,
+        pattern: &'db HirPattern,
+        ty_annotation: Option<&'db AstAnyTypeExpr>,
+        init: &'db HirExpr,
+    ) {
+        let (init_ty, err) = self.type_check_expr(init);
+        if let Some(err) = err {
+            dbg!("TODO: err here !", err);
+        }
+        match self.inf_ctx.infer_pattern(pattern, None) {
+            Ok(pattern_ty) => match init_ty {
+                TyRef::Inf(infer_ty) => {
+                    if let Err(err) =
+                        self.inf_ctx.unify(infer_ty.clone(), pattern_ty)
+                    {
+                        dbg!("TODO: err here !", err);
+                    } else if let Some(annotation) = ty_annotation
+                        && let Some(annotation) = annotation.as_known()
+                        && let Some(annotated) =
+                            self.inf_ctx.allocate_ast_type_expr(
+                                &annotation.data,
+                                self.inf_ctx.implicit_ctx().as_ref(),
+                            )
+                        && let Err(err) =
+                            self.inf_ctx.unify(infer_ty, annotated)
+                    {
+                        dbg!("TODO: err here !", err);
+                    }
+                }
+                TyRef::Error => (),
+            },
+            Err(err) => {
+                dbg!("TODO: err here !", err);
+            }
+        }
+    }
+
     fn type_check_stmt(&mut self, stmt: &'db HirStmt) {
         match &stmt.kind {
             HirStmtKind::Let {
@@ -466,36 +505,7 @@ impl<'db> TyCtx<'db> {
                 init,
                 ..
             } => {
-                let (init_ty, err) = self.type_check_expr(init);
-                if let Some(err) = err {
-                    dbg!("TODO: err here !", err);
-                }
-                match self.inf_ctx.infer_pattern(pattern, None) {
-                    Ok(pattern_ty) => match init_ty {
-                        TyRef::Inf(infer_ty) => {
-                            if let Err(err) =
-                                self.inf_ctx.unify(infer_ty.clone(), pattern_ty)
-                            {
-                                dbg!("TODO: err here !", err);
-                            } else if let Some(annotation) = ty_annotation
-                                && let Some(annotation) = annotation.as_known()
-                                && let Some(annotated) =
-                                    self.inf_ctx.allocate_ast_type_expr(
-                                        &annotation.data,
-                                        self.inf_ctx.implicit_ctx().as_ref(),
-                                    )
-                                && let Err(err) =
-                                    self.inf_ctx.unify(infer_ty, annotated)
-                            {
-                                dbg!("TODO: err here !", err);
-                            }
-                        }
-                        TyRef::Error => (),
-                    },
-                    Err(err) => {
-                        dbg!("TODO: err here !", err);
-                    }
-                }
+                self.type_check_let(pattern, ty_annotation.as_ref(), init);
             }
             HirStmtKind::Match {
                 scrutinee,
