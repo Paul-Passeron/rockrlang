@@ -521,11 +521,31 @@ pub enum ConstructorType {
     None,
 }
 
+impl ConstructorType {
+    pub fn with_substitution(&self, db: &dyn Db, sub: &[TypeRef]) -> Self {
+        match self {
+            ConstructorType::Tuple(type_refs) => ConstructorType::Tuple(
+                type_refs
+                    .iter()
+                    .map(|ty| ty.with_substitution(db, sub))
+                    .collect(),
+            ),
+            ConstructorType::Struct(items) => ConstructorType::Struct(
+                items
+                    .iter()
+                    .map(|(name, ty)| (*name, ty.with_substitution(db, sub)))
+                    .collect(),
+            ),
+            ConstructorType::None => ConstructorType::None,
+        }
+    }
+}
+
 impl EnumRef {
     pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
         let item = enum_item(db, self.def.interned());
         let variant = item.variants.get(idx)?;
-        match &variant.kind {
+        let raw = match &variant.kind {
             AstEnumVariantKind::Unit => Some(ConstructorType::None),
             AstEnumVariantKind::StructLike(fields) => {
                 let ctx = AstImplicitContext::new(
@@ -563,7 +583,8 @@ impl EnumRef {
                         .collect(),
                 ))
             }
-        }
+        }?;
+        Some(raw.with_substitution(db, &self.args))
     }
 }
 
