@@ -1,5 +1,5 @@
 enum Foo {
-    bar { x: Bar; y: str }
+    Bar { x: Bar; y: str }
 }
 
 struct Bar {
@@ -9,10 +9,20 @@ struct Bar {
 
 fun qux(foo: Foo): void {
     match foo {
-        Foo::bar { x: Bar {x, y}, y: z } => {
-            let a = x;
-            let b = y;
-            let c = z;
+        Foo::Bar { x: Bar {x, y}, y: z } => {
+            let a: int = x;
+            let b: str = y;
+            let c: str = z;
+        }
+    }
+}
+
+fun quux(foo: &Foo): void {
+    match foo {
+        Foo::Bar { x: Bar {x, y}, y: z } => {
+            let a: &int = x;
+            let b: &str = y;
+            let c: &str = z;
         }
     }
 }
