@@ -215,7 +215,7 @@ impl AstImplicitContext {
                         }
                         return Some(TypeRef::Param(TypeParamId(pos)));
                     }
-                    match resolve_in_module(db, name.interned(), module.interned())? {
+                    match resolve_in_module(db, *name, module)? {
                         Definition::Type(type_def_id) => {
                             let args = args
                                 .iter()
@@ -241,11 +241,7 @@ impl AstImplicitContext {
                             None
                         }
                     } else {
-                        let new_module = match resolve_in_module(
-                            db,
-                            from.interned(),
-                            module.interned(),
-                        )? {
+                        let new_module = match resolve_in_module(db, *from, module)? {
                             Definition::Module(module_id) => module_id,
                             _ => return None,
                         };
@@ -308,7 +304,7 @@ impl AstImplicitContext {
                     if this.template_asts.iter().any(|temp| temp.name == *name) {
                         return None;
                     }
-                    match resolve_in_module(db, name.interned(), module.interned())? {
+                    match resolve_in_module(db, *name, module)? {
                         Definition::Interface(def) => {
                             let args = args
                                 .iter()
@@ -323,11 +319,7 @@ impl AstImplicitContext {
                     }
                 }
                 AstTypeExprDesc::NameResolved { from, to } => {
-                    let new_module = match resolve_in_module(
-                        db,
-                        from.interned(),
-                        module.interned(),
-                    )? {
+                    let new_module = match resolve_in_module(db, *from, module)? {
                         Definition::Module(module_id) => module_id,
                         _ => return None,
                     };
@@ -419,7 +411,7 @@ pub trait AsAstImplCtx {
                     }
                     return Some(TypeRef::Param(TypeParamId(pos)));
                 }
-                match resolve_in_module(db, name.interned(), module.interned())? {
+                match resolve_in_module(db, *name, module)? {
                     Definition::Type(type_def_id) => {
                         let args = args
                             .iter()
@@ -442,11 +434,7 @@ pub trait AsAstImplCtx {
                         None
                     }
                 } else {
-                    let new_module = match resolve_in_module(
-                        db,
-                        from.interned(),
-                        module.interned(),
-                    )? {
+                    let new_module = match resolve_in_module(db, *from, module)? {
                         Definition::Module(module_id) => module_id,
                         _ => return None,
                     };

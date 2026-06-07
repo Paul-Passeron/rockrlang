@@ -15,15 +15,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{common::symbols::Symbol, parse_tree::Spanned};
+use crate::{
+    common::{location::Span, symbols::Symbol},
+    parse_tree::Spanned,
+};
 
 pub type AstPattern = Spanned<AstPatternDesc>;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructFieldPattern {
-    Rebind { name: Symbol, pattern: AstPattern },
-    Name(Symbol),
+    Rebind {
+        name: Symbol,
+        name_span: Span,
+        pattern: AstPattern,
+    },
+    Name(Symbol, Span),
 }
 
 #[allow(dead_code)]
@@ -31,7 +38,6 @@ pub enum StructFieldPattern {
 pub enum AstConstructFields {
     TupleFields(Vec<AstPattern>),
     StructFields(Vec<StructFieldPattern>),
-    None,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -39,6 +45,7 @@ pub enum AstNamedPattern {
     Mut {
         name: Symbol,
     },
+    Bare(Symbol),
     Constructor {
         name: Symbol,
         args: AstConstructFields,

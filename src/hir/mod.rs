@@ -19,8 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::Arc;
 
-use itertools::Either;
-
 use crate::{
     Db,
     common::{
@@ -94,7 +92,7 @@ pub enum HirPatternDesc {
     Tuple(Vec<HirPattern>),
     DestructureBinding {
         resolution: StructId,
-        fields: Vec<(Symbol, Either<HirPattern, LocalId>)>,
+        fields: Vec<HirStructFieldPattern>,
     },
     Constructor {
         resolution: EnumId,

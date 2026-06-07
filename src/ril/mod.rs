@@ -20,6 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod display;
 pub mod plumbing;
 
+use std::sync::Arc;
+
 pub use plumbing::*;
 
 use crate::{
@@ -27,7 +29,7 @@ use crate::{
     common::{location::Span, symbols::Symbol, unord::Set},
     name_resolve::{
         module_items,
-        type_expr::{templates_of_enum, templates_of_struct},
+        type_expr::{struct_item, templates_of_enum, templates_of_struct},
     },
     parse_tree::top_level::{AstImplItem, AstTemplateArg, AstTopLevelItemDesc},
     printer::type_printer::TypePrinter,
@@ -217,6 +219,14 @@ impl FunctionId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructId(salsa::Id);
+
+#[salsa::tracked]
+impl StructId {
+    pub fn field_names(self, db: &dyn Db) -> Arc<[Symbol]> {
+        let item = struct_item(db, self.interned());
+        item.fields.iter().map(|field| field.name).collect()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EnumId(salsa::Id);

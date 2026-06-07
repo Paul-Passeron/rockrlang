@@ -119,18 +119,19 @@ impl<'db> Parser<'db> {
                 while let Some(t) = self.peek_n(0)
                     && !matches!(t.kind, TokenKind::CloseBra)
                 {
-                    let name = self.parse_symbol()?.data;
+                    let name = self.parse_symbol()?;
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Colon)
                     {
                         self.consume();
                         let associated = self.parse_pattern()?;
                         fields.push(StructFieldPattern::Rebind {
-                            name,
+                            name: name.data,
+                            name_span: name.span,
                             pattern: associated,
                         })
                     } else {
-                        fields.push(StructFieldPattern::Name(name));
+                        fields.push(StructFieldPattern::Name(name.data, name.span));
                     }
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Comma)
@@ -148,10 +149,7 @@ impl<'db> Parser<'db> {
                 Ok(AstNamedPattern::Constructor { name, args })
             }
 
-            _ => Ok(AstNamedPattern::Constructor {
-                name,
-                args: AstConstructFields::None,
-            }),
+            _ => Ok(AstNamedPattern::Bare(name)),
         }
     }
 

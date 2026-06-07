@@ -77,7 +77,7 @@ pub fn resolve_type_expr_desc<'db>(
                 }
             }
 
-            resolve_in_module(db, name.interned(), module).map_or(
+            resolve_in_module(db, *name, module.into()).map_or(
                 TypeResolution::Error,
                 |def| {
                     if let Definition::Type(type_def_id) = def {
@@ -110,7 +110,7 @@ pub fn resolve_type_expr_desc<'db>(
         }
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) =
-                resolve_in_module(db, from.interned(), module)
+                resolve_in_module(db, *from, module.into())
             {
                 resolve_type_expr(db, to, module.interned(), template_args, has_zelf)
             } else {

@@ -27,13 +27,13 @@ use crate::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId, Package},
+    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
 
 pub fn resolve_type_expr_as_interface<'db>(
     db: &'db dyn Db,
     interface: &'db AstTypeExpr,
-    module: InternedModuleId<'db>,
+    module: ModuleId,
     template_args: &'db [AstTemplateArg],
     has_zelf: bool,
 ) -> Option<InterfaceRef> {
@@ -45,7 +45,7 @@ pub fn resolve_type_expr_as_interface<'db>(
                 return None;
             }
 
-            resolve_in_module(db, name.interned(), module).and_then(|def| {
+            resolve_in_module(db, *name, module).and_then(|def| {
                 if let Definition::Interface(interface_id) = def {
                     let resolved_args = args
                         .iter()
@@ -53,7 +53,7 @@ pub fn resolve_type_expr_as_interface<'db>(
                             match resolve_any_type_expr(
                                 db,
                                 arg,
-                                module,
+                                module.interned(),
                                 template_args,
                                 has_zelf,
                             ) {
@@ -69,16 +69,9 @@ pub fn resolve_type_expr_as_interface<'db>(
             })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) =
-                resolve_in_module(db, from.interned(), module)
+            if let Some(Definition::Module(module)) = resolve_in_module(db, *from, module)
             {
-                resolve_type_expr_as_interface(
-                    db,
-                    to,
-                    module.interned(),
-                    template_args,
-                    has_zelf,
-                )
+                resolve_type_expr_as_interface(db, to, module, template_args, has_zelf)
             } else {
                 None
             }
@@ -105,7 +98,7 @@ pub fn module_impls<'db>(
                     if let Some(interface) = resolve_type_expr_as_interface(
                         db,
                         constraint,
-                        module,
+                        module.into(),
                         &item.template_args,
                         false,
                     ) {
@@ -129,7 +122,7 @@ pub fn module_impls<'db>(
                     resolve_type_expr_as_interface(
                         db,
                         interface,
-                        module,
+                        module.into(),
                         &item.template_args,
                         false,
                     )

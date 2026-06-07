@@ -208,7 +208,7 @@ impl<'db> InferenceCtx<'db> {
                     let resolved = resolve_type_expr_as_interface(
                         this.db,
                         cons,
-                        this.implicit_ctx().owner_module(this.db).interned(),
+                        this.implicit_ctx().owner_module(this.db),
                         templates.as_ref(),
                         false,
                     )

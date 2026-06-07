@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::BTreeMap, iter};
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter,
+};
 
 use itertools::Itertools;
 use salsa::Accumulator;
@@ -31,7 +34,7 @@ use crate::{
         PartialTypeArg, PartialTypeRef,
     },
     name_resolve::{
-        definition::{Definition, resolve_in_module},
+        definition::{Definition, get_module_pretty_name, resolve_in_module},
         interfaces::{
             core_int_iter_struct, core_into_iterator_interface, core_iter_interface,
             core_opt_enum,
@@ -151,7 +154,7 @@ impl<'db> LowerFundef<'db> {
                 }
             }
             AstExprDesc::NameResolved { from, to } => {
-                match resolve_in_module(self.db, from.interned(), module.interned()) {
+                match resolve_in_module(self.db, *from, module) {
                     Some(Definition::Module(inner)) => {
                         self.expr_as_place(to, scope, inner)
                     }
@@ -261,14 +264,13 @@ impl<'db> LowerFundef<'db> {
                         )));
                     }
                 }
-                let resolution =
-                    resolve_in_module(self.db, name.interned(), module.interned())
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Could not resolve name {} in scope",
-                                name.display(self.db)
-                            )
-                        });
+                let resolution = resolve_in_module(self.db, *name, module)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Could not resolve name {} in scope",
+                            name.display(self.db)
+                        )
+                    });
 
                 let type_def_id = match resolution {
                     Definition::Type(type_def_id) => type_def_id,
@@ -309,7 +311,7 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::NameResolved { from, to } => {
-                match resolve_in_module(self.db, from.interned(), module.interned()) {
+                match resolve_in_module(self.db, *from, module) {
                     Some(Definition::Module(inner_module)) => {
                         self.resolve_holed_ty(to, inner_module)
                     }
@@ -421,7 +423,7 @@ impl<'db> LowerFundef<'db> {
             };
             HirExprDesc::Use(place)
         } else {
-            match resolve_in_module(self.db, symbol.interned(), module.interned()) {
+            match resolve_in_module(self.db, symbol, module) {
                 Some(Definition::Function(_)) => {
                     todo!(
                         "bare function name `{}` used as value expression",
@@ -467,7 +469,7 @@ impl<'db> LowerFundef<'db> {
                 _ => todo!("Handle bad cases"),
             }
         } else {
-            match resolve_in_module(self.db, from.interned(), module.interned()) {
+            match resolve_in_module(self.db, from, module) {
                 Some(Definition::Module(module_id)) => {
                     self.lower_expr(to, scope, module_id).data
                 }
@@ -560,7 +562,7 @@ impl<'db> LowerFundef<'db> {
                     .collect();
 
                 // Module-level: must be a free function
-                match resolve_in_module(self.db, symbol.interned(), module.interned()) {
+                match resolve_in_module(self.db, *symbol, module) {
                     Some(Definition::Function(fid)) => {
                         HirExprDesc::CallDirect { target: fid, args }
                     }
@@ -974,6 +976,8 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
+    /// TODO: see what's the difference with the similarly named
+    ///  `lower_pattern_as_constructor_args`
     fn lower_constructor_pattern(
         &mut self,
         pat: &AstPattern,
@@ -983,44 +987,124 @@ impl<'db> LowerFundef<'db> {
         name: &Symbol,
         args: &AstConstructFields,
     ) -> HirPattern {
-        let resolution = resolve_in_module(self.db, name.interned(), module.interned());
-        match (resolution, args) {
-            (
-                Some(Definition::Type(_type_def_id)),
-                AstConstructFields::StructFields(_fields),
-            ) => {
-                todo!("Constructor pattern with struct fields")
-            }
-            (_, AstConstructFields::None) => {
-                let local_id =
-                    self.allocate_local(scope, *name, Mutability::Const, None, pat.span);
-                locals.push(local_id);
-                HirPattern {
-                    id: self.alloc.fresh(),
-                    data: HirPatternDesc::Bind {
-                        id: local_id,
-                        name: *name,
-                        mutable: false,
-                    },
-                    span: pat.span,
+        let Some(resolution) = resolve_in_module(self.db, *name, module) else {
+            println!(
+                "UNRESOLVED name {} in module {}",
+                name.to_string(self.db),
+                get_module_pretty_name(self.db, module.interned())
+            );
+            todo!()
+        };
+
+        let Definition::Type(type_def) = resolution else {
+            todo!()
+        };
+
+        match type_def {
+            TypeDefId::Struct(struct_id) => match args {
+                AstConstructFields::StructFields(struct_field_patterns) => {
+                    let expected: HashSet<Symbol> =
+                        struct_id.field_names(self.db).iter().copied().collect();
+                    let bound: HashSet<Symbol> = struct_field_patterns
+                        .iter()
+                        .map(|pat| match pat {
+                            StructFieldPattern::Rebind { name, .. } => *name,
+                            StructFieldPattern::Name(symbol, _) => *symbol,
+                        })
+                        .collect();
+
+                    if expected != bound {
+                        todo!()
+                    }
+
+                    let hir_fields = struct_field_patterns
+                        .iter()
+                        .map(|pat| match pat {
+                            StructFieldPattern::Rebind { name, pattern, .. } => {
+                                println!(
+                                    "Lowering pattern of {}",
+                                    name.to_string(self.db)
+                                );
+                                let (lowered, new_locals) =
+                                    self.lower_pattern(pattern, scope);
+                                locals.extend(new_locals);
+
+                                HirStructFieldPattern::Rebind {
+                                    name: *name,
+                                    pattern: lowered,
+                                }
+                            }
+                            StructFieldPattern::Name(name, name_span) => {
+                                let local = self.allocate_local(
+                                    scope,
+                                    *name,
+                                    Mutability::Const,
+                                    None,
+                                    *name_span,
+                                );
+                                locals.push(local);
+                                HirStructFieldPattern::Name {
+                                    id: local,
+                                    name: *name,
+                                }
+                            }
+                        })
+                        .collect_vec();
+                    HirPattern {
+                        id: self.alloc.fresh(),
+                        data: HirPatternDesc::DestructureBinding {
+                            resolution: struct_id,
+                            fields: hir_fields,
+                        },
+                        span: pat.span,
+                    }
                 }
-            }
-            _ => {
-                Diag::generic_error(
-                    format!(
-                        "Expected an enum variant but got `{}`",
-                        name.display(self.db)
-                    ),
-                    pat.span,
-                )
-                .accumulate(self.db);
-                HirPattern {
-                    id: self.alloc.fresh(),
-                    data: HirPatternDesc::Error,
-                    span: pat.span,
-                }
-            }
+                _ => todo!(),
+            },
+            TypeDefId::Enum(_enum_id) => match args {
+                AstConstructFields::TupleFields(_spanneds) => todo!(),
+                AstConstructFields::StructFields(_struct_field_patterns) => todo!(),
+            },
+            _ => todo!(),
         }
+
+        // match (resolution, args) {
+        //     (
+        //         Some(Definition::Type(_type_def_id)),
+        //         AstConstructFields::StructFields(_fields),
+        //     ) => {
+        //         todo!("Constructor pattern with struct fields")
+        //     }
+        //     (_, AstConstructFields::None) => {
+        //         let local_id =
+        //             self.allocate_local(scope, *name, Mutability::Const, None, pat.span);
+        //         locals.push(local_id);
+        //         HirPattern {
+        //             id: self.alloc.fresh(),
+        //             data: HirPatternDesc::Bind {
+        //                 id: local_id,
+        //                 name: *name,
+        //                 mutable: false,
+        //             },
+        //             span: pat.span,
+        //         }
+        //     }
+        //     _ => {
+        //         Diag::generic_error(
+        //             format!(
+        //                 "Expected an enum variant but got `{}`",
+        //                 name.display(self.db)
+        //             ),
+        //             pat.span,
+        //         )
+        //         .accumulate(self.db);
+        //         HirPattern {
+        //             id: self.alloc.fresh(),
+        //             data: HirPatternDesc::Error,
+        //             span: pat.span,
+        //         }
+        //     }
+        // }
     }
 
     fn lower_pattern(
@@ -1056,16 +1140,38 @@ impl<'db> LowerFundef<'db> {
                             span: pat.span,
                         }
                     }
-                    AstNamedPattern::Constructor { name, args } => this
-                        .lower_constructor_pattern(
+                    AstNamedPattern::Bare(name) => {
+                        let local_id = this.allocate_local(
+                            scope,
+                            *name,
+                            Mutability::Const,
+                            None,
+                            pat.span,
+                        );
+                        locals.push(local_id);
+                        return HirPattern {
+                            id: this.alloc.fresh(),
+                            data: HirPatternDesc::Bind {
+                                id: local_id,
+                                name: *name,
+                                mutable: false,
+                            },
+                            span: pat.span,
+                        };
+                    }
+                    AstNamedPattern::Constructor { name, args } => {
+                        println!(
+                            "Found a constructor at {}",
+                            pat.span.start().loc_info(this.db)
+                        );
+                        let res = this.lower_constructor_pattern(
                             pat, scope, locals, module, name, args,
-                        ),
+                        );
+                        println!("-- END");
+                        res
+                    }
                     AstNamedPattern::NameResolved { from, to } => {
-                        match resolve_in_module(
-                            this.db,
-                            from.interned(),
-                            module.interned(),
-                        ) {
+                        match resolve_in_module(this.db, *from, module) {
                             Some(Definition::Module(id)) => {
                                 let inner_pat = AstPattern::new(
                                     AstPatternDesc::Named(*to.clone()),
@@ -1501,7 +1607,7 @@ impl<'db> LowerFundef<'db> {
                         let mut lowered_pats = vec![];
                         for pat in pats {
                             let pat = match pat {
-                                StructFieldPattern::Rebind { name, pattern } => {
+                                StructFieldPattern::Rebind { name, pattern, .. } => {
                                     let (pat, new_locals) =
                                         self.lower_pattern(pattern, scope);
                                     locals.extend(new_locals);
@@ -1510,7 +1616,7 @@ impl<'db> LowerFundef<'db> {
                                         pattern: pat,
                                     }
                                 }
-                                StructFieldPattern::Name(symbol) => {
+                                StructFieldPattern::Name(symbol, _) => {
                                     let new_local = self.allocate_local(
                                         scope,
                                         *symbol,
@@ -1529,7 +1635,6 @@ impl<'db> LowerFundef<'db> {
                         }
                         HirPatternConstructorArgs::StructFields(lowered_pats)
                     }
-                    AstConstructFields::None => HirPatternConstructorArgs::None,
                 };
                 (*name, args)
             }
@@ -1538,6 +1643,7 @@ impl<'db> LowerFundef<'db> {
                 unreachable!()
             }
             AstNamedPattern::Mut { .. } => unreachable!(),
+            AstNamedPattern::Bare(name) => (*name, HirPatternConstructorArgs::None),
         }
     }
 }

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, sync::Arc};
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use la_arena::{Arena, Idx};
 
 use crate::{
@@ -474,13 +474,13 @@ impl<'db> ThirTranslator<'db> {
                 let def = ty.as_struct_ref(self.db);
                 let fields = fields
                     .iter()
-                    .map(|(symbol, hir_pattern)| {
-                        (*symbol, {
-                            match hir_pattern.as_ref() {
-                                Either::Left(pat) => self.pat(b, pat),
-                                Either::Right(id) => self.pattern_of_local(b, *id),
-                            }
-                        })
+                    .map(|field_pat| match field_pat {
+                        HirStructFieldPattern::Rebind { name, pattern } => {
+                            (*name, self.pat(b, pattern))
+                        }
+                        HirStructFieldPattern::Name { id, name } => {
+                            (*name, self.pattern_of_local(b, *id))
+                        }
                     })
                     .collect();
                 def.map(|def| ThirPatternKind::Struct { def, fields })
@@ -569,22 +569,26 @@ impl<'db> ThirTranslator<'db> {
                 v.push(ThirStmt::let_(fresh, value, span));
                 let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
                 let def = ty.as_struct_ref(self.db).expect("TODO: handle bad case");
-                for (name, binding) in fields {
+                for pat_field in fields {
+                    let name = match pat_field {
+                        HirStructFieldPattern::Name { name, .. }
+                        | HirStructFieldPattern::Rebind { name, .. } => *name,
+                    };
                     let field_ty =
-                        def.typeof_field(self.db, *name).unwrap_or(TypeRef::Error);
+                        def.typeof_field(self.db, name).unwrap_or(TypeRef::Error);
                     let field_place = b.with_synthetic_projection(
                         place,
-                        Projection::Field(*name, field_ty),
+                        Projection::Field(name, field_ty),
                         field_ty,
                     );
                     let field_value =
                         b.new_expr(ThirExpr::use_place(field_place, b, span));
-                    match binding {
-                        Either::Left(pat) => {
+                    match pat_field {
+                        HirStructFieldPattern::Rebind { pattern: pat, .. } => {
                             self._destructure_pattern_init(b, pat, field_value, span, v);
                         }
-                        Either::Right(local) => {
-                            let thir_local = b.local_map[local];
+                        HirStructFieldPattern::Name { id, .. } => {
+                            let thir_local = b.local_map[id];
                             v.push(ThirStmt::let_(thir_local, field_value, span));
                         }
                     }

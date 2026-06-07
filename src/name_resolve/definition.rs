@@ -381,8 +381,16 @@ pub fn resolve_include_path<'db>(
     })
 }
 
+pub fn resolve_in_module(
+    db: &dyn Db,
+    name: Symbol,
+    module: ModuleId,
+) -> Option<Definition> {
+    _resolve_in_module(db, name.interned(), module.interned())
+}
+
 #[salsa::tracked]
-pub fn resolve_in_module<'db>(
+fn _resolve_in_module<'db>(
     db: &'db dyn Db,
     name: InternedSymbol<'db>,
     module: InternedModuleId<'db>,
@@ -406,7 +414,7 @@ pub fn resolve_in_module<'db>(
     // since the parent will run its own module_includes when we recurse into it
     module
         .parent(db)
-        .and_then(|parent| resolve_in_module(db, name, parent.interned()))
+        .and_then(|parent| _resolve_in_module(db, name, parent.interned()))
 }
 
 #[salsa::tracked]
@@ -414,8 +422,16 @@ pub struct Segments<'db> {
     pub segments: NonEmpty<Symbol>,
 }
 
+pub fn resolve_path(
+    db: &dyn Db,
+    segments: Segments<'_>,
+    module: ModuleId,
+) -> Option<Definition> {
+    _resolve_path(db, segments, module.interned())
+}
+
 #[salsa::tracked]
-pub fn resolve_path<'db>(
+fn _resolve_path<'db>(
     db: &'db dyn Db,
     segments: Segments<'db>,
     module: InternedModuleId<'db>,
@@ -423,10 +439,10 @@ pub fn resolve_path<'db>(
     let segments = segments.segments(db);
     let (head, tail) = segments.split_first();
     tail.iter().fold(
-        resolve_in_module(db, head.interned(), module),
+        _resolve_in_module(db, head.interned(), module),
         |acc, name| {
             if let Some(Definition::Module(module_id)) = acc {
-                resolve_in_module(db, name.interned(), module_id.interned())
+                _resolve_in_module(db, name.interned(), module_id.interned())
             } else {
                 None
             }
