@@ -176,12 +176,11 @@ impl<'db> InferenceCtx<'db> {
         let ast = function_ast(this.db, func.interned()).inner(this.db);
         let args = ast.get_args();
         for (local, ast) in params.iter().zip_eq(args) {
-            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).expect(
-                format!(
+            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).unwrap_or_else(||
+                panic!(
                     "Top level items should already have valid and resolved types ({})",
                     ast.ty.span.start().loc_info(db)
                 )
-                .as_str(),
             );
             let ty = this.allocate_type_ref(&ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
@@ -194,10 +193,10 @@ impl<'db> InferenceCtx<'db> {
             .as_zelf_arg()
             .map(|arg| arg.get_zelf_type_for(db, zelf_ty.unwrap()));
 
-        actual_zelf_ty.map(|ty| {
+        if let Some(ty) = actual_zelf_ty {
             let local_ty = this.local_var(zelf.unwrap());
             this.unify(ty, InferTy::Var(local_ty)).unwrap();
-        });
+        }
 
         infer_templates
             .iter()
@@ -207,7 +206,7 @@ impl<'db> InferenceCtx<'db> {
                 for cons in constraints {
                     let resolved = resolve_type_expr_as_interface(
                         this.db,
-                        &cons,
+                        cons,
                         this.implicit_ctx().owner_module(this.db).interned(),
                         templates.as_ref(),
                         false,

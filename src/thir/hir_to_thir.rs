@@ -239,7 +239,7 @@ impl<'db> ThirTranslator<'db> {
     fn handle_block(
         &mut self,
         b: &mut ThirBuilder,
-        stmts: &Vec<HirStmt>,
+        stmts: &[HirStmt],
         span: Span,
     ) -> ThirStmt {
         let (scope, stmts) =
@@ -986,9 +986,9 @@ impl TypeRef {
         let type_id = self.as_type_id()?;
         let def = type_id.def(db);
         if def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)) {
-            Some((Mutability::Mutable, *type_id.args(db).get(0)?))
+            Some((Mutability::Mutable, *type_id.args(db).first()?))
         } else if def == TypeDefId::Builtin(BuiltinTypeId::ref_(db)) {
-            Some((Mutability::Const, *type_id.args(db).get(0)?))
+            Some((Mutability::Const, *type_id.args(db).first()?))
         } else {
             None
         }
@@ -1002,7 +1002,7 @@ impl ThirPlace {
             base: PlaceBase::Local(local),
             projections: vec![],
             ty,
-            span: span,
+            span,
         }
     }
 }

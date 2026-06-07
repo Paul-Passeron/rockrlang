@@ -51,7 +51,7 @@ pub fn check<'db>(db: &'db dyn Db, ws: Workspace) {
     }
 }
 
-pub fn check_definition<'db>(db: &'db dyn Db, def: Definition) {
+pub fn check_definition(db: &dyn Db, def: Definition) {
     match def {
         Definition::Function(function_id) => check_fundef(db, function_id),
         Definition::Interface(interface_id) => {
@@ -62,8 +62,8 @@ pub fn check_definition<'db>(db: &'db dyn Db, def: Definition) {
     }
 }
 
-pub fn check_duplicate_defs<'db>(
-    db: &'db dyn Db,
+pub fn check_duplicate_defs(
+    db: &dyn Db,
     defs: impl Iterator<Item = (Symbol, Definition)>,
 ) {
     let mut map: HashMap<Symbol, HashSet<Definition>> = HashMap::new();

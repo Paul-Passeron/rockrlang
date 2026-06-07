@@ -102,7 +102,7 @@ impl Location {
     }
 }
 
-fn _loc_info<'db>(db: &'db dyn Db, loc: Location) -> LocationInfo {
+fn _loc_info(db: &dyn Db, loc: Location) -> LocationInfo {
     #[salsa::interned]
     struct Interned {
         inner: Location,

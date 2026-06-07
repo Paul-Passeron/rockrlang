@@ -214,7 +214,7 @@ impl<'db> Parser<'db> {
         }
 
         let ty = self.parse_type_expr()?;
-        let span = ty.span.clone();
+        let span = ty.span;
         Ok(Spanned::new(
             AstAnyTypeExprDesc::Known(ty.data),
             vec![],

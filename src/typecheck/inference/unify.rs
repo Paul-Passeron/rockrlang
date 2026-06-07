@@ -141,8 +141,7 @@ impl<'db> InferenceCtx<'db> {
                 .inspect(|_| self.merge_listeners(*a, *b)),
             (InferTy::Var(infer_var), value)
             | (value, InferTy::Var(infer_var)) => {
-                let res = self
-                    .table
+                self.table
                     .unify_var_value(*infer_var, Some(value.clone()))?;
                 self.listeners
                     .remove(&self.table.find(*infer_var))
@@ -152,7 +151,7 @@ impl<'db> InferenceCtx<'db> {
                             self.ready.push_back(l);
                         }
                     });
-                Ok(res)
+                Ok(())
             }
             (
                 InferTy::Adt {

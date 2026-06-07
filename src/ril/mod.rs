@@ -284,7 +284,7 @@ impl ModuleId {
                     if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
                         && curr_mod.data.name.data == self.name(db)
                     {
-                        return curr_mod.span.clone();
+                        return curr_mod.span;
                     }
                 }
                 unreachable!()

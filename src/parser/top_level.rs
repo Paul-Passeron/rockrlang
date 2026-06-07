@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::sync::Arc;
+
 use nonempty::nonempty;
 
 use crate::{
@@ -64,7 +66,7 @@ impl<'db> Parser<'db> {
             }
             _ => self.parse_toplevel_item().map(|item| {
                 AstAnyTopLevelItem::new(
-                    AstAnyTopLevelItemDesc::Item(item.data),
+                    AstAnyTopLevelItemDesc::Item(Box::new(item.data)),
                     item.annotations,
                     item.span,
                 )
@@ -543,7 +545,7 @@ impl<'db> Parser<'db> {
             TokenKind::Fun => {
                 let mut fdef = self.parse_methoddef()?;
                 fdef.annotations = annotations;
-                Ok(AstImplItem::Fundef(fdef))
+                Ok(AstImplItem::Fundef(Box::new(fdef)))
             }
             found => Err(self.parse_error(ParseErrorKind::ExpectedToken {
                 expected: TokenKind::Fun,
@@ -743,14 +745,14 @@ impl<'db> Parser<'db> {
                 let sig = self.parse_methodsig()?;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
-                Ok(AstInterfaceItem::Sig(sig))
+                Ok(AstInterfaceItem::Sig(Arc::new(sig)))
             }
             x => Err(ParseError {
                 kind: ParseErrorKind::ExpectedToken {
                     expected: TokenKind::Fun,
                     found: x,
                 },
-                file: self.file.clone(),
+                file: self.file,
                 start: self.current_token()?.location.start_offset,
                 end: self.current_token()?.location.end_offset,
             }),
@@ -765,7 +767,7 @@ impl<'db> Parser<'db> {
         match &self.current_token()?.kind {
             TokenKind::Module => {
                 let module = self.parse_module()?;
-                let span = module.span.clone();
+                let span = module.span;
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Module(module),
                     annotations,
@@ -774,7 +776,7 @@ impl<'db> Parser<'db> {
             }
             TokenKind::Fun => {
                 let fdef = self.parse_fundef()?;
-                let span = fdef.span.clone();
+                let span = fdef.span;
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Fundef(fdef),
                     annotations,

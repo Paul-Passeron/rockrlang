@@ -101,7 +101,7 @@ fn label_for<'db>(
 ) -> CrLabel<usize> {
     let span = label.span;
     let file_id = ensure_file(db, span.file, files, file_ids);
-    let range = (span.start_offset as usize)..(span.end_offset as usize);
+    let range = span.start_offset..span.end_offset;
 
     let mut l = CrLabel::new(style, file_id, range);
     if let Some(msg) = label.message {
@@ -136,5 +136,5 @@ fn severity_to_cr(s: Severity) -> CrSeverity {
 }
 
 fn io_error(e: codespan_reporting::files::Error) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, e)
+    io::Error::other(e)
 }

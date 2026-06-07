@@ -89,7 +89,7 @@ impl<'db> InferenceCtx<'db> {
                 self.infer_binop(lhs, *op, rhs)
             }
             HirExprDesc::StructLit { ty, fields } => {
-                self.infer_struct_lit(ty, fields, expr.span.clone())
+                self.infer_struct_lit(ty, fields, expr.span)
             }
             HirExprDesc::Neg(hir_expr) => {
                 let ty = self.infer_expr(hir_expr)?;
@@ -300,7 +300,7 @@ impl<'db> InferenceCtx<'db> {
 
             self.diagnose_bad_struct_fields(
                 fields,
-                span.clone(),
+                span,
                 &ast,
                 &inferred_fields,
                 struct_id,
@@ -371,7 +371,7 @@ impl<'db> InferenceCtx<'db> {
                 //         },
                 //         message: format!("Missing field in struct lit"),
                 //     },
-                //     span: span.clone(),
+                //     span: span,
                 // });
                 // println!(
                 //     "[Info]: Missing field in struct lit: {}",
@@ -494,7 +494,7 @@ impl<'db> InferenceCtx<'db> {
         args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
         let receiver_ty =
-            self.allocate_partial_type_ref(ty, &self.implicit_ctx().as_ref());
+            self.allocate_partial_type_ref(ty, self.implicit_ctx().as_ref());
         let inferred_args = args
             .iter()
             .map(|arg| self.infer_expr(arg))

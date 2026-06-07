@@ -225,10 +225,7 @@ impl PartialEq for ThirArc {
 }
 impl Eq for ThirArc {}
 
-pub fn thir_body<'db>(
-    db: &'db dyn Db,
-    function: FunctionId,
-) -> Option<Arc<Thir>> {
+pub fn thir_body(db: &dyn Db, function: FunctionId) -> Option<Arc<Thir>> {
     _thir_body(db, function.interned()).map(|arc| arc.0)
 }
 

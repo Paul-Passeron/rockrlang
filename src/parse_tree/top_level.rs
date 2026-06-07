@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use itertools::Itertools;
 use nonempty::NonEmpty;
@@ -39,7 +39,7 @@ pub type AstAnyTopLevelItem = Spanned<AstAnyTopLevelItemDesc>;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstAnyTopLevelItemDesc {
     Include(AstIncludePath),
-    Item(AstTopLevelItemDesc),
+    Item(Box<AstTopLevelItemDesc>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -254,7 +254,7 @@ pub struct AstInterface {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstInterfaceItem {
     Type(AstTemplateArg),
-    Sig(AstMethodsig),
+    Sig(Arc<AstMethodsig>),
 }
 
 #[allow(dead_code)]
@@ -278,7 +278,7 @@ pub struct AstImplBlock {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
     Type { name: Symbol, ty: AstTypeExpr },
-    Fundef(AstMethodDef),
+    Fundef(Box<AstMethodDef>),
 }
 
 #[salsa::tracked]

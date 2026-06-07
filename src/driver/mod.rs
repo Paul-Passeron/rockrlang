@@ -35,7 +35,7 @@ pub struct DiscoveredModule {
 pub fn discover_package(p: &Path) -> Option<DiscoveredModule> {
     // let p = p.canonicalize().ok()?;
     if p.is_dir() {
-        discover_dir(&p)
+        discover_dir(p)
     } else if p.file_name()? == ANCHOR_FILE_NAME {
         discover_dir(p.parent()?)
     } else {
@@ -84,11 +84,11 @@ pub struct SalsaPath<'db> {
     pub value: PathBuf,
 }
 
-pub fn read_source_file<'db>(
-    db: &'db mut dyn Db,
+pub fn read_source_file(
+    db: &mut dyn Db,
     path: &Path,
 ) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
-    Some(db.add_source_file(path.to_path_buf(), s).ok()?)
+    db.add_source_file(path.to_path_buf(), s).ok()
 }

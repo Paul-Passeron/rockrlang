@@ -306,11 +306,11 @@ impl<'db> Parser<'db> {
                     // where `a::b::c` has already been built up as a NameResolved expr.
                     let start = expr.span.start();
                     if let Some(static_call) =
-                        self.try_parse_static_call(&expr, start.clone())
+                        self.try_parse_static_call(&expr, start)
                     {
                         expr = static_call;
                     } else if let Some(qualified_cons) =
-                        self.try_parse_qualified_cons(&expr, start.clone())
+                        self.try_parse_qualified_cons(&expr, start)
                     {
                         expr = qualified_cons;
                     } else {
@@ -358,7 +358,7 @@ impl<'db> Parser<'db> {
                                 let base_expr = AstExpr::new(
                                     AstExprDesc::Name(from),
                                     vec![],
-                                    expr.span.clone(),
+                                    expr.span,
                                 );
                                 (
                                     self.reinterpret_expr_as_ty(base_expr)?,
@@ -554,10 +554,10 @@ impl<'db> Parser<'db> {
                         ))
                     }
 
-                    Some(TokenKind::OpenBra) => {
+                    Some(TokenKind::OpenBra)
                         if self.peek_n(1).map(|t| &t.kind)
                             == Some(&TokenKind::Dot)
-                        {
+                        => {
                             self.consume();
                             let fields = self.parse_struct_fields()?;
                             self.expect(TokenKind::CloseBra)?;
@@ -578,15 +578,7 @@ impl<'db> Parser<'db> {
                                 vec![],
                                 start.span(end),
                             ))
-                        } else {
-                            let end = self.get_end();
-                            Ok(Spanned::new(
-                                AstExprDesc::Name(name),
-                                vec![],
-                                start.span(end),
-                            ))
                         }
-                    }
 
                     // `<` is not handled here — just return the Name and let
                     // parse_postfix handle it for static calls / qualified paths.

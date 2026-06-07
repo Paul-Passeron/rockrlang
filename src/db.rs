@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dashmap::DashMap;
 use salsa::Setter;
@@ -38,22 +38,18 @@ pub trait Db: salsa::Database {
         Workspace::get(self).config(self)
     }
 
-    fn get_ref_files<'a>(&'a self) -> &'a DashMap<PathBuf, SourceFile>;
+    fn get_ref_files(&self) -> &DashMap<PathBuf, SourceFile>;
 
-    fn get_mut_ref_files<'a>(
-        &'a mut self,
-    ) -> &'a mut DashMap<PathBuf, SourceFile>;
+    fn get_mut_ref_files(&mut self) -> &mut DashMap<PathBuf, SourceFile>;
 }
 
 #[salsa::db]
 impl Db for RockrDb {
-    fn get_ref_files<'a>(&'a self) -> &'a DashMap<PathBuf, SourceFile> {
+    fn get_ref_files(&self) -> &DashMap<PathBuf, SourceFile> {
         &self.files
     }
 
-    fn get_mut_ref_files<'a>(
-        &'a mut self,
-    ) -> &'a mut DashMap<PathBuf, SourceFile> {
+    fn get_mut_ref_files(&mut self) -> &mut DashMap<PathBuf, SourceFile> {
         &mut self.files
     }
 }
@@ -92,7 +88,7 @@ impl dyn Db {
         Ok(sf)
     }
 
-    pub fn find_source_file(&self, path: &PathBuf) -> Option<SourceFile> {
+    pub fn find_source_file(&self, path: &Path) -> Option<SourceFile> {
         let path = path.canonicalize().ok()?;
         self.get_ref_files().get(&path).map(|val| *val)
     }

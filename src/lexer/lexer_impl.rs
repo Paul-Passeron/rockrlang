@@ -160,7 +160,7 @@ impl<'db, T> Lexer<'db, T> {
                         "Unexpected character `{}`",
                         contents.chars().nth(self.offset).unwrap_or('\0')
                     ),
-                    file: self.file.clone(),
+                    file: self.file,
                     offset: self.offset,
                 })
             })

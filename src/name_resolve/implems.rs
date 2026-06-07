@@ -152,7 +152,7 @@ pub fn module_impls<'db>(
                             module.into(),
                             item.template_args.clone(),
                             item.items.clone(),
-                            item.span.clone(),
+                            item.span,
                         );
                         res.push(src);
                     }
@@ -170,7 +170,7 @@ pub fn module_impls<'db>(
                             module.into(),
                             item.template_args.clone(),
                             item.items.clone(),
-                            item.span.clone(),
+                            item.span,
                         );
                         res.push(src);
                     }

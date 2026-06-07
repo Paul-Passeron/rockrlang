@@ -313,10 +313,12 @@ impl<'db> TyCtx<'db> {
                                                 .emit_binds_like_constraint(
                                                     binds_like, infer_ty,
                                                 );
-                                            if let Err(_) = self.inf_ctx.unify(
-                                                InferTy::Var(to_unify),
-                                                pat_ty,
-                                            ) {
+                                            if let Err(_err) =
+                                                self.inf_ctx.unify(
+                                                    InferTy::Var(to_unify),
+                                                    pat_ty,
+                                                )
+                                            {
                                                 todo!()
                                             }
                                         } else {
@@ -341,10 +343,12 @@ impl<'db> TyCtx<'db> {
                                                 .emit_binds_like_constraint(
                                                     binds_like, infer_ty,
                                                 );
-                                            if let Err(_) = self.inf_ctx.unify(
-                                                InferTy::Var(to_unify),
-                                                local_ty,
-                                            ) {
+                                            if let Err(_err) =
+                                                self.inf_ctx.unify(
+                                                    InferTy::Var(to_unify),
+                                                    local_ty,
+                                                )
+                                            {
                                                 todo!()
                                             }
                                         } else {

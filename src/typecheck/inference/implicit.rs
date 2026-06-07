@@ -78,7 +78,7 @@ impl AstImplicitContext {
         templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
     ) -> ImplResult<ImplicitContext> {
-        if &self.template_asts.len() != &templates.len() {
+        if self.template_asts.len() != templates.len() {
             dbg!(&self.template_asts);
             dbg!(&templates);
             return Err(ImplicitCtxCreationError::TemplateLenMismatch);
@@ -109,7 +109,7 @@ pub enum ImplicitCtxCreationError {
 pub type ImplResult<T> = Result<T, ImplicitCtxCreationError>;
 
 impl ImplicitContext {
-    pub fn new<'a>(
+    pub fn new(
         db: &dyn Db,
         owner: ScopeOwnerId,
         other_templates: Arc<[AstTemplateArg]>,
@@ -129,7 +129,7 @@ impl ImplicitContext {
         let owner = func.parent(db);
         let full_templates = get_templates_of_fun(db, func.interned());
         let other_templates = full_templates
-            .into_iter()
+            .iter()
             .skip(templates_of_owner(db, owner).len())
             .cloned()
             .collect();
@@ -146,9 +146,9 @@ impl AstImplicitContext {
         }
     }
 
-    pub fn get_associated_type_ast_template_arg<'a>(
+    pub fn get_associated_type_ast_template_arg(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTemplateArg> {
         let interface_ref = self.get_interface_ref(db)?;
@@ -161,9 +161,9 @@ impl AstImplicitContext {
         })
     }
 
-    pub fn get_associated_type_ast<'a>(
+    pub fn get_associated_type_ast(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTypeExpr> {
         let impl_id = match self.owner {
@@ -179,9 +179,9 @@ impl AstImplicitContext {
         })
     }
 
-    pub fn get_associated_type<'a>(
+    pub fn get_associated_type(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<TypeRef> {
         if let Some(ast_ty) = self.get_associated_type_ast(db, associated) {
@@ -405,21 +405,21 @@ pub trait AsAstImplCtx {
     fn get_module(&self) -> Option<ModuleId>;
     fn owning_module(&self, db: &dyn Db) -> ModuleId;
 
-    fn get_associated_type_ast<'a>(
+    fn get_associated_type_ast(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTypeExpr>;
 
-    fn get_associated_type_ast_template_arg<'a>(
+    fn get_associated_type_ast_template_arg(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTemplateArg>;
 
-    fn get_associated_type<'a>(
+    fn get_associated_type(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<TypeRef> {
         if let Some(ast_ty) = self.get_associated_type_ast(db, associated) {
@@ -555,9 +555,9 @@ impl AsAstImplCtx for ImplicitContext {
         }
     }
 
-    fn get_associated_type_ast<'a>(
+    fn get_associated_type_ast(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTypeExpr> {
         unused!(db);
@@ -565,9 +565,9 @@ impl AsAstImplCtx for ImplicitContext {
         todo!()
     }
 
-    fn get_associated_type_ast_template_arg<'a>(
+    fn get_associated_type_ast_template_arg(
         &self,
-        db: &'a dyn Db,
+        db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTemplateArg> {
         unused!(db);

@@ -157,7 +157,7 @@ impl<'db> Parser<'db> {
         match current.kind {
             TokenKind::Identifier(s) => {
                 self.consume();
-                Ok(Spanned::new(s, vec![], current.location.clone()))
+                Ok(Spanned::new(s, vec![], current.location))
             }
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),
@@ -212,7 +212,7 @@ pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
                     includes.push(include);
                 }
                 AstAnyTopLevelItemDesc::Item(x) => {
-                    items.push(Spanned::new(x, item.annotations, item.span));
+                    items.push(Spanned::new(*x, item.annotations, item.span));
                 }
             },
             Err(parse_error) => {

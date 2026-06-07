@@ -134,7 +134,7 @@ impl ThirStmt {
                 scrutinee: scrut,
                 branches,
             },
-            span: span,
+            span,
         }
     }
 

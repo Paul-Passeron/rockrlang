@@ -87,7 +87,7 @@ impl ModuleId {
             if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
                 && curr_mod.data.name.data == self.name(db)
             {
-                return Some(curr_mod.data.name.span.clone());
+                return Some(curr_mod.data.name.span);
             }
         }
         unreachable!()
@@ -140,7 +140,7 @@ impl StructId {
 
 impl EnumId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
-        enum_item(db, self.interned()).name.span.clone()
+        enum_item(db, self.interned()).name.span
     }
 
     pub fn span(&self, db: &dyn Db) -> Span {
@@ -150,7 +150,7 @@ impl EnumId {
 
 impl InterfaceId {
     pub fn name_span(&self, db: &dyn Db) -> Span {
-        interface_item(db, self.interned()).name.span.clone()
+        interface_item(db, self.interned()).name.span
     }
 }
 
@@ -167,14 +167,10 @@ impl FunctionId {
 impl FunctionLikeAst {
     pub fn name_span(&self) -> Span {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => {
-                spanned.data.name.span.clone()
-            }
-            FunctionLikeAst::Fundef(spanned) => spanned.data.name.span.clone(),
-            FunctionLikeAst::Method(spanned) => spanned.data.name.span.clone(),
-            FunctionLikeAst::TraitMethod(spanned) => {
-                spanned.data.name.span.clone()
-            }
+            FunctionLikeAst::ExternDef(spanned, _) => spanned.data.name.span,
+            FunctionLikeAst::Fundef(spanned) => spanned.data.name.span,
+            FunctionLikeAst::Method(spanned) => spanned.data.name.span,
+            FunctionLikeAst::TraitMethod(spanned) => spanned.data.name.span,
         }
     }
 }

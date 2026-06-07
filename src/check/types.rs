@@ -19,7 +19,7 @@ use salsa::Accumulator;
 
 use crate::{Db, check::Diag, ril::TypeDefId};
 
-pub fn check_typedef<'db>(db: &'db dyn Db, typedef: TypeDefId) {
+pub fn check_typedef(db: &dyn Db, typedef: TypeDefId) {
     if let Some(span) = typedef.span(db) {
         Diag::todo(
             format!("Implement check_typedef ({}:{})", file!(), line!()),

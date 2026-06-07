@@ -98,7 +98,7 @@ pub fn check_stmts(
             if i < stmts.len() - 1 {
                 let next_stmt = &stmts[i + 1];
                 Diag::todo(
-                    format!("Have a real unreachable diagnostic"),
+                    "Have a real unreachable diagnostic".to_string(),
                     next_stmt.span,
                 )
                 .accumulate(db);
@@ -226,7 +226,7 @@ fn check_branch(
     thir: &Thir,
     branch: &ThirMatchBranch,
 ) -> Completeness {
-    let guard_returns = branch.guard.as_ref().map_or(false, |expr| {
+    let guard_returns = branch.guard.as_ref().is_some_and(|expr| {
         check_expr_with_setup(db, thir, expr).always_returns()
     });
     let body_check = check_stmts(db, thir, &branch.body);

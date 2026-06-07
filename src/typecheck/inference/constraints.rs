@@ -46,7 +46,6 @@ use crate::{
             implicit::ImplicitContext, var::InferVar,
         },
     },
-    unused,
 };
 
 use super::{InferTy, implems::PotentialBlockRes};
@@ -63,7 +62,6 @@ pub struct InferenceConstraint {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
 pub enum InferenceConstraintKind {
     Deref {
         var: InferVar,
@@ -89,15 +87,7 @@ pub enum InferenceConstraintKind {
         struct_ty: InferTy,
         field: Symbol,
     },
-    Method {
-        ret_var: InferVar,
-        ty: InferTy,
-        id: ExprId,
-        method: Symbol,
-        args: Box<[InferTy]>,
-        interface_hint: Option<InterfaceId>,
-        is_static: bool,
-    },
+    Method(MethodConstraint),
     Implements {
         ty: InferTy,
         id: InterfaceId,
@@ -122,13 +112,24 @@ pub enum InferenceConstraintKind {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MethodConstraint {
+    ret_var: InferVar,
+    ty: InferTy,
+    id: ExprId,
+    method: Symbol,
+    args: Box<[InferTy]>,
+    interface_hint: Option<InterfaceId>,
+    is_static: bool,
+}
+
 impl InferenceConstraintKind {
     pub fn has_default_behaviour(&self) -> bool {
-        match self {
+        matches!(
+            self,
             InferenceConstraintKind::Deref { .. }
-            | InferenceConstraintKind::IntLike { .. } => true,
-            _ => false,
-        }
+                | InferenceConstraintKind::IntLike { .. }
+        )
     }
 }
 
@@ -322,22 +323,29 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         ret_var: InferVar,
         receiver: &InferTy,
-        id: ExprId,
         method: Symbol,
         args: &[InferTy],
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> Option<ConstraintSolveResult> {
-        unused!(id);
-        for (iface_id, implem, sig) in self.known_impls_providing(
-            receiver,
-            method,
-            args.len(),
-            interface_hint,
-            is_static,
-        ) {
+        if let Some((iface_id, implem, sig)) = self
+            .known_impls_providing(
+                receiver,
+                method,
+                args.len(),
+                interface_hint,
+                is_static,
+            )
+            .into_iter()
+            .next()
+        {
             return Some(self.apply_interface_method(
-                iface_id, implem, sig, ret_var, args, is_static,
+                iface_id,
+                implem,
+                sig.as_ref(),
+                ret_var,
+                args,
+                is_static,
             ));
         }
         None
@@ -347,7 +355,7 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         iface_id: InterfaceId,
         implem: InterfaceImplem,
-        sig: AstMethodsig,
+        sig: &AstMethodsig,
         ret_var: InferVar,
         args: &[InferTy],
         is_static: bool,
@@ -403,7 +411,7 @@ impl<'db> InferenceCtx<'db> {
         arity: usize,
         hint: Option<InterfaceId>,
         is_static: bool,
-    ) -> Vec<(InterfaceId, InterfaceImplem, AstMethodsig)> {
+    ) -> Vec<(InterfaceId, InterfaceImplem, Arc<AstMethodsig>)> {
         let mut out = vec![];
         let receiver = self.find(receiver);
         let implements = self.implements.clone(); // same clone as before, fix later
@@ -432,26 +440,29 @@ impl<'db> InferenceCtx<'db> {
 
     fn solve_method_constraint(
         &mut self,
-        ret_var: InferVar,
-        receiver: &InferTy,
-        id: ExprId,
-        method: Symbol,
-        args: &[InferTy],
-        interface_hint: Option<InterfaceId>,
-        is_static: bool,
+        method_constraint: &MethodConstraint,
     ) -> ConstraintSolveResult {
-        if self.call_infos.contains_key(&id) {
-            return ConstraintSolveResult::Solved;
-        }
-
-        if let Some(result) = self.try_resolve_via_known_impl(
+        let MethodConstraint {
             ret_var,
-            receiver,
+            ty: receiver,
             id,
             method,
             args,
             interface_hint,
             is_static,
+        } = method_constraint;
+
+        if self.call_infos.contains_key(id) {
+            return ConstraintSolveResult::Solved;
+        }
+
+        if let Some(result) = self.try_resolve_via_known_impl(
+            *ret_var,
+            receiver,
+            *method,
+            args,
+            *interface_hint,
+            *is_static,
         ) {
             return result;
         }
@@ -464,8 +475,8 @@ impl<'db> InferenceCtx<'db> {
                 let items = impl_items(self.db, src.id(self.db).interned());
                 for item in items {
                     if let AstImplItem::Fundef(def) = item
-                        && def.data.name.data == method
-                        && def.data.receiver.is_static() == is_static
+                        && def.data.name.data == *method
+                        && def.data.receiver.is_static() == *is_static
                         && def.data.args.len() == args.len()
                     {
                         return true;
@@ -480,7 +491,7 @@ impl<'db> InferenceCtx<'db> {
                 .filter(|(src, _)| {
                     src.id(self.db).interface(self.db).is_some_and(
                         |impl_interface_id| {
-                            impl_interface_id.def(self.db) == id
+                            impl_interface_id.def(self.db) == *id
                         },
                     )
                 })
@@ -518,23 +529,23 @@ impl<'db> InferenceCtx<'db> {
 
         let method_id = FunctionId::new(
             self.db,
-            method,
+            *method,
             ScopeOwnerId::Impl(src.id(self.db)),
         );
 
         let ast = impl_items(self.db, src.id(self.db).interned())
             .into_iter()
             .find_map(|item| match item {
-                AstImplItem::Fundef(def) if def.data.name.data == method => {
+                AstImplItem::Fundef(def) if def.data.name.data == *method => {
                     Some(def)
                 }
                 _ => None,
             })
             .unwrap();
 
-        if ast.data.receiver.is_static() != is_static {
+        if ast.data.receiver.is_static() != *is_static {
             return ConstraintSolveResult::Error(
-                UnificationError::StaticMethodCallOnReceiver(id, method_id),
+                UnificationError::StaticMethodCallOnReceiver(*id, method_id),
             );
         }
 
@@ -581,18 +592,18 @@ impl<'db> InferenceCtx<'db> {
             .allocate_ast_type_expr(&ast_ret_ty.data, &method_ctx)
             .unwrap();
 
-        if let Err(err) = self.unify(InferTy::Var(ret_var), ret_ty.clone()) {
+        if let Err(err) = self.unify(InferTy::Var(*ret_var), ret_ty.clone()) {
             return ConstraintSolveResult::Error(err);
         }
 
         let call_infos = InferCallInfos {
-            expr_id: id,
+            expr_id: *id,
             callee: method_id,
             substitution: method_templates,
             variadic: false,
         };
 
-        self.call_infos.insert(id, call_infos);
+        self.call_infos.insert(*id, call_infos);
         ConstraintSolveResult::Solved
     }
 
@@ -867,23 +878,9 @@ impl<'db> InferenceCtx<'db> {
             } => {
                 self.solve_struct_field_constraint(*elem_var, struct_ty, *field)
             }
-            InferenceConstraintKind::Method {
-                ret_var,
-                ty,
-                id,
-                method,
-                args,
-                interface_hint,
-                is_static,
-            } => self.solve_method_constraint(
-                *ret_var,
-                ty,
-                *id,
-                *method,
-                args,
-                *interface_hint,
-                *is_static,
-            ),
+            InferenceConstraintKind::Method(method) => {
+                self.solve_method_constraint(method)
+            }
             InferenceConstraintKind::Implements { ty, id, args } => {
                 self.solve_implements_constraint(constraint.id, ty, *id, args)
             }
@@ -982,11 +979,10 @@ impl<'db> InferenceCtx<'db> {
             let pending = self
                 .all_constraints
                 .iter()
-                .filter(|(id, constraint)| {
+                .find(|(id, constraint)| {
                     !self.solved_constraints.contains(*id)
                         && (constraint.kind.has_default_behaviour())
                 })
-                .next()
                 .map(|(_, val)| val.clone());
             match pending {
                 None => {
@@ -1103,15 +1099,17 @@ impl<'db> InferenceCtx<'db> {
         is_static: bool,
     ) -> InferVar {
         let ret_var = self.fresh_var();
-        self.emit_constraint(InferenceConstraintKind::Method {
-            ret_var,
-            ty,
-            id,
-            method,
-            args,
-            interface_hint,
-            is_static,
-        });
+        self.emit_constraint(InferenceConstraintKind::Method(
+            MethodConstraint {
+                ret_var,
+                ty,
+                id,
+                method,
+                args,
+                interface_hint,
+                is_static,
+            },
+        ));
         ret_var
     }
 
@@ -1200,7 +1198,7 @@ impl<'db> InferenceCtx<'db> {
 
         match (&lhs_ty, &rhs_ty) {
             (InferTy::Var(_), InferTy::Var(_)) => {
-                return ConstraintSolveResult::Pending;
+                ConstraintSolveResult::Pending
             }
             (InferTy::Var(v), InferTy::Adt { def, fields })
             | (InferTy::Adt { def, fields }, InferTy::Var(v))
@@ -1342,7 +1340,7 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                     field.display(self.db)
                 )
             }
-            InferenceConstraintKind::Method {
+            InferenceConstraintKind::Method(MethodConstraint {
                 ret_var,
                 ty,
                 id,
@@ -1350,7 +1348,7 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 args,
                 interface_hint,
                 is_static,
-            } => {
+            }) => {
                 write!(
                     f,
                     "Method {{ret_var: {}, ty: {}, id: ExprId({:?}), method: {}, args: [{}], interface_hint: {}, is_static: {is_static}}}",
@@ -1472,9 +1470,12 @@ impl InferenceConstraintKind {
                 .into_iter()
                 .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
                 .collect(),
-            InferenceConstraintKind::Method {
-                ret_var, ty, args, ..
-            } => args
+            InferenceConstraintKind::Method(MethodConstraint {
+                ret_var,
+                ty,
+                args,
+                ..
+            }) => args
                 .iter()
                 .flat_map(|t| ctx.find(t).listeners())
                 .collect::<Box<_>>()

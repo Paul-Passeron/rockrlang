@@ -107,19 +107,12 @@ impl Workspace {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub struct Config {
     pub no_std: bool,
     pub skip_core: bool,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            no_std: false,
-            skip_core: false,
-        }
-    }
-}
 
 pub enum CompilerError {
     NoCompilationUnitFound(PathBuf),
@@ -343,12 +336,11 @@ fn std_path() -> Result<PathBuf, CompilerError> {
 fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
     std::env::var(env)
         .map_err(|_| CompilerError::CoreLibNotFound)
-        .map(|path| {
+        .and_then(|path| {
             PathBuf::from(path)
                 .canonicalize()
                 .map_err(|_| CompilerError::CoreLibNotFound)
         })
-        .flatten()
 }
 
 fn compute_package_roots(
@@ -370,7 +362,7 @@ fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
                 .into_iter()
                 .filter_map(Result::ok)
                 .filter(|path| {
-                    if path.path() == &p {
+                    if path.path() == p {
                         return false;
                     }
                     if path.file_type().is_file() {
@@ -411,7 +403,7 @@ fn load_workspace_from_disk(
     config: Config,
 ) -> Result<RockrDb, CompilerError> {
     let mut db = RockrDb::new();
-    Workspace::initialize(&mut db, config);
+    Workspace::initialize(&db, config);
     compute_package_roots(&mut db, root)?;
     compute_all_files_from_roots(&mut db)?;
     Ok(db)

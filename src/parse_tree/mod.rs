@@ -74,7 +74,7 @@ impl<T: Clone> Clone for Spanned<T> {
         Self {
             data: self.data.clone(),
             annotations: self.annotations.clone(),
-            span: self.span.clone(),
+            span: self.span,
         }
     }
 }

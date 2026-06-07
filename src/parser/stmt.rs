@@ -307,7 +307,7 @@ impl<'db> Parser<'db> {
                     let expr = self.parse_expr()?;
                     self.expect(TokenKind::Semicolon)?;
                     self.consume();
-                    let span = expr.span.clone();
+                    let span = expr.span;
                     Ok(AstStmt::new(AstStmtDesc::Expr(expr), vec![], span))
                 }
             }

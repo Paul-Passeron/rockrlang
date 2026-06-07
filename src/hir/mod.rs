@@ -59,12 +59,18 @@ pub struct HirIdAlloc {
     next: u32,
 }
 
+impl Default for HirIdAlloc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HirIdAlloc {
     pub fn new() -> Self {
         Self { next: 0 }
     }
 
-    pub fn next(&mut self) -> HirId {
+    pub fn fresh(&mut self) -> HirId {
         let id = HirId(self.next);
         self.next += 1;
         id
@@ -366,19 +372,19 @@ pub fn interface_items<'db>(
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub enum FunctionLikeAst {
-    ExternDef(AstFunsig, bool),
-    Fundef(AstFundef),
-    Method(AstMethodDef),
-    TraitMethod(AstMethodsig),
+    ExternDef(Arc<AstFunsig>, bool),
+    Fundef(Arc<AstFundef>),
+    Method(Arc<AstMethodDef>),
+    TraitMethod(Arc<AstMethodsig>),
 }
 
 impl FunctionLikeAst {
     pub fn get_span(&self) -> Span {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => spanned.span.clone(),
-            FunctionLikeAst::Fundef(spanned) => spanned.span.clone(),
-            FunctionLikeAst::Method(spanned) => spanned.span.clone(),
-            FunctionLikeAst::TraitMethod(spanned) => spanned.span.clone(),
+            FunctionLikeAst::ExternDef(spanned, _) => spanned.span,
+            FunctionLikeAst::Fundef(spanned) => spanned.span,
+            FunctionLikeAst::Method(spanned) => spanned.span,
+            FunctionLikeAst::TraitMethod(spanned) => spanned.span,
         }
     }
 
@@ -445,7 +451,7 @@ pub fn function_ast<'db>(
                     {
                         return InternedFunctionLikeAst::new(
                             db,
-                            FunctionLikeAst::Fundef(fdef),
+                            FunctionLikeAst::Fundef(Arc::new(fdef)),
                         );
                     }
                     AstTopLevelItemDesc::ExternDef(fsig, variadic)
@@ -453,7 +459,10 @@ pub fn function_ast<'db>(
                     {
                         return InternedFunctionLikeAst::new(
                             db,
-                            FunctionLikeAst::ExternDef(fsig, variadic),
+                            FunctionLikeAst::ExternDef(
+                                Arc::new(fsig),
+                                variadic,
+                            ),
                         );
                     }
                     _ => (),
@@ -467,7 +476,7 @@ pub fn function_ast<'db>(
                 {
                     return InternedFunctionLikeAst::new(
                         db,
-                        FunctionLikeAst::Method(fdef),
+                        FunctionLikeAst::Method(Arc::new(*fdef)),
                     );
                 }
             }
@@ -525,7 +534,7 @@ pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
 }
 
 impl FunctionId {
-    pub fn receiver<'a>(self, db: &'a dyn Db) -> AstReceiver {
+    pub fn receiver(self, db: &dyn Db) -> AstReceiver {
         let ast = function_ast(db, self.interned());
         match ast.inner(db) {
             FunctionLikeAst::Fundef(_) | FunctionLikeAst::ExternDef(_, _) => {

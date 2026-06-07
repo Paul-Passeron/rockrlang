@@ -59,7 +59,7 @@ impl AstAnyTypeExpr {
             Some(AstTypeExpr::new(
                 ty.clone(),
                 self.annotations.clone(),
-                self.span.clone(),
+                self.span,
             ))
         } else {
             None

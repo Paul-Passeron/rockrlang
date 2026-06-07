@@ -311,8 +311,8 @@ pub fn get_templates_of_fun<'db>(
         .collect()
 }
 
-pub fn templates_of_owner<'db>(
-    db: &'db dyn Db,
+pub fn templates_of_owner(
+    db: &dyn Db,
     scope_owner: ScopeOwnerId,
 ) -> Arc<[AstTemplateArg]> {
     match scope_owner {

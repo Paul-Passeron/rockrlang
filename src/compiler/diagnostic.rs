@@ -69,14 +69,14 @@ impl Diag {
 
         let primary = DiagLabel::new(
             first.name_span(db).unwrap(),
-            Some(format!("Defined here")),
+            Some("Defined here".to_string()),
         );
         let secondary = others
             .into_iter()
             .map(|def| {
                 DiagLabel::new(
                     def.name_span(db).unwrap(),
-                    Some(format!("Defined here")),
+                    Some("Defined here".to_string()),
                 )
             })
             .collect();

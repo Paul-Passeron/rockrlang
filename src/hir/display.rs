@@ -165,7 +165,7 @@ fn write_stmt(
         HirStmtKind::If { cond, then, else_ } => {
             write!(f, "if ")?;
             write_expr(f, cond, db)?;
-            writeln!(f, "")?;
+            writeln!(f)?;
             write_stmt(f, then, db, depth + 1)?;
             write_indent(f, depth)?;
             if let Some(else_branch) = else_ {
@@ -173,7 +173,7 @@ fn write_stmt(
                 write_stmt(f, else_branch, db, depth + 1)?;
                 write_indent(f, depth)?;
             }
-            writeln!(f, "")
+            writeln!(f)
         }
         HirStmtKind::While { cond, body } => {
             write!(f, "while ")?;

@@ -174,9 +174,9 @@ impl LspBackend {
 
 #[tokio::main]
 async fn main() {
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
+    // let stdin = tokio::io::stdin();
+    // let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::new(|client| LspBackend::new(client));
-    Server::new(stdin, stdout, socket).serve(service).await;
+    // let (service, socket) = LspService::new(|client| LspBackend::new(client));
+    // Server::new(stdin, stdout, socket).serve(service).await;
 }

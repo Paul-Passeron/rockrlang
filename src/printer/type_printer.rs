@@ -34,6 +34,12 @@ pub struct TypePrinter {
     pub options: TypePrinterOptionSet,
 }
 
+impl Default for TypePrinter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TypePrinter {
     pub fn new() -> Self {
         Self {
@@ -156,7 +162,7 @@ impl TypePrinter {
                 {
                     format!("{}{}{}", prefix, fields_str, suffix)
                 } else if no_fields {
-                    format!("{}", self.type_def_id_to_string(db, def))
+                    self.type_def_id_to_string(db, def).to_string()
                 } else {
                     format!(
                         "{}<{fields_str}>",
@@ -220,7 +226,7 @@ impl TypePrinter {
 
         if let Some(inter) = id.interface(db) {
             res.push_str(&self.interface_ref_to_string(db, inter));
-            res.push_str(" ");
+            res.push(' ');
         }
         res.push('`');
         res
@@ -264,7 +270,7 @@ impl TypePrinter {
         {
             format!("{}{}{}", prefix, fields_str, suffix)
         } else if no_fields {
-            format!("{}", self.type_def_id_to_string(db, def))
+            self.type_def_id_to_string(db, def).to_string()
         } else {
             format!("{}<{fields_str}>", self.type_def_id_to_string(db, def),)
         }
@@ -287,9 +293,9 @@ impl TypePrinter {
             TypeRef::Param(type_param_id) => {
                 self.type_param_id_to_string(db, type_param_id)
             }
-            TypeRef::Zelf => format!("Self"),
-            TypeRef::Error => format!("<ERROR>"),
-            TypeRef::Unknown => format!("<???>"),
+            TypeRef::Zelf => "Self".to_string(),
+            TypeRef::Error => "<ERROR>".to_string(),
+            TypeRef::Unknown => "<???>".to_string(),
         }
     }
 
