@@ -43,9 +43,8 @@ use crate::{
         type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },
     ril::{
-        EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId,
-        InternedImplId, InternedInterfaceId, ModuleId, ScopeOwnerId, StructId,
-        TypeDefId, TypeRef,
+        EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
+        InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeDefId, TypeRef,
     },
 };
 
@@ -409,12 +408,8 @@ impl FunctionLikeAst {
         match self {
             FunctionLikeAst::ExternDef(_, _) => None,
             FunctionLikeAst::Fundef(_) => None,
-            FunctionLikeAst::Method(spanned) => {
-                Some(spanned.data.receiver.clone())
-            }
-            FunctionLikeAst::TraitMethod(spanned) => {
-                Some(spanned.data.receiver.clone())
-            }
+            FunctionLikeAst::Method(spanned) => Some(spanned.data.receiver.clone()),
+            FunctionLikeAst::TraitMethod(spanned) => Some(spanned.data.receiver.clone()),
         }
     }
 
@@ -442,8 +437,7 @@ pub fn function_ast<'db>(
     let parent = function.parent(db);
     match parent {
         ScopeOwnerId::Module(module_id) => {
-            let module_items =
-                module_items(db, module_id.interned()).unwrap_or_default();
+            let module_items = module_items(db, module_id.interned()).unwrap_or_default();
             for item in module_items {
                 match item.data {
                     AstTopLevelItemDesc::Fundef(fdef)
@@ -459,10 +453,7 @@ pub fn function_ast<'db>(
                     {
                         return InternedFunctionLikeAst::new(
                             db,
-                            FunctionLikeAst::ExternDef(
-                                Arc::new(fsig),
-                                variadic,
-                            ),
+                            FunctionLikeAst::ExternDef(Arc::new(fsig), variadic),
                         );
                     }
                     _ => (),
@@ -482,9 +473,7 @@ pub fn function_ast<'db>(
             }
         }
         ScopeOwnerId::Interface(interface_ref) => {
-            for item in
-                interface_items(db, interface_ref.def(db).interned()).iter()
-            {
+            for item in interface_items(db, interface_ref.def(db).interned()).iter() {
                 if let AstInterfaceItem::Sig(sig) = item {
                     return InternedFunctionLikeAst::new(
                         db,
@@ -497,10 +486,7 @@ pub fn function_ast<'db>(
     panic!("[INTERNAL COMPILER ERROR] FunctionId's Ast not found")
 }
 
-pub fn hir_body<'db>(
-    db: &'db dyn Db,
-    function: FunctionId,
-) -> Option<HirBody<'db>> {
+pub fn hir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<HirBody<'db>> {
     _hir_body(db, function.interned())
 }
 
@@ -527,9 +513,7 @@ pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
     match owner {
         ScopeOwnerId::Module(module_id) => module_id,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
-        ScopeOwnerId::Interface(interface_ref) => {
-            interface_ref.def(db).parent(db)
-        }
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     }
 }
 
@@ -541,9 +525,7 @@ impl FunctionId {
                 AstReceiver::None
             }
             FunctionLikeAst::Method(spanned) => spanned.data.receiver.clone(),
-            FunctionLikeAst::TraitMethod(spanned) => {
-                spanned.data.receiver.clone()
-            }
+            FunctionLikeAst::TraitMethod(spanned) => spanned.data.receiver.clone(),
         }
     }
 
@@ -552,18 +534,10 @@ impl FunctionId {
         let owning_module = owning_module(db, self.parent(db));
         let ast = function_ast(db, self.interned()).inner(db);
         let (type_expr, has_zelf) = match ast {
-            FunctionLikeAst::ExternDef(spanned, _) => {
-                (&spanned.data.return_type, false)
-            }
-            FunctionLikeAst::Fundef(spanned) => {
-                (&spanned.data.return_type, false)
-            }
-            FunctionLikeAst::Method(spanned) => {
-                (&spanned.data.return_type, true)
-            }
-            FunctionLikeAst::TraitMethod(spanned) => {
-                (&spanned.data.return_type, true)
-            }
+            FunctionLikeAst::ExternDef(spanned, _) => (&spanned.data.return_type, false),
+            FunctionLikeAst::Fundef(spanned) => (&spanned.data.return_type, false),
+            FunctionLikeAst::Method(spanned) => (&spanned.data.return_type, true),
+            FunctionLikeAst::TraitMethod(spanned) => (&spanned.data.return_type, true),
         };
         match resolve_type_expr(
             db,
@@ -572,9 +546,7 @@ impl FunctionId {
             &templates,
             has_zelf,
         ) {
-            crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => {
-                type_ref
-            }
+            crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => type_ref,
             _ => panic!(
                 "{}: Unresolved type in function {}",
                 type_expr.span.start().loc_info(db),
@@ -583,18 +555,11 @@ impl FunctionId {
         }
     }
 
-    pub fn args<'db>(
-        &'db self,
-        db: &'db dyn Db,
-    ) -> (Option<TypeRef>, Vec<AstFundefArg>) {
+    pub fn args<'db>(&'db self, db: &'db dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
         let ast = function_ast(db, self.interned()).inner(db);
         match ast {
-            FunctionLikeAst::ExternDef(spanned, _) => {
-                (None, spanned.data.args.clone())
-            }
-            FunctionLikeAst::Fundef(spanned) => {
-                (None, spanned.data.args.clone())
-            }
+            FunctionLikeAst::ExternDef(spanned, _) => (None, spanned.data.args.clone()),
+            FunctionLikeAst::Fundef(spanned) => (None, spanned.data.args.clone()),
             FunctionLikeAst::Method(spanned) => {
                 let receiver = match self.parent(db) {
                     ScopeOwnerId::Impl(impl_id) => impl_id.implemented(db),

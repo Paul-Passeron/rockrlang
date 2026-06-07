@@ -42,9 +42,7 @@ impl<'db> Parser<'db> {
                     start.span(self.get_end()),
                 ))
             }
-            TokenKind::Identifier(name)
-                if name == Symbol::new(self.db, "_") =>
-            {
+            TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(end)))

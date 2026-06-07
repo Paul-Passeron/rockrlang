@@ -41,8 +41,8 @@ use crate::{
     },
     printer::type_printer::TypePrinter,
     ril::{
-        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::Display,
+        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId,
+        TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -131,8 +131,8 @@ impl<'db> InferenceCtx<'db> {
             .map(|(i, _)| InferTy::Param(TypeParamId(i)))
             .collect();
 
-        let l = infer_templates.len()
-            - get_templates_of_fun_only(db, func.interned()).len();
+        let l =
+            infer_templates.len() - get_templates_of_fun_only(db, func.interned()).len();
 
         let owner_ctx = ImplicitContext::new(
             db,
@@ -143,9 +143,10 @@ impl<'db> InferenceCtx<'db> {
         )
         .unwrap();
 
-        let zelf_ty = func.parent(db).get_canonical_zelf(db).map(|ty| {
-            Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap()
-        });
+        let zelf_ty = func
+            .parent(db)
+            .get_canonical_zelf(db)
+            .map(|ty| Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap());
 
         let ctx =
             ImplicitContext::from_function(db, func, infer_templates.clone(), zelf_ty.clone())
@@ -225,9 +226,7 @@ impl<'db> InferenceCtx<'db> {
         this
     }
 
-    pub(super) fn drain_call_infos(
-        &mut self,
-    ) -> BTreeMap<ExprId, InferCallInfos> {
+    pub(super) fn drain_call_infos(&mut self) -> BTreeMap<ExprId, InferCallInfos> {
         mem::take(&mut self.call_infos)
     }
 
@@ -269,10 +268,7 @@ pub enum UnificationError {
 }
 
 impl UnificationError {
-    pub fn display<'a, 'db>(
-        &'a self,
-        db: &'db dyn Db,
-    ) -> Display<'db, &'a Self> {
+    pub fn display<'a, 'db>(&'a self, db: &'db dyn Db) -> Display<'db, &'a Self> {
         Display { value: self, db }
     }
 }
@@ -355,10 +351,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     function_id.name(self.db).display(self.db)
                 )
             }
-            UnificationError::StaticMethodCallOnReceiver(
-                expr_id,
-                function_id,
-            ) => {
+            UnificationError::StaticMethodCallOnReceiver(expr_id, function_id) => {
                 write!(
                     f,
                     "Static method call on receiver: {:?} (function: {})",
@@ -366,11 +359,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     function_id.name(self.db).display(self.db)
                 )
             }
-            UnificationError::NoImplemCandidateFor(
-                infer_ty,
-                interface_id,
-                items,
-            ) => {
+            UnificationError::NoImplemCandidateFor(infer_ty, interface_id, items) => {
                 write!(
                     f,
                     "No implementation candidate found for type {} with interface {}{}",
@@ -381,10 +370,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     } else {
                         format!(
                             "<{}>",
-                            items
-                                .iter()
-                                .map(|i| i.to_string(self.db))
-                                .join(", ")
+                            items.iter().map(|i| i.to_string(self.db)).join(", ")
                         )
                     }
                 )
@@ -425,19 +411,15 @@ impl<'db> InferenceCtx<'db> {
         let ty = self.find(&ty);
         match ty {
             InferTy::Var(_) => None,
-            InferTy::Adt { def, fields } => {
-                Some(TypeRef::Concrete(TypeId::new(
-                    self.db,
-                    def,
-                    fields
-                        .into_iter()
-                        .map(|field| self.solve(field))
-                        .collect::<Option<Vec<_>>>()?,
-                )))
-            }
-            InferTy::Param(type_param_id) => {
-                Some(TypeRef::Param(type_param_id))
-            }
+            InferTy::Adt { def, fields } => Some(TypeRef::Concrete(TypeId::new(
+                self.db,
+                def,
+                fields
+                    .into_iter()
+                    .map(|field| self.solve(field))
+                    .collect::<Option<Vec<_>>>()?,
+            ))),
+            InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
         }
     }
 }

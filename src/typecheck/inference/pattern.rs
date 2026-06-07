@@ -40,9 +40,10 @@ impl<'a> InferenceCtx<'a> {
     ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
             HirPatternDesc::Bind { id, .. } => {
-                let var = *self.local_map.get(id).expect(
-                    "Internal error: local_map should contain all bind ids",
-                );
+                let var = *self
+                    .local_map
+                    .get(id)
+                    .expect("Internal error: local_map should contain all bind ids");
                 if let Some(_like) = binds_like {
                     todo!()
                 }
@@ -54,9 +55,7 @@ impl<'a> InferenceCtx<'a> {
             HirPatternDesc::Tuple(_) => todo!(),
             HirPatternDesc::DestructureBinding { .. } => todo!(),
             HirPatternDesc::Constructor { .. } => todo!(),
-            HirPatternDesc::IntLit(_) => {
-                Ok(InferTy::Var(self.emit_intlike_constraint()))
-            }
+            HirPatternDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
         }
     }
 }

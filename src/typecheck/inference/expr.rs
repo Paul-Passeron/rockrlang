@@ -36,10 +36,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDef},
     },
-    ril::{
-        EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId,
-        TypeRef,
-    },
+    ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         ExprId, InferCallInfos, PlaceId,
         inference::{implicit::ImplicitContext, var::InferVar},
@@ -49,21 +46,15 @@ use crate::{
 use super::{InferTy, InferenceCtx, UnificationError};
 
 impl<'db> InferenceCtx<'db> {
-    fn _infer_expr(
-        &mut self,
-        expr: &HirExpr,
-    ) -> Result<InferTy, UnificationError> {
+    fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         match &expr.data {
-            HirExprDesc::IntLit(_) => {
-                Ok(InferTy::Var(self.emit_intlike_constraint()))
-            }
+            HirExprDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
             HirExprDesc::CharLit(_) => Ok(self.char_ty()),
             HirExprDesc::StrLit(_) => Ok(self.str_ty()),
             HirExprDesc::CStrLit(_) => Ok(self.cstr_ty()),
             HirExprDesc::BoolLit(_) => Ok(self.bool_ty()),
             HirExprDesc::Use(place) => self.infer_place(place),
-            HirExprDesc::AddressOf { place, .. }
-            | HirExprDesc::Ref { place, .. } => {
+            HirExprDesc::AddressOf { place, .. } | HirExprDesc::Ref { place, .. } => {
                 let place_ty = self.infer_place(place)?;
                 Ok(self.some_ptr_to(place_ty))
             }
@@ -85,9 +76,7 @@ impl<'db> InferenceCtx<'db> {
             HirExprDesc::CallStatic { ty, method, args } => {
                 self.infer_static(ExprId(expr.id), ty, *method, args)
             }
-            HirExprDesc::BinOp { lhs, op, rhs } => {
-                self.infer_binop(lhs, *op, rhs)
-            }
+            HirExprDesc::BinOp { lhs, op, rhs } => self.infer_binop(lhs, *op, rhs),
             HirExprDesc::StructLit { ty, fields } => {
                 self.infer_struct_lit(ty, fields, expr.span)
             }
@@ -135,16 +124,12 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn _infer_place(
-        &mut self,
-        place: &HirPlace,
-    ) -> Result<InferTy, UnificationError> {
+    fn _infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
         let val = match &place.kind {
             HirPlaceKind::Local(local_id) => Ok(self.infer_local(*local_id)),
             HirPlaceKind::Field { base, field } => {
                 let base_ty = self.infer_place(base)?;
-                let elem_var =
-                    self.emit_struct_field_constraint(base_ty, *field);
+                let elem_var = self.emit_struct_field_constraint(base_ty, *field);
                 Ok(InferTy::Var(elem_var))
             }
             HirPlaceKind::TupleField { base, index } => {
@@ -155,16 +140,14 @@ impl<'db> InferenceCtx<'db> {
             HirPlaceKind::Deref(hir_place) => {
                 let ptr_ty = self.infer_place(hir_place)?;
                 let pointee_var = self.fresh_var();
-                let ptr_var =
-                    self.emit_deref_constraint(InferTy::Var(pointee_var));
+                let ptr_var = self.emit_deref_constraint(InferTy::Var(pointee_var));
                 self.unify(InferTy::Var(ptr_var), ptr_ty)?;
                 Ok(InferTy::Var(pointee_var))
             }
             HirPlaceKind::Index { base, index } => {
                 let index_ty = self.infer_expr(index)?;
                 let base_ty = self.infer_place(base)?;
-                let element_var =
-                    self.emit_indexed_by_constraint(base_ty, index_ty);
+                let element_var = self.emit_indexed_by_constraint(base_ty, index_ty);
                 Ok(InferTy::Var(element_var))
             }
             HirPlaceKind::Temporary(hir_expr) => self.infer_expr(hir_expr),
@@ -173,17 +156,11 @@ impl<'db> InferenceCtx<'db> {
         Ok(val)
     }
 
-    pub fn infer_place(
-        &mut self,
-        place: &HirPlace,
-    ) -> Result<InferTy, UnificationError> {
+    pub fn infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| this._infer_place(place))
     }
 
-    pub fn infer_expr(
-        &mut self,
-        expr: &HirExpr,
-    ) -> Result<InferTy, UnificationError> {
+    pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
             let ty = this._infer_expr(expr)?;
             this.inferred_exprs.insert(ExprId(expr.id), ty.clone());
@@ -252,8 +229,7 @@ impl<'db> InferenceCtx<'db> {
                 args,
             } => {
                 let struct_id = *struct_id;
-                let templates =
-                    templates_of_struct(self.db, struct_id.interned());
+                let templates = templates_of_struct(self.db, struct_id.interned());
                 let templates = templates
                     .iter()
                     .map(|_| InferTy::Var(self.fresh_var()))
@@ -287,15 +263,11 @@ impl<'db> InferenceCtx<'db> {
         fields: &[(Symbol, HirExpr)],
         span: Span,
     ) -> Result<InferTy, UnificationError> {
-        if let Some((struct_id, templates)) =
-            self.allocate_struct_partial_ref(ty)
-        {
+        if let Some((struct_id, templates)) = self.allocate_struct_partial_ref(ty) {
             let ast = struct_item(self.db, struct_id.interned());
             let inferred_fields = fields
                 .iter()
-                .map(|(name, expr)| {
-                    self.infer_expr(expr).map(|res| (*name, res))
-                })
+                .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
             self.diagnose_bad_struct_fields(
@@ -328,9 +300,8 @@ impl<'db> InferenceCtx<'db> {
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
                     let ty = inferred_fields.get(&ast.name).unwrap().clone();
-                    let resolved = this
-                        .allocate_ast_type_expr(&ast.ty.data, &ctx)
-                        .unwrap();
+                    let resolved =
+                        this.allocate_ast_type_expr(&ast.ty.data, &ctx).unwrap();
                     this.unify(ty, resolved)
                 })
             })?;
@@ -417,9 +388,7 @@ impl<'db> InferenceCtx<'db> {
         template_hints: &[PartialTypeArg],
     ) -> Result<InferTy, UnificationError> {
         let variants = &enum_item(self.db, enum_def.interned()).variants;
-        let Some(variant) =
-            variants.iter().find(|variant| variant.name == name)
-        else {
+        let Some(variant) = variants.iter().find(|variant| variant.name == name) else {
             todo!(
                 "report unknown variant `{}` in type `{}`",
                 name.display(self.db),
@@ -436,8 +405,8 @@ impl<'db> InferenceCtx<'db> {
                 // TODO: handle conformances for t
                 let var = InferTy::Var(self.fresh_var());
                 if let Some(hint) = template_hints.get(i) {
-                    let allocated = self
-                        .allocate_partial_type_arg(hint, &self.implicit_ctx());
+                    let allocated =
+                        self.allocate_partial_type_arg(hint, &self.implicit_ctx());
                     self.unify(allocated, var.clone())?;
                 }
                 Ok(var)
@@ -463,8 +432,7 @@ impl<'db> InferenceCtx<'db> {
                 assert_eq!(hir_exprs.len(), spanneds.len());
                 for (hir, ast) in hir_exprs.iter().zip(spanneds) {
                     let hir_ty = self.infer_expr(hir)?;
-                    let in_ctx =
-                        self.allocate_ast_type_expr(&ast.data, &ctx).unwrap();
+                    let in_ctx = self.allocate_ast_type_expr(&ast.data, &ctx).unwrap();
                     self.unify(hir_ty, in_ctx)?;
                 }
             }

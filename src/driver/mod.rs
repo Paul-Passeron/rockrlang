@@ -64,8 +64,7 @@ fn discover_dir(dir: &Path) -> Option<DiscoveredModule> {
             if let Some(m) = discover_dir(&entry_path) {
                 submodules.push(m);
             }
-        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr")
-        {
+        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr") {
             submodules.push(DiscoveredModule {
                 path: entry_path,
                 submodules: vec![],
@@ -84,10 +83,7 @@ pub struct SalsaPath<'db> {
     pub value: PathBuf,
 }
 
-pub fn read_source_file(
-    db: &mut dyn Db,
-    path: &Path,
-) -> Option<SourceFile> {
+pub fn read_source_file(db: &mut dyn Db, path: &Path) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
     db.add_source_file(path.to_path_buf(), s).ok()

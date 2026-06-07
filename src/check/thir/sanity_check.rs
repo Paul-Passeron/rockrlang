@@ -10,13 +10,13 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, ptr_of,
+        ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
-        ThirMatchBranch, ThirPattern, ThirPatternKind,
+        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
+        ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::AstImplicitContext,
@@ -113,11 +113,7 @@ impl<'db> SanityChecker<'db> {
         self.check_types(ty, pat.ty, pat.span);
     }
 
-    fn check_pattern_against_scrut_ty(
-        &mut self,
-        scrut_ty: TypeRef,
-        pat: &ThirPattern,
-    ) {
+    fn check_pattern_against_scrut_ty(&mut self, scrut_ty: TypeRef, pat: &ThirPattern) {
         if let Some((_, mut inner_type)) = scrut_ty.as_ref(self.db) {
             while let Some((_, inner)) = inner_type.as_ref(self.db) {
                 inner_type = inner;
@@ -128,11 +124,7 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    fn check_pattern_with_expected_ty(
-        &mut self,
-        pat: &ThirPattern,
-        expected: TypeRef,
-    ) {
+    fn check_pattern_with_expected_ty(&mut self, pat: &ThirPattern, expected: TypeRef) {
         self.check_pattern(pat);
         self.check_types(expected, pat.ty, pat.span);
     }
@@ -158,11 +150,7 @@ impl<'db> SanityChecker<'db> {
                 let actual_fields = def.get_fields_ty(self.db);
                 for (symbol, thir_pattern) in fields {
                     let actual_ty = actual_fields[symbol];
-                    self.check_types(
-                        actual_ty,
-                        thir_pattern.ty,
-                        thir_pattern.span,
-                    );
+                    self.check_types(actual_ty, thir_pattern.ty, thir_pattern.span);
                 }
             }
             ThirPatternKind::Constructor { def, idx, args } => {
@@ -207,11 +195,9 @@ impl<'db> SanityChecker<'db> {
                 infos.ty,
                 infos.span,
             ),
-            ExprKind::StrLit(_) => self.check_types(
-                TypeRef::Concrete(str_id(self.db)),
-                infos.ty,
-                infos.span,
-            ),
+            ExprKind::StrLit(_) => {
+                self.check_types(TypeRef::Concrete(str_id(self.db)), infos.ty, infos.span)
+            }
             ExprKind::CStrLit(_) => self.check_types(
                 TypeRef::Concrete(const_ptr_of(
                     self.db,
@@ -233,21 +219,15 @@ impl<'db> SanityChecker<'db> {
             ExprKind::AddressOf { place, mutability } => {
                 self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
-                let expected_ty = TypeRef::Concrete(ptr_of(
-                    self.db,
-                    place_ty,
-                    mutability.is_mut(),
-                ));
+                let expected_ty =
+                    TypeRef::Concrete(ptr_of(self.db, place_ty, mutability.is_mut()));
                 self.check_types(expected_ty, infos.ty, infos.span);
             }
             ExprKind::Ref { place, mutability } => {
                 self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
-                let ref_ty = TypeRef::Concrete(ref_of(
-                    self.db,
-                    place_ty,
-                    mutability.is_mut(),
-                ));
+                let ref_ty =
+                    TypeRef::Concrete(ref_of(self.db, place_ty, mutability.is_mut()));
                 self.check_types(infos.ty, ref_ty, infos.span);
             }
             ExprKind::Call { called, args } => {
@@ -259,11 +239,7 @@ impl<'db> SanityChecker<'db> {
                 let params = called.params(self.db);
                 params.into_iter().zip(args_ty).for_each(
                     |((_, param), (arg_ty, arg))| {
-                        self.check_types(
-                            param,
-                            arg_ty,
-                            self.thir.exprs[arg].span,
-                        )
+                        self.check_types(param, arg_ty, self.thir.exprs[arg].span)
                     },
                 );
                 self.check_types(ret, infos.ty, infos.span);
@@ -315,8 +291,7 @@ impl<'db> SanityChecker<'db> {
                         })
                         .copied()
                         .unwrap_or(TypeRef::Error);
-                    let expected =
-                        TypeRef::Concrete(slice_of(self.db, witness_type));
+                    let expected = TypeRef::Concrete(slice_of(self.db, witness_type));
                     self.check_types(expected, infos.ty, infos.span);
                 }
             }
@@ -358,9 +333,7 @@ impl<'db> SanityChecker<'db> {
         expected: TypeRef,
         span: Span,
     ) {
-        if let Some(ty) =
-            self.compute_type_after_projection(before, projection, span)
-        {
+        if let Some(ty) = self.compute_type_after_projection(before, projection, span) {
             self.check_types(expected, ty, span);
         } else {
             todo!()
@@ -372,23 +345,21 @@ impl<'db> SanityChecker<'db> {
         let base_ty = match info.base {
             PlaceBase::Local(idx) => self.thir.locals[idx].ty,
         };
-        let end_ty =
-            info.projections.iter().fold(base_ty, |before, projection| {
-                let expected = match projection {
-                    Projection::Field(_, type_ref)
-                    | Projection::TupleField(_, type_ref) => Some(*type_ref),
-                    _ => None,
-                };
-                let expected = expected
-                    .or_else(|| {
-                        self.compute_type_after_projection(
-                            before, projection, info.span,
-                        )
-                    })
-                    .unwrap_or(TypeRef::Error);
-                self.check_projection(before, projection, expected, info.span);
-                expected
-            });
+        let end_ty = info.projections.iter().fold(base_ty, |before, projection| {
+            let expected = match projection {
+                Projection::Field(_, type_ref) | Projection::TupleField(_, type_ref) => {
+                    Some(*type_ref)
+                }
+                _ => None,
+            };
+            let expected = expected
+                .or_else(|| {
+                    self.compute_type_after_projection(before, projection, info.span)
+                })
+                .unwrap_or(TypeRef::Error);
+            self.check_projection(before, projection, expected, info.span);
+            expected
+        });
         self.check_types(end_ty, info.ty, info.span);
     }
 
@@ -406,11 +377,7 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    pub fn check_expr_with_expected_type(
-        &mut self,
-        expr: ExprId,
-        expected: TypeRef,
-    ) {
+    pub fn check_expr_with_expected_type(&mut self, expr: ExprId, expected: TypeRef) {
         self.check_expr(expr);
         let (got, span) = {
             let expr = &self.thir.exprs[expr];
@@ -468,8 +435,7 @@ impl<'db> SanityChecker<'db> {
             ) => {
                 assert_eq!(field_tys.len(), pat_tys.len());
                 for field in field_tys {
-                    let matching_field =
-                        pat_tys.iter().find(|p| p.0 == field.0).unwrap();
+                    let matching_field = pat_tys.iter().find(|p| p.0 == field.0).unwrap();
                     let _ = matching_field;
                     todo!()
                 }
@@ -490,20 +456,12 @@ impl<'db> SanityChecker<'db> {
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
-            (
-                ConstructorType::Struct(tys),
-                ThirConstructorArgs::Struct(pats),
-            ) => {
+            (ConstructorType::Struct(tys), ThirConstructorArgs::Struct(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 pats.iter().for_each(|pat| self.check_pattern(&pat.1));
                 for field in tys {
-                    let matching_field =
-                        &pats.iter().find(|p| p.0 == field.0).unwrap().1;
-                    self.check_types(
-                        field.1,
-                        matching_field.ty,
-                        matching_field.span,
-                    );
+                    let matching_field = &pats.iter().find(|p| p.0 == field.0).unwrap().1;
+                    self.check_types(field.1, matching_field.ty, matching_field.span);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
@@ -563,8 +521,7 @@ impl EnumRef {
                         .map(|field| {
                             (
                                 field.name,
-                                ctx.resolve(db, &field.ty.data)
-                                    .unwrap_or(TypeRef::Error),
+                                ctx.resolve(db, &field.ty.data).unwrap_or(TypeRef::Error),
                             )
                         })
                         .collect(),
@@ -580,9 +537,7 @@ impl EnumRef {
                 Some(ConstructorType::Tuple(
                     spanneds
                         .iter()
-                        .map(|ast| {
-                            ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error)
-                        })
+                        .map(|ast| ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error))
                         .collect(),
                 ))
             }

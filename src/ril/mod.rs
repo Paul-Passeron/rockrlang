@@ -48,8 +48,7 @@ impl<'db> FileModule<'db> {
             .parent()
             .and_then(|parent| {
                 // If this file is main.rkr, the module name is the directory name
-                if path.file_name().and_then(|n| n.to_str()) == Some("main.rkr")
-                {
+                if path.file_name().and_then(|n| n.to_str()) == Some("main.rkr") {
                     parent.file_name()
                 } else {
                     None
@@ -257,15 +256,11 @@ pub struct InterfaceRef(salsa::Id);
 
 pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
     match ty {
-        TypeDefId::Builtin(builtin_type_id) => {
-            builtin_type_id.template_count(db)
-        }
+        TypeDefId::Builtin(builtin_type_id) => builtin_type_id.template_count(db),
         TypeDefId::Struct(struct_id) => {
             templates_of_struct(db, struct_id.interned()).len()
         }
-        TypeDefId::Enum(enum_id) => {
-            templates_of_enum(db, enum_id.interned()).len()
-        }
+        TypeDefId::Enum(enum_id) => templates_of_enum(db, enum_id.interned()).len(),
     }
 }
 
@@ -278,9 +273,7 @@ impl ModuleId {
     pub fn get_span(&self, db: &dyn Db) -> Span {
         match self.parent(db) {
             Some(parent) => {
-                for item in
-                    module_items(db, parent.interned()).into_iter().flatten()
-                {
+                for item in module_items(db, parent.interned()).into_iter().flatten() {
                     if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
                         && curr_mod.data.name.data == self.name(db)
                     {

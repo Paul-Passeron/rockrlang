@@ -55,8 +55,7 @@ impl<T> Frozen<T> {
     }
 
     pub fn push(&self, item: T) {
-        if self.data.borrow().is_empty()
-            || *self.next_bucket_idx.borrow() == BUCKET_SIZE
+        if self.data.borrow().is_empty() || *self.next_bucket_idx.borrow() == BUCKET_SIZE
         {
             *self.next_bucket_idx.borrow_mut() = 0;
             self.data
@@ -137,16 +136,14 @@ impl<T> Frozen<T> {
 
     pub fn is_empty(&self) -> bool {
         self.data.borrow().is_empty()
-            || (self.data.borrow().len() == 1
-                && *self.next_bucket_idx.borrow() == 0)
+            || (self.data.borrow().len() == 1 && *self.next_bucket_idx.borrow() == 0)
     }
 
     pub fn len(&self) -> usize {
         if self.is_empty() {
             0
         } else {
-            *self.next_bucket_idx.borrow()
-                + (self.data.borrow().len() - 1) * BUCKET_SIZE
+            *self.next_bucket_idx.borrow() + (self.data.borrow().len() - 1) * BUCKET_SIZE
         }
     }
 }
@@ -295,11 +292,7 @@ impl<T> IntoIterator for Frozen<T> {
                     }
                 }
             } else {
-                res.extend(
-                    values
-                        .into_iter()
-                        .map(|item| unsafe { item.assume_init() }),
-                );
+                res.extend(values.into_iter().map(|item| unsafe { item.assume_init() }));
             }
         }
         res.reverse();
@@ -336,8 +329,7 @@ impl<T: Clone> Clone for Frozen<T> {
                     .iter()
                     .enumerate()
                     .map(|(i, x)| {
-                        let mut arr =
-                            [const { MaybeUninit::uninit() }; BUCKET_SIZE];
+                        let mut arr = [const { MaybeUninit::uninit() }; BUCKET_SIZE];
                         let max_idx = if i == last_bucket {
                             *self.next_bucket_idx.borrow()
                         } else {

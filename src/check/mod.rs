@@ -54,9 +54,7 @@ pub fn check<'db>(db: &'db dyn Db, ws: Workspace) {
 pub fn check_definition(db: &dyn Db, def: Definition) {
     match def {
         Definition::Function(function_id) => check_fundef(db, function_id),
-        Definition::Interface(interface_id) => {
-            check_interface(db, interface_id)
-        }
+        Definition::Interface(interface_id) => check_interface(db, interface_id),
         Definition::Module(module_id) => check_module(db, module_id.interned()),
         Definition::Type(type_def_id) => check_typedef(db, type_def_id),
     }

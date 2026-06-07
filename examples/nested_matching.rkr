@@ -1,0 +1,18 @@
+enum Foo {
+    bar { x: Bar; y: str }
+}
+
+struct Bar {
+    x: int;
+    y: str;
+}
+
+fun qux(foo: Foo): void {
+    match foo {
+        Foo::bar { x: Bar {x, y}, y: z } => {
+            let a = x;
+            let b = y;
+            let c = z;
+        }
+    }
+}

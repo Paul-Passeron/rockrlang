@@ -6,8 +6,7 @@ use crate::{
     compiler::{diagnostic::Diag, get_sig_of_function},
     ril::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
-        ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup,
-        ThirMatchBranch,
+        ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
     },
 };
@@ -17,15 +16,9 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
     if ret_ty == get_never_ty(db) || ret_ty == get_void_ty(db) {
         return;
     }
-    if let Completeness::MayFallthrough { span } =
-        check_stmts(db, thir, &thir.root)
-    {
+    if let Completeness::MayFallthrough { span } = check_stmts(db, thir, &thir.root) {
         Diag::generic_error(
-            format!(
-                "Emit real fallthrough diagnostic ({}:{})",
-                file!(),
-                line!()
-            ),
+            format!("Emit real fallthrough diagnostic ({}:{})", file!(), line!()),
             span,
         )
         .accumulate(db)
@@ -55,15 +48,12 @@ pub fn expr_contains_never(db: &dyn Db, thir: &Thir, expr: ExprId) -> bool {
     }
     match &thir_expr.kind {
         ExprKind::BinOp { lhs, rhs, .. } => {
-            expr_contains_never(db, thir, *lhs)
-                || expr_contains_never(db, thir, *rhs)
+            expr_contains_never(db, thir, *lhs) || expr_contains_never(db, thir, *rhs)
         }
         ExprKind::StructLit { fields, .. } => fields
             .iter()
             .any(|item| expr_contains_never(db, thir, item.1)),
-        ExprKind::Not(e) | ExprKind::Neg(e) => {
-            expr_contains_never(db, thir, *e)
-        }
+        ExprKind::Not(e) | ExprKind::Neg(e) => expr_contains_never(db, thir, *e),
         ExprKind::Call { args: items, .. }
         | ExprKind::Tuple(items)
         | ExprKind::SliceLit(items) => items
@@ -88,11 +78,7 @@ pub enum Completeness {
     MayFallthrough { span: Span },
 }
 
-pub fn check_stmts(
-    db: &dyn Db,
-    thir: &Thir,
-    stmts: &[ThirStmt],
-) -> Completeness {
+pub fn check_stmts(db: &dyn Db, thir: &Thir, stmts: &[ThirStmt]) -> Completeness {
     for (i, stmt) in stmts.iter().enumerate() {
         if check_stmt(db, thir, stmt).always_returns() {
             if i < stmts.len() - 1 {
@@ -121,10 +107,7 @@ fn compute_if_stmt_completeness(
         (Completeness::AlwaysReturns, Some(Completeness::AlwaysReturns)) => {
             Completeness::AlwaysReturns
         }
-        (
-            Completeness::AlwaysReturns,
-            Some(Completeness::MayFallthrough { span }),
-        )
+        (Completeness::AlwaysReturns, Some(Completeness::MayFallthrough { span }))
         | (
             Completeness::MayFallthrough { span },
             Some(Completeness::AlwaysReturns) | None,
@@ -157,8 +140,7 @@ fn check_stmt(db: &dyn Db, thir: &Thir, stmt: &ThirStmt) -> Completeness {
         } => {
             let cond_check = check_expr_with_setup(db, thir, cond);
             let then_check = check_stmts(db, thir, then);
-            let else_check =
-                else_.as_ref().map(|else_| check_stmts(db, thir, else_));
+            let else_check = else_.as_ref().map(|else_| check_stmts(db, thir, else_));
             if cond_check.always_returns() {
                 Completeness::AlwaysReturns
             } else {
@@ -221,14 +203,11 @@ impl ThirMatchBranch {
     }
 }
 
-fn check_branch(
-    db: &dyn Db,
-    thir: &Thir,
-    branch: &ThirMatchBranch,
-) -> Completeness {
-    let guard_returns = branch.guard.as_ref().is_some_and(|expr| {
-        check_expr_with_setup(db, thir, expr).always_returns()
-    });
+fn check_branch(db: &dyn Db, thir: &Thir, branch: &ThirMatchBranch) -> Completeness {
+    let guard_returns = branch
+        .guard
+        .as_ref()
+        .is_some_and(|expr| check_expr_with_setup(db, thir, expr).always_returns());
     let body_check = check_stmts(db, thir, &branch.body);
     if guard_returns || body_check.always_returns() {
         Completeness::AlwaysReturns

@@ -41,10 +41,7 @@ impl LspBackend {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for LspBackend {
-    async fn initialize(
-        &self,
-        _: InitializeParams,
-    ) -> Result<InitializeResult> {
+    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: None,
             capabilities: ServerCapabilities {
@@ -52,9 +49,11 @@ impl LanguageServer for LspBackend {
                     TextDocumentSyncOptions {
                         open_close: Some(true),
                         change: Some(TextDocumentSyncKind::FULL),
-                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(SaveOptions {
-                            include_text: Some(true),
-                        })),
+                        save: Some(TextDocumentSyncSaveOptions::SaveOptions(
+                            SaveOptions {
+                                include_text: Some(true),
+                            },
+                        )),
                         ..Default::default()
                     },
                 )),
@@ -76,15 +75,17 @@ impl LanguageServer for LspBackend {
                 semantic_tokens_provider: Some(
                     SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
                         SemanticTokensRegistrationOptions {
-                            text_document_registration_options: TextDocumentRegistrationOptions {
-                                document_selector: Some(vec![DocumentFilter {
-                                    language: Some("l".to_string()),
-                                    scheme: Some("file".to_string()),
-                                    pattern: None,
-                                }]),
-                            },
+                            text_document_registration_options:
+                                TextDocumentRegistrationOptions {
+                                    document_selector: Some(vec![DocumentFilter {
+                                        language: Some("l".to_string()),
+                                        scheme: Some("file".to_string()),
+                                        pattern: None,
+                                    }]),
+                                },
                             semantic_tokens_options: SemanticTokensOptions {
-                                work_done_progress_options: WorkDoneProgressOptions::default(),
+                                work_done_progress_options:
+                                    WorkDoneProgressOptions::default(),
                                 legend: SemanticTokensLegend {
                                     token_types: vec![
                                         SemanticTokenType::FUNCTION,
@@ -101,7 +102,8 @@ impl LanguageServer for LspBackend {
                                 range: Some(true),
                                 full: Some(SemanticTokensFullOptions::Bool(true)),
                             },
-                            static_registration_options: StaticRegistrationOptions::default(),
+                            static_registration_options:
+                                StaticRegistrationOptions::default(),
                         },
                     ),
                 ),

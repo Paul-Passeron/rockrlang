@@ -60,20 +60,16 @@ impl<'a> InferenceCtx<'a> {
                     let mut constraints = Vec::new();
                     fields.iter().zip(other_fields).try_for_each(
                         |(infer_ty, matcher)| {
-                            constraints.extend(
-                                self.matches_ty(infer_ty, matcher, ctx)?,
-                            );
+                            constraints.extend(self.matches_ty(infer_ty, matcher, ctx)?);
                             Some(())
                         },
                     )?;
                     Some(constraints)
                 }
-                TypeRef::Param(id) => {
-                    Some(vec![InferenceConstraintKind::Unify {
-                        a: ty.clone(),
-                        b: ctx.get_template(id.0)?.clone(),
-                    }])
-                }
+                TypeRef::Param(id) => Some(vec![InferenceConstraintKind::Unify {
+                    a: ty.clone(),
+                    b: ctx.get_template(id.0)?.clone(),
+                }]),
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },

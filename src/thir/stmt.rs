@@ -17,9 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{
-        ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch,
-    },
+    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
 };
 
 pub struct ThirStmt {

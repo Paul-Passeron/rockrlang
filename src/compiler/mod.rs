@@ -22,14 +22,12 @@ use crate::{
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
-    name_resolve::type_expr::{
-        get_templates_of_fun_only, get_templates_of_owner,
-    },
+    name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner},
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     printer::render_diagnostics,
     ril::{
-        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
-        TypeDefId, TypeRef,
+        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId,
+        TypeRef,
     },
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
@@ -106,13 +104,11 @@ impl Workspace {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Config {
     pub no_std: bool,
     pub skip_core: bool,
 }
-
 
 pub enum CompilerError {
     NoCompilationUnitFound(PathBuf),
@@ -126,11 +122,7 @@ impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CompilerError::NoCompilationUnitFound(path_buf) => {
-                write!(
-                    f,
-                    "No compilation unit found at `{}`",
-                    path_buf.display()
-                )
+                write!(f, "No compilation unit found at `{}`", path_buf.display())
             }
             CompilerError::STDLibNotFound => {
                 write!(f, "Standard library (`std`) package not found.")
@@ -199,7 +191,7 @@ pub struct FunctionSignature {
     pub name: Symbol,
     pub zelf: Option<ZelfArg>,
     pub implicit_templates: Vec<Vec<InterfaceRef>>, // Templates inherited from environment
-    pub added_templates: Vec<Vec<InterfaceRef>>, // Templates for this function only
+    pub added_templates: Vec<Vec<InterfaceRef>>,    // Templates for this function only
     pub args: Vec<(Symbol, TypeRef)>,
     pub ret: TypeRef,
 }
@@ -220,12 +212,8 @@ impl AstReceiver {
                 return None;
             }
             AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
-            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => {
-                ZelfKind::RefZelf
-            }
-            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => {
-                ZelfKind::PtrZelf
-            }
+            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
+            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
         };
         Some(ZelfArg { mutability, kind })
     }
@@ -251,20 +239,15 @@ pub fn get_sig_of_function(
 ) -> Arc<FunctionSignature> {
     let function_templates: Arc<[AstTemplateArg]> =
         get_templates_of_fun_only(db, function_id).into();
-    let ctx = AstImplicitContext::new(
-        db,
-        function_id.parent(db),
-        function_templates.clone(),
-    )
-    .unwrap();
+    let ctx =
+        AstImplicitContext::new(db, function_id.parent(db), function_templates.clone())
+            .unwrap();
     let added_templates: Vec<Vec<InterfaceRef>> = function_templates
         .iter()
         .map(|t| {
             t.constraints
                 .iter()
-                .flat_map(|constraint| {
-                    ctx.resolve_interface(db, &constraint.data)
-                })
+                .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                 .collect()
         })
         .collect();
@@ -275,9 +258,7 @@ pub fn get_sig_of_function(
             .map(|t| {
                 t.constraints
                     .iter()
-                    .flat_map(|constraint| {
-                        ctx.resolve_interface(db, &constraint.data)
-                    })
+                    .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                     .collect_vec()
             })
             .collect_vec();
@@ -318,8 +299,8 @@ fn add_package_root_from_disk(
         root.clone()
     };
     let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
-    let root_file = read_source_file(db, &path_to_file)
-        .ok_or(CompilerError::NoFileFoundAt(root))?;
+    let root_file =
+        read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
     let root = PackageRoot::new(db, package_name, root_file);
     Workspace::get(db).add_package_root(db, root);
     Ok(())
@@ -343,10 +324,7 @@ fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
         })
 }
 
-fn compute_package_roots(
-    db: &mut dyn Db,
-    root: PathBuf,
-) -> Result<(), CompilerError> {
+fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
     add_package_root_from_disk(db, root)?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {
@@ -386,8 +364,7 @@ fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
         walk(
             db,
             if path.is_file()
-                && path.file_name().unwrap().to_str().unwrap()
-                    == ANCHOR_FILE_NAME
+                && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME
             {
                 path.parent().unwrap().to_path_buf()
             } else {
@@ -409,10 +386,7 @@ fn load_workspace_from_disk(
     Ok(db)
 }
 
-pub fn check_from_disk(
-    root: PathBuf,
-    config: Config,
-) -> Result<(), CompilerError> {
+pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -489,19 +463,13 @@ pub fn submodules_of_file<'db>(
 }
 
 #[salsa::tracked]
-pub fn package_of_root<'db>(
-    db: &'db dyn Db,
-    root: PackageRoot,
-) -> Package<'db> {
+pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> {
     let file = root.file(db);
     Package::new(db, FileModule::new(db, file, submodules_of_file(db, file)))
 }
 
 #[salsa::tracked]
-pub fn workspace_packages<'db>(
-    db: &'db dyn Db,
-    ws: Workspace,
-) -> Arc<Vec<Package<'db>>> {
+pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Arc<Vec<Package<'db>>> {
     Arc::new(
         ws.roots(db)
             .iter()
