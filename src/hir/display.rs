@@ -293,6 +293,7 @@ fn write_pattern(
         }
         HirPatternDesc::DestructureBinding { .. } => todo!(),
         HirPatternDesc::IntLit(x) => write!(f, "{x}"),
+        HirPatternDesc::Error => write!(f, "<ERROR>"),
     }
 }
 

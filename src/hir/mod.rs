@@ -97,6 +97,7 @@ pub enum HirPatternDesc {
         fields: HirPatternConstructorArgs,
     },
     IntLit(i64),
+    Error,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

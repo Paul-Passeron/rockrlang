@@ -394,6 +394,7 @@ impl<'db> TyCtx<'db> {
                 HirPatternDesc::IntLit(_) => {
                     InferTy::Var(self.inf_ctx.emit_intlike_constraint())
                 }
+                HirPatternDesc::Error => InferTy::Var(self.inf_ctx.fresh_var()),
             }
         };
         let res = compute();

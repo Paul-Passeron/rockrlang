@@ -546,6 +546,7 @@ impl<'db> ThirTranslator<'db> {
                 }
             }
             HirPatternDesc::IntLit(lit) => Some(ThirPatternKind::IntLit(*lit)),
+            HirPatternDesc::Error => Some(ThirPatternKind::Error),
         };
         let kind = kind.unwrap_or(ThirPatternKind::Error);
         ThirPattern {
@@ -642,6 +643,9 @@ impl<'db> ThirTranslator<'db> {
             }
             HirPatternDesc::Constructor { .. } => todo!("Invalid lhs pattern"),
             HirPatternDesc::IntLit(_) => todo!("Invalid lhs pattern"),
+            HirPatternDesc::Error => {
+                // Do nothing: This should have been reported earlier.
+            }
         }
     }
 

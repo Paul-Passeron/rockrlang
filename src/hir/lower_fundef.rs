@@ -1053,6 +1053,61 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
+    fn lower_constructor_pattern(
+        &mut self,
+        pat: &AstPattern,
+        scope: &mut Scope,
+        locals: &mut Vec<LocalId>,
+        module: ModuleId,
+        name: &Symbol,
+        args: &AstConstructFields,
+    ) -> HirPattern {
+        let resolution =
+            resolve_in_module(self.db, name.interned(), module.interned());
+        match (resolution, args) {
+            (
+                Some(Definition::Type(_type_def_id)),
+                AstConstructFields::StructFields(_fields),
+            ) => {
+                todo!("Constructor pattern with struct fields")
+            }
+            (_, AstConstructFields::None) => {
+                let local_id = self.allocate_local(
+                    scope,
+                    *name,
+                    Mutability::Const,
+                    None,
+                    pat.span,
+                );
+                locals.push(local_id);
+                HirPattern {
+                    id: self.alloc.next(),
+                    data: HirPatternDesc::Bind {
+                        id: local_id,
+                        name: *name,
+                        mutable: false,
+                    },
+                    span: pat.span,
+                }
+            }
+            _ => {
+                Diag::generic_error(
+                    format!(
+                        "Expected an enum variant but got `{}`",
+                        name.display(self.db)
+                    ),
+                    pat.span,
+                )
+                .accumulate(self.db);
+                HirPattern {
+                    id: self.alloc.next(),
+                    data: HirPatternDesc::Error,
+                    span: pat.span,
+                }
+            }
+        }
+    }
+
     fn lower_pattern(
         &mut self,
         pat: &AstPattern,
@@ -1086,46 +1141,10 @@ impl<'db> LowerFundef<'db> {
                             span: pat.span,
                         }
                     }
-                    AstNamedPattern::Constructor { name, args } => {
-                        let resolution = resolve_in_module(
-                            this.db,
-                            name.interned(),
-                            module.interned(),
-                        );
-                        match (resolution, args) {
-                            (
-                                Some(Definition::Type(_type_def_id)),
-                                AstConstructFields::StructFields(_fields),
-                            ) => {
-                                todo!("Constructor pattern with struct fields")
-                            }
-                            (_, AstConstructFields::None) => {
-                                let local_id = this.allocate_local(
-                                    scope,
-                                    *name,
-                                    Mutability::Const,
-                                    None,
-                                    pat.span,
-                                );
-                                locals.push(local_id);
-                                HirPattern {
-                                    id: this.alloc.next(),
-                                    data: HirPatternDesc::Bind {
-                                        id: local_id,
-                                        name: *name,
-                                        mutable: false,
-                                    },
-                                    span: pat.span,
-                                }
-                            }
-                            (_, _) => {
-                                todo!(
-                                    "error: `{}` is not a type but used as constructor pattern",
-                                    name.interned().contents(this.db)
-                                )
-                            }
-                        }
-                    }
+                    AstNamedPattern::Constructor { name, args } => this
+                        .lower_constructor_pattern(
+                            pat, scope, locals, module, name, args,
+                        ),
                     AstNamedPattern::NameResolved { from, to } => {
                         match resolve_in_module(
                             this.db,

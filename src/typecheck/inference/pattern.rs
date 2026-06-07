@@ -48,7 +48,9 @@ impl<'a> InferenceCtx<'a> {
                 }
                 Ok(InferTy::Var(var))
             }
-            HirPatternDesc::Any => Ok(InferTy::Var(self.fresh_var())),
+            HirPatternDesc::Error | HirPatternDesc::Any => {
+                Ok(InferTy::Var(self.fresh_var()))
+            }
             HirPatternDesc::Tuple(_) => todo!(),
             HirPatternDesc::DestructureBinding { .. } => todo!(),
             HirPatternDesc::Constructor { .. } => todo!(),
