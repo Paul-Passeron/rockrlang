@@ -77,3 +77,10 @@ fun ref_bar(f: &Foo): void {
         }
     }
 }
+
+fun unannotated(f: &Foo): void {
+    match f {
+        Foo::qux { x, y } => { let a = x; }
+        _ => {}
+    }
+}
