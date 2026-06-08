@@ -44,7 +44,8 @@ pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
 }
 
 /// Build the ModuleId hierarchy for a FileModule tree rooted at a package root.
-/// The package root's parent is builtin_module; all submodules are parented to it.
+/// The package root's parent is builtin_module; all submodules are parented to
+/// it.
 #[salsa::tracked]
 pub fn file_module_id<'db>(
     db: &'db dyn Db,

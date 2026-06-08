@@ -145,11 +145,11 @@ impl LanguageServer for LspBackend {
         // let snapshot = self.snapshot();
 
         // let result = tokio::task::spawn_blocking(move || {
-        //     // Convert LSP Position → byte offset via a Salsa query on `snapshot`
-        //     // let offset = snapshot.line_index(file).offset(pos);
-        //     // let info = snapshot.hover_at(file, offset)?;
-        //     // Some(Hover { contents: ..., range: ... })
-        //     None::<Hover>
+        //     // Convert LSP Position → byte offset via a Salsa query on
+        // `snapshot`     // let offset =
+        // snapshot.line_index(file).offset(pos);     // let info =
+        // snapshot.hover_at(file, offset)?;     // Some(Hover {
+        // contents: ..., range: ... })     None::<Hover>
         // })
         // .await
         // .ok()
@@ -179,6 +179,7 @@ async fn main() {
     // let stdin = tokio::io::stdin();
     // let stdout = tokio::io::stdout();
 
-    // let (service, socket) = LspService::new(|client| LspBackend::new(client));
-    // Server::new(stdin, stdout, socket).serve(service).await;
+    // let (service, socket) = LspService::new(|client|
+    // LspBackend::new(client)); Server::new(stdin, stdout,
+    // socket).serve(service).await;
 }

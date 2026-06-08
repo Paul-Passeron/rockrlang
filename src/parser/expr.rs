@@ -307,7 +307,8 @@ impl<'db> Parser<'db> {
                     {
                         expr = qualified_cons;
                     } else {
-                        // Not a static call or qualified cons — `<` is a comparison operator.
+                        // Not a static call or qualified cons — `<` is a comparison
+                        // operator.
                         break;
                     }
                 }

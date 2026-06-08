@@ -188,7 +188,7 @@ impl<'db> InferenceCtx<'db> {
                 } else {
                     inner.clone()
                 };
-            if let Err(err) = self.unify(InferTy::Var(ty), to_unify) {
+            if let Err(err) = self.unify(ty.into(), to_unify) {
                 ConstraintSolveResult::Error(err)
             } else {
                 ConstraintSolveResult::Solved
@@ -212,11 +212,11 @@ impl<'db> InferenceCtx<'db> {
     ) -> ConstraintSolveResult {
         let found = self.find(base_ty);
         if let Some(elem_ty) = self.is_builtin_indexed_by_int(&found) {
-            if let Err(err) = self.unify(InferTy::Var(elem_var), elem_ty) {
+            if let Err(err) = self.unify(elem_var.into(), elem_ty) {
                 return ConstraintSolveResult::Error(err);
             }
             let idx = self.emit_intlike_constraint();
-            if let Err(err) = self.unify(index_ty.clone(), InferTy::Var(idx)) {
+            if let Err(err) = self.unify(index_ty.clone(), idx.into()) {
                 return ConstraintSolveResult::Error(err);
             }
             ConstraintSolveResult::Solved
@@ -241,7 +241,7 @@ impl<'db> InferenceCtx<'db> {
                     got: fields.len(),
                 })
             } else if let Err(err) =
-                self.unify(InferTy::Var(elem_var), fields[has_index as usize].clone())
+                self.unify(elem_var.into(), fields[has_index as usize].clone())
             {
                 ConstraintSolveResult::Error(err)
             } else {
@@ -266,7 +266,7 @@ impl<'db> InferenceCtx<'db> {
         let found = self.find(struct_ty);
         if let Some((struct_id, mut fields)) = self.is_struct(&found) {
             if let Some(ty) = fields.remove(&field) {
-                if let Err(err) = self.unify(InferTy::Var(elem_var), ty) {
+                if let Err(err) = self.unify(elem_var.into(), ty) {
                     ConstraintSolveResult::Error(err)
                 } else {
                     ConstraintSolveResult::Solved
@@ -381,7 +381,7 @@ impl<'db> InferenceCtx<'db> {
         let ret_ty = self
             .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
             .unwrap();
-        if let Err(e) = self.unify(InferTy::Var(ret_var), ret_ty) {
+        if let Err(e) = self.unify(ret_var.into(), ret_ty) {
             return ConstraintSolveResult::Error(e);
         }
 
@@ -540,12 +540,12 @@ impl<'db> InferenceCtx<'db> {
 
         let method_templates = templates
             .iter()
-            .map(|var| InferTy::Var(*var))
+            .map(|var| var.into())
             .chain(ast.data.template_args.iter().map(|ast_template| {
                 if !ast_template.constraints.is_empty() {
                     todo!()
                 }
-                InferTy::Var(self.fresh_var())
+                self.fresh_var().into()
             }))
             .collect::<Box<[_]>>();
 
@@ -575,7 +575,7 @@ impl<'db> InferenceCtx<'db> {
             .allocate_ast_type_expr(&ast_ret_ty.data, &method_ctx)
             .unwrap();
 
-        if let Err(err) = self.unify(InferTy::Var(*ret_var), ret_ty.clone()) {
+        if let Err(err) = self.unify(ret_var.into(), ret_ty.clone()) {
             return ConstraintSolveResult::Error(err);
         }
 
@@ -801,7 +801,7 @@ impl<'db> InferenceCtx<'db> {
         }
         match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
-                match self.unify(InferTy::Var(*res_ty), self.int_ty()) {
+                match self.unify(res_ty.into(), self.int_ty()) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
                 }
@@ -811,7 +811,7 @@ impl<'db> InferenceCtx<'db> {
                     def: TypeDefId::Builtin(BuiltinTypeId::ref_(self.db)),
                     fields: Box::new([target.clone()]),
                 };
-                match self.unify(InferTy::Var(*var), adt) {
+                match self.unify(var.into(), adt) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
                 }
@@ -867,7 +867,7 @@ impl<'db> InferenceCtx<'db> {
                 op,
             } => self.solve_binop_constraint(*res_ty, lhs_ty, rhs_ty, *op),
             InferenceConstraintKind::IntLike { res_ty } => {
-                let t = self.find(&InferTy::Var(*res_ty));
+                let t = self.find(&res_ty.into());
                 match t {
                     InferTy::Var(_) => ConstraintSolveResult::Pending,
                     InferTy::Adt { def, .. } => {
@@ -937,8 +937,9 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
 
-            // For all pending constraints remaining, solve them using the default behaviour
-            // Might want to do this one at a time, in order to avoid non-determinism issues
+            // For all pending constraints remaining, solve them using the default
+            // behaviour Might want to do this one at a time, in order to
+            // avoid non-determinism issues
 
             let pending = self
                 .all_constraints
@@ -1121,6 +1122,10 @@ impl<'db> InferenceCtx<'db> {
         res_ty
     }
 
+    pub fn emit_is_inner_constraint(&mut self, inner: InferTy, ref_ty: InferTy) {
+        self.emit_constraint(InferenceConstraintKind::IsInner { inner, ref_ty });
+    }
+
     fn solve_binop_constraint(
         &mut self,
         res_ty: InferVar,
@@ -1161,7 +1166,7 @@ impl<'db> InferenceCtx<'db> {
                 if fields.is_empty()
                     && let Some(int_like) = def.is_int_like(self.db) =>
             {
-                if let Err(err) = self.unify(InferTy::Var(*v), rhs_ty.clone()) {
+                if let Err(err) = self.unify(v.into(), rhs_ty.clone()) {
                     return ConstraintSolveResult::Error(err);
                 }
                 self.solve_int_binop(res_ty, int_like, int_like, op)
@@ -1190,7 +1195,7 @@ impl<'db> InferenceCtx<'db> {
             | BinaryOperator::Lt => {
                 // We know they are int-like, so it is safe to just say
                 // that res_ty must be bool
-                if let Err(err) = self.unify(InferTy::Var(res_ty), self.bool_ty()) {
+                if let Err(err) = self.unify(res_ty.into(), self.bool_ty()) {
                     return ConstraintSolveResult::Error(err);
                 }
                 ConstraintSolveResult::Solved
@@ -1201,7 +1206,7 @@ impl<'db> InferenceCtx<'db> {
                         def: TypeDefId::Builtin(lid),
                         fields: Box::new([]),
                     };
-                    if let Err(err) = self.unify(InferTy::Var(res_ty), ty) {
+                    if let Err(err) = self.unify(res_ty.into(), ty) {
                         return ConstraintSolveResult::Error(err);
                     }
                     ConstraintSolveResult::Solved
@@ -1380,14 +1385,14 @@ impl InferenceConstraintKind {
                 .find(target)
                 .listeners()
                 .into_iter()
-                .chain(ctx.find(&InferTy::Var(*var)).listeners())
+                .chain(ctx.find(&var.into()).listeners())
                 .collect(),
             InferenceConstraintKind::BindsLike { ty, inner, like } => ctx
                 .find(inner)
                 .listeners()
                 .into_iter()
-                .chain(ctx.find(&InferTy::Var(*ty)).listeners())
-                .chain(ctx.find(&InferTy::Var(*like)).listeners())
+                .chain(ctx.find(&ty.into()).listeners())
+                .chain(ctx.find(&like.into()).listeners())
                 .collect(),
             InferenceConstraintKind::IndexedBy {
                 elem_var,
@@ -1398,7 +1403,7 @@ impl InferenceConstraintKind {
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(index_ty).listeners())
-                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
             InferenceConstraintKind::Tuple {
                 elem_var, tuple_ty, ..
@@ -1406,7 +1411,7 @@ impl InferenceConstraintKind {
                 .find(tuple_ty)
                 .listeners()
                 .into_iter()
-                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
             InferenceConstraintKind::StructField {
                 elem_var,
@@ -1416,7 +1421,7 @@ impl InferenceConstraintKind {
                 .find(struct_ty)
                 .listeners()
                 .into_iter()
-                .chain(ctx.find(&InferTy::Var(*elem_var)).listeners())
+                .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
             InferenceConstraintKind::Method(MethodConstraint {
                 ret_var,
@@ -1429,7 +1434,7 @@ impl InferenceConstraintKind {
                 .collect::<Box<_>>()
                 .into_iter()
                 .chain(ty.listeners())
-                .chain(ctx.find(&InferTy::Var(*ret_var)).listeners())
+                .chain(ctx.find(&ret_var.into()).listeners())
                 .collect(),
             InferenceConstraintKind::Implements { ty, args, .. } => args
                 .iter()
@@ -1453,10 +1458,10 @@ impl InferenceConstraintKind {
                 .listeners()
                 .into_iter()
                 .chain(rhs_ty.listeners())
-                .chain(ctx.find(&InferTy::Var(*res_ty)).listeners())
+                .chain(ctx.find(&res_ty.into()).listeners())
                 .collect(),
             InferenceConstraintKind::IntLike { res_ty } => {
-                ctx.find(&InferTy::Var(*res_ty)).listeners()
+                ctx.find(&res_ty.into()).listeners()
             }
             InferenceConstraintKind::IsInner { inner, ref_ty } => ctx
                 .find(inner)

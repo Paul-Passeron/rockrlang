@@ -68,7 +68,8 @@ pub fn expr_contains_never(db: &dyn Db, thir: &Thir, expr: ExprId) -> bool {
                 .any(|item| expr_contains_never(db, thir, item.1)),
             ThirConstructorArgs::None => false,
         },
-        _ => false, // places don't need to be checked as any temporary expression was spilled already
+        _ => false, /* places don't need to be checked as any temporary expression was
+                     * spilled already */
     }
 }
 

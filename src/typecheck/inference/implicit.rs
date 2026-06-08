@@ -181,7 +181,8 @@ impl AstImplicitContext {
             self.resolve(db, &ast_ty.data)
         } else {
             let _ = self.get_associated_type_ast_template_arg(db, associated)?;
-            // Fallback if the scope owner is an interface and actually contains the associated type
+            // Fallback if the scope owner is an interface and actually contains the
+            // associated type
             Some(TypeRef::Associated(associated))
         }
     }
@@ -245,7 +246,8 @@ impl AstImplicitContext {
                             Definition::Module(module_id) => module_id,
                             _ => return None,
                         };
-                        // Cannot be a template because of the form A::B, so B here isn't a template
+                        // Cannot be a template because of the form A::B, so B here isn't
+                        // a template
                         _resolve(this, db, &to.data, new_module, false)
                     }
                 }
@@ -386,7 +388,8 @@ pub trait AsAstImplCtx {
             self.resolve(db, &ast_ty.data)
         } else {
             let _ = self.get_associated_type_ast_template_arg(db, associated)?;
-            // Fallback if the scope owner is an interface and actually contains the associated type
+            // Fallback if the scope owner is an interface and actually contains the
+            // associated type
             Some(TypeRef::Associated(associated))
         }
     }

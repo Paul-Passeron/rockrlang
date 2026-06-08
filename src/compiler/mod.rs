@@ -190,8 +190,9 @@ pub enum ZelfKind {
 pub struct FunctionSignature {
     pub name: Symbol,
     pub zelf: Option<ZelfArg>,
-    pub implicit_templates: Vec<Vec<InterfaceRef>>, // Templates inherited from environment
-    pub added_templates: Vec<Vec<InterfaceRef>>,    // Templates for this function only
+    pub implicit_templates: Vec<Vec<InterfaceRef>>, /* Templates inherited from
+                                                     * environment */
+    pub added_templates: Vec<Vec<InterfaceRef>>, // Templates for this function only
     pub args: Vec<(Symbol, TypeRef)>,
     pub ret: TypeRef,
 }
