@@ -363,21 +363,12 @@ impl<'a> InferenceCtx<'a> {
                 }
                 HirStructFieldPattern::Name { id, name } => {
                     let local_ty = self.infer_local(*id);
-                    if let Some(like) = &binds_like {
-                        let like_var = self.fresh_var();
-                        self.unify(InferTy::Var(like_var), like.clone()).unwrap();
-                        self.emit_binds_like_constraint(like_var, local_ty.clone());
-                    }
                     let field_ty = field_types
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
-                    self.unify_pattern_depending_on_kind(
-                        binds_like.as_ref(),
-                        field_ty,
-                        local_ty,
-                        None,
-                    );
+                    let adjusted = self.apply_binds_like(binds_like.as_ref(), field_ty);
+                    self.unify(adjusted, local_ty).expect("TODO");
                 }
             }
         }
