@@ -277,7 +277,7 @@ impl<'a> InferenceCtx<'a> {
     ) {
         let data = pattern.map(|pat| &pat.data);
         match data {
-            Some(HirPatternDesc::Bind { .. }) => {
+            Some(HirPatternDesc::Any | HirPatternDesc::Bind { .. }) => {
                 let adjusted = self.apply_binds_like(binds_like, inner_ty);
                 self.unify(adjusted.clone(), pot_ref_ty.clone())
                     .expect("TODO");
