@@ -17,6 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::BTreeMap, panic, sync::Arc};
 
+use salsa::Accumulator;
+
+use crate::compiler::diagnostic::Diag;
 use crate::hir::HirMatchBranch;
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::{
@@ -206,12 +209,7 @@ impl<'db> TyCtx<'db> {
         }
         let typeof_scrut = match typeof_scrut {
             TyRef::Inf(infer_ty) => infer_ty,
-            TyRef::Error => {
-                println!(
-                    "TODO: handle this but I don't want to make it terminate the program"
-                );
-                return;
-            }
+            TyRef::Error => self.inf_ctx.fresh_var().into(),
         };
 
         let mut errors = vec![];
@@ -229,7 +227,7 @@ impl<'db> TyCtx<'db> {
                 }
             };
             self.inf_ctx
-                .emit_is_inner_constraint(typeof_scrut.clone(), pat_ty);
+                .emit_is_inner_constraint(pat_ty, typeof_scrut.clone());
 
             if let Some(guard) = &branch.guard {
                 let inferred = self.inf_ctx.infer_expr(guard);
@@ -282,9 +280,18 @@ impl<'db> TyCtx<'db> {
                             &annotation.data,
                             self.inf_ctx.implicit_ctx().as_ref(),
                         )
-                        && let Err(err) = self.inf_ctx.unify(infer_ty, annotated)
+                        && let Err(err) =
+                            self.inf_ctx.unify(infer_ty.clone(), annotated.clone())
                     {
-                        dbg!("TODO: err here !", err);
+                        Diag::generic_error(
+                            format!(
+                                "Annotation does not match the type: {} vs {}",
+                                self.inf_ctx.find(&annotated).to_string(self.db),
+                                self.inf_ctx.find(&infer_ty).to_string(self.db),
+                            ),
+                            pattern.span.start().span(init.span.end()),
+                        )
+                        .accumulate(self.db);
                     }
                 }
                 TyRef::Error => (),

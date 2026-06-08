@@ -36,13 +36,18 @@ use crate::{
     common::symbols::Symbol,
     hir::{LocalId, PartialTypeRef, function_ast},
     name_resolve::{
+        definition::Definition,
         implems::resolve_type_expr_as_interface,
-        type_expr::{get_templates_of_fun, get_templates_of_fun_only},
+        type_expr::{
+            get_templates_of_fun, get_templates_of_fun_only, templates_of_enum,
+            templates_of_struct,
+        },
     },
+    parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
     ril::{
-        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId,
-        TypeRef, display::Display,
+        FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId,
+        TypeParamId, TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -421,6 +426,40 @@ impl<'db> InferenceCtx<'db> {
             ))),
             InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
         }
+    }
+
+    pub fn get_templates_for(&mut self, def: Definition) -> Box<[InferTy]> {
+        let asts: Arc<[AstTemplateArg]> = match def {
+            Definition::Function(func) => get_templates_of_fun(self.db, func.interned()),
+            Definition::Interface(_) => todo!(),
+            Definition::Module(_) => {
+                return Box::new([]);
+            }
+            Definition::Type(tdef) => match tdef {
+                TypeDefId::Builtin(_) => {
+                    return Box::new([]);
+                }
+                TypeDefId::Struct(struct_id) => {
+                    templates_of_struct(self.db, struct_id.interned())
+                        .iter()
+                        .cloned()
+                        .collect()
+                }
+                TypeDefId::Enum(enum_id) => {
+                    templates_of_enum(self.db, enum_id.interned())
+                        .iter()
+                        .cloned()
+                        .collect()
+                }
+            },
+        };
+
+        // Just do that for the moment, in the future it would be nice to apply
+        // interface constraints etc on the type :)
+
+        asts.iter()
+            .map(|_| InferTy::Var(self.fresh_var()))
+            .collect()
     }
 }
 
