@@ -18,10 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::EitherOrBoth;
 
 use crate::{
-    hir::{
-        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern,
-        Mutability,
-    },
+    hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     ril::{EnumId, ScopeOwnerId},
@@ -42,22 +39,9 @@ impl<'a> InferenceCtx<'a> {
             Ok(ty)
         })
     }
-
-    fn _infer_bind_pattern(
-        &mut self,
-        id: LocalId,
-        binds_like: Option<InferTy>,
-    ) -> InferTy {
+    fn _infer_bind_pattern(&mut self, id: LocalId) -> InferTy {
         let var = self.local_map[&id];
-        match binds_like {
-            Some(like) => {
-                let like_var = self.fresh_var();
-                self.unify(InferTy::Var(like_var), like).unwrap();
-                let result = self.emit_binds_like_constraint(like_var, InferTy::Var(var));
-                InferTy::Var(result) // return the adjusted type
-            }
-            None => InferTy::Var(var),
-        }
+        InferTy::Var(var)
     }
 
     fn _infer_pattern(
@@ -67,9 +51,7 @@ impl<'a> InferenceCtx<'a> {
     ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
             HirPatternDesc::Error | HirPatternDesc::Any => Ok(self.fresh_var().into()),
-            HirPatternDesc::Bind { id, .. } => {
-                Ok(self._infer_bind_pattern(*id, binds_like))
-            }
+            HirPatternDesc::Bind { id, .. } => Ok(InferTy::Var(self.local_map[id])),
             HirPatternDesc::Tuple(pats) => {
                 let tys: Box<[_]> = pats
                     .iter()
@@ -268,17 +250,46 @@ impl<'a> InferenceCtx<'a> {
 
         variant_tys
             .into_iter()
-            .zip_longest(tys)
+            .zip_longest(tys.into_iter().zip(hir_patterns))
             .take(hir_patterns.len())
             .for_each(|zipped| {
-                let (variant_ty, pat_ty) = match zipped {
-                    EitherOrBoth::Both(a, b) => (a, b),
-                    EitherOrBoth::Left(a) => (a, self.fresh_var().into()),
-                    EitherOrBoth::Right(b) => (self.fresh_var().into(), b),
+                let (variant_ty, pat_ty, pattern) = match zipped {
+                    EitherOrBoth::Both(a, (b, c)) => (a, b, Some(c)),
+                    EitherOrBoth::Left(a) => (a, self.fresh_var().into(), None),
+                    EitherOrBoth::Right((b, c)) => (self.fresh_var().into(), b, Some(c)),
                 };
-                let adjusted = self.apply_binds_like(binds_like.as_ref(), variant_ty);
-                let _ = self.unify(adjusted.into(), pat_ty);
+                self.unify_pattern_depending_on_kind(
+                    binds_like.as_ref(),
+                    variant_ty,
+                    pat_ty,
+                    pattern,
+                );
             });
+    }
+
+    /// TODO: find a better name
+    fn unify_pattern_depending_on_kind(
+        &mut self,
+        binds_like: Option<&InferTy>,
+        inner_ty: InferTy,
+        pot_ref_ty: InferTy,
+        pattern: Option<&HirPattern>,
+    ) {
+        let data = pattern.map(|pat| &pat.data);
+        match data {
+            Some(HirPatternDesc::Bind { .. }) => {
+                let adjusted = self.apply_binds_like(binds_like, inner_ty);
+                self.unify(adjusted.clone(), pot_ref_ty.clone())
+                    .expect("TODO");
+            }
+            _ => {
+                let mut p = TypePrinter::new();
+                p.options = p.options.with(
+                    crate::printer::type_printer::TypePrinterOption::DebugInferenceVars,
+                );
+                self.emit_is_inner_constraint(inner_ty, pot_ref_ty);
+            }
+        }
     }
 
     fn _infer_destructure_binding(
@@ -343,7 +354,12 @@ impl<'a> InferenceCtx<'a> {
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
-                    self.emit_is_inner_constraint(field_ty, inferred);
+                    self.unify_pattern_depending_on_kind(
+                        binds_like.as_ref(),
+                        field_ty,
+                        inferred,
+                        Some(pattern),
+                    );
                 }
                 HirStructFieldPattern::Name { id, name } => {
                     let local_ty = self.infer_local(*id);
@@ -356,7 +372,12 @@ impl<'a> InferenceCtx<'a> {
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
-                    self.emit_is_inner_constraint(field_ty, local_ty);
+                    self.unify_pattern_depending_on_kind(
+                        binds_like.as_ref(),
+                        field_ty,
+                        local_ty,
+                        None,
+                    );
                 }
             }
         }

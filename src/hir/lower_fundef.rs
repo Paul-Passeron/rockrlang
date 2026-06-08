@@ -1159,17 +1159,10 @@ impl<'db> LowerFundef<'db> {
                             span: pat.span,
                         };
                     }
-                    AstNamedPattern::Constructor { name, args } => {
-                        println!(
-                            "Found a constructor at {}",
-                            pat.span.start().loc_info(this.db)
-                        );
-                        let res = this.lower_constructor_pattern(
+                    AstNamedPattern::Constructor { name, args } => this
+                        .lower_constructor_pattern(
                             pat, scope, locals, module, name, args,
-                        );
-                        println!("-- END");
-                        res
-                    }
+                        ),
                     AstNamedPattern::NameResolved { from, to } => {
                         match resolve_in_module(this.db, *from, module) {
                             Some(Definition::Module(id)) => {

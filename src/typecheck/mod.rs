@@ -280,7 +280,7 @@ impl<'db> TyCtx<'db> {
                             &annotation.data,
                             self.inf_ctx.implicit_ctx().as_ref(),
                         )
-                        && let Err(err) =
+                        && let Err(_err) =
                             self.inf_ctx.unify(infer_ty.clone(), annotated.clone())
                     {
                         Diag::generic_error(

@@ -119,7 +119,6 @@ impl<'db> InferenceCtx<'db> {
             .collect_vec();
         self.listeners.entry(root).or_default().extend(flattened);
     }
-
     fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
         let a = &self.find(a);
         let b = &self.find(b);
@@ -129,8 +128,11 @@ impl<'db> InferenceCtx<'db> {
                 .unify_var_var(*a, *b)
                 .inspect(|_| self.merge_listeners(*a, *b)),
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
-                self.table
-                    .unify_var_value(*infer_var, Some(value.clone()))?;
+                let resolved = self.find(value);
+                if resolved.occurs(*infer_var) {
+                    return Err(UnificationError::RecursiveDefinition(*infer_var));
+                }
+                self.table.unify_var_value(*infer_var, Some(resolved))?;
                 self.listeners
                     .remove(&self.table.find(*infer_var))
                     .into_flat_iter()

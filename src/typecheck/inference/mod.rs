@@ -46,8 +46,8 @@ use crate::{
     parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
     ril::{
-        FunctionId, InterfaceId, Package, ScopeOwnerId, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::Display,
+        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId,
+        TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
