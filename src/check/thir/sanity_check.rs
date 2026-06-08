@@ -109,59 +109,59 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    fn check_ref_binded_pattern_to(&mut self, ty: TypeRef, pat: &ThirPattern) {
-        self.check_types(ty, pat.ty, pat.span);
-    }
-
-    fn check_pattern_against_scrut_ty(&mut self, scrut_ty: TypeRef, pat: &ThirPattern) {
-        if let Some((_, mut inner_type)) = scrut_ty.as_ref(self.db) {
-            while let Some((_, inner)) = inner_type.as_ref(self.db) {
-                inner_type = inner;
-            }
-            self.check_ref_binded_pattern_to(inner_type, pat);
-        } else {
-            self.check_pattern_with_expected_ty(pat, scrut_ty)
+    fn ref_depth(&mut self, ref_ty: TypeRef, from: TypeRef, span: Span) -> usize {
+        let mut cur = ref_ty;
+        let mut cnt = 0;
+        while cur != from
+            && let Some((_, inner_ty)) = cur.as_ref(self.db)
+        {
+            cnt += 1;
+            cur = inner_ty;
         }
+        self.check_types(from, cur, span);
+        cnt
     }
 
-    fn check_pattern_with_expected_ty(&mut self, pat: &ThirPattern, expected: TypeRef) {
-        self.check_pattern(pat);
-        self.check_types(expected, pat.ty, pat.span);
+    fn reref(&self, ty: TypeRef, cnt: usize) -> TypeRef {
+        let mut cur = ty;
+        for _ in 0..cnt {
+            cur = TypeRef::Concrete(ref_of(self.db, cur, false))
+        }
+        cur
     }
 
-    fn check_pattern(&mut self, pat: &ThirPattern) {
+    fn check_pattern(&mut self, expected_ty: TypeRef, pat: &ThirPattern) {
+        let depth = self.ref_depth(expected_ty, pat.ty, pat.span);
         match &pat.kind {
             ThirPatternKind::Error
             | ThirPatternKind::Any
             | ThirPatternKind::Bind { .. } => (),
-            ThirPatternKind::Tuple(thir_patterns) => {
-                let tys = thir_patterns
-                    .iter()
-                    .map(|pat| {
-                        self.check_pattern(pat);
-                        pat.ty
-                    })
-                    .collect_vec();
-                let expected = TypeRef::Concrete(tuple_of(self.db, tys));
-                self.check_types(expected, pat.ty, pat.span);
-            }
-            ThirPatternKind::Struct { def, fields } => {
-                // All fields should be here, this is checked previously
-                let actual_fields = def.get_fields_ty(self.db);
-                for (symbol, thir_pattern) in fields {
-                    let actual_ty = actual_fields[symbol];
-                    self.check_types(actual_ty, thir_pattern.ty, thir_pattern.span);
+            ThirPatternKind::Tuple(pats) => {
+                for pat in pats {
+                    self.check_pattern(pat.ty, pat);
                 }
             }
+            ThirPatternKind::Struct { def, fields } => {
+                let actual = def.get_fields_ty(self.db);
+                for (sym, fpat) in fields {
+                    self.check_pattern(self.reref(actual[sym], depth), fpat);
+                }
+                let bare = TypeRef::Concrete(TypeId::new(
+                    self.db,
+                    TypeDefId::Struct(def.def),
+                    def.args.clone(),
+                ));
+                self.check_types(bare, pat.ty, pat.span);
+            }
             ThirPatternKind::Constructor { def, idx, args } => {
-                let expected = TypeRef::Concrete(TypeId::new(
+                let enum_ty = TypeRef::Concrete(TypeId::new(
                     self.db,
                     TypeDefId::Enum(def.def),
                     def.args.clone(),
                 ));
-                self.check_types(expected, pat.ty, pat.span);
-                if let Some(constructor_ty) = def.get_cons(self.db, *idx) {
-                    self.check_constructor_pat(&constructor_ty, args);
+                self.check_types(enum_ty, pat.ty, pat.span);
+                if let Some(cty) = def.get_cons(self.db, *idx) {
+                    self.check_constructor_pat(&cty, args, depth);
                 } else {
                     todo!()
                 }
@@ -173,7 +173,7 @@ impl<'db> SanityChecker<'db> {
     }
 
     fn check_branch(&mut self, scrut_ty: TypeRef, branch: &ThirMatchBranch) {
-        self.check_pattern_against_scrut_ty(scrut_ty, &branch.pattern);
+        self.check_pattern(scrut_ty, &branch.pattern);
         if let Some(guard) = &branch.guard {
             self.check_stmts(&guard.stmts);
             self.check_expr_with_expected_type(
@@ -453,22 +453,21 @@ impl<'db> SanityChecker<'db> {
         &mut self,
         ty: &ConstructorType,
         pat: &ThirConstructorArgs<ThirPattern>,
+        depth: usize,
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
             (ConstructorType::Struct(tys), ThirConstructorArgs::Struct(pats)) => {
                 assert_eq!(tys.len(), pats.len());
-                pats.iter().for_each(|pat| self.check_pattern(&pat.1));
-                for field in tys {
-                    let matching_field = &pats.iter().find(|p| p.0 == field.0).unwrap().1;
-                    self.check_types(field.1, matching_field.ty, matching_field.span);
+                for (sym, fty) in tys {
+                    let fpat = &pats.iter().find(|p| p.0 == *sym).unwrap().1;
+                    self.check_pattern(self.reref(*fty, depth), fpat);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 tys.iter().zip(pats).for_each(|(ty, pat)| {
-                    self.check_pattern(pat);
-                    self.check_types(*ty, pat.ty, pat.span);
+                    self.check_pattern(self.reref(*ty, depth), pat);
                 });
             }
             _ => todo!(),
