@@ -264,38 +264,34 @@ impl<'db> TyCtx<'db> {
         ty_annotation: Option<&AstAnyTypeExpr>,
         init: &HirExpr,
     ) {
-        let (init_ty, err) = self.type_check_expr(init);
-        if let Some(err) = err {
-            dbg!("TODO: err here !", err);
-        }
-        match self.inf_ctx.infer_pattern(pattern, None) {
-            Ok(pattern_ty) => match init_ty {
-                TyRef::Inf(infer_ty) => {
-                    if let Err(err) = self.inf_ctx.unify(infer_ty.clone(), pattern_ty) {
-                        dbg!("TODO: err here !", err);
-                    };
-                    if let Some(annotation) = ty_annotation
-                        && let Some(annotation) = annotation.as_known()
-                        && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
-                            &annotation.data,
-                            self.inf_ctx.implicit_ctx().as_ref(),
-                        )
-                        && let Err(_err) =
-                            self.inf_ctx.unify(infer_ty.clone(), annotated.clone())
-                    {
-                        Diag::generic_error(
-                            format!(
-                                "Annotation does not match the type: {} vs {}",
-                                self.inf_ctx.find(&annotated).to_string(self.db),
-                                self.inf_ctx.find(&infer_ty).to_string(self.db),
-                            ),
-                            pattern.span.start().span(init.span.end()),
-                        )
-                        .accumulate(self.db);
-                    }
+        let init_ty = match self.inf_ctx.infer_expr(init) {
+            Ok(ty) => ty,
+            Err(_) => todo!(),
+        };
+        match self.inf_ctx.infer_pattern(pattern, Some(init_ty.clone())) {
+            Ok(pattern_ty) => {
+                self.inf_ctx
+                    .emit_is_inner_constraint(pattern_ty, init_ty.clone());
+                if let Some(annotation) = ty_annotation
+                    && let Some(annotation) = annotation.as_known()
+                    && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
+                        &annotation.data,
+                        self.inf_ctx.implicit_ctx().as_ref(),
+                    )
+                    && let Err(_err) =
+                        self.inf_ctx.unify(init_ty.clone(), annotated.clone())
+                {
+                    Diag::generic_error(
+                        format!(
+                            "Annotation does not match the type: {} vs {}",
+                            self.inf_ctx.find(&annotated).to_string(self.db),
+                            self.inf_ctx.find(&init_ty).to_string(self.db),
+                        ),
+                        pattern.span.start().span(init.span.end()),
+                    )
+                    .accumulate(self.db);
                 }
-                TyRef::Error => (),
-            },
+            }
             Err(err) => {
                 dbg!("TODO: err here !", err);
             }
