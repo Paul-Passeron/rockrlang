@@ -1021,10 +1021,6 @@ impl<'db> LowerFundef<'db> {
                         .iter()
                         .map(|pat| match pat {
                             StructFieldPattern::Rebind { name, pattern, .. } => {
-                                println!(
-                                    "Lowering pattern of {}",
-                                    name.to_string(self.db)
-                                );
                                 let (lowered, new_locals) =
                                     self.lower_pattern(pattern, scope);
                                 locals.extend(new_locals);
