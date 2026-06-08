@@ -1,0 +1,10 @@
+struct Foo {
+    x: int;
+    y: str;
+}
+
+fun bar(foo: &Foo): void {
+    let Foo { x, y } = foo;
+    let x: &int = x;
+    let y: &str = y;
+}
