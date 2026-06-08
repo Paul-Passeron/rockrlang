@@ -36,6 +36,12 @@ impl From<InferVar> for InferTy {
     }
 }
 
+impl From<&InferVar> for InferTy {
+    fn from(value: &InferVar) -> Self {
+        InferTy::Var(*value)
+    }
+}
+
 impl UnifyKey for InferVar {
     type Value = Option<InferTy>;
 

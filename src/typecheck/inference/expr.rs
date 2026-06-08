@@ -48,7 +48,7 @@ use super::{InferTy, InferenceCtx, UnificationError};
 impl<'db> InferenceCtx<'db> {
     fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         match &expr.data {
-            HirExprDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
+            HirExprDesc::IntLit(_) => Ok(self.emit_intlike_constraint().into()),
             HirExprDesc::CharLit(_) => Ok(self.char_ty()),
             HirExprDesc::StrLit(_) => Ok(self.str_ty()),
             HirExprDesc::CStrLit(_) => Ok(self.cstr_ty()),
@@ -101,10 +101,10 @@ impl<'db> InferenceCtx<'db> {
                 let elem_var = self.fresh_var();
                 exprs.iter().try_for_each(|expr| {
                     let ty = self.infer_expr(expr)?;
-                    self.unify(InferTy::Var(elem_var), ty)?;
+                    self.unify(elem_var.into(), ty)?;
                     Ok(())
                 })?;
-                Ok(self.slice_of(InferTy::Var(elem_var)))
+                Ok(self.slice_of(elem_var.into()))
             }
             HirExprDesc::SizeOf(_) => Ok(self.int_ty()),
             HirExprDesc::Constructor {
@@ -120,7 +120,7 @@ impl<'db> InferenceCtx<'db> {
                 println!("TODO: function not found in current scope");
                 Ok(InferTy::Var(self.fresh_var()))
             }
-            HirExprDesc::Error => Ok(InferTy::Var(self.fresh_var())),
+            HirExprDesc::Error => Ok(self.fresh_var().into()),
         }
     }
 
@@ -130,25 +130,25 @@ impl<'db> InferenceCtx<'db> {
             HirPlaceKind::Field { base, field } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_struct_field_constraint(base_ty, *field);
-                Ok(InferTy::Var(elem_var))
+                Ok(elem_var.into())
             }
             HirPlaceKind::TupleField { base, index } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_tuple_constraint(base_ty, *index);
-                Ok(InferTy::Var(elem_var))
+                Ok(elem_var.into())
             }
             HirPlaceKind::Deref(hir_place) => {
                 let ptr_ty = self.infer_place(hir_place)?;
                 let pointee_var = self.fresh_var();
-                let ptr_var = self.emit_deref_constraint(InferTy::Var(pointee_var));
-                self.unify(InferTy::Var(ptr_var), ptr_ty)?;
-                Ok(InferTy::Var(pointee_var))
+                let ptr_var = self.emit_deref_constraint(pointee_var.into());
+                self.unify(ptr_var.into(), ptr_ty)?;
+                Ok(pointee_var.into())
             }
             HirPlaceKind::Index { base, index } => {
                 let index_ty = self.infer_expr(index)?;
                 let base_ty = self.infer_place(base)?;
                 let element_var = self.emit_indexed_by_constraint(base_ty, index_ty);
-                Ok(InferTy::Var(element_var))
+                Ok(element_var.into())
             }
             HirPlaceKind::Temporary(hir_expr) => self.infer_expr(hir_expr),
         }?;
@@ -173,11 +173,11 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn infer_local(&mut self, local_id: LocalId) -> InferTy {
-        InferTy::Var(self.local_var(local_id))
+        self.local_var(local_id).into()
     }
 
     pub fn some_ptr_to(&mut self, pointee: InferTy) -> InferTy {
-        InferTy::Var(self.emit_deref_constraint(pointee))
+        self.emit_deref_constraint(pointee).into()
     }
 
     fn allocate_struct_partial_ref(
@@ -204,8 +204,8 @@ impl<'db> InferenceCtx<'db> {
                             templates_of_struct(self.db, struct_id.interned());
                         let templates = templates
                             .iter()
-                            .map(|_| InferTy::Var(self.fresh_var()))
-                            .collect::<Box<[_]>>();
+                            .map(|_| self.fresh_var().into())
+                            .collect::<Box<[InferTy]>>();
                         let args = type_id.args(self.db);
                         self.snapshot(|this| {
                             templates.iter().zip(args.iter()).try_for_each(
@@ -232,8 +232,8 @@ impl<'db> InferenceCtx<'db> {
                 let templates = templates_of_struct(self.db, struct_id.interned());
                 let templates = templates
                     .iter()
-                    .map(|_| InferTy::Var(self.fresh_var()))
-                    .collect::<Box<[_]>>();
+                    .map(|_| self.fresh_var().into())
+                    .collect::<Box<[InferTy]>>();
 
                 self.snapshot(|this| {
                     args.iter()
@@ -403,7 +403,7 @@ impl<'db> InferenceCtx<'db> {
             .enumerate()
             .map(|(i, _)| {
                 // TODO: handle conformances for t
-                let var = InferTy::Var(self.fresh_var());
+                let var: InferTy = self.fresh_var().into();
                 if let Some(hint) = template_hints.get(i) {
                     let allocated =
                         self.allocate_partial_type_arg(hint, &self.implicit_ctx());
@@ -420,7 +420,7 @@ impl<'db> InferenceCtx<'db> {
             ScopeOwnerId::Module(enum_def.parent(self.db)),
             enum_templates.iter().cloned().collect(),
             templates.clone(),
-            Some(InferTy::Var(zelf)),
+            Some(zelf.into()),
         )
         .unwrap();
 
