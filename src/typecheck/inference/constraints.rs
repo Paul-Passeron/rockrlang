@@ -937,8 +937,9 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
 
-            // For all pending constraints remaining, solve them using the default behaviour
-            // Might want to do this one at a time, in order to avoid non-determinism issues
+            // For all pending constraints remaining, solve them using the default
+            // behaviour Might want to do this one at a time, in order to
+            // avoid non-determinism issues
 
             let pending = self
                 .all_constraints
@@ -1119,6 +1120,10 @@ impl<'db> InferenceCtx<'db> {
             like,
         });
         res_ty
+    }
+
+    pub fn emit_is_inner_constraint(&mut self, inner: InferTy, ref_ty: InferTy) {
+        self.emit_constraint(InferenceConstraintKind::IsInner { inner, ref_ty });
     }
 
     fn solve_binop_constraint(

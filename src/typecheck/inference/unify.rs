@@ -210,7 +210,9 @@ impl<'db> InferenceCtx<'db> {
                 InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
             }
         }
-        // For the moment, ena does not let us find the value without the table being mutable for path-compression reason I believe. We might want to find an alternative.
+        // For the moment, ena does not let us find the value without the table being
+        // mutable for path-compression reason I believe. We might want to find an
+        // alternative.
         let mut tbl = self.table.clone();
         _find(ty, &mut tbl)
     }

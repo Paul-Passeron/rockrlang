@@ -422,16 +422,19 @@ impl Default for TypePrinterOptionSet {
 // TODO: use bit flags instead
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypePrinterOption {
-    /// Print as a fully-qualified path from the outermost scope to the innermost ex: `core::io::str`
+    /// Print as a fully-qualified path from the outermost scope to the
+    /// innermost ex: `core::io::str`
     PrintPath,
 
     /// Print the `@builtin` outer-scope when printing path
     PrintBuiltin,
 
-    /// Wether or not to debug print inference variables. Ex: `Vec<_>` can become `Vec<'19>`
+    /// Wether or not to debug print inference variables. Ex: `Vec<_>` can
+    /// become `Vec<'19>`
     DebugInferenceVars,
 
     /// Pretty-prints ADT types like tuple and references.
-    /// Ex: `(int, str, str)` might be printed as `()<int, int, str>` if this flag not enabled.
+    /// Ex: `(int, str, str)` might be printed as `()<int, int, str>` if this
+    /// flag not enabled.
     PrettyPrintBuiltinADTs,
 }

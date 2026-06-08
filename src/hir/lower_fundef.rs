@@ -1077,8 +1077,8 @@ impl<'db> LowerFundef<'db> {
         //     }
         //     (_, AstConstructFields::None) => {
         //         let local_id =
-        //             self.allocate_local(scope, *name, Mutability::Const, None, pat.span);
-        //         locals.push(local_id);
+        //             self.allocate_local(scope, *name, Mutability::Const,
+        // None, pat.span);         locals.push(local_id);
         //         HirPattern {
         //             id: self.alloc.fresh(),
         //             data: HirPatternDesc::Bind {

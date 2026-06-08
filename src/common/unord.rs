@@ -20,7 +20,8 @@ use std::hash::Hash;
 
 use salsa::Update;
 
-/// Unordered collection of items for easy interning of set-like objects in salsa
+/// Unordered collection of items for easy interning of set-like objects in
+/// salsa
 
 #[derive(Clone)]
 pub struct Set<T: Eq + Ord> {

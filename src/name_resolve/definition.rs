@@ -53,7 +53,8 @@ impl Definition {
         TypePrinter::new().definition_to_string(db, self)
     }
 
-    // TODO: The current way we do things, we can't get the name span of other definitions of the same kind with the same name at top level.
+    // TODO: The current way we do things, we can't get the name span of other
+    // definitions of the same kind with the same name at top level.
 
     pub fn name(self, db: &dyn Db) -> Symbol {
         match self {
@@ -211,7 +212,7 @@ pub fn builtin_definitions<'db>(db: &'db dyn Db) -> BTreeMap<Symbol, Definition>
             Definition::Type(usize_id(db).def(db)),
         ),
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
-        (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), // i32 is an alias for int. Might want to switch this around
+        (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), /* i32 is an alias for int. Might want to switch this around */
         (
             Symbol::new(db, "void"),
             Definition::Type(void_id(db).def(db)),

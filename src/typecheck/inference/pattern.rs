@@ -17,9 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::{HirPattern, HirPatternDesc, HirStructFieldPattern},
-    name_resolve::type_expr::{struct_item, templates_of_enum, templates_of_struct},
+    name_resolve::type_expr::{struct_item, templates_of_struct},
     ril::ScopeOwnerId,
-    typecheck::inference::implicit::AstImplicitContext,
 };
 
 use super::*;
@@ -49,10 +48,15 @@ impl<'a> InferenceCtx<'a> {
                     .local_map
                     .get(id)
                     .expect("Internal error: local_map should contain all bind ids");
-                if let Some(_like) = binds_like {
-                    todo!()
+                if let Some(like) = binds_like {
+                    let like_var = self.fresh_var();
+                    self.unify(InferTy::Var(like_var), like).unwrap();
+                    let res =
+                        self.emit_binds_like_constraint(like_var, InferTy::Var(var));
+                    Ok(InferTy::Var(res))
+                } else {
+                    Ok(InferTy::Var(var))
                 }
-                Ok(InferTy::Var(var))
             }
             HirPatternDesc::Error | HirPatternDesc::Any => {
                 Ok(InferTy::Var(self.fresh_var()))
@@ -62,58 +66,63 @@ impl<'a> InferenceCtx<'a> {
                 resolution: struct_id,
                 fields,
             } => {
-                if let Some(binds_like) = binds_like {
-                    todo!()
-                } else {
-                    let templates = templates_of_struct(self.db, struct_id.interned());
-                    let infer_templates = templates
-                        .iter()
-                        .map(|_| InferTy::Var(self.fresh_var()))
-                        .collect_vec();
-                    let struct_ty = InferTy::Adt {
-                        def: TypeDefId::Struct(*struct_id),
-                        fields: infer_templates.iter().cloned().collect(),
+                let templates = templates_of_struct(self.db, struct_id.interned());
+                let infer_templates = templates
+                    .iter()
+                    .map(|_| InferTy::Var(self.fresh_var()))
+                    .collect_vec();
+                let struct_ty = InferTy::Adt {
+                    def: TypeDefId::Struct(*struct_id),
+                    fields: infer_templates.iter().cloned().collect(),
+                };
+                let ctx = ImplicitContext::new(
+                    self.db,
+                    ScopeOwnerId::Module(struct_id.parent(self.db)),
+                    templates.iter().cloned().collect(),
+                    infer_templates.iter().cloned().collect(),
+                    Some(struct_ty.clone()),
+                )
+                .unwrap();
+                let item = struct_item(self.db, struct_id.interned());
+
+                let field_types: HashMap<Symbol, InferTy> = item
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        (
+                            field.name,
+                            self.allocate_ast_type_expr(&field.ty.data, &ctx)
+                                .unwrap_or(InferTy::Var(self.fresh_var())),
+                        )
+                    })
+                    .collect();
+
+                for field in fields {
+                    let (name, inferred) = match field {
+                        HirStructFieldPattern::Rebind { name, pattern } => {
+                            (*name, self.infer_pattern(pattern, binds_like.clone())?)
+                        }
+                        HirStructFieldPattern::Name { id, name } => {
+                            let local_ty = self.infer_local(*id);
+                            let ty = if let Some(like) = &binds_like {
+                                let like_var = self.fresh_var();
+                                self.unify(InferTy::Var(like_var), like.clone()).unwrap();
+                                InferTy::Var(
+                                    self.emit_binds_like_constraint(like_var, local_ty),
+                                )
+                            } else {
+                                local_ty
+                            };
+                            (*name, ty)
+                        }
                     };
-                    let ctx = ImplicitContext::new(
-                        self.db,
-                        ScopeOwnerId::Module(struct_id.parent(self.db)),
-                        templates.iter().cloned().collect(),
-                        infer_templates.iter().cloned().collect(),
-                        Some(struct_ty.clone()),
-                    )
-                    .unwrap();
-                    let item = struct_item(self.db, struct_id.interned());
-
-                    let field_types: HashMap<Symbol, InferTy> = item
-                        .fields
-                        .iter()
-                        .map(|field| {
-                            (
-                                field.name,
-                                self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                                    .unwrap_or(InferTy::Var(self.fresh_var())),
-                            )
-                        })
-                        .collect();
-
-                    for field in fields {
-                        let (name, inferred) = match field {
-                            HirStructFieldPattern::Rebind { name, pattern } => {
-                                (*name, self.infer_pattern(pattern, None)?)
-                            }
-                            HirStructFieldPattern::Name { id, name } => {
-                                (*name, self.infer_local(*id))
-                            }
-                        };
-                        if let Some(expected_type) = field_types.get(&name) {
-                            self.unify(inferred, expected_type.clone())?;
-                        } else {
-                            todo!()
-                        };
-                    }
-
-                    Ok(struct_ty)
+                    if let Some(expected_type) = field_types.get(&name) {
+                        self.unify(inferred, expected_type.clone())?;
+                    } else {
+                        todo!()
+                    };
                 }
+                Ok(struct_ty)
             }
             HirPatternDesc::Constructor { .. } => todo!(),
             HirPatternDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
