@@ -79,8 +79,12 @@ impl<'db> SanityChecker<'db> {
                 self.check_stmts(body);
             }
             StmtKind::Let { local, init } => {
-                let local_ty = self.thir.locals[*local].ty;
-                self.check_expr_with_expected_type(*init, local_ty);
+                let (local_ty, span) = {
+                    let loc = &self.thir.locals[*local];
+                    (loc.ty, loc.span)
+                };
+                let ty = self.check_expr(*init);
+                self.check_types(ty, local_ty, span);
             }
             StmtKind::Assign { place, rhs } => {
                 self.check_place(*place);

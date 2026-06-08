@@ -268,7 +268,7 @@ impl<'a> InferenceCtx<'a> {
     }
 
     /// TODO: find a better name
-    fn unify_pattern_depending_on_kind(
+    pub fn unify_pattern_depending_on_kind(
         &mut self,
         binds_like: Option<&InferTy>,
         inner_ty: InferTy,

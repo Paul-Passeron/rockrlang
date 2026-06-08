@@ -20,7 +20,7 @@ use std::{collections::BTreeMap, panic, sync::Arc};
 use salsa::Accumulator;
 
 use crate::compiler::diagnostic::Diag;
-use crate::hir::HirMatchBranch;
+use crate::hir::{HirMatchBranch, HirPatternDesc};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::{
     Db,
@@ -270,8 +270,21 @@ impl<'db> TyCtx<'db> {
         };
         match self.inf_ctx.infer_pattern(pattern, Some(init_ty.clone())) {
             Ok(pattern_ty) => {
-                self.inf_ctx
-                    .emit_is_inner_constraint(pattern_ty, init_ty.clone());
+                match &pattern.data {
+                    HirPatternDesc::Tuple(_)
+                    | HirPatternDesc::DestructureBinding { .. } => {
+                        self.inf_ctx
+                            .emit_is_inner_constraint(pattern_ty, init_ty.clone());
+                    }
+                    HirPatternDesc::Constructor { .. } => {
+                        todo!("Not allowed here")
+                    }
+                    _ => {
+                        self.inf_ctx
+                            .unify(init_ty.clone(), pattern_ty)
+                            .expect("TODO");
+                    }
+                }
                 if let Some(annotation) = ty_annotation
                     && let Some(annotation) = annotation.as_known()
                     && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
