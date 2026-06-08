@@ -30,7 +30,7 @@ use crate::{
         PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
-    ril::{BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef},
+    ril::{BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, ref_of},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
@@ -568,7 +568,14 @@ impl<'db> ThirTranslator<'db> {
                 let fresh = b.new_synthetic_local(ty, Mutability::Const, pat.span);
                 v.push(ThirStmt::let_(fresh, value, span));
                 let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
-                let def = ty.as_struct_ref(self.db).expect("TODO: handle bad case");
+                let inner_ty = ty.peeled(self.db);
+                let depth = ty.ref_depth(self.db);
+                let def = inner_ty.as_struct_ref(self.db).unwrap_or_else(|| {
+                    todo!(
+                        "handle bad case: inner_ty = {}",
+                        inner_ty.to_string(self.db)
+                    )
+                });
                 for pat_field in fields {
                     let name = match pat_field {
                         HirStructFieldPattern::Name { name, .. }
@@ -576,13 +583,47 @@ impl<'db> ThirTranslator<'db> {
                     };
                     let field_ty =
                         def.typeof_field(self.db, name).unwrap_or(TypeRef::Error);
+                    let mut place = place;
+                    for _ in 0..depth {
+                        let new_ty = b.places[place].ty.as_ref(self.db).unwrap().1;
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, new_ty);
+                    }
                     let field_place = b.with_synthetic_projection(
                         place,
                         Projection::Field(name, field_ty),
                         field_ty,
                     );
-                    let field_value =
-                        b.new_expr(ThirExpr::use_place(field_place, b, span));
+
+                    let field_value = if depth == 0 {
+                        b.new_expr(ThirExpr::use_place(field_place, b, span))
+                    } else {
+                        let mut cur_ty = field_ty;
+                        let mut val = b.new_expr(ThirExpr {
+                            kind: ExprKind::Ref {
+                                place: field_place,
+                                mutability: Mutability::Const,
+                            },
+                            ty: cur_ty.wrap_ref(self.db),
+                            span,
+                        });
+                        for _ in 1..depth {
+                            cur_ty = cur_ty.wrap_ref(self.db);
+                            let tmp =
+                                b.new_synthetic_local(cur_ty, Mutability::Const, span);
+                            v.push(ThirStmt::let_(tmp, val, span));
+                            let tmp_place = b.new_place(ThirPlace::local(tmp, b, span));
+                            val = b.new_expr(ThirExpr {
+                                kind: ExprKind::Ref {
+                                    place: tmp_place,
+                                    mutability: Mutability::Const,
+                                },
+                                ty: cur_ty.wrap_ref(self.db),
+                                span,
+                            });
+                        }
+                        val
+                    };
                     match pat_field {
                         HirStructFieldPattern::Rebind { pattern: pat, .. } => {
                             self._destructure_pattern_init(b, pat, field_value, span, v);
@@ -1001,6 +1042,33 @@ impl PartialTypeRef {
                     })
                     .collect(),
             )),
+        }
+    }
+}
+
+impl TypeRef {
+    pub fn peel_aux(self, db: &dyn Db) -> (Self, usize) {
+        let mut cur = self;
+        let mut cnt = 0;
+        while let Some((_, inner)) = cur.as_ref(db) {
+            cur = inner;
+            cnt += 1;
+        }
+        (cur, cnt)
+    }
+
+    pub fn peeled(self, db: &dyn Db) -> Self {
+        self.peel_aux(db).0
+    }
+
+    pub fn ref_depth(self, db: &dyn Db) -> usize {
+        self.peel_aux(db).1
+    }
+
+    pub fn wrap_ref(self, db: &dyn Db) -> Self {
+        match self {
+            TypeRef::Error | TypeRef::Unknown => self,
+            _ => TypeRef::Concrete(ref_of(db, self, false)),
         }
     }
 }
