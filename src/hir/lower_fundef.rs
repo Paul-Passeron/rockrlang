@@ -1067,44 +1067,6 @@ impl<'db> LowerFundef<'db> {
             },
             _ => todo!(),
         }
-
-        // match (resolution, args) {
-        //     (
-        //         Some(Definition::Type(_type_def_id)),
-        //         AstConstructFields::StructFields(_fields),
-        //     ) => {
-        //         todo!("Constructor pattern with struct fields")
-        //     }
-        //     (_, AstConstructFields::None) => {
-        //         let local_id =
-        //             self.allocate_local(scope, *name, Mutability::Const,
-        // None, pat.span);         locals.push(local_id);
-        //         HirPattern {
-        //             id: self.alloc.fresh(),
-        //             data: HirPatternDesc::Bind {
-        //                 id: local_id,
-        //                 name: *name,
-        //                 mutable: false,
-        //             },
-        //             span: pat.span,
-        //         }
-        //     }
-        //     _ => {
-        //         Diag::generic_error(
-        //             format!(
-        //                 "Expected an enum variant but got `{}`",
-        //                 name.display(self.db)
-        //             ),
-        //             pat.span,
-        //         )
-        //         .accumulate(self.db);
-        //         HirPattern {
-        //             id: self.alloc.fresh(),
-        //             data: HirPatternDesc::Error,
-        //             span: pat.span,
-        //         }
-        //     }
-        // }
     }
 
     fn lower_pattern(
