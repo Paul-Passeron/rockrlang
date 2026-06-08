@@ -1,0 +1,127 @@
+enum Tree {
+    Leaf(int),
+    Node { left: *Tree; right: *Tree; tag: str },
+}
+
+struct Pair {
+    a: int;
+    b: Inner;
+}
+
+struct Inner {
+    p: int;
+    q: str;
+}
+
+enum Wrap {
+    W { pair: Pair; tree: Tree },
+}
+
+fun deep_ref(w: &Wrap): void {
+    match w {
+        Wrap::W { pair: Pair { a, b: Inner { p, q } }, tree: t } => {
+            let a1: &int = a;
+            let p1: &int = p;
+            let q1: &str = q;
+            let t1: &Tree = t;
+        }
+    }
+}
+
+
+fun deep_val(w: Wrap): void {
+    match w {
+        Wrap::W { pair: Pair { a, b: Inner { p, q } }, tree: t } => {
+            let a1: int = a;
+            let p1: int = p;
+            let q1: str = q;
+            let t1: Tree = t;
+        }
+    }
+}
+
+
+fun ptr_under_ref(t: &Tree): void {
+    match t {
+        Tree::Leaf(n) => {
+            let n1: &int = n;
+        }
+        Tree::Node { left: l, right: r, tag } => {
+            let l1: &*Tree = l;
+            let r1: &*Tree = r;
+            let tag1: &str = tag;
+        }
+    }
+}
+
+
+fun shorthand_eq(p: &Pair): void {
+    match p {
+        Pair { a, b } => {
+            let a1: &int = a;
+            let b1: &Inner = b;
+        }
+    }
+}
+
+fun rebind_eq(p: &Pair): void {
+    match p {
+        Pair { a: a, b: b } => {
+            let a1: &int = a;
+            let b1: &Inner = b;
+        }
+    }
+}
+
+
+enum Mix {
+    M(int, Pair, str),
+}
+
+fun tuple_mix_ref(m: &Mix): void {
+    match m {
+        Mix::M(n, Pair { a, b }, s) => {
+            let n1: &int = n;
+            let a1: &int = a;
+            let b1: &Inner = b;
+            let s1: &str = s;
+        }
+    }
+}
+
+
+fun let_nested_ref(w: &Wrap): void {
+    let Pair { a, b: Inner { p, q } } = pair_ref();
+    let a1: &int = a;
+    let p1: &int = p;
+    let q1: &str = q;
+}
+
+fun pair_ref(): &Pair {
+    return make_pair();
+}
+
+fun make_pair(): &Pair {
+    return make_pair();
+}
+
+
+fun unannotated_deep(w: &Wrap): void {
+    match w {
+        Wrap::W { pair: Pair { a, b }, tree } => {
+            let x = a;
+            let y = b;
+            let z = tree;
+        }
+    }
+}
+
+
+fun wildcard_mix(m: &Mix): void {
+    match m {
+        Mix::M(n, _, s) => {
+            let n1: &int = n;
+            let s1: &str = s;
+        }
+    }
+}
