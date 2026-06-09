@@ -23,3 +23,16 @@ fun round_trip2(bar: &Bar): Bar {
         }
     }
 }
+
+fun round_trip_value(foo: Foo): Foo {
+    let Foo {x, y} = foo;
+    return Foo {.x: x, .y: y};
+}
+
+fun round_trip2_value(bar: Bar): Bar {
+    match bar {
+        Bar::Foo {x, y} => {
+            return Bar::Foo {.x: x, .y: y};
+        }
+    }
+}
