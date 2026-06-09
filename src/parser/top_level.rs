@@ -608,7 +608,11 @@ impl<'db> Parser<'db> {
         self.consume();
         let ty = self.parse_type_expr()?;
         let end = self.get_end();
-        Ok(AstStructDefField { name, ty, span: start.span(end) })
+        Ok(AstStructDefField {
+            name,
+            ty,
+            span: start.span(end),
+        })
     }
 
     fn parse_struct_def_fields(&mut self) -> Result<Vec<AstStructDefField>, ParseError> {
@@ -658,7 +662,11 @@ impl<'db> Parser<'db> {
             _ => AstEnumVariantKind::Unit,
         };
         let end = self.get_end();
-        Ok(AstEnumVariant { name, kind, span: start.span(end) })
+        Ok(AstEnumVariant {
+            name,
+            kind,
+            span: start.span(end),
+        })
     }
 
     fn parse_enum_variants(&mut self) -> Result<Vec<AstEnumVariant>, ParseError> {

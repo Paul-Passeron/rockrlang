@@ -10,7 +10,6 @@ enum Bar {
     }
 }
 
-
 fun round_trip(foo: &Foo): Foo {
     let Foo {x, y} = foo;
     return Foo {.x: x$, .y: y$};
