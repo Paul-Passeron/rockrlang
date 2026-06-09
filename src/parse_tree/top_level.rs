@@ -315,6 +315,7 @@ pub struct AstEnumDef {
 pub struct AstEnumVariant {
     pub name: Symbol,
     pub kind: AstEnumVariantKind,
+    pub span: Span,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

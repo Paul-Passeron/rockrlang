@@ -629,6 +629,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_enum_variant(&mut self) -> Result<AstEnumVariant, ParseError> {
+        let start = self.get_start();
         let name = self.parse_symbol()?.data;
 
         let kind = match self.peek_n(0).map(|t| t.kind) {
@@ -656,7 +657,8 @@ impl<'db> Parser<'db> {
             }
             _ => AstEnumVariantKind::Unit,
         };
-        Ok(AstEnumVariant { name, kind })
+        let end = self.get_end();
+        Ok(AstEnumVariant { name, kind, span: start.span(end) })
     }
 
     fn parse_enum_variants(&mut self) -> Result<Vec<AstEnumVariant>, ParseError> {
