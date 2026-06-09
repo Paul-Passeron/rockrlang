@@ -1107,7 +1107,7 @@ impl<'db> LowerFundef<'db> {
                             pat.span,
                         );
                         locals.push(local_id);
-                        return HirPattern {
+                        HirPattern {
                             id: this.alloc.fresh(),
                             data: HirPatternDesc::Bind {
                                 id: local_id,
@@ -1115,7 +1115,7 @@ impl<'db> LowerFundef<'db> {
                                 mutable: false,
                             },
                             span: pat.span,
-                        };
+                        }
                     }
                     AstNamedPattern::Constructor { name, args } => this
                         .lower_constructor_pattern(

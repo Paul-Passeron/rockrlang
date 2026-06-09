@@ -296,7 +296,7 @@ impl<'a> InferenceCtx<'a> {
         &mut self,
         binds_like: Option<InferTy>,
         struct_id: &StructId,
-        fields: &Vec<HirStructFieldPattern>,
+        fields: &[HirStructFieldPattern],
     ) -> Result<InferTy, UnificationError> {
         let (struct_ty, field_types) = self.fresh_struct_instance(struct_id);
         self._infer_fields(fields, &field_types, binds_like);
