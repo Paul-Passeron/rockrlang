@@ -328,6 +328,7 @@ pub enum AstEnumVariantKind {
 pub struct AstStructDefField {
     pub name: Symbol,
     pub ty: AstTypeExpr,
+    pub span: Span,
 }
 
 impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {

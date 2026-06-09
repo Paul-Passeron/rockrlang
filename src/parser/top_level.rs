@@ -602,11 +602,13 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_struct_def_field(&mut self) -> Result<AstStructDefField, ParseError> {
+        let start = self.get_start();
         let name = self.parse_symbol()?.data;
         self.expect(TokenKind::Colon)?;
         self.consume();
         let ty = self.parse_type_expr()?;
-        Ok(AstStructDefField { name, ty })
+        let end = self.get_end();
+        Ok(AstStructDefField { name, ty, span: start.span(end) })
     }
 
     fn parse_struct_def_fields(&mut self) -> Result<Vec<AstStructDefField>, ParseError> {
