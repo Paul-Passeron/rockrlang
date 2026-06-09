@@ -428,7 +428,7 @@ impl<'db> TyCtx<'db> {
                 stmts.iter().for_each(|stmt| self.type_check_stmt(stmt))
             }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
-            HirStmtKind::Break => todo!(),
+            HirStmtKind::Break => (),
         }
     }
 

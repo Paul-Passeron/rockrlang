@@ -367,8 +367,7 @@ impl TypePrinter {
         function_id: FunctionId,
     ) -> String {
         format!(
-            "{}::{}",
-            self.scope_owner_to_string(db, function_id.parent(db)),
+            "{}",
             function_id.name(db).display(db)
         )
     }

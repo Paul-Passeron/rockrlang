@@ -33,6 +33,7 @@ use std::sync::Arc;
 pub mod expr;
 pub mod hir_to_thir;
 pub mod stmt;
+pub mod display;
 
 pub type ExprId = Idx<ThirExpr>;
 pub type LocalId = Idx<ThirLocal>;
