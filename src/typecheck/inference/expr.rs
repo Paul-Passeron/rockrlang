@@ -34,7 +34,7 @@ use crate::{
     },
     parse_tree::{
         expr::BinaryOperator,
-        top_level::{AstEnumVariantKind, AstStructDef},
+        top_level::{AstEnumVariantKind, AstStructDef, AstStructDefField},
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
@@ -380,6 +380,19 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn diagnose_field_mismatches(
+        &mut self,
+        fields: &[(Symbol, HirExpr)],
+        ast_fields: &[AstStructDefField],
+    ) {
+        let expected_fields: HashSet<Symbol> =
+            HashSet::from_iter(ast_fields.iter().map(|f| f.name));
+        let got_fields: HashSet<Symbol> = HashSet::from_iter(fields.iter().map(|f| f.0));
+        if expected_fields != got_fields {
+            todo!()
+        }
+    }
+
     fn infer_constructor(
         &mut self,
         enum_def: EnumId,
@@ -437,10 +450,26 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
             (
-                HirConstructorArgs::StructLike { .. },
-                AstEnumVariantKind::StructLike(_),
+                HirConstructorArgs::StructLike { fields },
+                AstEnumVariantKind::StructLike(ast_fields),
             ) => {
-                todo!();
+                let mut errors = vec![];
+                self.diagnose_field_mismatches(fields, ast_fields);
+                for field in fields {
+                    let ast = ast_fields.iter().find(|ast| ast.name == field.0);
+                    let field_ty = ast
+                        .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
+                        .unwrap_or_else(|| self.fresh_var().into());
+                    match self.infer_expr(&field.1) {
+                        Ok(expr_ty) => {
+                            if let Err(err) = self.unify(expr_ty, field_ty) {
+                                errors.push(err);
+                            }
+                        }
+                        Err(err) => errors.push(err),
+                    }
+                }
+                assert!(errors.is_empty());
             }
             (HirConstructorArgs::None, AstEnumVariantKind::Unit) => (),
             _ => todo!("handle constructor kind mismatch between decl and use"),
