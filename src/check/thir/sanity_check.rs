@@ -10,8 +10,8 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, ptr_of,
-        ref_of, slice_of, str_id, tuple_of, void_id,
+        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
+        const_ptr_of, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -322,7 +322,21 @@ impl<'db> SanityChecker<'db> {
                 let constructor_ty = enum_def.get_cons(self.db, *idx).unwrap();
                 self.check_constructor_expr(&constructor_ty, args);
             }
-            ExprKind::StructLit { .. } => todo!(),
+            ExprKind::StructLit { struct_def, fields } => {
+                let ty = TypeRef::Concrete(TypeId::new(
+                    self.db,
+                    TypeDefId::Struct(struct_def.def),
+                    struct_def.args.clone(),
+                ));
+                self.check_types(ty, infos.ty, infos.span);
+                let struct_fields = struct_def.get_fields_ty(self.db);
+                for field in fields {
+                    let matching_field = struct_fields[&field.0];
+                    let field_ty = self.check_expr(field.1);
+                    let span = self.thir.exprs[field.1].span;
+                    self.check_types(matching_field, field_ty, span);
+                }
+            }
 
             ExprKind::Error => (),
         };
@@ -448,9 +462,10 @@ impl<'db> SanityChecker<'db> {
             ) => {
                 assert_eq!(field_tys.len(), pat_tys.len());
                 for field in field_tys {
-                    let matching_field = pat_tys.iter().find(|p| p.0 == field.0).unwrap();
-                    let _ = matching_field;
-                    todo!()
+                    let field_expr = pat_tys.iter().find(|p| p.0 == field.0).unwrap().1;
+                    let field_ty = self.check_expr(field_expr);
+                    let span = self.thir.exprs[field_expr].span;
+                    self.check_types(field.1, field_ty, span);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
