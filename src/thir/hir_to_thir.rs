@@ -52,7 +52,6 @@ pub struct ThirBuilder<'db> {
     local_map: HashMap<hir::LocalId, LocalId>,
 }
 
-#[allow(dead_code)]
 impl<'db> ThirBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         Self {
@@ -324,14 +323,14 @@ impl<'db> ThirTranslator<'db> {
 
         let (then_scope, then_stmts) =
             self.scoped(b, then.span, ScopeKind::Block, |this, b| {
-                this.handle_stmt(b, then)
+                this.handle_single_stmt(b, then)
             });
 
         let (else_stmts, else_scope) = match else_ {
             Some(stmt) => {
                 let (else_scope, else_stmts) =
                     self.scoped(b, then.span, ScopeKind::Block, |this, b| {
-                        this.handle_stmt(b, stmt)
+                        this.handle_single_stmt(b, stmt)
                     });
                 (Some(else_stmts), Some(else_scope))
             }
@@ -343,6 +342,26 @@ impl<'db> ThirTranslator<'db> {
         )
     }
 
+    fn handle_single_stmt(
+        &mut self,
+        b: &mut ThirBuilder<'_>,
+        stmt: &HirStmt,
+    ) -> Vec<ThirStmt> {
+        match &stmt.kind {
+            HirStmtKind::Block(stmts) => {
+                if stmts.len() == 1 {
+                    self.handle_single_stmt(b, &stmts[0])
+                } else {
+                    stmts
+                        .iter()
+                        .flat_map(|stmt| self.handle_stmt(b, stmt))
+                        .collect()
+                }
+            }
+            _ => self.handle_stmt(b, stmt),
+        }
+    }
+
     fn handle_while(
         &mut self,
         b: &mut ThirBuilder<'_>,
@@ -352,7 +371,7 @@ impl<'db> ThirTranslator<'db> {
     ) -> ThirStmt {
         let cond = self.expr_with_setup(b, cond);
         let (scope, body) = self.scoped(b, span, ScopeKind::Loop, |this, b| {
-            this.handle_stmt(b, body)
+            this.handle_single_stmt(b, body)
         });
         ThirStmt::whl(cond, scope, body, span)
     }
@@ -369,7 +388,7 @@ impl<'db> ThirTranslator<'db> {
             .map(|guard| self.expr_with_setup(b, guard));
         let (body_scope, body) =
             self.scoped(b, branch.body.span, ScopeKind::Block, |this, b| {
-                this.handle_stmt(b, &branch.body)
+                this.handle_single_stmt(b, &branch.body)
             });
         ThirMatchBranch {
             pattern,
