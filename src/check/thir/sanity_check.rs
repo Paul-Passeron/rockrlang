@@ -276,7 +276,16 @@ impl<'db> SanityChecker<'db> {
             }
             ExprKind::SliceLit(items) => {
                 if items.is_empty() {
-                    todo!()
+                    match infos.ty {
+                        TypeRef::Concrete(type_id)
+                            if type_id.def(self.db)
+                                == TypeDefId::Builtin(BuiltinTypeId::slice(self.db)) => {}
+                        _ => {
+                            let mock_expected =
+                                TypeRef::Concrete(slice_of(self.db, TypeRef::Unknown));
+                            self.check_types(mock_expected, infos.ty, infos.span);
+                        }
+                    }
                 } else {
                     let tys = items
                         .iter()
