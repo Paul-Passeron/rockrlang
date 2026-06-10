@@ -41,7 +41,7 @@ impl<T> Eq for Idx<T> {}
 
 impl<T> PartialOrd for Idx<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
+        Some(self.cmp(other))
     }
 }
 
@@ -53,7 +53,7 @@ impl<T> Ord for Idx<T> {
 
 impl<T> Clone for Idx<T> {
     fn clone(&self) -> Self {
-        Idx(self.0, Default::default())
+        *self
     }
 }
 
@@ -84,13 +84,13 @@ impl<T> Arena<T> {
     }
 }
 
-impl<'a, T> IndexMut<Idx<T>> for Arena<T> {
+impl<T> IndexMut<Idx<T>> for Arena<T> {
     fn index_mut(&mut self, index: Idx<T>) -> &mut T {
         &mut self.inner[index.0]
     }
 }
 
-impl<'a, T> Index<Idx<T>> for Arena<T> {
+impl<T> Index<Idx<T>> for Arena<T> {
     type Output = T;
 
     fn index(&self, index: Idx<T>) -> &T {
@@ -98,7 +98,7 @@ impl<'a, T> Index<Idx<T>> for Arena<T> {
     }
 }
 
-impl<'a, T> Default for Arena<T> {
+impl<T> Default for Arena<T> {
     fn default() -> Self {
         Self::new()
     }

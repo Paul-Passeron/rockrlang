@@ -185,11 +185,11 @@ impl<'a> ThirPrinter<'a> {
         };
         self.line(&header);
         self.indent += 1;
-        if let Some(g) = &branch.guard {
-            if !g.stmts.is_empty() {
-                self.line("// guard setup:");
-                self.print_stmts(&g.stmts);
-            }
+        if let Some(g) = &branch.guard
+            && !g.stmts.is_empty()
+        {
+            self.line("// guard setup:");
+            self.print_stmts(&g.stmts);
         }
         self.print_stmts(&branch.body);
         self.indent -= 1;
@@ -209,8 +209,8 @@ impl<'a> ThirPrinter<'a> {
         match &expr.kind {
             ExprKind::IntLit(n) => n.to_string(),
             ExprKind::Charlit(c) => format!("{c:?}"),
-            ExprKind::StrLit(s) => s.display(self.db).to_string(),
-            ExprKind::CStrLit(s) => format!("c{}", s.display(self.db).to_string()),
+            ExprKind::StrLit(s) => s.display(self.db),
+            ExprKind::CStrLit(s) => format!("c{}", s.display(self.db)),
             ExprKind::BoolLit(b) => b.to_string(),
 
             ExprKind::Use(p) => self.render_place(*p),
