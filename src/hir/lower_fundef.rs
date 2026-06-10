@@ -1347,20 +1347,10 @@ impl<'db> LowerFundef<'db> {
             },
             span: iterator_span,
         };
-        let iterator_id = LocalId(self.next_local_id);
-        self.next_local_id += 1;
         let iterator_var_name =
             Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id()));
-        self.locals.insert(
-            iterator_id,
-            LocalInfo {
-                id: iterator_id,
-                name: iterator_var_name,
-                mutability: Mutability::Mutable,
-                ty_annotation: None,
-                span: iterator_span,
-            },
-        );
+        let iterator_id =
+            self.allocate_local(scope, iterator_var_name, Mutability::Mutable, None, iterator_span);
         let mut stmts = vec![];
         stmts.push(HirStmt {
             id: self.alloc.fresh(),
