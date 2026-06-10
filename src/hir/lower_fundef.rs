@@ -28,7 +28,10 @@ use crate::{
     common::{ids::IdWrapper, location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch,
+        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability,
+        PartialTypeArg, PartialTypeRef,
     },
     name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
@@ -1337,12 +1340,12 @@ impl<'db> LowerFundef<'db> {
 
         let mut iterator_scope = scope.clone();
 
-        let (lowered_pat, locals) = self.lower_pattern(element, &mut iterator_scope);
+        let pat = self.lower_pattern(element, &mut iterator_scope);
 
         let iterator_body = self.lower_stmt(body, &mut iterator_scope);
 
         let while_body =
-            self.match_some_do_or_break(next_expr, lowered_pat, locals, iterator_body);
+            self.match_some_do_or_break(next_expr, pat.0, pat.1, iterator_body);
 
         let while_true_loop = self.while_true_do(while_body, iterator_span);
         HirStmtKind::Block(vec![let_iter, while_true_loop])

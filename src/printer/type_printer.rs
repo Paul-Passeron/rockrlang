@@ -366,10 +366,7 @@ impl TypePrinter {
         db: &dyn Db,
         function_id: FunctionId,
     ) -> String {
-        format!(
-            "{}",
-            function_id.name(db).display(db)
-        )
+        format!("{}", function_id.name(db).display(db))
     }
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {

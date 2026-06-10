@@ -15,12 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+pub mod arena;
 pub mod frozen;
+pub mod ids;
 pub mod location;
 pub mod symbols;
 pub mod unord;
-pub mod arena;
-pub mod ids;
 
 #[macro_export]
 macro_rules! unused {

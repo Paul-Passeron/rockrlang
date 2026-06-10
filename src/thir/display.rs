@@ -62,7 +62,6 @@ impl<'a> ThirPrinter<'a> {
         self.line("}");
     }
 
-
     fn print_stmts(&mut self, stmts: &'a [ThirStmt]) {
         for stmt in stmts {
             self.print_stmt(stmt);

@@ -43,10 +43,10 @@ impl Default for IdGen {
 
 pub struct IdWrapper<T: From<usize>> {
     inner: IdGen,
-    _brand: PhantomData<T>
+    _brand: PhantomData<T>,
 }
 
-impl <T: From<usize>> IdWrapper<T> {
+impl<T: From<usize>> IdWrapper<T> {
     pub fn new() -> Self {
         Self {
             inner: IdGen::new(),
@@ -59,7 +59,7 @@ impl <T: From<usize>> IdWrapper<T> {
     }
 }
 
-impl <T: From<usize>> Default for IdWrapper<T> {
+impl<T: From<usize>> Default for IdWrapper<T> {
     fn default() -> Self {
         Self::new()
     }

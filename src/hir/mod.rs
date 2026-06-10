@@ -47,8 +47,8 @@ use crate::{
 };
 
 pub mod display;
-pub mod utils;
 pub mod lower_fundef;
+pub mod utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HirId(pub usize);
