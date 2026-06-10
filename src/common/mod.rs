@@ -19,6 +19,7 @@ pub mod frozen;
 pub mod location;
 pub mod symbols;
 pub mod unord;
+pub mod arena;
 
 #[macro_export]
 macro_rules! unused {
