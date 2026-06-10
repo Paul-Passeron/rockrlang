@@ -68,6 +68,7 @@ struct LowerFundef<'db> {
     next_local_id: u32,
     alloc: HirIdAlloc,
     locals: BTreeMap<LocalId, LocalInfo>,
+    next_iterator_id: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +108,7 @@ impl<'db> LowerFundef<'db> {
             next_local_id: 0,
             alloc: HirIdAlloc::new(),
             locals: BTreeMap::new(),
+            next_iterator_id: 0,
         }
     }
 
@@ -1348,7 +1350,7 @@ impl<'db> LowerFundef<'db> {
         let iterator_id = LocalId(self.next_local_id);
         self.next_local_id += 1;
         let iterator_var_name =
-            Symbol::new(self.db, format!("@iterator_{}", iterator_id.0));
+            Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id()));
         self.locals.insert(
             iterator_id,
             LocalInfo {
@@ -1458,6 +1460,12 @@ impl<'db> LowerFundef<'db> {
         });
 
         HirStmtKind::Block(stmts)
+    }
+
+    fn next_iterator_id(&mut self) -> usize {
+        let res = self.next_iterator_id;
+        self.next_iterator_id += 1;
+        res
     }
 
     fn collect_args(&mut self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {
