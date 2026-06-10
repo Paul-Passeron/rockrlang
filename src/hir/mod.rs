@@ -47,7 +47,7 @@ use crate::{
 };
 
 pub mod display;
-pub mod expr;
+pub mod utils;
 pub mod lower_fundef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
