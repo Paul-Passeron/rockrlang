@@ -19,3 +19,9 @@ fun cmain2(argc: int, argv: **char): void {
         printf(c"%s\n", argv[i]);
     }
 }
+
+fun main(argc: int, argv: &[*char]): void {
+    for i in 0..argc {
+        printf(c"%s\n", argv[i]);
+    }
+}
