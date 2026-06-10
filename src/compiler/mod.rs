@@ -294,11 +294,8 @@ fn add_package_root_from_disk(
     let root = root
         .canonicalize()
         .map_err(|_| CompilerError::NoFileFoundAt(root))?;
-    let path_to_file = if root.is_dir() {
-        root.join(ANCHOR_FILE_NAME)
-    } else {
-        root.clone()
-    };
+    let path_to_file =
+        if root.is_dir() { root.join(ANCHOR_FILE_NAME) } else { root.clone() };
     let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
     let root_file =
         read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
@@ -408,11 +405,7 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     });
 
     render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
-    if has_errors {
-        Err(CompilerError::CompiledWithErrors)
-    } else {
-        Ok(())
-    }
+    if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
 #[salsa::tracked]
 pub fn is_file_direct_submodule_of_file<'db>(

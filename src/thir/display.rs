@@ -268,11 +268,7 @@ impl<'a> ThirPrinter<'a> {
 
             ExprKind::Tuple(es) => {
                 let s = self.render_exprs(es);
-                if es.len() == 1 {
-                    format!("({s},)")
-                } else {
-                    format!("({s})")
-                }
+                if es.len() == 1 { format!("({s},)") } else { format!("({s})") }
             }
             ExprKind::SliceLit(es) => format!("[{}]", self.render_exprs(es)),
             ExprKind::SizeOf(ty) => format!("sizeof({})", ty.to_string(self.db)),
@@ -349,11 +345,7 @@ impl<'a> ThirPrinter<'a> {
                     .map(|p| self.render_pattern(p))
                     .collect::<Vec<_>>()
                     .join(", ");
-                if ps.len() == 1 {
-                    format!("({s},)")
-                } else {
-                    format!("({s})")
-                }
+                if ps.len() == 1 { format!("({s},)") } else { format!("({s})") }
             }
             ThirPatternKind::Struct { def, fields } => {
                 let name = TypeDefId::Struct(def.def).to_string(self.db);

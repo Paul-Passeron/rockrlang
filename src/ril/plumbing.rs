@@ -357,11 +357,7 @@ pub enum PtrKind {
 }
 
 pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
-    if mutable {
-        mut_ptr_of(db, ty)
-    } else {
-        const_ptr_of(db, ty)
-    }
+    if mutable { mut_ptr_of(db, ty) } else { const_ptr_of(db, ty) }
 }
 
 pub fn const_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
@@ -381,11 +377,7 @@ pub fn mut_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
 }
 
 pub fn ref_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
-    if mutable {
-        mut_ref_of(db, ty)
-    } else {
-        const_ref_of(db, ty)
-    }
+    if mutable { mut_ref_of(db, ty) } else { const_ref_of(db, ty) }
 }
 
 pub fn slice_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {

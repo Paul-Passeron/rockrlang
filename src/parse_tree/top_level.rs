@@ -216,11 +216,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     f,
                     "[{}{}]",
                     ty.data.display(self.db),
-                    if let Some(len) = len {
-                        format!("; {len}")
-                    } else {
-                        String::new()
-                    }
+                    if let Some(len) = len { format!("; {len}") } else { String::new() }
                 )
             }
             AstTypeExprDesc::Tuple(spanneds) => {

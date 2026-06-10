@@ -340,11 +340,7 @@ impl<'db> Parser<'db> {
             None
         };
 
-        let args = if has_args {
-            self.parse_fundef_args()?
-        } else {
-            vec![]
-        };
+        let args = if has_args { self.parse_fundef_args()? } else { vec![] };
 
         let variadic = if let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Plus)

@@ -155,11 +155,7 @@ impl<T> Drop for Frozen<T> {
         let last = data.len().wrapping_sub(1);
 
         for (i, bucket) in data.iter().enumerate() {
-            let count = if i == last {
-                next_bucket_idx
-            } else {
-                BUCKET_SIZE
-            };
+            let count = if i == last { next_bucket_idx } else { BUCKET_SIZE };
             for j in 0..count {
                 unsafe {
                     bucket[j].as_ptr().cast_mut().drop_in_place();

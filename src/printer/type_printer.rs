@@ -130,11 +130,8 @@ impl TypePrinter {
         infer_ty: InferTy,
         ctx: Option<&InferenceCtx>,
     ) -> String {
-        let infer_ty = if let Some(ctx) = ctx {
-            ctx.find_const(&infer_ty)
-        } else {
-            infer_ty
-        };
+        let infer_ty =
+            if let Some(ctx) = ctx { ctx.find_const(&infer_ty) } else { infer_ty };
         match infer_ty {
             InferTy::Var(infer_var) => {
                 if self.options.has(TypePrinterOption::DebugInferenceVars) {
@@ -233,11 +230,7 @@ impl TypePrinter {
         format!(
             "{}{}",
             self.interface_id_to_string(db, interface_ref.def(db)),
-            if args.is_empty() {
-                args_str
-            } else {
-                format!("<{args_str}>")
-            }
+            if args.is_empty() { args_str } else { format!("<{args_str}>") }
         )
     }
 

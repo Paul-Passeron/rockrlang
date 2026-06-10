@@ -50,11 +50,8 @@ fn rkr_files_in(dir: &Path, recursive: bool) -> Vec<PathBuf> {
     if !dir.is_dir() {
         return Vec::new();
     }
-    let walker = if recursive {
-        WalkDir::new(dir)
-    } else {
-        WalkDir::new(dir).max_depth(1)
-    };
+    let walker =
+        if recursive { WalkDir::new(dir) } else { WalkDir::new(dir).max_depth(1) };
     let mut files: Vec<PathBuf> = walker
         .into_iter()
         .filter_map(Result::ok)

@@ -725,11 +725,7 @@ impl<'db> LowerFundef<'db> {
         let place = self.expr_as_place(place, scope, self.module);
         HirExprDesc::Ref {
             place,
-            mutability: if mutable {
-                Mutability::Mutable
-            } else {
-                Mutability::Const
-            },
+            mutability: if mutable { Mutability::Mutable } else { Mutability::Const },
         }
     }
 
