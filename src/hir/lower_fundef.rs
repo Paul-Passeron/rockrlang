@@ -25,7 +25,11 @@ use salsa::Accumulator;
 
 use crate::{
     Db,
-    common::{ids::IdWrapper, location::Span, symbols::Symbol},
+    common::{
+        ids::{IdGen, IdWrapper},
+        location::Span,
+        symbols::Symbol,
+    },
     compiler::diagnostic::Diag,
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch,
@@ -67,7 +71,7 @@ pub struct LowerFundef<'db> {
     pub next_local_id: u32,
     pub alloc: IdWrapper<HirId>,
     pub locals: BTreeMap<LocalId, LocalInfo>,
-    pub next_iterator_id: usize,
+    pub iterator_id: IdGen,
 }
 
 #[derive(Debug, Clone)]
@@ -107,7 +111,7 @@ impl<'db> LowerFundef<'db> {
             next_local_id: 0,
             alloc: IdWrapper::new(),
             locals: BTreeMap::new(),
-            next_iterator_id: 0,
+            iterator_id: IdGen::new(),
         }
     }
 
@@ -157,20 +161,20 @@ impl<'db> LowerFundef<'db> {
                     }
                     _ => {
                         let temp = self.lower_expr(expr, scope, module);
-                        self.new_place(HirPlaceKind::Temporary(Box::new(temp)), expr.span)
+                        self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span)
                     }
                 }
             }
             AstExprDesc::PostfixDeref(inner) => {
                 let temp = self.expr_as_place(inner, scope, module);
-                self.new_place(HirPlaceKind::Deref(Box::new(temp)), expr.span)
+                self.new_place(HirPlaceKind::Deref(temp.boxed()), expr.span)
             }
 
             AstExprDesc::FieldAccess { object, field } => {
                 let base = self.expr_as_place(object, scope, module);
                 self.new_place(
                     HirPlaceKind::Field {
-                        base: Box::new(base),
+                        base: base.boxed(),
                         field: *field,
                     },
                     expr.span,
@@ -180,7 +184,7 @@ impl<'db> LowerFundef<'db> {
                 let base = self.expr_as_place(object, scope, module);
                 self.new_place(
                     HirPlaceKind::TupleField {
-                        base: Box::new(base),
+                        base: base.boxed(),
                         index: *index,
                     },
                     expr.span,
@@ -191,15 +195,15 @@ impl<'db> LowerFundef<'db> {
                 let index = self.lower_expr(index, scope, self.module);
                 self.new_place(
                     HirPlaceKind::Index {
-                        base: Box::new(base),
-                        index: Box::new(index),
+                        base: base.boxed(),
+                        index: index.boxed(),
                     },
                     expr.span,
                 )
             }
             _ => {
                 let temp = self.lower_expr(expr, scope, module);
-                self.new_place(HirPlaceKind::Temporary(Box::new(temp)), expr.span)
+                self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span)
             }
         }
     }
@@ -489,9 +493,9 @@ impl<'db> LowerFundef<'db> {
         let lhs = self.lower_expr(lhs, scope, self.module);
         let rhs = self.lower_expr(rhs, scope, self.module);
         HirExprDesc::BinOp {
-            lhs: Box::new(lhs),
+            lhs: lhs.boxed(),
             op,
-            rhs: Box::new(rhs),
+            rhs: rhs.boxed(),
         }
     }
 
@@ -588,7 +592,7 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         HirExprDesc::CallMethod {
-            receiver: Box::new(self.lower_expr(object, scope, module)),
+            receiver: self.lower_expr(object, scope, module).boxed(),
             method,
             args: args
                 .iter()
@@ -749,10 +753,10 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::BinOp { lhs, op, rhs } => self.lower_binop(lhs, rhs, *op, scope),
             AstExprDesc::Range { from, to } => self.lower_range(from, to, scope),
             AstExprDesc::Neg(inner) => {
-                HirExprDesc::Neg(Box::new(self.lower_expr(inner, scope, self.module)))
+                HirExprDesc::Neg(self.lower_expr(inner, scope, self.module).boxed())
             }
             AstExprDesc::Not(inner) => {
-                HirExprDesc::Not(Box::new(self.lower_expr(inner, scope, self.module)))
+                HirExprDesc::Not(self.lower_expr(inner, scope, self.module).boxed())
             }
             AstExprDesc::AddressOf(place) => HirExprDesc::AddressOf {
                 place: self.expr_as_place(place, scope, module),
@@ -1180,7 +1184,7 @@ impl<'db> LowerFundef<'db> {
                     .map(Box::new);
                 HirStmtKind::If {
                     cond,
-                    then: Box::new(then),
+                    then: then.boxed(),
                     else_,
                 }
             }
@@ -1189,7 +1193,7 @@ impl<'db> LowerFundef<'db> {
                 let body = self.lower_stmt(body, scope);
                 HirStmtKind::While {
                     cond,
-                    body: Box::new(body),
+                    body: body.boxed(),
                 }
             }
             AstStmtDesc::For {
@@ -1232,9 +1236,9 @@ impl<'db> LowerFundef<'db> {
                 let rhs_expr = self.lower_expr(rhs, scope, self.module);
                 let combined = self.new_expr(
                     HirExprDesc::BinOp {
-                        lhs: Box::new(lhs_expr),
+                        lhs: lhs_expr.boxed(),
                         op: binop,
-                        rhs: Box::new(rhs_expr),
+                        rhs: rhs_expr.boxed(),
                     },
                     stmt.span,
                 );
@@ -1267,7 +1271,7 @@ impl<'db> LowerFundef<'db> {
                             pattern,
                             locals,
                             guard,
-                            body: Box::new(body),
+                            body: body.boxed(),
                         }
                     })
                     .collect();
@@ -1277,7 +1281,7 @@ impl<'db> LowerFundef<'db> {
                 }
             }
             AstStmtDesc::Defer(stmt) => {
-                HirStmtKind::Defer(Box::new(self.lower_stmt(stmt, scope)))
+                HirStmtKind::Defer(self.lower_stmt(stmt, scope).boxed())
             }
             AstStmtDesc::Break => HirStmtKind::Break,
         };
@@ -1307,18 +1311,16 @@ impl<'db> LowerFundef<'db> {
         let iterator_candidate = self.lower_expr(iterator, scope, self.module);
         let iterator = self.new_expr(
             HirExprDesc::CallMethod {
-                receiver: Box::new(iterator_candidate),
+                receiver: iterator_candidate.boxed(),
                 method: Symbol::new(self.db, "into_iter"),
                 args: vec![],
                 interface_hint: Some(into_iter_interface),
             },
             iterator_span,
         );
-        let iterator_var_name =
-            Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id()));
         let iterator_id = self.allocate_local(
             scope,
-            iterator_var_name,
+            Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id())),
             Mutability::Mutable,
             None,
             iterator_span,
@@ -1328,9 +1330,10 @@ impl<'db> LowerFundef<'db> {
             self.new_place(HirPlaceKind::Local(iterator_id), iterator_span);
         let next_expr = self.new_expr(
             HirExprDesc::CallMethod {
-                receiver: Box::new(
-                    self.new_expr(HirExprDesc::Use(iterator_place), iterator_span),
-                ),
+                receiver: self
+                    .new_expr(HirExprDesc::Use(iterator_place), iterator_span)
+                    .boxed(),
+
                 method: Symbol::new(self.db, "next"),
                 args: vec![],
                 interface_hint: Some(iter_interface),
@@ -1351,10 +1354,8 @@ impl<'db> LowerFundef<'db> {
         HirStmtKind::Block(vec![let_iter, while_true_loop])
     }
 
-    fn next_iterator_id(&mut self) -> usize {
-        let res = self.next_iterator_id;
-        self.next_iterator_id += 1;
-        res
+    fn next_iterator_id(&self) -> usize {
+        self.iterator_id.fresh()
     }
 
     fn collect_args(&mut self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {

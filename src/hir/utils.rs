@@ -61,7 +61,7 @@ impl LowerFundef<'_> {
         self.new_stmt(
             HirStmtKind::While {
                 cond: self.new_expr(HirExprDesc::BoolLit(true), cond_span),
-                body: Box::new(stmt),
+                body: stmt.boxed(),
             },
             stmt_span,
         )
@@ -86,13 +86,13 @@ impl LowerFundef<'_> {
                         pattern: self.wrap_some(pat),
                         locals,
                         guard: None,
-                        body: Box::new(stmt),
+                        body: stmt.boxed(),
                     },
                     HirMatchBranch {
                         pattern: self.new_pattern(HirPatternDesc::Any, pat_span),
                         locals: vec![],
                         guard: None,
-                        body: Box::new(self.new_stmt(HirStmtKind::Break, pat_span)),
+                        body: self.new_stmt(HirStmtKind::Break, pat_span).boxed(),
                     },
                 ],
             },
@@ -123,5 +123,29 @@ impl LowerFundef<'_> {
             },
             span,
         )
+    }
+}
+
+impl HirExpr {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+}
+
+impl HirPattern {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+}
+
+impl HirPlace {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
+}
+
+impl HirStmt {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
     }
 }
