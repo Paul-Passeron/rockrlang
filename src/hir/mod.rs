@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![allow(dead_code)]
 
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     Db,
@@ -51,29 +51,11 @@ pub mod expr;
 pub mod lower_fundef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct HirId(pub u32);
+pub struct HirId(pub usize);
 
-pub struct HirIdAlloc {
-    next: RefCell<u32>,
-}
-
-impl Default for HirIdAlloc {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl HirIdAlloc {
-    pub fn new() -> Self {
-        Self {
-            next: RefCell::new(0),
-        }
-    }
-
-    pub fn fresh(&self) -> HirId {
-        let id = HirId(*self.next.borrow());
-        *self.next.borrow_mut() += 1;
-        id
+impl From<usize> for HirId {
+    fn from(value: usize) -> Self {
+        Self(value)
     }
 }
 

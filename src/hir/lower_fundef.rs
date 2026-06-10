@@ -25,13 +25,10 @@ use salsa::Accumulator;
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
+    common::{ids::IdWrapper, location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirIdAlloc, HirMatchBranch,
-        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
-        HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability,
-        PartialTypeArg, PartialTypeRef,
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef
     },
     name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
@@ -66,7 +63,7 @@ pub struct LowerFundef<'db> {
     pub module: ModuleId,
     pub template_args: Vec<AstTemplateArg>,
     pub next_local_id: u32,
-    pub alloc: HirIdAlloc,
+    pub alloc: IdWrapper<HirId>,
     pub locals: BTreeMap<LocalId, LocalInfo>,
     pub next_iterator_id: usize,
 }
@@ -106,7 +103,7 @@ impl<'db> LowerFundef<'db> {
             module,
             template_args,
             next_local_id: 0,
-            alloc: HirIdAlloc::new(),
+            alloc: IdWrapper::new(),
             locals: BTreeMap::new(),
             next_iterator_id: 0,
         }
