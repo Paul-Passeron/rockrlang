@@ -647,7 +647,7 @@ impl TypeRef {
     }
 
     pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {
-        let res = if let Some((_, inner)) = self.as_ptr(db) {
+        if let Some((_, inner)) = self.as_ptr(db) {
             Some(inner)
         } else if let Some(inner) = self.as_slice(db) {
             Some(inner)
@@ -659,7 +659,6 @@ impl TypeRef {
                 self.to_string(db)
             );
             None
-        };
-        res
+        }
     }
 }
