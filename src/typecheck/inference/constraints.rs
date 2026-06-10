@@ -199,10 +199,9 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn is_builtin_indexed_by_int(&self, ty: &InferTy) -> Option<InferTy> {
-        if self.is_slice(ty).is_some() {
-            todo!()
-        }
-        self.is_ref_to_slice(ty).or_else(|| self.is_ptr(ty))
+        self.is_slice(ty)
+            .or_else(|| self.is_ref_to_slice(ty))
+            .or_else(|| self.is_ptr(ty))
     }
 
     fn solve_indexed_by_constraint(
@@ -584,7 +583,6 @@ impl<'db> InferenceCtx<'db> {
             expr_id: *id,
             callee: method_id,
             substitution: method_templates,
-            variadic: false,
         };
 
         self.call_infos.insert(*id, call_infos);

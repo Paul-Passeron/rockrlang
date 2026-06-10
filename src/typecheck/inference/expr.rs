@@ -617,7 +617,6 @@ impl<'db> InferenceCtx<'db> {
                 expr_id: id,
                 callee: target,
                 substitution: inferred_templates.iter().cloned().collect(),
-                variadic: false, // TODO: Actually compute this
             },
         );
 

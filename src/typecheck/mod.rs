@@ -41,7 +41,6 @@ pub(super) struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
     substitution: Box<[InferTy]>,
-    variadic: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -49,7 +48,6 @@ pub struct CallInfos {
     pub expr_id: ExprId,
     pub callee: FunctionId,
     pub substitution: Vec<TypeRef>,
-    pub variadic: bool,
 }
 
 #[derive(Clone)]
@@ -111,7 +109,6 @@ impl<'db> TyCtx<'db> {
                 .into_iter()
                 .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
                 .collect(),
-            variadic: infos.variadic,
         }
     }
 
@@ -353,7 +350,11 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Expr(hir_expr) => {
                 let (_, err) = self.type_check_expr(hir_expr);
                 if let Some(err) = err {
-                    dbg!("TODO: err here !", err);
+                    Diag::generic_error(
+                        format!("unification error: `{}`", err.display(self.db)),
+                        hir_expr.span,
+                    )
+                    .accumulate(self.db);
                 }
             }
             HirStmtKind::Return(hir_expr) => {
