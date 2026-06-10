@@ -1,0 +1,68 @@
+struct DupField {
+    x: int;
+    y: str;
+    x: str;
+}
+
+struct TripleDup {
+    a: int;
+    a: int;
+    a: int;
+}
+
+struct BadFieldType {
+    x: int;
+    y: Nonexistent;
+}
+
+struct BadPtr {
+    p: *Nonexistent;
+    r: &Missing;
+}
+
+struct DupAndBad {
+    x: Ghost;
+    x: Ghost;
+}
+
+enum DupVariant {
+    A,
+    B,
+    A,
+}
+
+enum DupVariantMixed {
+    V,
+    V(int),
+    V { x: str },
+}
+
+enum VariantDupField {
+    A { x: int; x: str },
+}
+
+enum VariantBadField {
+    A { x: int; y: Nope },
+}
+
+enum TupleBad {
+    A(int, Nope, str, AlsoNope),
+}
+
+enum AllUnit { A, B, C }
+
+enum Mess {
+    Dup,
+    Dup,
+    Tup(int, Ghost, Ghost),
+    Rec { a: int; a: *Ghost; b: Ghost },
+}
+
+enum Tree {
+    Leaf(int),
+    Node { left: *Tree; right: *Tree },
+}
+
+struct Infinite {
+    me: Infinite;
+}
