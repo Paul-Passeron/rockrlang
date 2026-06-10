@@ -16,54 +16,99 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::{
-    marker::PhantomData,
-    ops::{Index, IndexMut},
+    any::TypeId, hash::Hash, marker::PhantomData, ops::{Index, IndexMut}
 };
 
 use crate::common::frozen::Frozen;
 
-pub struct Arena<'a, T> {
+pub struct Arena<T> {
     inner: Frozen<T>,
-    _brand: PhantomData<fn(&'a T) -> &'a T>,
 }
 
-pub type Idx<'a, T> = (usize, PhantomData<&'a T>);
+#[derive(Debug)]
+pub struct Idx<T>(usize, PhantomData<T>);
 
-impl<'a, T> Arena<'a, T> {
+impl<T> PartialEq for Idx<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T> Eq for Idx<T> {}
+
+impl<T> PartialOrd for Idx<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<T> Ord for Idx<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<T> Clone for Idx<T> {
+    fn clone(&self) -> Self {
+        Idx(self.0, Default::default())
+    }
+}
+
+impl <T: 'static> Hash for Idx<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+        TypeId::of::<T>().hash(state);
+    }
+}
+
+impl<T> Copy for Idx<T> {}
+
+impl<T> Arena<T> {
     pub fn new() -> Self {
         Self {
             inner: Frozen::new(),
-            _brand: PhantomData,
         }
     }
 
-    pub fn insert(&'a self, elem: T) -> Idx<'a, T> {
+    pub fn insert(&self, elem: T) -> Idx<T> {
         let id = self.next_id();
         self.inner.push(elem);
         id
     }
 
-    pub fn next_id(&'a self) -> Idx<'a, T> {
-        (self.inner.len(), Default::default())
+    pub fn next_id(&self) -> Idx<T> {
+        Idx(self.inner.len(), Default::default())
     }
 }
 
-impl<'a, T> IndexMut<Idx<'a, T>> for Arena<'a, T> {
-    fn index_mut(&mut self, index: Idx<'a, T>) -> &mut T {
+impl<'a, T> IndexMut<Idx<T>> for Arena<T> {
+    fn index_mut(&mut self, index: Idx<T>) -> &mut T {
         &mut self.inner[index.0]
     }
 }
 
-impl<'a, T> Index<Idx<'a, T>> for Arena<'a, T> {
+impl<'a, T> Index<Idx<T>> for Arena<T> {
     type Output = T;
 
-    fn index(&self, index: Idx<'a, T>) -> &T {
+    fn index(&self, index: Idx<T>) -> &T {
         &self.inner[index.0]
     }
 }
 
-impl<'a, T> Default for Arena<'a, T> {
+impl<'a, T> Default for Arena<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<T> Idx<T> {
+    pub fn raw(&self) -> usize {
+        self.0
+    }
+}
+
+impl <T> Arena<T> {
+    pub fn into_values(self) -> impl Iterator<Item = T> {
+        self.inner.into_iter()
     }
 }
