@@ -1,3 +1,21 @@
+@include core::io
+
 fun foo(arr: &[int], idx: int): void {
     let x = &arr[idx]; 
+}
+
+fun str_of(cstr: *char): str {
+    return str_of(cstr); // So it typechecks
+}
+
+fun cmain(argc: int, argv: **char): void {
+    for i in 0..argc {
+        str_of(argv[i]).println();
+    }
+}
+
+fun cmain2(argc: int, argv: **char): void {
+    for i in 0..argc {
+        printf(c"%s\n", argv[i]);
+    }
 }
