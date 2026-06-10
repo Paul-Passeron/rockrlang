@@ -1,0 +1,8 @@
+fun foo(arr: &[int]): void {
+    for i in 0..10 {
+        for j in 0..i {
+            for k in 0..1000 {}
+            let x = &arr[j]; 
+        }
+    }
+}
