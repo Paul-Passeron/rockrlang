@@ -26,6 +26,7 @@ use salsa::Accumulator;
 use crate::{
     Db,
     common::{
+        arena::Arena,
         ids::{IdGen, IdWrapper},
         location::Span,
         symbols::Symbol,
@@ -70,7 +71,7 @@ pub struct LowerFundef<'db> {
     pub template_args: Vec<AstTemplateArg>,
     pub next_local_id: u32,
     pub alloc: IdWrapper<HirId>,
-    pub locals: BTreeMap<LocalId, LocalInfo>,
+    pub locals: Arena<LocalInfo>,
     pub iterator_id: IdGen,
 }
 
@@ -110,7 +111,7 @@ impl<'db> LowerFundef<'db> {
             template_args,
             next_local_id: 0,
             alloc: IdWrapper::new(),
-            locals: BTreeMap::new(),
+            locals: Arena::new(),
             iterator_id: IdGen::new(),
         }
     }
@@ -123,8 +124,7 @@ impl<'db> LowerFundef<'db> {
         ty_annotation: Option<AstAnyTypeExpr>,
         span: Span,
     ) -> LocalId {
-        let id = LocalId(self.next_local_id);
-        self.next_local_id += 1;
+        let id = self.locals.next_id();
         let info = LocalInfo {
             id,
             name,
@@ -132,7 +132,8 @@ impl<'db> LowerFundef<'db> {
             ty_annotation,
             span,
         };
-        self.locals.insert(id, info);
+        let new_id = self.locals.insert(info);
+        debug_assert_eq!(id, new_id);
         scope.map.insert(name, id);
         id
     }

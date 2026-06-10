@@ -83,7 +83,7 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
             self.value
                 .params(self.db)
                 .iter()
-                .map(|p| format!("_{}", p.0))
+                .map(|p| format!("_{}", p.raw()))
                 .collect::<Vec<_>>()
                 .join(", ")
         )?;
@@ -100,7 +100,7 @@ impl<'a> fmt::Display for Display<'a, &'a HirBody<'a>> {
             writeln!(
                 f,
                 "    _{}: {}{}",
-                local.id.0,
+                local.id.raw(),
                 mutstr,
                 local.name.display(self.db)
             )?;
@@ -232,7 +232,7 @@ fn write_pattern(
             if *mutable {
                 write!(f, "mut ")?;
             }
-            write!(f, "{}/*_{}*/", name.display(db), id.0)
+            write!(f, "{}/*_{}*/", name.display(db), id.raw())
         }
         HirPatternDesc::Any => write!(f, "_"),
         HirPatternDesc::Tuple(pats) => {
@@ -268,7 +268,7 @@ fn write_pattern(
                                 write_pattern(f, pattern, db, depth + 2)?;
                             }
                             HirStructFieldPattern::Name { id, name } => {
-                                write!(f, "{}/*_{}*/", name.display(db), id.0)?;
+                                write!(f, "{}/*_{}*/", name.display(db), id.raw())?;
                             }
                         }
                         writeln!(f, ", ")?;
@@ -296,7 +296,7 @@ fn write_pattern(
 
 fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
     match &place.kind {
-        HirPlaceKind::Local(id) => write!(f, "_{}", id.0),
+        HirPlaceKind::Local(id) => write!(f, "_{}", id.raw()),
         HirPlaceKind::Field { base, field } => {
             write_place(f, base, db)?;
             write!(f, ".{}", field.display(db))

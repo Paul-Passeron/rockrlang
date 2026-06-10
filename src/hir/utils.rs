@@ -106,7 +106,7 @@ impl LowerFundef<'_> {
         init: HirExpr,
         span: Span,
     ) -> HirStmt {
-        let var_name = self.locals[&var_id].name;
+        let var_name = self.locals[var_id].name;
         self.new_stmt(
             HirStmtKind::Let {
                 pattern: self.new_pattern(
