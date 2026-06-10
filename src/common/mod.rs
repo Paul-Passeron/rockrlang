@@ -20,6 +20,7 @@ pub mod location;
 pub mod symbols;
 pub mod unord;
 pub mod arena;
+pub mod ids;
 
 #[macro_export]
 macro_rules! unused {
