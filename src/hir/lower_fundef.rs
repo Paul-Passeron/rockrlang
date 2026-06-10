@@ -60,15 +60,15 @@ use crate::{
     },
 };
 
-struct LowerFundef<'db> {
-    db: &'db dyn Db,
-    function: FunctionId,
-    module: ModuleId,
-    template_args: Vec<AstTemplateArg>,
-    next_local_id: u32,
-    alloc: HirIdAlloc,
-    locals: BTreeMap<LocalId, LocalInfo>,
-    next_iterator_id: usize,
+pub struct LowerFundef<'db> {
+    pub db: &'db dyn Db,
+    pub function: FunctionId,
+    pub module: ModuleId,
+    pub template_args: Vec<AstTemplateArg>,
+    pub next_local_id: u32,
+    pub alloc: HirIdAlloc,
+    pub locals: BTreeMap<LocalId, LocalInfo>,
+    pub next_iterator_id: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -143,11 +143,7 @@ impl<'db> LowerFundef<'db> {
         match &expr.data {
             AstExprDesc::Name(symbol) => {
                 if let Some(id) = scope.map.get(symbol) {
-                    HirPlace {
-                        id: self.alloc.fresh(),
-                        kind: super::HirPlaceKind::Local(*id),
-                        span: expr.span,
-                    }
+                    self.new_place(HirPlaceKind::Local(*id), expr.span)
                 } else {
                     todo!(
                         "expr_as_place: Name `{}` not found in local scope",
@@ -162,62 +158,49 @@ impl<'db> LowerFundef<'db> {
                     }
                     _ => {
                         let temp = self.lower_expr(expr, scope, module);
-                        HirPlace {
-                            id: self.alloc.fresh(),
-                            kind: HirPlaceKind::Temporary(Box::new(temp)),
-                            span: expr.span,
-                        }
+                        self.new_place(HirPlaceKind::Temporary(Box::new(temp)), expr.span)
                     }
                 }
             }
-            AstExprDesc::PostfixDeref(inner) => HirPlace {
-                id: self.alloc.fresh(),
-                kind: HirPlaceKind::Deref(Box::new(
-                    self.expr_as_place(inner, scope, module),
-                )),
-                span: expr.span,
-            },
+            AstExprDesc::PostfixDeref(inner) => {
+                let temp = self.expr_as_place(inner, scope, module);
+                self.new_place(HirPlaceKind::Deref(Box::new(temp)), expr.span)
+            }
+
             AstExprDesc::FieldAccess { object, field } => {
                 let base = self.expr_as_place(object, scope, module);
-                HirPlace {
-                    id: self.alloc.fresh(),
-                    kind: HirPlaceKind::Field {
+                self.new_place(
+                    HirPlaceKind::Field {
                         base: Box::new(base),
                         field: *field,
                     },
-                    span: expr.span,
-                }
+                    expr.span,
+                )
             }
             AstExprDesc::TupleAccess { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
-                HirPlace {
-                    id: self.alloc.fresh(),
-                    kind: HirPlaceKind::TupleField {
+                self.new_place(
+                    HirPlaceKind::TupleField {
                         base: Box::new(base),
                         index: *index,
                     },
-                    span: expr.span,
-                }
+                    expr.span,
+                )
             }
             AstExprDesc::Index { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
                 let index = self.lower_expr(index, scope, self.module);
-                HirPlace {
-                    id: self.alloc.fresh(),
-                    kind: HirPlaceKind::Index {
+                self.new_place(
+                    HirPlaceKind::Index {
                         base: Box::new(base),
                         index: Box::new(index),
                     },
-                    span: expr.span,
-                }
+                    expr.span,
+                )
             }
             _ => {
                 let temp = self.lower_expr(expr, scope, module);
-                HirPlace {
-                    id: self.alloc.fresh(),
-                    kind: HirPlaceKind::Temporary(Box::new(temp)),
-                    span: expr.span,
-                }
+                self.new_place(HirPlaceKind::Temporary(Box::new(temp)), expr.span)
             }
         }
     }
@@ -418,12 +401,7 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         if let Some(id) = scope.map.get(&symbol) {
-            let place = HirPlace {
-                id: self.alloc.fresh(),
-                kind: HirPlaceKind::Local(*id),
-                span,
-            };
-            HirExprDesc::Use(place)
+            HirExprDesc::Use(self.new_place(HirPlaceKind::Local(*id), span))
         } else {
             match resolve_in_module(self.db, symbol, module) {
                 Some(Definition::Function(_)) => {
@@ -807,11 +785,7 @@ impl<'db> LowerFundef<'db> {
             _ => HirExprDesc::Use(self.expr_as_place(expr, scope, module)),
         };
 
-        HirExpr {
-            id: self.alloc.fresh(),
-            data,
-            span: expr.span,
-        }
+        self.new_expr(data, expr.span)
     }
 
     fn compute_template_hints(&mut self, ty: PartialTypeRef) -> Vec<PartialTypeArg> {
@@ -1048,14 +1022,13 @@ impl<'db> LowerFundef<'db> {
                             }
                         })
                         .collect_vec();
-                    HirPattern {
-                        id: self.alloc.fresh(),
-                        data: HirPatternDesc::DestructureBinding {
+                    self.new_pattern(
+                        HirPatternDesc::DestructureBinding {
                             resolution: struct_id,
                             fields: hir_fields,
                         },
-                        span: pat.span,
-                    }
+                        pat.span,
+                    )
                 }
                 _ => todo!(),
             },
@@ -1192,128 +1165,124 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_stmt(&mut self, stmt: &AstStmt, scope: &mut Scope) -> HirStmt {
-        HirStmt {
-            id: self.alloc.fresh(),
-            kind: match &stmt.data {
-                AstStmtDesc::Return { value } => {
-                    let value = value
-                        .as_ref()
-                        .map(|expr| self.lower_expr(expr, scope, self.module));
-                    HirStmtKind::Return(value)
+        let kind = match &stmt.data {
+            AstStmtDesc::Return { value } => {
+                let value = value
+                    .as_ref()
+                    .map(|expr| self.lower_expr(expr, scope, self.module));
+                HirStmtKind::Return(value)
+            }
+            AstStmtDesc::If { cond, then, else_ } => {
+                let cond = self.lower_expr(cond, scope, self.module);
+                let then = self.lower_stmt(then, scope);
+                let else_ = else_
+                    .as_ref()
+                    .map(|s| self.lower_stmt(s, scope))
+                    .map(Box::new);
+                HirStmtKind::If {
+                    cond,
+                    then: Box::new(then),
+                    else_,
                 }
-                AstStmtDesc::If { cond, then, else_ } => {
-                    let cond = self.lower_expr(cond, scope, self.module);
-                    let then = self.lower_stmt(then, scope);
-                    let else_ = else_
-                        .as_ref()
-                        .map(|s| self.lower_stmt(s, scope))
-                        .map(Box::new);
-                    HirStmtKind::If {
-                        cond,
-                        then: Box::new(then),
-                        else_,
-                    }
+            }
+            AstStmtDesc::While { cond, body } => {
+                let cond = self.lower_expr(cond, scope, self.module);
+                let body = self.lower_stmt(body, scope);
+                HirStmtKind::While {
+                    cond,
+                    body: Box::new(body),
                 }
-                AstStmtDesc::While { cond, body } => {
-                    let cond = self.lower_expr(cond, scope, self.module);
-                    let body = self.lower_stmt(body, scope);
-                    HirStmtKind::While {
-                        cond,
-                        body: Box::new(body),
-                    }
+            }
+            AstStmtDesc::For {
+                element,
+                iterator,
+                body,
+            } => self.desugar_for_loop(scope, element, iterator, body),
+            AstStmtDesc::LetDecl {
+                pat,
+                type_constraint,
+                value,
+            } => {
+                let init = self.lower_expr(value, scope, self.module);
+                let (pat, locals) = self.lower_pattern(pat, scope);
+                HirStmtKind::Let {
+                    pattern: pat,
+                    locals,
+                    ty_annotation: type_constraint.clone(),
+                    init,
                 }
-                AstStmtDesc::For {
-                    element,
-                    iterator,
-                    body,
-                } => self.desugar_for_loop(scope, element, iterator, body),
-                AstStmtDesc::LetDecl {
-                    pat,
-                    type_constraint,
-                    value,
-                } => {
-                    let init = self.lower_expr(value, scope, self.module);
-                    let (pat, locals) = self.lower_pattern(pat, scope);
-                    HirStmtKind::Let {
-                        pattern: pat,
-                        locals,
-                        ty_annotation: type_constraint.clone(),
-                        init,
-                    }
+            }
+            AstStmtDesc::Block { stmts } => {
+                let mut block_scope = scope.clone();
+                HirStmtKind::Block(
+                    stmts
+                        .iter()
+                        .map(|s| self.lower_stmt(s, &mut block_scope))
+                        .collect(),
+                )
+            }
+            AstStmtDesc::Assign { lhs, rhs } => {
+                let place = self.expr_as_place(lhs, scope, self.module);
+                let rhs = self.lower_expr(rhs, scope, self.module);
+                HirStmtKind::Assign { lhs: place, rhs }
+            }
+            AstStmtDesc::CompoundAssign { lhs, op, rhs } => {
+                let place = self.expr_as_place(lhs, scope, self.module);
+                let binop = op.to_binop();
+                let lhs_expr = self.lower_expr(lhs, scope, self.module);
+                let rhs_expr = self.lower_expr(rhs, scope, self.module);
+                let combined = self.new_expr(
+                    HirExprDesc::BinOp {
+                        lhs: Box::new(lhs_expr),
+                        op: binop,
+                        rhs: Box::new(rhs_expr),
+                    },
+                    stmt.span,
+                );
+                HirStmtKind::Assign {
+                    lhs: place,
+                    rhs: combined,
                 }
-                AstStmtDesc::Block { stmts } => {
-                    let mut block_scope = scope.clone();
-                    HirStmtKind::Block(
-                        stmts
-                            .iter()
-                            .map(|s| self.lower_stmt(s, &mut block_scope))
-                            .collect(),
-                    )
-                }
-                AstStmtDesc::Assign { lhs, rhs } => {
-                    let place = self.expr_as_place(lhs, scope, self.module);
-                    let rhs = self.lower_expr(rhs, scope, self.module);
-                    HirStmtKind::Assign { lhs: place, rhs }
-                }
-                AstStmtDesc::CompoundAssign { lhs, op, rhs } => {
-                    let place = self.expr_as_place(lhs, scope, self.module);
-                    let binop = op.to_binop();
-                    let lhs_expr = self.lower_expr(lhs, scope, self.module);
-                    let rhs_expr = self.lower_expr(rhs, scope, self.module);
-                    let combined = HirExpr {
-                        id: self.alloc.fresh(),
-                        data: HirExprDesc::BinOp {
-                            lhs: Box::new(lhs_expr),
-                            op: binop,
-                            rhs: Box::new(rhs_expr),
-                        },
-                        span: stmt.span,
-                    };
-                    HirStmtKind::Assign {
-                        lhs: place,
-                        rhs: combined,
-                    }
-                }
-                AstStmtDesc::Expr(expr) => {
-                    let expr = self.lower_expr(expr, scope, self.module);
-                    HirStmtKind::Expr(expr)
-                }
-                AstStmtDesc::Match {
+            }
+            AstStmtDesc::Expr(expr) => {
+                let expr = self.lower_expr(expr, scope, self.module);
+                HirStmtKind::Expr(expr)
+            }
+            AstStmtDesc::Match {
+                scrutinee,
+                branches,
+            } => {
+                let scrutinee = self.lower_expr(scrutinee, scope, self.module);
+
+                let branches = branches
+                    .iter()
+                    .map(|AstMatchBranch { pat, guard, body }| {
+                        let mut branch_scope = scope.clone();
+                        let (pattern, locals) =
+                            self.lower_pattern(pat, &mut branch_scope);
+                        let guard = guard.as_ref().map(|expr| {
+                            self.lower_expr(expr, &branch_scope, self.module)
+                        });
+                        let body = self.lower_stmt(body, &mut branch_scope);
+                        HirMatchBranch {
+                            pattern,
+                            locals,
+                            guard,
+                            body: Box::new(body),
+                        }
+                    })
+                    .collect();
+                HirStmtKind::Match {
                     scrutinee,
                     branches,
-                } => {
-                    let scrutinee = self.lower_expr(scrutinee, scope, self.module);
-
-                    let branches = branches
-                        .iter()
-                        .map(|AstMatchBranch { pat, guard, body }| {
-                            let mut branch_scope = scope.clone();
-                            let (pattern, locals) =
-                                self.lower_pattern(pat, &mut branch_scope);
-                            let guard = guard.as_ref().map(|expr| {
-                                self.lower_expr(expr, &branch_scope, self.module)
-                            });
-                            let body = self.lower_stmt(body, &mut branch_scope);
-                            HirMatchBranch {
-                                pattern,
-                                locals,
-                                guard,
-                                body: Box::new(body),
-                            }
-                        })
-                        .collect();
-                    HirStmtKind::Match {
-                        scrutinee,
-                        branches,
-                    }
                 }
-                AstStmtDesc::Defer(stmt) => {
-                    HirStmtKind::Defer(Box::new(self.lower_stmt(stmt, scope)))
-                }
-                AstStmtDesc::Break => HirStmtKind::Break,
-            },
-            span: stmt.span,
-        }
+            }
+            AstStmtDesc::Defer(stmt) => {
+                HirStmtKind::Defer(Box::new(self.lower_stmt(stmt, scope)))
+            }
+            AstStmtDesc::Break => HirStmtKind::Break,
+        };
+        self.new_stmt(kind, stmt.span)
     }
 
     fn desugar_for_loop(
@@ -1337,58 +1306,53 @@ impl<'db> LowerFundef<'db> {
         let iter_interface = core_iter_interface(self.db);
         let into_iter_interface = core_into_iterator_interface(self.db);
         let iterator_candidate = self.lower_expr(iterator, scope, self.module);
-        let iterator = HirExpr {
-            id: self.alloc.fresh(),
-            data: HirExprDesc::CallMethod {
+        let iterator = self.new_expr(
+            HirExprDesc::CallMethod {
                 receiver: Box::new(iterator_candidate),
                 method: Symbol::new(self.db, "into_iter"),
                 args: vec![],
                 interface_hint: Some(into_iter_interface),
             },
-            span: iterator_span,
-        };
+            iterator_span,
+        );
         let iterator_var_name =
             Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id()));
-        let iterator_id =
-            self.allocate_local(scope, iterator_var_name, Mutability::Mutable, None, iterator_span);
-        let mut stmts = vec![];
-        stmts.push(HirStmt {
-            id: self.alloc.fresh(),
-            kind: HirStmtKind::Let {
-                pattern: HirPattern {
-                    id: self.alloc.fresh(),
-                    data: HirPatternDesc::Bind {
+        let iterator_id = self.allocate_local(
+            scope,
+            iterator_var_name,
+            Mutability::Mutable,
+            None,
+            iterator_span,
+        );
+        let let_iter = self.new_stmt(
+            HirStmtKind::Let {
+                pattern: self.new_pattern(
+                    HirPatternDesc::Bind {
                         id: iterator_id,
                         name: iterator_var_name,
                         mutable: true,
                     },
-                    span: iterator_span,
-                },
+                    iterator_span,
+                ),
                 locals: vec![iterator_id],
                 ty_annotation: None,
                 init: iterator,
             },
-            span: iterator_span,
-        });
-        let iterator_place = HirPlace {
-            id: self.alloc.fresh(),
-            kind: HirPlaceKind::Local(iterator_id),
-            span: iterator_span,
-        };
-        let next_expr = HirExpr {
-            id: self.alloc.fresh(),
-            data: HirExprDesc::CallMethod {
-                receiver: Box::new(HirExpr {
-                    id: self.alloc.fresh(),
-                    data: HirExprDesc::Use(iterator_place),
-                    span: iterator_span,
-                }),
+            iterator_span,
+        );
+        let iterator_place =
+            self.new_place(HirPlaceKind::Local(iterator_id), iterator_span);
+        let next_expr = self.new_expr(
+            HirExprDesc::CallMethod {
+                receiver: Box::new(
+                    self.new_expr(HirExprDesc::Use(iterator_place), iterator_span),
+                ),
                 method: Symbol::new(self.db, "next"),
                 args: vec![],
                 interface_hint: Some(iter_interface),
             },
-            span: iterator_span,
-        };
+            iterator_span,
+        );
 
         let mut iterator_scope = scope.clone();
 
@@ -1396,60 +1360,48 @@ impl<'db> LowerFundef<'db> {
 
         let option_enum = core_opt_enum(self.db);
 
-        let some_pat = HirPattern {
-            id: self.alloc.fresh(),
-            data: HirPatternDesc::Constructor {
+        let some_pat = self.new_pattern(
+            HirPatternDesc::Constructor {
                 resolution: option_enum,
                 name: Symbol::new(self.db, "Some"),
                 fields: HirPatternConstructorArgs::TupleFields(vec![lowered_pat]),
             },
-            span: element.span,
-        };
+            element.span,
+        );
 
-        stmts.push(HirStmt {
-            id: self.alloc.fresh(),
-            kind: HirStmtKind::While {
-                cond: HirExpr {
-                    id: self.alloc.fresh(),
-                    data: HirExprDesc::BoolLit(true),
-                    span: iterator_span,
-                },
-                body: Box::new(HirStmt {
-                    id: self.alloc.fresh(),
-                    kind: HirStmtKind::Match {
+        let iterator_body = self.lower_stmt(body, &mut iterator_scope);
+
+        let while_true_loop = self.new_stmt(
+            HirStmtKind::While {
+                cond: self.new_expr(HirExprDesc::BoolLit(true), iterator_span),
+                body: Box::new(self.new_stmt(
+                    HirStmtKind::Match {
                         scrutinee: next_expr,
                         branches: vec![
                             HirMatchBranch {
                                 pattern: some_pat,
                                 locals,
                                 guard: None,
-                                body: Box::new(
-                                    self.lower_stmt(body, &mut iterator_scope),
-                                ),
+                                body: Box::new(iterator_body),
                             },
                             HirMatchBranch {
-                                pattern: HirPattern {
-                                    id: self.alloc.fresh(),
-                                    data: HirPatternDesc::Any,
-                                    span: element.span,
-                                },
+                                pattern:
+                                    self.new_pattern(HirPatternDesc::Any, element.span),
                                 locals: vec![],
                                 guard: None,
-                                body: Box::new(HirStmt {
-                                    id: self.alloc.fresh(),
-                                    kind: HirStmtKind::Break,
-                                    span: element.span,
-                                }),
+                                body: Box::new(
+                                    self.new_stmt(HirStmtKind::Break, element.span),
+                                ),
                             },
                         ],
                     },
-                    span: body.span,
-                }),
+                    body.span,
+                )),
             },
-            span: body.span,
-        });
+            body.span,
+        );
 
-        HirStmtKind::Block(stmts)
+        HirStmtKind::Block(vec![let_iter, while_true_loop])
     }
 
     fn next_iterator_id(&mut self) -> usize {
