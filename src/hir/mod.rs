@@ -22,7 +22,9 @@ use std::sync::Arc;
 use crate::{
     Db,
     common::{
-        arena, location::Span, symbols::{StrLit, Symbol}
+        arena,
+        location::Span,
+        symbols::{StrLit, Symbol},
     },
     hir::lower_fundef::{lower_fundef_body, lower_method_body},
     name_resolve::{
@@ -86,9 +88,6 @@ pub enum HirPatternDesc {
     IntLit(i64),
     Error,
 }
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub struct LocalId(pub u32);
 
 pub type LocalId = arena::Idx<LocalInfo>;
 

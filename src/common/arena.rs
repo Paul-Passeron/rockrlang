@@ -16,7 +16,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::{
-    any::TypeId, hash::Hash, marker::PhantomData, ops::{Index, IndexMut}
+    any::TypeId,
+    hash::Hash,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
 };
 
 use crate::common::frozen::Frozen;
@@ -54,7 +57,7 @@ impl<T> Clone for Idx<T> {
     }
 }
 
-impl <T: 'static> Hash for Idx<T> {
+impl<T: 'static> Hash for Idx<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
         TypeId::of::<T>().hash(state);
@@ -107,7 +110,7 @@ impl<T> Idx<T> {
     }
 }
 
-impl <T> Arena<T> {
+impl<T> Arena<T> {
     pub fn into_values(self) -> impl Iterator<Item = T> {
         self.inner.into_iter()
     }

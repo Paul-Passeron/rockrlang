@@ -267,7 +267,7 @@ impl<'db> LowerFundef<'db> {
                         todo!("Interface {} here", id.to_string(self.db))
                     }
                     other_def => {
-                        panic!("todo {}", other_def.to_string(self.db))
+                        todo!("{}", other_def.to_string(self.db))
                     }
                 };
 
