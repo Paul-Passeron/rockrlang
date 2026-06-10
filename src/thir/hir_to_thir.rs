@@ -905,17 +905,16 @@ impl<'db> ThirTranslator<'db> {
             }
             HirPlaceKind::Index { base, index } => {
                 let base = self.place(b, base, stmts);
-                let ty = b.get_place(base).ty;
-                let type_id = ty.as_type_id().expect("TODO");
-                let TypeDefId::Builtin(builtin) = type_id.def(self.db) else {
-                    todo!()
+                let place = self.auto_deref_place_if_needed(b, base);
+                let (place_span, ty) = {
+                    let pl = b.get_place(place);
+                    (pl.span, pl.ty)
                 };
-                if builtin.is_ptr_like(self.db).is_none() {
-                    todo!("error diagnostic")
-                }
-                let deref_ty = type_id.args(self.db).try_remove(0).expect("TODO");
+                let Some(deref_ty) = ty.element_of_indexed(self.db) else {
+                    todo!("error diagnostic, place ty = {}", ty.to_string(self.db))
+                };
                 let index = self.expr(b, index, stmts);
-                b.with_projection(base, Projection::Index(index), deref_ty, place.span)
+                b.with_projection(place, Projection::Index(index), deref_ty, place_span)
             }
             HirPlaceKind::Temporary(hir_expr) => {
                 let value = self.expr(b, hir_expr, stmts);

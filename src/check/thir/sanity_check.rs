@@ -453,21 +453,7 @@ impl<'db> SanityChecker<'db> {
                     self.check_types(ty, TypeRef::Concrete(int_id(self.db)), idx_span);
                     return None;
                 }
-                let res = if let Some((_, inner)) = before.as_ptr(self.db) {
-                    Some(inner)
-                } else if let Some(inner) =
-                    before.as_ref(self.db).and_then(|t| t.1.as_slice(self.db))
-                {
-                    Some(inner)
-                } else {
-                    println!(
-                        "TODO: Cannot index into {}. Is this right ?",
-                        before.to_string(self.db)
-                    );
-                    None
-                }?;
-                println!("Found type {}", res.to_string(self.db));
-                Some(res)
+                before.element_of_indexed(self.db)
             }
         }
     }
@@ -658,5 +644,22 @@ impl TypeRef {
         } else {
             None
         }
+    }
+
+    pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {
+        let res = if let Some((_, inner)) = self.as_ptr(db) {
+            Some(inner)
+        } else if let Some(inner) = self.as_slice(db) {
+            Some(inner)
+        } else if let Some(inner) = self.as_ref(db).and_then(|t| t.1.as_slice(db)) {
+            Some(inner)
+        } else {
+            println!(
+                "TODO: Cannot index into {}. Is this right ?",
+                self.to_string(db)
+            );
+            None
+        };
+        res
     }
 }
