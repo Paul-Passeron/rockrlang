@@ -210,8 +210,9 @@ impl TypePrinter {
 
         if let Some(inter) = id.interface(db) {
             res.push_str(&self.interface_ref_to_string(db, inter));
-            res.push(' ');
+            res.push_str(" for ");
         }
+        res.push_str(&id.implemented(db).to_string(db));
         res.push('`');
         res
     }
@@ -359,7 +360,11 @@ impl TypePrinter {
         db: &dyn Db,
         function_id: FunctionId,
     ) -> String {
-        function_id.name(db).display(db)
+        format!(
+            "{}::{}",
+            self.scope_owner_to_string(db, function_id.parent(db)),
+            function_id.name(db).display(db)
+        )
     }
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {
