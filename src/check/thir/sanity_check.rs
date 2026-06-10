@@ -11,7 +11,7 @@ use crate::{
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
         BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
+        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -442,9 +442,28 @@ impl<'db> SanityChecker<'db> {
                 self.check_types(typeof_field, *type_ref, span);
                 Some(typeof_field)
             }
-            Projection::Index(expr) => {
-                self.check_expr(*expr);
-                todo!()
+            Projection::Index(idx_expr) => {
+                let ty = self.check_expr(*idx_expr);
+                if ty
+                    .as_type_id()
+                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                    .is_none()
+                {
+                    let idx_span = self.thir.exprs[*idx_expr].span;
+                    self.check_types(ty, TypeRef::Concrete(int_id(self.db)), idx_span);
+                    return None;
+                }
+               let res =  if let Some((_, inner)) = before.as_ptr(self.db) {
+                    Some(inner)
+                } else if let Some(inner) = before.as_ref(self.db).and_then(|t| t.1.as_slice(self.db)) {
+                    Some(inner)
+                }
+                else {
+                    println!("TODO: Cannot index into {}. Is this right ?", before.to_string(self.db));
+                    None
+                }?;
+               println!("Found type {}", res.to_string(self.db));
+               Some(res)
             }
         }
     }
@@ -622,5 +641,18 @@ impl FunctionRef {
             .iter()
             .map(|(symb, ty)| (*symb, ty.with_substitution(db, &self.args)))
             .collect()
+    }
+}
+
+impl TypeRef {
+    pub fn as_slice(self, db: &dyn Db) -> Option<Self> {
+        let ty = self.as_type_id()?;
+        if ty.def(db) == TypeDefId::Builtin(BuiltinTypeId::slice(db)) {
+            let mut args = ty.args(db);
+            assert_eq!(args.len(), 1);
+            Some(args.remove(0))
+        } else {
+            None
+        }
     }
 }

@@ -995,6 +995,18 @@ impl TypeRef {
             None
         }
     }
+
+    pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+        let type_id = self.as_type_id()?;
+        let def = type_id.def(db);
+        if def == TypeDefId::Builtin(BuiltinTypeId::mut_ptr(db)) {
+            Some((Mutability::Mutable, *type_id.args(db).first()?))
+        } else if def == TypeDefId::Builtin(BuiltinTypeId::ptr(db)) {
+            Some((Mutability::Const, *type_id.args(db).first()?))
+        } else {
+            None
+        }
+    }
 }
 
 impl ThirPlace {
