@@ -34,7 +34,6 @@ use crate::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
         interfaces::{
             core_int_iter_struct, core_into_iterator_interface, core_iter_interface,
-            core_opt_enum,
         },
         type_expr::{enum_item, templates_of_enum},
     },
@@ -1321,22 +1320,7 @@ impl<'db> LowerFundef<'db> {
             None,
             iterator_span,
         );
-        let let_iter = self.new_stmt(
-            HirStmtKind::Let {
-                pattern: self.new_pattern(
-                    HirPatternDesc::Bind {
-                        id: iterator_id,
-                        name: iterator_var_name,
-                        mutable: true,
-                    },
-                    iterator_span,
-                ),
-                locals: vec![iterator_id],
-                ty_annotation: None,
-                init: iterator,
-            },
-            iterator_span,
-        );
+        let let_iter = self.declare_single_var(iterator_id, iterator, iterator_span);
         let iterator_place =
             self.new_place(HirPlaceKind::Local(iterator_id), iterator_span);
         let next_expr = self.new_expr(
@@ -1355,49 +1339,12 @@ impl<'db> LowerFundef<'db> {
 
         let (lowered_pat, locals) = self.lower_pattern(element, &mut iterator_scope);
 
-        let option_enum = core_opt_enum(self.db);
-
-        let some_pat = self.new_pattern(
-            HirPatternDesc::Constructor {
-                resolution: option_enum,
-                name: Symbol::new(self.db, "Some"),
-                fields: HirPatternConstructorArgs::TupleFields(vec![lowered_pat]),
-            },
-            element.span,
-        );
-
         let iterator_body = self.lower_stmt(body, &mut iterator_scope);
 
-        let while_true_loop = self.new_stmt(
-            HirStmtKind::While {
-                cond: self.new_expr(HirExprDesc::BoolLit(true), iterator_span),
-                body: Box::new(self.new_stmt(
-                    HirStmtKind::Match {
-                        scrutinee: next_expr,
-                        branches: vec![
-                            HirMatchBranch {
-                                pattern: some_pat,
-                                locals,
-                                guard: None,
-                                body: Box::new(iterator_body),
-                            },
-                            HirMatchBranch {
-                                pattern:
-                                    self.new_pattern(HirPatternDesc::Any, element.span),
-                                locals: vec![],
-                                guard: None,
-                                body: Box::new(
-                                    self.new_stmt(HirStmtKind::Break, element.span),
-                                ),
-                            },
-                        ],
-                    },
-                    body.span,
-                )),
-            },
-            body.span,
-        );
+        let while_body =
+            self.match_some_do_or_break(next_expr, lowered_pat, locals, iterator_body);
 
+        let while_true_loop = self.while_true_do(while_body, iterator_span);
         HirStmtKind::Block(vec![let_iter, while_true_loop])
     }
 
