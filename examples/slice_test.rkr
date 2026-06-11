@@ -1,9 +1,8 @@
 impl <T> [T] {
     fun len(&self): usize {
-        return @metadata(self); 
+        return @metadata(self);
     }
 }
-
 
 @extern {
     @[ffi(C, printf)]
@@ -12,6 +11,8 @@ impl <T> [T] {
 
 
 fun foo(xs: &[int]): void {
-    let x = xs$.len();
-    for i in 0..as_int(x) {}
+    let x = xs.len();
+    for i in 0..as_int(x) {
+        let j = xs[i];
+    }
 }
