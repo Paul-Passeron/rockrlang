@@ -20,8 +20,8 @@ fun cmain2(argc: int, argv: **char): void {
     }
 }
 
-fun main(argc: int, argv: &[*char]): void {
-    for i in 0..argc {
-        printf(c"%s\n", argv[i]);
+fun main(args: &[*char]): void {
+    for arg in args {
+        printf(c"%s\n", arg);
     }
 }
