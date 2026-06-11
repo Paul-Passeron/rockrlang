@@ -7,7 +7,10 @@ use crate::{
     hir::{Mutability, impl_items},
     parse_tree::{expr::BinaryOperator, top_level::AstImplItem},
     printer::type_printer::{TypePrinter, TypePrinterOption, TypePrinterOptionSet},
-    ril::{BuiltinTypeId, FunctionId, InterfaceId, PtrKind, ScopeOwnerId, TypeDefId},
+    ril::{
+        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
+        TypeDefId,
+    },
     typecheck::{
         CallKind, InferCallInfos,
         inference::{
@@ -301,36 +304,13 @@ impl<'db> InferenceCtx<'db> {
             return result;
         }
 
-        let mut possible_blocks = self
-            .get_potential_blocks(receiver)
-            .into_iter()
-            .unique_by(|(src, _)| src.id(self.db))
-            .filter(|(src, _)| {
-                let items = impl_items(self.db, src.id(self.db).interned());
-                for item in items {
-                    if let AstImplItem::Fundef(def) = item
-                        && def.data.name.data == *method
-                        && def.data.receiver.is_static() == *is_static
-                        && def.data.args.len() == args.len()
-                    {
-                        return true;
-                    }
-                }
-                false
-            })
-            .collect::<Box<[_]>>();
-        if let Some(id) = interface_hint {
-            possible_blocks =
-                possible_blocks
-                    .into_iter()
-                    .filter(|(src, _)| {
-                        src.id(self.db).interface(self.db).is_some_and(
-                            |impl_interface_id| impl_interface_id.def(self.db) == *id,
-                        )
-                    })
-                    .collect();
-        }
-        let possible_blocks = self.get_working_impls(possible_blocks);
+        let possible_blocks = self.compute_possible_blocks(
+            receiver,
+            *method,
+            *interface_hint,
+            args.len(),
+            *is_static,
+        );
 
         if possible_blocks.is_empty() {
             return ConstraintSolveResult::Error(UnificationError::Custom(format!(
@@ -733,5 +713,45 @@ impl<'db> InferenceCtx<'db> {
         } else {
             ConstraintSolveResult::Solved
         }
+    }
+
+    fn compute_possible_blocks(
+        &mut self,
+        receiver: &InferTy,
+        method: Symbol,
+        interface_hint: Option<InterfaceId>,
+        arity: usize,
+        is_static: bool,
+    ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
+        let mut possible_blocks = self
+            .get_potential_blocks(receiver)
+            .into_iter()
+            .unique_by(|(src, _)| src.id(self.db))
+            .filter(|(src, _)| {
+                let items = impl_items(self.db, src.id(self.db).interned());
+                for item in items {
+                    if let AstImplItem::Fundef(def) = item
+                        && def.data.name.data == method
+                        && def.data.receiver.is_static() == is_static
+                        && def.data.args.len() == arity
+                    {
+                        return true;
+                    }
+                }
+                false
+            })
+            .collect::<Box<[_]>>();
+        if let Some(id) = interface_hint {
+            possible_blocks =
+                possible_blocks
+                    .into_iter()
+                    .filter(|(src, _)| {
+                        src.id(self.db).interface(self.db).is_some_and(
+                            |impl_interface_id| impl_interface_id.def(self.db) == id,
+                        )
+                    })
+                    .collect();
+        }
+        self.get_working_impls(possible_blocks)
     }
 }
