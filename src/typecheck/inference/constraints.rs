@@ -981,6 +981,9 @@ impl<'db> InferenceCtx<'db> {
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
         loop {
             while let Some(id) = self.ready.pop_front() {
+                if self.error_constraints.contains(&id) {
+                    continue;
+                }
                 let constraint = self.all_constraints[&id].clone();
                 match self.try_solve_constraint(&constraint) {
                     ConstraintSolveResult::Solved => {
@@ -990,6 +993,7 @@ impl<'db> InferenceCtx<'db> {
                         self.register_listeners(&constraint);
                     }
                     ConstraintSolveResult::Error(e) => {
+                        self.error_constraints.insert(constraint.id);
                         return Err((constraint, e));
                     }
                 }

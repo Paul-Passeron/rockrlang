@@ -118,7 +118,7 @@ impl<'db> TyCtx<'db> {
                 .into_iter()
                 .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
                 .collect(),
-            call_kind: infos.call_kind
+            call_kind: infos.call_kind,
         }
     }
 
@@ -441,7 +441,11 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Break => (),
         }
         if let Err(err) = self.inf_ctx.solve_constraints() {
-            dbg!(err);
+            eprintln!(
+                "Error solving constraints after type checking stmt: {}\n    {}",
+                err.1.display(self.db),
+                err.0.kind.display(self.db)
+            );
         }
     }
 
