@@ -1,6 +1,6 @@
 impl <T> [T] {
     fun len(&self): usize {
-        return self.len();
+        return @metadata(self); 
     }
 }
 

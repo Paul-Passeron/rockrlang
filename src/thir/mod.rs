@@ -155,6 +155,8 @@ pub enum ExprKind {
         args: ThirConstructorArgs<ExprId>,
     },
 
+    Metadata(ExprId),
+    
     Error, // Todo: Add metadata maybe
 }
 

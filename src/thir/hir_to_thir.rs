@@ -806,6 +806,10 @@ impl<'db> ThirTranslator<'db> {
             }
             HirExprDesc::CallStatic { .. } => todo!(),
             HirExprDesc::Error => ExprKind::Error,
+            HirExprDesc::Metadata(fat_ptr) => {
+                let thir_fat_ptr = self.expr(b, fat_ptr, stmts);
+                ExprKind::Metadata(thir_fat_ptr)
+            },
         };
         b.new_expr(ThirExpr {
             kind,

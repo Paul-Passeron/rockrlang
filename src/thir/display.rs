@@ -285,6 +285,9 @@ impl<'a> ThirPrinter<'a> {
             }
 
             ExprKind::Error => "<error>".to_string(),
+            ExprKind::Metadata(id) => {
+                format!("@metadata({})", self.render_expr(*id))
+            },
         }
     }
 

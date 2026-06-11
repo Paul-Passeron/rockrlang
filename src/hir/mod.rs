@@ -206,6 +206,9 @@ pub enum HirExprDesc {
         args: HirConstructorArgs,
         template_hints: Vec<PartialTypeArg>,
     },
+
+    Metadata(Box<HirExpr>),
+    
     Error,
 }
 

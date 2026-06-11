@@ -516,6 +516,26 @@ impl<'db> Parser<'db> {
                 ))
             }
 
+            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "metadata") => {
+                self.consume();
+
+                self.expect(TokenKind::OpenPar)?;
+                self.consume();
+
+                let expr = self.parse_expr()?;
+
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+
+                let end = self.get_end();
+
+                Ok(AstExpr::new(
+                    AstExprDesc::Metadata(Box::new(expr)),
+                    vec![],
+                    start.span(end),
+                ))
+            }
+
             TokenKind::Identifier(name) => {
                 self.consume();
 

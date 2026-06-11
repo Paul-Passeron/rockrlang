@@ -339,6 +339,10 @@ impl<'db> SanityChecker<'db> {
             }
 
             ExprKind::Error => (),
+            ExprKind::Metadata(idx) => {
+                self.check_expr(*idx);
+                todo!()
+            },
         };
         infos.ty
     }

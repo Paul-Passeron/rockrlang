@@ -780,6 +780,10 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::SizeOf(ty) => HirExprDesc::SizeOf(self.resolve_holed(ty)),
             AstExprDesc::QualifiedPath { ty, name } => self.lower_qualified(*name, ty),
             AstExprDesc::Ref(mutable, place) => self.lower_ref(place, *mutable, scope),
+            AstExprDesc::Metadata(fat_ptr) => {
+                let expr = self.lower_expr(fat_ptr, scope, self.module);
+                HirExprDesc::Metadata(expr.boxed())
+            }
             _ => HirExprDesc::Use(self.expr_as_place(expr, scope, module)),
         };
 
@@ -1175,8 +1179,7 @@ impl<'db> LowerFundef<'db> {
                 let then = self.lower_stmt(then, scope);
                 let else_ = else_
                     .as_ref()
-                    .map(|s| self.lower_stmt(s, scope))
-                    .map(Box::new);
+                    .map(|s| self.lower_stmt(s, scope).boxed());
                 HirStmtKind::If {
                     cond,
                     then: then.boxed(),

@@ -457,7 +457,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             write!(f, "]")
         }
         HirExprDesc::SizeOf(ty) => {
-            write!(f, "sizeof(")?;
+            write!(f, "@sizeof(")?;
             write_partial_type(f, ty, db)?;
             write!(f, ")")
         }
@@ -511,6 +511,11 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             }
         }
         HirExprDesc::Error => write!(f, "<ERROR>"),
+        HirExprDesc::Metadata(hir_expr) => {
+            write!(f, "@metadata(")?;
+            write_expr(f, hir_expr, db)?;
+            write!(f, ")")
+        },
     }
 }
 

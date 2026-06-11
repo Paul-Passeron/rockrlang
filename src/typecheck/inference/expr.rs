@@ -121,6 +121,10 @@ impl<'db> InferenceCtx<'db> {
                 Ok(InferTy::Var(self.fresh_var()))
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
+            HirExprDesc::Metadata(hir_expr) => {
+                let _fat_ptr_ty = self.infer_expr(hir_expr)?;
+                todo!()
+            },
         }
     }
 
