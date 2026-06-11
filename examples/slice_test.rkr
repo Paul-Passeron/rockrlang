@@ -1,18 +1,22 @@
-impl <T> [T] {
-    fun len(&self): usize {
-        return @metadata(self);
-    }
-}
+@include core::iter
+@include core::opt
+@include core::panic
 
 @extern {
     @[ffi(C, printf)]
     fun as_int(x: usize): int;
 }
 
-
 fun foo(xs: &[int]): void {
     let x = xs.len();
     for i in 0..as_int(x) {
         let j = xs[i];
+    }
+}
+
+
+fun bar(xs: &[int]): void {
+    for x in xs {
+        let y = x;
     }
 }

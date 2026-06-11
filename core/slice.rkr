@@ -1,0 +1,39 @@
+@include core::iter
+@include core::opt
+
+impl <T> [T] {
+    fun len(&self): usize {
+        let this = self;
+        return @metadata(self);
+    }
+}
+
+struct SliceIter<T> {
+    slice: &[T];
+    idx: usize;
+}
+
+impl <T> Iter for SliceIter<T> {
+    type Item = &T;
+    
+    fun next(&mut self): opt<&T> {
+        panic("TODO");
+    }
+}
+
+impl <T> IntoIterator for &[T] {
+    type Out = SliceIter<T>;
+    fun into_iter(self): SliceIter<T> {
+        return SliceIter {
+            .slice: self,
+            .idx: 0,
+        };
+    }
+}
+
+fun not_working(): void {
+    let always_increasing = 0;
+    for i in 0..always_increasing {
+        always_increasing += 1;
+    }
+}

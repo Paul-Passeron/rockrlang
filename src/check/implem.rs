@@ -46,7 +46,7 @@ fn check_ambiguous_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
 
 fn check_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     implem.items(db).iter().for_each(|item| match item {
-        AstImplItem::Type { .. } => todo!(),
+        AstImplItem::Type { .. } => (),
         AstImplItem::Fundef(fdef) => {
             let id = FunctionId::new(
                 db,
