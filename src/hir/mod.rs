@@ -335,7 +335,7 @@ pub fn impl_items<'db>(
 ) -> Vec<AstImplItem> {
     impl_sources(db, impl_id)
         .into_iter()
-        .flat_map(|impl_| impl_.items(db))
+        .flat_map(|impl_| impl_.items(db).clone())
         .collect()
 }
 

@@ -237,7 +237,13 @@ pub fn get_templates_of_owner(db: &dyn Db, owner: ScopeOwnerId) -> Box<[AstTempl
         ScopeOwnerId::Module(_) => Box::new([]),
         ScopeOwnerId::Impl(impl_id) => {
             let sources = impl_sources(db, impl_id.interned());
-            sources.into_iter().next().unwrap().templates(db).into()
+            sources
+                .into_iter()
+                .next()
+                .unwrap()
+                .templates(db)
+                .clone()
+                .into_boxed_slice() // !!!
         }
         ScopeOwnerId::Interface(id) => interface_item(db, id.def(db).interned())
             .template_args
@@ -268,7 +274,8 @@ pub fn templates_of_owner(
             .next()
             .unwrap()
             .templates(db)
-            .into_iter()
+            .iter()
+            .cloned()
             .collect::<Arc<[_]>>(),
         ScopeOwnerId::Interface(interface_ref) => {
             interface_item(db, interface_ref.def(db).interned())

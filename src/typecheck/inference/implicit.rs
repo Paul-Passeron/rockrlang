@@ -167,7 +167,7 @@ impl AstImplicitContext {
         }?;
         let items = impl_items(db, impl_id.interned());
         items.iter().find_map(|item| match item {
-            AstImplItem::Type { name, ty } if *name == associated => Some(ty.clone()),
+            AstImplItem::Type { name, ty, .. } if *name == associated => Some(ty.clone()),
             _ => None,
         })
     }

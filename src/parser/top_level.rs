@@ -23,15 +23,14 @@ use crate::{
     common::symbols::Symbol,
     lexer::TokenKind,
     parse_tree::{
-        annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
-        top_level::{
+        Spanned, annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem}, top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef, AstEnumVariant,
             AstEnumVariantKind, AstFundef, AstFundefArg, AstFundefDesc, AstFunsig,
             AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
             AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig,
             AstMethodsigDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
             AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
-        },
+        }
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -520,13 +519,13 @@ impl<'db> Parser<'db> {
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
-                let name = self.parse_symbol()?.data;
+                let Spanned { data: name, span: name_span, .. } = self.parse_symbol()?;
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
-                Ok(AstImplItem::Type { name, ty })
+                Ok(AstImplItem::Type { name, name_span, ty })
             }
             TokenKind::Fun => {
                 let mut fdef = self.parse_methoddef()?;

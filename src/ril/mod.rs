@@ -197,7 +197,9 @@ impl TypeDefId {
 pub struct ImplSource<'db> {
     pub id: ImplId,
     pub module: ModuleId,
+    #[returns(ref)]
     pub templates: Vec<AstTemplateArg>,
+    #[returns(ref)]
     pub items: Vec<AstImplItem>,
     pub span: Span,
 }
