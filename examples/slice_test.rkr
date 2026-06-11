@@ -1,0 +1,17 @@
+impl <T> [T] {
+    fun len(&self): usize {
+        return self.len();
+    }
+}
+
+
+@extern {
+    @[ffi(C, printf)]
+    fun as_int(x: usize): int;
+}
+
+
+fun foo(xs: &[int]): void {
+    let x = xs$.len();
+    for i in 0..as_int(x) {}
+}
