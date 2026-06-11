@@ -10,8 +10,7 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
-        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
+        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id, void_id
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -339,8 +338,24 @@ impl<'db> SanityChecker<'db> {
             }
 
             ExprKind::Metadata(idx) => {
-                self.check_expr(*idx);
-                todo!()
+                let ty = self.check_expr(*idx);
+                if let Some(_) =
+                    ty.as_ref(self.db).and_then(|(_, ty)| ty.as_slice(self.db))
+                {
+                    self.check_types(
+                        ty.typeof_metadata(self.db).unwrap_or(TypeRef::Error),
+                        infos.ty,
+                        infos.span,
+                    );
+                } else {
+                    // No other fatptr type is supported
+                    let expr_span = self.thir.exprs[*idx].span;
+                    self.check_types(
+                        TypeRef::ref_slice_of(self.db, TypeRef::Unknown),
+                        ty,
+                        expr_span,
+                    );
+                }
             }
             ExprKind::Error => (),
         };
@@ -662,6 +677,22 @@ impl TypeRef {
                 "TODO: Cannot index into {}. Is this right ?",
                 self.to_string(db)
             );
+            None
+        }
+    }
+
+    pub fn ref_slice_of(db: &dyn Db, inner: Self) -> Self {
+        TypeRef::Concrete(slice_of(db, TypeRef::Concrete(slice_of(db, inner))))
+    }
+
+    pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
+        if self
+            .as_ref(db)
+            .and_then(|(_, ty)| ty.as_slice(db))
+            .is_some()
+        {
+            Some(Self::Concrete(usize_id(db)))
+        } else {
             None
         }
     }
