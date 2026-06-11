@@ -108,6 +108,13 @@ pub enum InferenceConstraintKind {
         inner: InferTy,
         ref_ty: InferTy,
     },
+    FatPtr {
+        fat_ptr_var: InferVar,
+    },
+    MetadataOfFatPtr {
+        fat_ptr_var: InferVar,
+        metadata_var: InferVar,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -823,6 +830,21 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn solve_fat_ptr_constraint(
+        &mut self,
+        _fat_ptr_var: InferVar,
+    ) -> ConstraintSolveResult {
+        ConstraintSolveResult::Pending
+    }
+
+    fn solve_metadata_of_fat_ptr_constraint(
+        &mut self,
+        _fat_ptr_var: InferVar,
+        _metadata_var: InferVar,
+    ) -> ConstraintSolveResult {
+        ConstraintSolveResult::Pending
+    }
+
     fn try_solve_constraint(
         &mut self,
         constraint: &InferenceConstraint,
@@ -914,6 +936,13 @@ impl<'db> InferenceCtx<'db> {
                     ConstraintSolveResult::Pending
                 }
             }
+            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
+                self.solve_fat_ptr_constraint(*fat_ptr_var)
+            }
+            InferenceConstraintKind::MetadataOfFatPtr {
+                fat_ptr_var,
+                metadata_var,
+            } => self.solve_metadata_of_fat_ptr_constraint(*fat_ptr_var, *metadata_var),
         }
     }
 
@@ -1123,6 +1152,24 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn emit_is_inner_constraint(&mut self, inner: InferTy, ref_ty: InferTy) {
         self.emit_constraint(InferenceConstraintKind::IsInner { inner, ref_ty });
+    }
+
+    pub fn emit_fat_ptr_constraint(&mut self) -> InferVar {
+        let fat_ptr_var = self.fresh_var();
+        self.emit_constraint(InferenceConstraintKind::FatPtr { fat_ptr_var });
+        fat_ptr_var
+    }
+
+    pub fn emit_metadata_of_fat_ptr_constraint(
+        &mut self,
+        fat_ptr_var: InferVar,
+    ) -> InferVar {
+        let metadata_var = self.fresh_var();
+        self.emit_constraint(InferenceConstraintKind::MetadataOfFatPtr {
+            fat_ptr_var,
+            metadata_var,
+        });
+        metadata_var
     }
 
     fn solve_binop_constraint(
@@ -1354,6 +1401,19 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 inner.to_string(self.db),
                 ref_ty.to_string(self.db)
             ),
+            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
+                write!(f, "FatPtr {{ fat_ptr_var: {} }}", fat_ptr_var)
+            }
+            InferenceConstraintKind::MetadataOfFatPtr {
+                fat_ptr_var,
+                metadata_var,
+            } => {
+                write!(
+                    f,
+                    "MetadataOfFatPtr {{ fat_ptr_var: {}, metadata_var: {} }}",
+                    fat_ptr_var, metadata_var
+                )
+            }
         }
     }
 }
@@ -1467,6 +1527,18 @@ impl InferenceConstraintKind {
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(ref_ty).listeners())
+                .collect(),
+            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
+                ctx.find(&fat_ptr_var.into()).listeners()
+            }
+            InferenceConstraintKind::MetadataOfFatPtr {
+                fat_ptr_var,
+                metadata_var,
+            } => ctx
+                .find(&fat_ptr_var.into())
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&metadata_var.into()).listeners())
                 .collect(),
         }
     }

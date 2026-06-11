@@ -15,14 +15,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use salsa::Accumulator;
 
-use crate::{Db, check::Diag, common::{location::Span, symbols::Symbol}, hir::impl_items, parse_tree::top_level::AstImplItem, ril::ImplSource};
+use crate::{
+    Db,
+    check::{Diag, fundef::check_fundef},
+    common::{location::Span, symbols::Symbol},
+    hir::impl_items,
+    parse_tree::top_level::AstImplItem,
+    ril::{FunctionId, ImplSource, ScopeOwnerId},
+};
 
 pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     check_ambiguous_impl_items(db, implem);
+    check_impl_items(db, implem);
+
     let span = implem.span(db);
     Diag::todo(
         format!("Implement check_implem ({}:{})", file!(), line!()),
@@ -41,7 +50,20 @@ fn check_ambiguous_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
             names.insert(item_name, item.name_span());
         }
     }
-    
+}
+
+fn check_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
+    implem.items(db).iter().for_each(|item| match item {
+        AstImplItem::Type { .. } => todo!(),
+        AstImplItem::Fundef(fdef) => {
+            let id = FunctionId::new(
+                db,
+                fdef.data.name.data,
+                ScopeOwnerId::Impl(implem.id(db)),
+            );
+            check_fundef(db, id);
+        }
+    });
 }
 
 impl AstImplItem {

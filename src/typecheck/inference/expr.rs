@@ -122,8 +122,11 @@ impl<'db> InferenceCtx<'db> {
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
             HirExprDesc::Metadata(hir_expr) => {
-                let _fat_ptr_ty = self.infer_expr(hir_expr)?;
-                todo!()
+                let fat_ptr_ty = self.infer_expr(hir_expr)?;
+                let fat_ptr_var = self.emit_fat_ptr_constraint();
+                let metadata_var = self.emit_metadata_of_fat_ptr_constraint(fat_ptr_var);
+                self.unify(fat_ptr_ty, fat_ptr_var.into())?;
+                Ok(metadata_var.into())
             },
         }
     }

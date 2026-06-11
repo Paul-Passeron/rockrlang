@@ -122,8 +122,7 @@ impl<'db> TyCtx<'db> {
         // Temporary
         let unsolveds = self.inf_ctx.unsolved_constraints();
         for unsolved in unsolveds {
-            let txt = format!("<UNSOLVED> {}", unsolved.kind.display(self.db));
-            dbg!("TODO: err here !", txt);
+            eprintln!("<UNSOLVED> {}", unsolved.kind.display(self.db));
         }
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
