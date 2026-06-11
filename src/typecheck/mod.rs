@@ -36,11 +36,19 @@ use crate::{
 
 pub mod inference;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CallKind {
+    Direct,                                 // Regular function call
+    Method { receiver_deref_depth: usize }, // foo.bar(...)
+    Static,                                 // Foo::bar(...) with no self
+}
+
 #[derive(Clone)]
 pub(super) struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
     substitution: Box<[InferTy]>,
+    call_kind: CallKind,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -48,6 +56,7 @@ pub struct CallInfos {
     pub expr_id: ExprId,
     pub callee: FunctionId,
     pub substitution: Vec<TypeRef>,
+    pub call_kind: CallKind,
 }
 
 #[derive(Clone)]
@@ -109,6 +118,7 @@ impl<'db> TyCtx<'db> {
                 .into_iter()
                 .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
                 .collect(),
+            call_kind: infos.call_kind
         }
     }
 

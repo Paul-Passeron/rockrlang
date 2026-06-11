@@ -38,8 +38,7 @@ use crate::{
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
-        ExprId, InferCallInfos, PlaceId,
-        inference::{implicit::ImplicitContext, var::InferVar},
+        CallKind, ExprId, InferCallInfos, PlaceId, inference::{implicit::ImplicitContext, var::InferVar}
     },
 };
 
@@ -624,6 +623,7 @@ impl<'db> InferenceCtx<'db> {
                 expr_id: id,
                 callee: target,
                 substitution: inferred_templates.iter().cloned().collect(),
+                call_kind: CallKind::Direct,
             },
         );
 
