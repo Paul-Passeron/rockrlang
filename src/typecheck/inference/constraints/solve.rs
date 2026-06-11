@@ -275,6 +275,36 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn resolve_with_auto_deref(
+        &mut self,
+        receiver: &InferTy,
+        method: Symbol,
+        interface_hint: Option<InterfaceId>,
+        arity: usize,
+        is_static: bool,
+    ) -> Option<(usize, HashMap<ImplSource<'db>, PotentialBlockRes>)> {
+        let mut cur = self.find(receiver);
+        let mut depth = 0;
+        loop {
+            let blocks = self.compute_possible_blocks(
+                &cur,
+                method,
+                interface_hint,
+                arity,
+                is_static,
+            );
+            if !blocks.is_empty() {
+                return Some((depth, blocks));
+            }
+            if let Some((_, inner)) = cur.as_ref(self.db) {
+                cur = inner.clone();
+                depth += 1;
+            } else {
+                return None;
+            }
+        }
+    }
+
     fn solve_method_constraint(
         &mut self,
         method_constraint: &MethodConstraint,
@@ -304,13 +334,15 @@ impl<'db> InferenceCtx<'db> {
             return result;
         }
 
-        let possible_blocks = self.compute_possible_blocks(
+        let Some((depth, possible_blocks)) = self.resolve_with_auto_deref(
             receiver,
             *method,
             *interface_hint,
             args.len(),
             *is_static,
-        );
+        ) else {
+            return ConstraintSolveResult::Pending;
+        };
 
         if possible_blocks.is_empty() {
             return ConstraintSolveResult::Error(UnificationError::Custom(format!(
@@ -319,7 +351,9 @@ impl<'db> InferenceCtx<'db> {
                 args.len(),
                 self.find(receiver).to_string(self.db)
             )));
-        } else if possible_blocks.len() > 1 {
+        }
+
+        if possible_blocks.len() > 1 {
             for possible in possible_blocks {
                 let src = possible.0;
                 println!("Here: {}", src.id(self.db).to_string(self.db))
@@ -407,8 +441,12 @@ impl<'db> InferenceCtx<'db> {
             expr_id: *id,
             callee: method_id,
             substitution: method_templates,
-            call_kind: CallKind::Method {
-                receiver_deref_depth: 0,
+            call_kind: if *is_static {
+                CallKind::Static
+            } else {
+                CallKind::Method {
+                    receiver_deref_depth: depth,
+                }
             },
         };
 
