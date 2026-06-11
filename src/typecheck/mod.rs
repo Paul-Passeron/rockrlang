@@ -263,7 +263,7 @@ impl<'db> TyCtx<'db> {
     ) {
         let init_ty = match self.inf_ctx.infer_expr(init) {
             Ok(ty) => ty,
-            Err(_) => todo!(),
+            Err(err) => todo!("{}", err.display(self.db)),
         };
         match self.inf_ctx.infer_pattern(pattern, Some(init_ty.clone())) {
             Ok(pattern_ty) => {
@@ -430,6 +430,9 @@ impl<'db> TyCtx<'db> {
             }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
             HirStmtKind::Break => (),
+        }
+        if let Err(err) = self.inf_ctx.solve_constraints() {
+            dbg!(err);
         }
     }
 
