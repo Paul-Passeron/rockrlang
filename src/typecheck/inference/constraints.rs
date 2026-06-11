@@ -38,7 +38,7 @@ use crate::{
         ScopeOwnerId, TypeDefId, TypeId, TypeRef, display::Display,
     },
     typecheck::{
-        ExprId, InferCallInfos,
+        CallKind, ExprId, InferCallInfos,
         inference::{
             InferenceCtx, InterfaceImplem, UnificationError, implicit::ImplicitContext,
             var::InferVar,
@@ -227,7 +227,7 @@ impl<'db> InferenceCtx<'db> {
                 return ConstraintSolveResult::Error(err);
             }
             ConstraintSolveResult::Solved
-        } else if found.is_adt().is_some() {
+        } else if found.as_adt().is_some() {
             todo!("Trait-based indexing")
         } else {
             ConstraintSolveResult::Pending
@@ -254,7 +254,7 @@ impl<'db> InferenceCtx<'db> {
             } else {
                 ConstraintSolveResult::Solved
             }
-        } else if let Some((def, _)) = found.is_adt() {
+        } else if let Some((def, _)) = found.as_adt() {
             ConstraintSolveResult::Error(UnificationError::TypeDefIdMismatch(
                 def,
                 TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
@@ -284,7 +284,7 @@ impl<'db> InferenceCtx<'db> {
                     field,
                 })
             }
-        } else if let Some((def, _)) = found.is_adt() {
+        } else if let Some((def, _)) = found.as_adt() {
             ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField {
                 def,
                 field,
@@ -590,6 +590,9 @@ impl<'db> InferenceCtx<'db> {
             expr_id: *id,
             callee: method_id,
             substitution: method_templates,
+            call_kind: CallKind::Method {
+                receiver_deref_depth: 0,
+            },
         };
 
         self.call_infos.insert(*id, call_infos);
@@ -832,17 +835,44 @@ impl<'db> InferenceCtx<'db> {
 
     fn solve_fat_ptr_constraint(
         &mut self,
-        _fat_ptr_var: InferVar,
+        fat_ptr_var: InferVar,
     ) -> ConstraintSolveResult {
-        ConstraintSolveResult::Pending
+        let fat_ptr_ty = self.find(&fat_ptr_var.into());
+        let Some((_, ty)) = fat_ptr_ty.as_ref(self.db) else {
+            return ConstraintSolveResult::Pending;
+        };
+        if !ty.is_adt() {
+            return ConstraintSolveResult::Pending;
+        }
+        let Some(_) = ty.as_slice(self.db) else {
+            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+                "Expected a fat ptr type but got {}",
+                fat_ptr_ty.to_string(self.db)
+            )));
+        };
+        ConstraintSolveResult::Solved
     }
 
     fn solve_metadata_of_fat_ptr_constraint(
         &mut self,
-        _fat_ptr_var: InferVar,
-        _metadata_var: InferVar,
+        fat_ptr_var: InferVar,
+        metadata_var: InferVar,
     ) -> ConstraintSolveResult {
-        ConstraintSolveResult::Pending
+        let fat_ptr_ty = self.find(&fat_ptr_var.into());
+
+        // Only fat ptr type supported for now is ref to slices
+        if fat_ptr_ty.as_ref_slice(self.db).is_none() {
+            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+                "Expected a fat ptr type but got {}",
+                fat_ptr_ty.to_string(self.db)
+            )));
+        }
+
+        if let Err(err) = self.unify(metadata_var.into(), self.usize_ty()) {
+            return ConstraintSolveResult::Error(err);
+        }
+
+        ConstraintSolveResult::Solved
     }
 
     fn try_solve_constraint(
@@ -1188,8 +1218,8 @@ impl<'db> InferenceCtx<'db> {
         // and this type must implement the <op> interface
         // or something etc...
 
-        if let Some((lid, _)) = lhs_ty.is_adt() {
-            if let Some((rid, _)) = rhs_ty.is_adt()
+        if let Some((lid, _)) = lhs_ty.as_adt() {
+            if let Some((rid, _)) = rhs_ty.as_adt()
                 && let Some(lid) = lid.is_int_like(self.db)
                 && let Some(rid) = rid.is_int_like(self.db)
             {

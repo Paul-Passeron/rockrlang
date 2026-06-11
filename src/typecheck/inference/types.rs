@@ -45,6 +45,13 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    pub fn usize_ty(&self) -> InferTy {
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::usize(self.db)),
+            fields: Box::new([]),
+        }
+    }
+
     pub fn bool_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::bool(self.db)),

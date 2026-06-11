@@ -34,7 +34,7 @@ use std::{
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{LocalId, PartialTypeRef, function_ast},
+    hir::{LocalId, Mutability, PartialTypeRef, function_ast},
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -46,8 +46,8 @@ use crate::{
     parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
     ril::{
-        FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId, TypeParamId,
-        TypeRef, display::Display,
+        BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
+        TypeParamId, TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -464,10 +464,43 @@ impl<'db> InferenceCtx<'db> {
 }
 
 impl InferTy {
-    pub fn is_adt(&self) -> Option<(TypeDefId, &[InferTy])> {
+    pub fn is_adt(&self) -> bool {
+        matches!(self, InferTy::Adt { .. })
+    }
+
+    pub fn as_adt(&self) -> Option<(TypeDefId, &[InferTy])> {
         match self {
             InferTy::Adt { def, fields } => Some((*def, fields)),
             _ => None,
+        }
+    }
+
+    pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
+        let (def, args) = self.as_adt()?;
+        let mutability = if def == TypeDefId::Builtin(BuiltinTypeId::ref_(db)) {
+            Some(Mutability::Const)
+        } else if def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)) {
+            Some(Mutability::Mutable)
+        } else {
+            None
+        }?;
+        assert_eq!(args.len(), 1);
+        Some((mutability, &args[0]))
+    }
+
+    pub fn as_ref_slice<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
+        let (muta, ty) = self.as_ref(db)?;
+        let as_slice = ty.as_slice(db)?;
+        Some((muta, as_slice))
+    }
+
+    pub fn as_slice<'a>(&'a self, db: &dyn Db) -> Option<&'a InferTy> {
+        let (def, args) = self.as_adt()?;
+        if def == TypeDefId::Builtin(BuiltinTypeId::slice(db)) {
+            assert_eq!(args.len(), 1);
+            Some(&args[0])
+        } else {
+            None
         }
     }
 }
