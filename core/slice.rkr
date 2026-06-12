@@ -1,5 +1,5 @@
-@include core::iter
 @include core::opt
+@include core::panic
 
 impl <T> [T] {
     fun len(&self): usize {
@@ -13,7 +13,7 @@ struct SliceIter<T> {
     idx: usize;
 }
 
-impl <T> Iter for SliceIter<T> {
+impl <T> iter::Iter for SliceIter<T> {
     type Item = &T;
     
     fun next(&mut self): opt<&T> {
@@ -21,19 +21,12 @@ impl <T> Iter for SliceIter<T> {
     }
 }
 
-impl <T> IntoIterator for &[T] {
+impl <T> iter::IntoIterator for &[T] {
     type Out = SliceIter<T>;
     fun into_iter(self): SliceIter<T> {
         return SliceIter {
             .slice: self,
             .idx: 0,
         };
-    }
-}
-
-fun not_working(): void {
-    let always_increasing = 0;
-    for i in 0..always_increasing {
-        always_increasing += 1;
     }
 }

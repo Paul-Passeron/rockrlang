@@ -9,7 +9,7 @@ impl str {
         while data[len] != 0 {
             len = len + 1;
         }
-        return Self {
+        return str {
             .data: data,
             .len: len
         };

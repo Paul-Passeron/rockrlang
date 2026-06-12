@@ -12,7 +12,7 @@ interface Drop {
 }
 
 @[orthogonal(Drop)]
-interface NoDrop {} // Marker struct
+interface NoDrop {} // Marker interface
 
 interface AsRef {
     type T;

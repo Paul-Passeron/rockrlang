@@ -9,7 +9,7 @@ struct Vec<T> {
 
 impl<T> Vec<T> {
     fun new(): Self {
-        return Self {
+        return Vec {
             .contents: 0,
             .len: 0,
             .cap: 0,
@@ -39,10 +39,10 @@ impl <T> Iter for VecIter<T> {
     type Item = T;
 
     fun next(&mut self): opt<T> {
-        if self.idx >= self.vec$.len() {
+        if self.idx >= self.vec.len() {
             return opt::None;
         }
-        let res = self.vec$.unsafe_idx(self.idx)$;
+        let res = self.vec.unsafe_idx(self.idx)$;
         self.idx += 1;
         return opt::Some(res);
     }
