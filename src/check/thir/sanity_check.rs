@@ -10,7 +10,9 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
-        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id, void_id
+        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
+        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
+        void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -247,7 +249,9 @@ impl<'db> SanityChecker<'db> {
                 );
                 self.check_types(ret, infos.ty, infos.span);
             }
-            ExprKind::BinOp { .. } => todo!(),
+            ExprKind::BinOp { .. } => {
+                Diag::todo("Check binop here".into(), infos.span).accumulate(self.db);
+            }
             ExprKind::Neg(_) => todo!(),
             ExprKind::Not(operand) => {
                 let operand_ty = self.check_expr(*operand);
@@ -319,7 +323,7 @@ impl<'db> SanityChecker<'db> {
                 ));
                 self.check_types(infos.ty, ty, infos.span);
                 let constructor_ty = enum_def.get_cons(self.db, *idx).unwrap();
-                self.check_constructor_expr(&constructor_ty, args);
+                self.check_constructor_expr(&constructor_ty, args, infos.span);
             }
             ExprKind::StructLit { struct_def, fields } => {
                 let ty = TypeRef::Concrete(TypeId::new(
@@ -481,6 +485,7 @@ impl<'db> SanityChecker<'db> {
         &mut self,
         ty: &ConstructorType,
         pat: &ThirConstructorArgs<ExprId>,
+        span: Span,
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
@@ -499,7 +504,7 @@ impl<'db> SanityChecker<'db> {
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 let _ = tys;
                 let _ = pats;
-                todo!()
+                Diag::todo("Check tuple pat here".into(), span).accumulate(self.db);
             }
             _ => todo!(),
         }

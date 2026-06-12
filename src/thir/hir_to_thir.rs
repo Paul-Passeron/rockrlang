@@ -786,11 +786,15 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Call { called: fref, args }
             }
             HirExprDesc::CallMethod { receiver, args, .. } => {
-                let call_infos = &self
-                    .tc
-                    .call_infos(self.db) 
-                    .get(&typecheck::ExprId(expr.id))
-                    .expect("TODO: No call info found");
+                let Some(call_infos) =
+                    &self.tc.call_infos(self.db).get(&typecheck::ExprId(expr.id))
+                else {
+                    return b.new_expr(ThirExpr {
+                        kind: ExprKind::Error,
+                        ty,
+                        span: expr.span,
+                    });
+                };
                 let thir_args = {
                     let mut thir_args = vec![self.expr(b, receiver, stmts)];
                     thir_args.extend(args.iter().map(|arg| self.expr(b, arg, stmts)));

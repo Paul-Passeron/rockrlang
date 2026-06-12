@@ -55,6 +55,10 @@ impl<'a> ThirPrinter<'a> {
         let thir = self.thir;
 
         let name = thir.id.sig_to_string(self.db);
+        self.line(&format!(
+            "{}",
+            thir.id.span(self.db).start().loc_info(self.db)
+        ));
         self.line(&format!("thir fun {name} {{"));
         self.indent += 1;
         self.print_stmts(&thir.root);
@@ -287,7 +291,7 @@ impl<'a> ThirPrinter<'a> {
             ExprKind::Error => "<error>".to_string(),
             ExprKind::Metadata(id) => {
                 format!("@metadata({})", self.render_expr(*id))
-            },
+            }
         }
     }
 

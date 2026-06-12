@@ -131,8 +131,14 @@ impl<'db> TyCtx<'db> {
 
         // Temporary
         let unsolveds = self.inf_ctx.unsolved_constraints();
-        for unsolved in unsolveds {
-            eprintln!("<UNSOLVED> {}", unsolved.kind.display(self.db));
+        if !unsolveds.is_empty() {
+            eprintln!(
+                "{}: Unsolved constraints",
+                self.function.span(self.db).start().loc_info(self.db)
+            );
+            for unsolved in unsolveds {
+                eprintln!("<UNSOLVED> {}", unsolved.kind.display(self.db));
+            }
         }
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
