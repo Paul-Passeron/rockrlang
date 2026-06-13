@@ -367,6 +367,8 @@ impl<'db> SanityChecker<'db> {
     }
 
     fn check_types(&mut self, expected: TypeRef, got: TypeRef, span: Span) {
+        let expected = self.normalize_type(expected);
+        let got = self.normalize_type(got);
         if expected != got {
             self.errs.push(SanityError {
                 expected,
@@ -534,6 +536,27 @@ impl<'db> SanityChecker<'db> {
             _ => todo!(),
         }
     }
+
+    fn normalize_type(&self, ty: TypeRef) -> TypeRef {
+        match ty {
+            TypeRef::Zelf => self
+                .thir
+                .id
+                .parent(self.db)
+                .get_canonical_zelf(self.db)
+                .unwrap_or(TypeRef::Zelf),
+            TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
+                self.db,
+                type_id.def(self.db),
+                type_id
+                    .args(self.db)
+                    .into_iter()
+                    .map(|ty| self.normalize_type(ty))
+                    .collect(),
+            )),
+            _ => ty, // TODO Maybe
+        }
+    }
 }
 
 pub enum ConstructorType {
@@ -619,7 +642,6 @@ pub fn sanity_check(db: &dyn Db, thir: &Thir) {
         )
         .accumulate(db);
     }
-    // assert!(mismatches.is_empty())
 }
 
 impl StructRef {
