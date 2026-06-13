@@ -164,7 +164,7 @@ impl<'db> LowerFundef<'db> {
                     }
                 }
             }
-            AstExprDesc::PostfixDeref(inner) => {
+            AstExprDesc::PostfixDeref(inner) | AstExprDesc::PrefixDeref(inner) => {
                 let temp = self.expr_as_place(inner, scope, module);
                 self.new_place(HirPlaceKind::Deref(temp.boxed()), expr.span)
             }
@@ -1177,9 +1177,7 @@ impl<'db> LowerFundef<'db> {
             AstStmtDesc::If { cond, then, else_ } => {
                 let cond = self.lower_expr(cond, scope, self.module);
                 let then = self.lower_stmt(then, scope);
-                let else_ = else_
-                    .as_ref()
-                    .map(|s| self.lower_stmt(s, scope).boxed());
+                let else_ = else_.as_ref().map(|s| self.lower_stmt(s, scope).boxed());
                 HirStmtKind::If {
                     cond,
                     then: then.boxed(),

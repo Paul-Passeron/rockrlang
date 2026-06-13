@@ -182,6 +182,16 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
+            TokenKind::Mult => {
+                self.consume();
+                let operand = self.parse_unary()?;
+                let end = self.get_end();
+                Ok(Spanned::new(
+                    AstExprDesc::PrefixDeref(Box::new(operand)),
+                    vec![],
+                    start.span(end),
+                ))
+            }
             _ => self.parse_postfix(),
         }
     }

@@ -66,6 +66,7 @@ pub enum AstExprDesc {
 
     AddressOf(Box<AstExpr>),
     PostfixDeref(Box<AstExpr>),
+    PrefixDeref(Box<AstExpr>),
 
     FieldAccess {
         object: Box<AstExpr>,
