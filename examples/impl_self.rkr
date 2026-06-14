@@ -1,0 +1,59 @@
+struct Foo {
+    bar: int;
+}
+
+impl Foo {
+    fun baz(): Self { 
+        return Self { .bar: 0 };
+    }
+
+    fun qux(): Foo {
+        return Self { .bar: 0 };
+    }
+
+    fun manie(): Self { 
+        return Foo { .bar: 0 };
+    }
+
+    fun sherif(): Foo {
+        return Foo { .bar: 0 };
+    }
+
+    fun titi(&self): Self {
+        return *self;
+    }
+
+    fun toto(&self): Foo {
+        return *self;
+    }
+
+    fun tata(&self): Self {
+        let x: &Foo = self; 
+        return *x;
+    }
+
+    fun tutu(&self): Self {
+        return Self { 
+            .bar: self.bar
+        };
+    }
+
+    fun zork(&self): Self {
+        return Self { 
+            .bar: self$.bar
+        };
+    }
+
+    fun gork(*self): Self {
+        return Self { 
+            .bar: self$.bar
+        };
+    }
+
+    fun blorg(self): void {
+        let x: &Self = &self;
+        let y: *Self = self@;
+        let _ = x.bar;
+        let _ = y$.bar;
+    }
+}
