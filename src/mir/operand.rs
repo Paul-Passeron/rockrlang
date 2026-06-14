@@ -21,8 +21,8 @@ use crate::{
     hir::Mutability,
     mir::{LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::{TypeDefId, TypeId, TypeRef, bool_id, char_id, ptr_of},
-    thir::{EnumRef, FunctionRef, StructRef},
+    ril::{TypeRef, bool_id, char_id, ptr_of},
+    thir::{EnumRef, FunctionRef},
 };
 
 use super::{Constant, Place};

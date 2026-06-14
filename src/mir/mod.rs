@@ -19,12 +19,11 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         location::Span,
-        symbols::{self, Symbol},
+        symbols::Symbol,
     },
     hir::{self, Mutability},
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
-        builder::MIRBuilder,
         operand::{
             MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection, MIRRValue,
             MIRRValueKind,
@@ -51,7 +50,6 @@ type Projection = MIRProjection;
 type RValue = MIRRValue;
 type RValueKind = MIRRValueKind;
 type Callee = MIRCallee;
-type Builder<'a> = MIRBuilder<'a>;
 
 pub type MIRBlockID = Idx<BasicBlock>;
 pub type MIRLocalID = Idx<Local>;
@@ -111,5 +109,4 @@ impl MIRLocal {
         this.syn_src = Some(src);
         this
     }
-
 }
