@@ -360,7 +360,7 @@ impl<'db> SanityChecker<'db> {
 
             ExprKind::Metadata(idx) => {
                 let ty = self.check_expr(*idx);
-                if let Some(_) =
+                if let Some(_value) =
                     ty.as_ref(self.db).and_then(|(_, ty)| ty.as_slice(self.db))
                 {
                     self.check_types(

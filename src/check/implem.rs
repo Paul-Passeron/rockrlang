@@ -36,7 +36,7 @@ fn check_ambiguous_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     let mut names: HashMap<Symbol, Span> = HashMap::new();
     for item in impl_items(db, implem.id(db).interned()) {
         let item_name = item.name();
-        if let Some(_) = names.get(&item_name).copied() {
+        if let Some(_value) = names.get(&item_name).copied() {
             todo!()
         } else {
             names.insert(item_name, item.name_span());

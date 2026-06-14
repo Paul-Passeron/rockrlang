@@ -925,7 +925,7 @@ impl<'db> ThirTranslator<'db> {
                                 mutability: Mutability::Mutable,
                             },
                             ty: receiver_ty.wrap_ref(self.db, true),
-                            span: span,
+                            span,
                         })
                     }
                     typecheck::ReceiverAdjustment::Deref(depth) => {
@@ -968,7 +968,7 @@ impl<'db> ThirTranslator<'db> {
                                 mutability: Mutability::Const,
                             },
                             ty: cur_ty.wrap_ref(self.db, false),
-                            span: span,
+                            span,
                         })
                     }
                     typecheck::ReceiverAdjustment::DerefThenMutRef(depth) => {
@@ -993,7 +993,7 @@ impl<'db> ThirTranslator<'db> {
                                 mutability: Mutability::Mutable,
                             },
                             ty: cur_ty.wrap_ref(self.db, true),
-                            span: span,
+                            span,
                         })
                     }
                 }
