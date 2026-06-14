@@ -14,9 +14,16 @@ fun foo(xs: &[int]): void {
     }
 }
 
-
 fun bar(xs: &[int]): void {
     for x in xs {
         let y = x;
+    }
+}
+
+fun my_slices(slices: &[&[int]]): void {
+    for outer in slices {
+        for inner in *outer {
+            let x = inner;
+        }
     }
 }
