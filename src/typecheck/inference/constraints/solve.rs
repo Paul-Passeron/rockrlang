@@ -5,14 +5,17 @@ use itertools::Itertools;
 use crate::{
     common::symbols::Symbol,
     hir::{Mutability, impl_items},
-    parse_tree::{expr::BinaryOperator, top_level::AstImplItem},
+    parse_tree::{
+        expr::BinaryOperator,
+        top_level::{AstImplItem, AstReceiver},
+    },
     printer::type_printer::{TypePrinter, TypePrinterOption, TypePrinterOptionSet},
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
         TypeDefId,
     },
     typecheck::{
-        CallKind, InferCallInfos,
+        CallKind, InferCallInfos, ReceiverAdjustment,
         inference::{
             InferTy, InferenceCtx, UnificationError,
             constraints::{
@@ -305,6 +308,43 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    fn get_adjustments_for(
+        &mut self,
+        mthd: FunctionId,
+        depth: usize,
+        _ty: &InferTy,
+    ) -> ReceiverAdjustment {
+        match mthd.receiver(self.db) {
+            // Error here but best to return that
+            AstReceiver::None => ReceiverAdjustment::None,
+
+            AstReceiver::Zelf(_)
+            | AstReceiver::MutZelf(_)
+            | AstReceiver::PtrZelf(_)
+            | AstReceiver::MutPtrZelf(_) => {
+                if depth == 0 {
+                    ReceiverAdjustment::None
+                } else {
+                    ReceiverAdjustment::Deref(depth)
+                }
+            }
+            AstReceiver::RefZelf(_) => {
+                if depth == 0 {
+                    ReceiverAdjustment::Ref
+                } else {
+                    ReceiverAdjustment::DerefThenRef(depth)
+                }
+            }
+            AstReceiver::MutRefZelf(_) => {
+                if depth == 0 {
+                    ReceiverAdjustment::MutRef
+                } else {
+                    ReceiverAdjustment::DerefThenMutRef(depth)
+                }
+            }
+        }
+    }
+
     fn solve_method_constraint(
         &mut self,
         method_constraint: &MethodConstraint,
@@ -445,7 +485,7 @@ impl<'db> InferenceCtx<'db> {
                 CallKind::Static
             } else {
                 CallKind::Method {
-                    adjustment: todo!(),
+                    adjustment: self.get_adjustments_for(method_id, depth, receiver),
                 }
             },
         };
