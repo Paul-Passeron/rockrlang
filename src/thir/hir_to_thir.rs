@@ -30,13 +30,11 @@ use crate::{
         PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
-    parse_tree::top_level::AstReceiver,
     ril::{BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, ref_of},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope,
-        stmt::{StmtKind, ThirStmt},
+        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::{
         self, PatternId, TypeCheckResults, inference::implicit::AstImplicitContext,
@@ -654,11 +652,11 @@ impl<'db> ThirTranslator<'db> {
                                 place: field_place,
                                 mutability: Mutability::Const,
                             },
-                            ty: cur_ty.wrap_ref(self.db),
+                            ty: cur_ty.wrap_ref(self.db, false),
                             span,
                         });
                         for _ in 1..depth {
-                            cur_ty = cur_ty.wrap_ref(self.db);
+                            cur_ty = cur_ty.wrap_ref(self.db, false);
                             let tmp =
                                 b.new_synthetic_local(cur_ty, Mutability::Const, span);
                             v.push(ThirStmt::let_(tmp, val, span));
@@ -668,7 +666,7 @@ impl<'db> ThirTranslator<'db> {
                                     place: tmp_place,
                                     mutability: Mutability::Const,
                                 },
-                                ty: cur_ty.wrap_ref(self.db),
+                                ty: cur_ty.wrap_ref(self.db, false),
                                 span,
                             });
                         }
@@ -827,10 +825,24 @@ impl<'db> ThirTranslator<'db> {
                         span: expr.span,
                     });
                 };
+
                 let thir_args = {
                     let thir_receiver = self.expr(b, receiver, stmts);
-                    let mut thir_args = vec![thir_receiver];
+                    let (receiver_ty, receiver_span) = {
+                        let e = &b.exprs[thir_receiver];
+                        (e.ty, e.span)
+                    };
 
+                    let thir_receiver = self.compute_receiver(
+                        b,
+                        stmts,
+                        call_infos,
+                        thir_receiver,
+                        receiver_ty,
+                        receiver_span,
+                    );
+
+                    let mut thir_args = vec![thir_receiver];
                     thir_args.extend(args.iter().map(|arg| self.expr(b, arg, stmts)));
                     thir_args
                 };
@@ -839,7 +851,7 @@ impl<'db> ThirTranslator<'db> {
                     id: call_infos.callee,
                     args: call_infos.substitution.clone(),
                     self_ty: None,
-                    dispatch: Dispatch::Direct, // TODO: Compute this
+                    dispatch: Dispatch::Direct,
                 };
                 ExprKind::Call {
                     called: fref,
@@ -858,6 +870,141 @@ impl<'db> ThirTranslator<'db> {
             ty,
             span: expr.span,
         })
+    }
+
+    fn compute_receiver(
+        &mut self,
+        b: &mut ThirBuilder<'_>,
+        stmts: &mut Vec<ThirStmt>,
+        call_infos: &typecheck::CallInfos,
+        thir_receiver: Idx<ThirExpr>,
+        receiver_ty: TypeRef,
+        span: Span,
+    ) -> Idx<ThirExpr> {
+        match call_infos.call_kind {
+            typecheck::CallKind::Method { adjustment } => {
+                match adjustment {
+                    typecheck::ReceiverAdjustment::None => {
+                        let local =
+                            b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                        stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                        let place = b.new_place(ThirPlace::local(local, b, span));
+                        b.new_expr(ThirExpr::use_place(place, b, span))
+                    }
+                    typecheck::ReceiverAdjustment::Ref => {
+                        let local =
+                            b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                        stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                        let place = b.new_place(ThirPlace::local(local, b, span));
+                        b.new_expr(ThirExpr {
+                            kind: ExprKind::Ref {
+                                place,
+                                mutability: Mutability::Const,
+                            },
+                            ty: receiver_ty.wrap_ref(self.db, false),
+                            span,
+                        })
+                    }
+                    typecheck::ReceiverAdjustment::MutRef => {
+                        let place = match b.get_expr(thir_receiver).kind {
+                            ExprKind::Use(place) => place,
+                            _ => {
+                                // Only spill if we have to
+                                let local = b.new_synthetic_local(
+                                    receiver_ty,
+                                    Mutability::Mutable,
+                                    span,
+                                );
+                                stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                                b.new_place(ThirPlace::local(local, b, span))
+                            }
+                        };
+                        b.new_expr(ThirExpr {
+                            kind: ExprKind::Ref {
+                                place,
+                                mutability: Mutability::Mutable,
+                            },
+                            ty: receiver_ty.wrap_ref(self.db, true),
+                            span: span,
+                        })
+                    }
+                    typecheck::ReceiverAdjustment::Deref(depth) => {
+                        let local =
+                            b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                        stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                        let mut place = b.new_place(ThirPlace::local(local, b, span));
+                        let mut cur_ty = receiver_ty;
+                        for _ in 0..depth {
+                            cur_ty = cur_ty
+                                .as_ref(self.db)
+                                .map_or(TypeRef::Error, |(_, ty)| ty);
+                            place = b.with_synthetic_projection(
+                                place,
+                                Projection::Deref,
+                                cur_ty,
+                            );
+                        }
+                        b.new_expr(ThirExpr::use_place(place, b, span))
+                    }
+                    typecheck::ReceiverAdjustment::DerefThenRef(depth) => {
+                        let local =
+                            b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                        stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                        let mut place = b.new_place(ThirPlace::local(local, b, span));
+                        let mut cur_ty = receiver_ty;
+                        for _ in 0..depth {
+                            cur_ty = cur_ty
+                                .as_ref(self.db)
+                                .map_or(TypeRef::Error, |(_, ty)| ty);
+                            place = b.with_synthetic_projection(
+                                place,
+                                Projection::Deref,
+                                cur_ty,
+                            );
+                        }
+                        b.new_expr(ThirExpr {
+                            kind: ExprKind::Ref {
+                                place,
+                                mutability: Mutability::Const,
+                            },
+                            ty: cur_ty.wrap_ref(self.db, false),
+                            span: span,
+                        })
+                    }
+                    typecheck::ReceiverAdjustment::DerefThenMutRef(depth) => {
+                        let local =
+                            b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                        stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                        let mut place = b.new_place(ThirPlace::local(local, b, span));
+                        let mut cur_ty = receiver_ty;
+                        for _ in 0..depth {
+                            cur_ty = cur_ty
+                                .as_ref(self.db)
+                                .map_or(TypeRef::Error, |(_, ty)| ty);
+                            place = b.with_synthetic_projection(
+                                place,
+                                Projection::Deref,
+                                cur_ty,
+                            );
+                        }
+                        b.new_expr(ThirExpr {
+                            kind: ExprKind::Ref {
+                                place,
+                                mutability: Mutability::Mutable,
+                            },
+                            ty: cur_ty.wrap_ref(self.db, true),
+                            span: span,
+                        })
+                    }
+                }
+            }
+            _ => {
+                let local = b.new_synthetic_local(receiver_ty, Mutability::Const, span);
+                stmts.push(ThirStmt::let_(local, thir_receiver, span));
+                let local_place = b.new_place(ThirPlace::local(local, b, span));
+                b.new_expr(ThirExpr::use_place(local_place, b, span))
+            }
+        }
     }
 
     fn auto_deref_place_if_needed(
@@ -1141,10 +1288,10 @@ impl TypeRef {
         self.peel_aux(db).1
     }
 
-    pub fn wrap_ref(self, db: &dyn Db) -> Self {
+    pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
             TypeRef::Error | TypeRef::Unknown => self,
-            _ => TypeRef::Concrete(ref_of(db, self, false)),
+            _ => TypeRef::Concrete(ref_of(db, self, mutable)),
         }
     }
 }
