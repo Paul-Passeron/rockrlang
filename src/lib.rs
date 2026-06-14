@@ -38,6 +38,7 @@ pub mod printer;
 pub mod ril;
 pub mod tests;
 pub mod thir;
+pub mod thir_to_mir;
 pub mod typecheck;
 
 #[derive(Debug)]
