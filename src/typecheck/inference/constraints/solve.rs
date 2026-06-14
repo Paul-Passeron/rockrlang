@@ -445,7 +445,7 @@ impl<'db> InferenceCtx<'db> {
                 CallKind::Static
             } else {
                 CallKind::Method {
-                    receiver_deref_depth: depth,
+                    adjustment: todo!(),
                 }
             },
         };

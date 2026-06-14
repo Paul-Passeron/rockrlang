@@ -37,10 +37,31 @@ use crate::{
 pub mod inference;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReceiverAdjustment {
+    /// The receiver is the expr as is
+    None,
+
+    /// The receiver is a ref to the expression
+    Ref,
+
+    /// The receiver is a mutable ref to the expression
+    MutRef,
+
+    /// The receiver is the expr dereferenced \.0 times
+    Deref(usize),
+
+    /// The receiver is a ref to the expr dereferenced \.0 times
+    DerefThenRef(usize),
+
+    /// The receiver is a mutable ref to the expr dereferenced \.0 times
+    DerefThenMutRef(usize),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CallKind {
-    Direct,                                 // Regular function call
-    Method { receiver_deref_depth: usize }, // foo.bar(...)
-    Static,                                 // Foo::bar(...) with no self
+    Direct,                                    // Regular function call
+    Method { adjustment: ReceiverAdjustment }, // foo.bar(...)
+    Static,                                    // Foo::bar(...) with no self
 }
 
 #[derive(Clone)]
