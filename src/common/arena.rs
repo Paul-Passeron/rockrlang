@@ -82,6 +82,14 @@ impl<T> Arena<T> {
     pub fn next_id(&self) -> Idx<T> {
         Idx(self.inner.len(), Default::default())
     }
+
+    pub fn get(&self, idx: Idx<T>) -> &T {
+        &self[idx]
+    }
+
+    pub fn get_mut(&mut self, idx: Idx<T>) -> &mut T {
+        &mut self[idx]
+    }
 }
 
 impl<T> IndexMut<Idx<T>> for Arena<T> {
@@ -113,5 +121,9 @@ impl<T> Idx<T> {
 impl<T> Arena<T> {
     pub fn into_values(self) -> impl Iterator<Item = T> {
         self.inner.into_iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
     }
 }
