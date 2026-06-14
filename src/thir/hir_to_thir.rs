@@ -30,11 +30,13 @@ use crate::{
         PartialTypeRef,
     },
     name_resolve::type_expr::{enum_item, struct_item},
+    parse_tree::top_level::AstReceiver,
     ril::{BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, ref_of},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
+        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope,
+        stmt::{StmtKind, ThirStmt},
     },
     typecheck::{
         self, PatternId, TypeCheckResults, inference::implicit::AstImplicitContext,
@@ -188,6 +190,29 @@ impl<'db> ThirTranslator<'db> {
             tc,
             scope_stack: Vec::new(),
         }
+    }
+
+    fn scope_owner(&self) -> ScopeOwnerId {
+        self.hir.owner(self.db).parent(self.db)
+    }
+
+    fn canonicalize_type(&self, ty: TypeRef) -> TypeRef {
+        fn _aux(db: &dyn Db, owner: ScopeOwnerId, ty: TypeRef) -> TypeRef {
+            match ty {
+                TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
+                    db,
+                    type_id.def(db),
+                    type_id
+                        .args(db)
+                        .into_iter()
+                        .map(|ty| _aux(db, owner, ty))
+                        .collect(),
+                )),
+                TypeRef::Zelf => owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error),
+                _ => ty, // TODO ???
+            }
+        }
+        _aux(self.db, self.scope_owner(), ty)
     }
 
     pub fn translate(mut self) -> Thir {
@@ -468,7 +493,7 @@ impl<'db> ThirTranslator<'db> {
                 local: local_id,
                 mutable: false,
             },
-            ty: local.ty,
+            ty: self.canonicalize_type(local.ty),
             span: local.span,
         }
     }
@@ -480,6 +505,7 @@ impl<'db> ThirTranslator<'db> {
             .get(&PatternId(pat.id))
             .copied()
             .unwrap_or(TypeRef::Unknown);
+        let ty = self.canonicalize_type(ty);
         let kind = match &pat.data {
             HirPatternDesc::Bind { id, mutable, .. } => Some(ThirPatternKind::Bind {
                 local: b.local_map[id],
@@ -565,13 +591,15 @@ impl<'db> ThirTranslator<'db> {
                 v.push(ThirStmt::expr(value, span));
             }
             HirPatternDesc::Tuple(hir_patterns) => {
-                let ty = b.get_expr(value).ty;
+                let ty = self.canonicalize_type(b.get_expr(value).ty);
                 let the_tuple_local = b.new_synthetic_local(ty, Mutability::Const, span);
                 v.push(ThirStmt::let_(the_tuple_local, value, span));
                 let the_tuple_place =
                     b.new_place(ThirPlace::local(the_tuple_local, b, span));
                 for (idx, pat) in hir_patterns.iter().enumerate() {
-                    let ty = self.tc.pat_types(self.db)[&PatternId(pat.id)];
+                    let ty = self.canonicalize_type(
+                        self.tc.pat_types(self.db)[&PatternId(pat.id)],
+                    );
                     let idx_place = b.with_synthetic_projection(
                         the_tuple_place,
                         Projection::TupleField(idx as u32, ty),
@@ -583,7 +611,7 @@ impl<'db> ThirTranslator<'db> {
                 }
             }
             HirPatternDesc::DestructureBinding { fields, .. } => {
-                let ty = b.get_expr(value).ty;
+                let ty = self.canonicalize_type(b.get_expr(value).ty);
                 let fresh = b.new_synthetic_local(ty, Mutability::Const, pat.span);
                 v.push(ThirStmt::let_(fresh, value, span));
                 let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
@@ -600,11 +628,14 @@ impl<'db> ThirTranslator<'db> {
                         HirStructFieldPattern::Name { name, .. }
                         | HirStructFieldPattern::Rebind { name, .. } => *name,
                     };
-                    let field_ty =
-                        def.typeof_field(self.db, name).unwrap_or(TypeRef::Error);
+                    let field_ty = self.canonicalize_type(
+                        def.typeof_field(self.db, name).unwrap_or(TypeRef::Error),
+                    );
                     let mut place = place;
                     for _ in 0..depth {
-                        let new_ty = b.places[place].ty.as_ref(self.db).unwrap().1;
+                        let new_ty = self.canonicalize_type(
+                            b.places[place].ty.as_ref(self.db).unwrap().1,
+                        );
                         place =
                             b.with_synthetic_projection(place, Projection::Deref, new_ty);
                     }
@@ -686,6 +717,7 @@ impl<'db> ThirTranslator<'db> {
             .get(&typecheck::ExprId(expr.id))
             .copied()
             .unwrap_or(TypeRef::Unknown);
+        let ty = self.canonicalize_type(ty);
         let kind = match &expr.data {
             HirExprDesc::IntLit(x) => ExprKind::IntLit(*x),
             HirExprDesc::CharLit(x) => ExprKind::Charlit(*x),
@@ -796,10 +828,69 @@ impl<'db> ThirTranslator<'db> {
                     });
                 };
                 let thir_args = {
-                    let mut thir_args = vec![self.expr(b, receiver, stmts)];
+                    let thir_receiver = self.expr(b, receiver, stmts);
+                    // TODO: handle receiver
+                    // let thir_receiver = match call_infos.call_kind {
+                    //     typecheck::CallKind::Method {
+                    //         receiver_deref_depth: depth,
+                    //     } => {
+                    //         let depth = match call_infos.callee.receiver(self.db) {
+                    //             AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) =>
+                    // {                 if depth == 0 {
+                    //                     depth
+                    //                 } else {
+                    //                     depth - 1 // TODO: Is all this right ?
+                    //                 }
+                    //             }
+                    //             _ => depth,
+                    //         };
+                    //         let (receiver_ty, receiver_span) = {
+                    //             let e = &b.exprs[thir_receiver];
+                    //             (e.ty, e.span)
+                    //         };
+
+                    //         let mut place = match receiver {
+                    //             _ => {
+                    //                 let local = b.new_synthetic_local(
+                    //                     b.exprs[thir_receiver].ty,
+                    //                     Mutability::Const,
+                    //                     receiver_span,
+                    //                 );
+                    //                 stmts.push(ThirStmt::let_(
+                    //                     local,
+                    //                     thir_receiver,
+                    //                     receiver_span,
+                    //                 ));
+                    //                 b.new_place(ThirPlace::local(local, b,
+                    // receiver_span))             }
+                    //         };
+
+                    //         let mut new_ty = receiver_ty;
+
+                    //         for _ in 0..depth {
+                    //             new_ty = new_ty
+                    //                 .as_ref(self.db)
+                    //                 .map_or(TypeRef::Error, |(_, ty)| ty);
+                    //             place = b.with_synthetic_projection(
+                    //                 place,
+                    //                 Projection::Deref,
+                    //                 new_ty,
+                    //             );
+                    //         }
+                    //         b.new_expr(ThirExpr {
+                    //             kind: ExprKind::Use(place),
+                    //             ty: new_ty,
+                    //             span: receiver_span,
+                    //         })
+                    //     }
+                    //     _ => thir_receiver,
+                    // };
+                    let mut thir_args = vec![thir_receiver];
+
                     thir_args.extend(args.iter().map(|arg| self.expr(b, arg, stmts)));
                     thir_args
                 };
+
                 let fref = FunctionRef {
                     id: call_infos.callee,
                     args: call_infos.substitution.clone(),
