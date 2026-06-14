@@ -93,3 +93,19 @@ impl Operand {
         }
     }
 }
+
+impl From<Constant> for Operand {
+    fn from(value: Constant) -> Self {
+        Self::Constant(value)
+    }
+}
+
+impl Place {
+    pub fn into_move(self) -> Operand {
+        Operand::Move(self)
+    }
+
+    pub fn into_copy(self) -> Operand {
+        Operand::Copy(self)
+    }
+}
