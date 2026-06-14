@@ -1,0 +1,8 @@
+struct Foo {}
+struct Bar {}
+
+fun foo(f: Foo, b: Bar): void {
+    let a = f;
+    let a = b;
+    let y: Bar = a;
+}
