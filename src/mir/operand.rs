@@ -16,12 +16,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
+    Db,
     common::{location::Span, symbols::Symbol},
     hir::Mutability,
     mir::{LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::TypeRef,
-    thir::{EnumRef, FunctionRef},
+    ril::{TypeDefId, TypeId, TypeRef},
+    thir::{EnumRef, FunctionRef, StructRef, ThirConstructorArgs},
 };
 
 use super::{Constant, Place};
@@ -33,7 +34,18 @@ pub enum MIROperand {
 }
 
 pub enum MIRConstant {
-    Integer { value: i128, ty: TypeRef },
+    Integer {
+        value: i128,
+        ty: TypeRef,
+    },
+    StructLit {
+        of: StructRef,
+        fields: Vec<(Symbol, MIRConstant)>,
+    },
+    EnumLit {
+        of: EnumRef,
+        fields: ThirConstructorArgs<MIRConstant>,
+    },
 }
 
 pub struct MIRPlace {
@@ -78,17 +90,19 @@ pub enum MIRRValueKind {
 }
 
 impl Constant {
-    pub fn ty(&self) -> TypeRef {
+    pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
             MIRConstant::Integer { ty, .. } => *ty,
+            MIRConstant::StructLit { of, .. } => of.clone().as_type_ref(db),
+            MIRConstant::EnumLit { of, .. } => of.clone().as_type_ref(db),
         }
     }
 }
 
 impl Operand {
-    pub fn ty(&self) -> TypeRef {
+    pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
-            MIROperand::Constant(mirconstant) => mirconstant.ty(),
+            MIROperand::Constant(mirconstant) => mirconstant.ty(db),
             MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
         }
     }
@@ -107,5 +121,29 @@ impl Place {
 
     pub fn into_copy(self) -> Operand {
         Operand::Copy(self)
+    }
+}
+
+impl From<FunctionRef> for MIRCallee {
+    fn from(value: FunctionRef) -> Self {
+        Self::Direct(value)
+    }
+}
+
+impl Constant {
+    pub fn int(value: i128, ty: TypeRef) -> Self {
+        Self::Integer { value, ty }
+    }
+}
+
+impl StructRef {
+    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
+        TypeRef::Concrete(TypeId::new(db, TypeDefId::Struct(self.def), self.args))
+    }
+}
+
+impl EnumRef {
+    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
+        TypeRef::Concrete(TypeId::new(db, TypeDefId::Enum(self.def), self.args))
     }
 }

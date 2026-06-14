@@ -98,11 +98,13 @@ pub enum Dispatch {
     Interface(InterfaceRef),
 }
 
+#[derive(Clone)]
 pub struct StructRef {
     pub def: StructId,
     pub args: Vec<TypeRef>,
 }
 
+#[derive(Clone)]
 pub struct EnumRef {
     pub def: EnumId,
     pub args: Vec<TypeRef>,
