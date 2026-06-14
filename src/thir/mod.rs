@@ -86,6 +86,7 @@ pub struct ThirExpr {
 }
 
 // TODO: figure out the right way to do this
+#[derive(PartialEq, Eq)]
 pub struct FunctionRef {
     pub id: FunctionId,
     pub args: Vec<TypeRef>,
@@ -93,18 +94,19 @@ pub struct FunctionRef {
     pub dispatch: Dispatch,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Dispatch {
     Direct,
     Interface(InterfaceRef),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct StructRef {
     pub def: StructId,
     pub args: Vec<TypeRef>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct EnumRef {
     pub def: EnumId,
     pub args: Vec<TypeRef>,

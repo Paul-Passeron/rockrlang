@@ -22,17 +22,19 @@ use crate::{
     mir::{LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
     ril::{TypeDefId, TypeId, TypeRef, bool_id, char_id, ptr_of},
-    thir::{EnumRef, FunctionRef, StructRef, ThirConstructorArgs},
+    thir::{EnumRef, FunctionRef, StructRef},
 };
 
 use super::{Constant, Place};
 
+#[derive(PartialEq, Eq)]
 pub enum MIROperand {
     Constant(Constant),
     Move(Place),
     Copy(Place),
 }
 
+#[derive(PartialEq, Eq)]
 pub enum MIRConstant {
     Integer {
         value: i128,
@@ -45,12 +47,14 @@ pub enum MIRConstant {
     },
 }
 
+#[derive(PartialEq, Eq)]
 pub struct MIRPlace {
     pub local: LocalID,
     pub projection: Vec<Projection>,
     pub ty: TypeRef,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum MIRProjection {
     Deref,
     Field { name: Symbol, resulting_ty: TypeRef },
@@ -58,21 +62,25 @@ pub enum MIRProjection {
     Index { index: Operand },
 }
 
+#[derive(PartialEq, Eq)]
 pub struct MIRRValue {
     pub kind: RValueKind,
     pub ty: TypeRef,
     pub span: Span,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum UnaryOperator {
     Neg,  // `-` in -x
     LNot, // `!` in !x
 }
 
+#[derive(PartialEq, Eq)]
 pub enum MIRCallee {
     Direct(FunctionRef),
 }
 
+#[derive(PartialEq, Eq)]
 pub enum MIRRValueKind {
     Use(Operand),
     Ref(Place, Mutability),
@@ -130,17 +138,5 @@ impl From<FunctionRef> for MIRCallee {
 impl Constant {
     pub fn int(value: i128, ty: TypeRef) -> Self {
         Self::Integer { value, ty }
-    }
-}
-
-impl StructRef {
-    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
-        TypeRef::Concrete(TypeId::new(db, TypeDefId::Struct(self.def), self.args))
-    }
-}
-
-impl EnumRef {
-    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
-        TypeRef::Concrete(TypeId::new(db, TypeDefId::Enum(self.def), self.args))
     }
 }

@@ -56,11 +56,13 @@ type Builder<'a> = MIRBuilder<'a>;
 pub type MIRBlockID = Idx<BasicBlock>;
 pub type MIRLocalID = Idx<Local>;
 
+#[derive(PartialEq, Eq)]
 pub struct SyntacticSource {
     pub span: Span,
     pub id: hir::LocalId,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct MIR {
     pub blocks: Arena<BasicBlock>,
     pub locals: Arena<Local>,
@@ -68,6 +70,7 @@ pub struct MIR {
     pub entry: BlockID,
 }
 
+#[derive(PartialEq, Eq)]
 pub struct MIRLocal {
     pub ty: TypeRef,
     pub mutability: Mutability,

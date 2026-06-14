@@ -25,6 +25,7 @@ use crate::{
 use super::{BlockID, LocalID, Operand};
 
 /// Come with me if you want to live
+#[derive(PartialEq, Eq)]
 pub enum MIRTerminator {
     /// This terminator cannot be reached. Calling a function returning never is
     /// a way of invoking it.
@@ -62,6 +63,7 @@ pub enum MIRTerminator {
     },
 }
 
+#[derive(PartialEq, Eq)]
 pub struct MIRBasicBlock {
     pub stmts: Vec<Stmt>,
     pub terminator: Terminator,
@@ -70,6 +72,7 @@ pub struct MIRBasicBlock {
     pub name: Option<String>,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum Stmt {
     Assign { dest: Place, rvalue: RValue },
 }
