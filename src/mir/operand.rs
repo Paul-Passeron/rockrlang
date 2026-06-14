@@ -21,7 +21,7 @@ use crate::{
     hir::Mutability,
     mir::{LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::{TypeDefId, TypeId, TypeRef},
+    ril::{TypeDefId, TypeId, TypeRef, bool_id, char_id, ptr_of},
     thir::{EnumRef, FunctionRef, StructRef, ThirConstructorArgs},
 };
 
@@ -38,13 +38,10 @@ pub enum MIRConstant {
         value: i128,
         ty: TypeRef,
     },
-    StructLit {
-        of: StructRef,
-        fields: Vec<(Symbol, MIRConstant)>,
-    },
-    EnumLit {
-        of: EnumRef,
-        fields: ThirConstructorArgs<MIRConstant>,
+    Bool(bool),
+    CString {
+        contents: String,
+        null_terminated: bool,
     },
 }
 
@@ -93,8 +90,8 @@ impl Constant {
     pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
             MIRConstant::Integer { ty, .. } => *ty,
-            MIRConstant::StructLit { of, .. } => of.clone().as_type_ref(db),
-            MIRConstant::EnumLit { of, .. } => of.clone().as_type_ref(db),
+            MIRConstant::Bool(_) => bool_id(db).into(),
+            MIRConstant::CString { .. } => ptr_of(db, char_id(db).into(), false).into(),
         }
     }
 }

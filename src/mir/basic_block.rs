@@ -17,7 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
 
-use crate::mir::{Callee, Place, RValue, Terminator};
+use crate::{
+    common::location::Span,
+    mir::{Callee, Place, RValue, Terminator},
+};
 
 use super::{BlockID, LocalID, Operand};
 
@@ -32,33 +35,55 @@ pub enum MIRTerminator {
         arguments: Vec<Operand>,
         dest: LocalID,
         next: BlockID,
+        span: Span,
     },
 
     Return {
         value: Option<Operand>,
+        span: Span,
     },
 
     Goto {
         next: BlockID,
+        span: Span,
     },
 
     Branch {
         cond: Operand,
         then: BlockID,
         else_: BlockID,
+        span: Span,
     },
 
     Switch {
         discriminant: Operand,
         branches: BTreeMap<u128, BlockID>,
+        span: Span,
     },
 }
 
 pub struct MIRBasicBlock {
     pub stmts: Vec<Stmt>,
     pub terminator: Terminator,
+
+    // Metadata:
+    pub name: Option<String>,
 }
 
 pub enum Stmt {
     Assign { dest: Place, rvalue: RValue },
+}
+
+impl MIRBasicBlock {
+    pub fn empty(name: Option<String>) -> Self {
+        Self::empty_with_terminator(name, Terminator::Diverge)
+    }
+
+    pub fn empty_with_terminator(name: Option<String>, terminator: Terminator) -> Self {
+        Self {
+            stmts: vec![],
+            terminator,
+            name,
+        }
+    }
 }

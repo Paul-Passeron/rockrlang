@@ -19,11 +19,12 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         location::Span,
-        symbols::Symbol,
+        symbols::{self, Symbol},
     },
     hir::{self, Mutability},
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
+        builder::MIRBuilder,
         operand::{
             MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection, MIRRValue,
             MIRRValueKind,
@@ -34,6 +35,7 @@ use crate::{
 };
 
 pub mod basic_block;
+pub mod builder;
 pub mod operand;
 
 // MIR-local type aliases
@@ -49,6 +51,7 @@ type Projection = MIRProjection;
 type RValue = MIRRValue;
 type RValueKind = MIRRValueKind;
 type Callee = MIRCallee;
+type Builder<'a> = MIRBuilder<'a>;
 
 pub type MIRBlockID = Idx<BasicBlock>;
 pub type MIRLocalID = Idx<Local>;
@@ -61,6 +64,7 @@ pub struct SyntacticSource {
 pub struct MIR {
     pub blocks: Arena<BasicBlock>,
     pub locals: Arena<Local>,
+    pub parameters: Vec<LocalID>,
     pub entry: BlockID,
 }
 
@@ -73,4 +77,36 @@ pub struct MIRLocal {
     pub name: Option<Symbol>,
     pub thir_src: Option<thir::LocalId>,
     pub syn_src: Option<SyntacticSource>,
+}
+
+impl MIRLocal {
+    pub fn new(ty: TypeRef, mutability: Mutability, span: Span) -> Self {
+        Self {
+            ty,
+            mutability,
+            span,
+            name: None,
+            thir_src: None,
+            syn_src: None,
+        }
+    }
+
+    pub fn with_thir_src(self, src: thir::LocalId) -> Self {
+        let mut this = self;
+        this.thir_src = Some(src);
+        this
+    }
+
+    pub fn with_name(self, name: Symbol) -> Self {
+        let mut this = self;
+        this.name = Some(name);
+        this
+    }
+
+    pub fn with_syn_src(self, src: SyntacticSource) -> Self {
+        let mut this = self;
+        this.syn_src = Some(src);
+        this
+    }
+
 }
