@@ -19,9 +19,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     Db,
-    mir::{MIR, MIRLocal, MIRLocalID, SyntacticSource, builder::MIRBuilder},
-    ril::{FunctionId, TypeId, TypeRef},
-    thir::{self, Thir, thir_body},
+    common::location::Span,
+    mir::{
+        MIR, MIRLocal, MIRLocalID, SyntacticSource, basic_block::MIRTerminator,
+        builder::MIRBuilder, operand::MIROperand,
+    },
+    ril::{FunctionId, TypeId, TypeRef, void_id},
+    thir::{self, Thir, stmt::ThirStmt, thir_body},
 };
 
 pub struct ThirToMIR<'a> {
@@ -158,10 +162,59 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn build_stmts(&mut self, stmts: &[ThirStmt]) {
+        for stmt in stmts {
+            self.build_stmt(stmt);
+        }
+    }
+
+    fn build_stmt(&mut self, stmt: &ThirStmt) {
+        todo!()
+    }
+
+    fn build_ret(&mut self, value: Option<MIROperand>, span: Span) {
+        self.builder
+            .terminate(MIRTerminator::Return { value, span })
+            .unwrap();
+    }
+
+    fn build_void_ret(&mut self, span: Span) {
+        self.build_ret(None, span);
+    }
+
+    fn get_ret_ty(&self) -> TypeRef {
+        self.ty(self.thir.get_ret_ty(self.db))
+    }
+
+    fn current_block_is_terminated(&self) -> bool {
+        self.builder.is_terminated(self.builder.current_block())
+    }
+
+    fn build_void_ret_if_needed(&mut self) {
+        if self.current_block_is_terminated() {
+            return;
+        }
+        if self.get_ret_ty() != void_id(self.db).into() {
+            return;
+        }
+
+        let loc = self.thir.body_span(self.db).end();
+        self.build_void_ret(loc.span(loc));
+    }
+
     pub fn lower(mut self) -> MIR {
+        // Only during debug ?
         self.check_substitution();
+
         self.build_thir_locals();
         self.build_arguments();
-        todo!()
+
+        self.build_stmts(&self.thir.root);
+
+        self.build_void_ret_if_needed();
+
+        self.builder
+            .finalize()
+            .expect("Something went wrong finalizing the builder")
     }
 }
