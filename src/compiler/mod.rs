@@ -407,6 +407,7 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
     if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
+
 #[salsa::tracked]
 pub fn is_file_direct_submodule_of_file<'db>(
     db: &'db dyn Db,
