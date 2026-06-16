@@ -40,7 +40,8 @@ use crate::{
         ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
-    }, unused,
+    },
+    unused,
 };
 
 pub struct ThirToMIR<'a> {
@@ -299,19 +300,23 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn build_projections(&mut self, projections: &[Projection]) -> Vec<MIRProjection> {
+        projections
+            .iter()
+            .map(|projection| self.build_projection(*projection))
+            .collect()
+    }
+
     fn build_place(&mut self, place: PlaceId) -> MIRPlace {
         let thir_place = &self.thir.places[place];
-
-        let base = self.build_place_base(thir_place.base);
+        let local = self.build_place_base(thir_place.base);
+        let projections = self.build_projections(&thir_place.projections);
+        let ty = self.ty(thir_place.ty);
 
         MIRPlace {
-            local: base,
-            projections: thir_place
-                .projections
-                .iter()
-                .map(|projection| self.build_projection(*projection))
-                .collect(),
-            ty: thir_place.ty,
+            local,
+            projections,
+            ty,
         }
     }
 
