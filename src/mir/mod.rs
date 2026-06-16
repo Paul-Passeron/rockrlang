@@ -25,7 +25,8 @@ use crate::{
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         operand::{
-            MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind
+            MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
+            MIRProjection, MIRRValue, MIRRValueKind,
         },
     },
     ril::TypeRef,
@@ -34,8 +35,8 @@ use crate::{
 
 pub mod basic_block;
 pub mod builder;
-pub mod operand;
 pub mod display;
+pub mod operand;
 
 // MIR-local type aliases
 type BasicBlock = MIRBasicBlock;

@@ -390,15 +390,11 @@ impl<'a> ThirToMIR<'a> {
                 enum_def,
                 idx,
                 args,
-            } => {
-                let enum_ref = self.enum_ref(enum_def);
-                let args = self.build_constructor_args(args);
-                MIRRValueKind::Constructor {
-                    enum_ref,
-                    idx: *idx,
-                    args,
-                }
-            }
+            } => MIRRValueKind::Constructor {
+                enum_ref: self.enum_ref(enum_def),
+                idx: *idx,
+                args: self.build_constructor_args(args),
+            },
             ExprKind::Use(place) => {
                 let place = self.build_place(*place);
                 MIRRValueKind::Use(self.move_or_copy(place))
@@ -413,11 +409,11 @@ impl<'a> ThirToMIR<'a> {
                 let local = self.build_call(called.clone(), args, ty, span);
                 MIRRValueKind::Use(self.place_of_local(local).into_move())
             }
-            ExprKind::BinOp { op, lhs, rhs } => {
-                let lhs = self.build_operand(*lhs);
-                let rhs = self.build_operand(*rhs);
-                MIRRValueKind::BinOp(*op, lhs, rhs)
-            }
+            ExprKind::BinOp { op, lhs, rhs } => MIRRValueKind::BinOp(
+                *op,
+                self.build_operand(*lhs),
+                self.build_operand(*rhs),
+            ),
             ExprKind::Neg(expr) => {
                 let operand = self.build_operand(*expr);
                 MIRRValueKind::UnaryOp(UnaryOperator::Neg, operand)
@@ -426,18 +422,15 @@ impl<'a> ThirToMIR<'a> {
                 let operand = self.build_operand(*expr);
                 MIRRValueKind::UnaryOp(UnaryOperator::LNot, operand)
             }
-            ExprKind::Tuple(exprs) => {
-                let operands = exprs
+            ExprKind::Tuple(exprs) => MIRRValueKind::Tuple(
+                exprs
                     .iter()
                     .map(|expr| self.build_operand(*expr))
-                    .collect_vec();
-
-                MIRRValueKind::Tuple(operands)
-            }
+                    .collect_vec(),
+            ),
             ExprKind::SizeOf(ty) => MIRRValueKind::SizeOf(self.ty(*ty)),
             ExprKind::Metadata(expr) => {
-                let operand = self.build_operand(*expr);
-                MIRRValueKind::Metadata(operand)
+                MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(cst.into())

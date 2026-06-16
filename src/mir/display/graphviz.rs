@@ -20,10 +20,13 @@ use std::fmt;
 use crate::{
     Db,
     mir::{
-        MIR, basic_block::{MIRBasicBlock, MIRTerminator, Stmt}, display::fmt_binop, operand::{
+        MIR,
+        basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
+        display::fmt_binop,
+        operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
-        }
+        },
     },
 };
 
