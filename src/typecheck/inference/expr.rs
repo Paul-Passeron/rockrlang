@@ -38,7 +38,8 @@ use crate::{
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
-        CallKind, ExprId, InferCallInfos, PlaceId, inference::{implicit::ImplicitContext, var::InferVar}
+        CallKind, ExprId, InferCallInfos, PlaceId,
+        inference::{implicit::ImplicitContext, var::InferVar},
     },
 };
 
@@ -126,7 +127,7 @@ impl<'db> InferenceCtx<'db> {
                 let metadata_var = self.emit_metadata_of_fat_ptr_constraint(fat_ptr_var);
                 self.unify(fat_ptr_ty, fat_ptr_var.into())?;
                 Ok(metadata_var.into())
-            },
+            }
         }
     }
 

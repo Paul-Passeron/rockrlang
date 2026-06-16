@@ -160,7 +160,7 @@ pub enum ExprKind {
     },
 
     Metadata(ExprId),
-    
+
     Error, // Todo: Add metadata maybe
 }
 

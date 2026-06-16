@@ -208,7 +208,7 @@ pub enum HirExprDesc {
     },
 
     Metadata(Box<HirExpr>),
-    
+
     Error,
 }
 

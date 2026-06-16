@@ -24,7 +24,6 @@ use std::{
 
 use crate::common::frozen::Frozen;
 
-
 pub struct Arena<T> {
     inner: Frozen<T>,
 }
@@ -133,11 +132,10 @@ impl<T> Arena<T> {
     }
 }
 
-impl <T: PartialEq> PartialEq for Arena<T> {
+impl<T: PartialEq> PartialEq for Arena<T> {
     fn eq(&self, other: &Self) -> bool {
         self.inner.iter().eq(&other.inner)
     }
 }
 
-
-impl <T: PartialEq + Eq> Eq for Arena<T> {}
+impl<T: PartialEq + Eq> Eq for Arena<T> {}

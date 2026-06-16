@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use crate::{
     Db,
-    check::{fundef::check_fundef},
+    check::fundef::check_fundef,
     common::{location::Span, symbols::Symbol},
     hir::impl_items,
     parse_tree::top_level::AstImplItem,

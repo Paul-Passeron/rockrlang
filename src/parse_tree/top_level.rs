@@ -268,7 +268,11 @@ pub struct AstImplBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
-    Type { name: Symbol, name_span: Span, ty: AstTypeExpr },
+    Type {
+        name: Symbol,
+        name_span: Span,
+        ty: AstTypeExpr,
+    },
     Fundef(Box<AstMethodDef>),
 }
 

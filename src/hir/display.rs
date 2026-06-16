@@ -515,7 +515,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             write!(f, "@metadata(")?;
             write_expr(f, hir_expr, db)?;
             write!(f, ")")
-        },
+        }
     }
 }
 

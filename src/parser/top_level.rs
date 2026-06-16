@@ -23,14 +23,16 @@ use crate::{
     common::symbols::Symbol,
     lexer::TokenKind,
     parse_tree::{
-        Spanned, annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem}, top_level::{
+        Spanned,
+        annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
+        top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef, AstEnumVariant,
             AstEnumVariantKind, AstFundef, AstFundefArg, AstFundefDesc, AstFunsig,
             AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
             AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig,
             AstMethodsigDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
             AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
-        }
+        },
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
@@ -519,13 +521,21 @@ impl<'db> Parser<'db> {
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
-                let Spanned { data: name, span: name_span, .. } = self.parse_symbol()?;
+                let Spanned {
+                    data: name,
+                    span: name_span,
+                    ..
+                } = self.parse_symbol()?;
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
-                Ok(AstImplItem::Type { name, name_span, ty })
+                Ok(AstImplItem::Type {
+                    name,
+                    name_span,
+                    ty,
+                })
             }
             TokenKind::Fun => {
                 let mut fdef = self.parse_methoddef()?;
@@ -871,7 +881,11 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
-            x => todo!("{}: {}", self.get_start().loc_info(self.db), x.display(self.db)),
+            x => todo!(
+                "{}: {}",
+                self.get_start().loc_info(self.db),
+                x.display(self.db)
+            ),
         }
     }
 }
