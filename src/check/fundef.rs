@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, check::thir::validate_thir, name_resolve::type_expr::get_templates_of_fun,
-    ril::FunctionId, thir::thir_body, thir_to_mir::mir,
+    ril::FunctionId, thir::thir_body, thir_to_mir::mir, typecheck::type_check_function,
 };
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
@@ -27,9 +27,20 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
 
         let templates = get_templates_of_fun(db, fdef.interned());
         if templates.is_empty() {
-            let mir = mir(db, fdef, vec![]);
-            println!("{}", mir.display(db))
+            let the_mir = mir(db, fdef, vec![]);
+            println!("{}:", fdef.sig_to_string(db));
+            println!("{}", the_mir.display(db));
+            if let Some(tc) = type_check_function(db, fdef) {
+                for (_, call_info) in tc.call_infos(db) {
+                    let callee_templates =
+                        get_templates_of_fun(db, call_info.callee.interned());
+                    if !callee_templates.is_empty() {
+                        println!("{}:", call_info.callee.sig_to_string(db));
+                        println!("{}", the_mir.display(db));
+                        mir(db, call_info.callee, call_info.substitution.clone());
+                    }
+                }
+            }
         }
-        // TODO: transitively compute other mirs
     }
 }
