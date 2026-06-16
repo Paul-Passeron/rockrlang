@@ -246,6 +246,7 @@ impl<'a> ThirToMIR<'a> {
             StmtKind::Return(expr) => {
                 let value = expr.map(|expr| self.build_operand(expr));
                 self.build_ret(value, stmt.span);
+                self.switch_to(self.builder.new_block(Some("dead".into())));
             }
             StmtKind::Break(scope_id) => {
                 let bb = self.loop_ends[scope_id];
