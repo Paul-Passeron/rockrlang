@@ -88,9 +88,9 @@ fn fmt_local(f: &mut fmt::Formatter<'_>, db: &dyn Db, local: &MIRLocal) -> fmt::
         write!(f, "mut ")?;
     }
     if let Some(name) = local.name {
-        write!(f, "{}", name.to_string(db))?;
+        write!(f, "{} :", name.to_string(db))?;
     }
-    write!(f, ": {}", local.ty.to_string(db))
+    write!(f, "{}", local.ty.to_string(db))
 }
 
 fn fmt_block(
