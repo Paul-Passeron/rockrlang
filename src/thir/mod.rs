@@ -58,7 +58,7 @@ pub struct ThirLocal {
     pub source: Option<(hir::LocalId, Symbol)>,
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum PlaceBase {
     Local(LocalId),
 }
@@ -71,7 +71,7 @@ pub struct ThirPlace {
     pub span: Span,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Projection {
     Deref,
     Field(Symbol, TypeRef),
