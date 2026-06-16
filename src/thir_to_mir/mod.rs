@@ -262,9 +262,24 @@ impl<'a> ThirToMIR<'a> {
                 branches,
             } => self.build_match_stmt(scrutinee, branches),
             StmtKind::Expr(idx) => {
-                self.build_operand(*idx);
+                let rval = self.build_rvalue(*idx);
+                self.spill_rvalue_if_needed(rval, stmt.span);
             }
             StmtKind::Error => panic!("Can only produce MIR of error-less THIR"),
+        }
+    }
+
+    fn spill_rvalue_if_needed(&mut self, rval: MIRRValue, span: Span) {
+        match &rval.kind {
+            MIRRValueKind::Use(op) => match op {
+                MIROperand::Move(place) | MIROperand::Copy(place) => {
+                    if !place.projections.is_empty() {
+                        self.assign(self.synthetic_place(rval.ty, span), rval);
+                    }
+                }
+                _ => (),
+            },
+            _ => self.assign(self.synthetic_place(rval.ty, span), rval),
         }
     }
 
