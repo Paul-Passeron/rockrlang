@@ -33,8 +33,8 @@ use crate::{
         },
     },
     ril::{
-        BuiltinTypeId, FunctionId, TypeId, TypeRef, bool_id, char_id, int_id, never_id,
-        usize_id, void_id,
+        BuiltinTypeId, FunctionId, TypeDefId, TypeId, TypeRef, bool_id, char_id, int_id,
+        never_id, str_def, usize_id, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -344,12 +344,41 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn get_str_struct_ref(&self) -> StructRef {
+        let TypeDefId::Struct(str_def) = str_def(self.db) else {
+            unreachable!()
+        };
+        StructRef {
+            def: str_def,
+            args: vec![],
+        }
+    }
+
+    fn build_strlit(&mut self, strlit: &str) -> MIRRValueKind {
+        let data = MIRConstant::CString {
+            contents: strlit.into(),
+            null_terminated: false,
+        };
+        let len = MIRConstant::Integer {
+            value: strlit.len() as i128,
+            ty: usize_id(self.db).into(),
+        };
+
+        MIRRValueKind::StructLit {
+            struct_ref: self.get_str_struct_ref(),
+            fields: HashMap::from_iter(vec![
+                (Symbol::new(self.db, "data"), data.into()),
+                (Symbol::new(self.db, "len"), len.into()),
+            ]),
+        }
+    }
+
     fn build_rvalue(&mut self, expr: ExprId) -> MIRRValue {
         let thir_expr = &self.thir.exprs[expr];
         let ty = self.ty(thir_expr.ty);
         let span = thir_expr.span;
         let kind = match &thir_expr.kind {
-            ExprKind::StrLit(_) => todo!(),
+            ExprKind::StrLit(lit) => self.build_strlit(&lit.interned().contents(self.db)),
             ExprKind::StructLit {
                 struct_def,
                 fields: thir_fields,
@@ -413,6 +442,7 @@ impl<'a> ThirToMIR<'a> {
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(cst.into())
             }
+            ExprKind::SliceLit(_) => todo!(),
             ExprKind::Error => panic!("Can only produce MIR of error-less THIR"),
             _ => {
                 unreachable!("Unhandled expression at {}", span.start().loc_info(self.db))
