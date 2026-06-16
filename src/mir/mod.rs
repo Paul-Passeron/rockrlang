@@ -35,6 +35,7 @@ use crate::{
 pub mod basic_block;
 pub mod builder;
 pub mod operand;
+pub mod display;
 
 // MIR-local type aliases
 type BasicBlock = MIRBasicBlock;
