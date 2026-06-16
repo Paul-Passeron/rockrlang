@@ -27,7 +27,9 @@ use crate::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
-        operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue},
+        operand::{
+            MIRConstant, MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind,
+        },
     },
     ril::{
         BuiltinTypeId, FunctionId, TypeId, TypeRef, bool_id, char_id, int_id, usize_id,
@@ -38,7 +40,7 @@ use crate::{
         ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
-    },
+    }, unused,
 };
 
 pub struct ThirToMIR<'a> {
@@ -269,6 +271,8 @@ impl<'a> ThirToMIR<'a> {
         scrutinee: &ThirExprWithSetup,
         branches: &[ThirMatchBranch],
     ) {
+        let _mir_scrut = self.build_expr_with_setup(scrutinee);
+        unused!(branches);
         todo!()
     }
 
@@ -311,8 +315,45 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn move_or_copy(&self, place: MIRPlace) -> MIROperand {
+        if place.ty.is_copy(self.db) { place.into_copy() } else { place.into_move() }
+    }
+
     fn build_rvalue(&mut self, expr: ExprId) -> MIRRValue {
-        todo!()
+        let thir_expr = &self.thir.exprs[expr];
+        let kind = match &thir_expr.kind {
+            ExprKind::StrLit(_) => todo!(),
+            ExprKind::Use(place) => {
+                let place = self.build_place(*place);
+                MIRRValueKind::Use(self.move_or_copy(place))
+            }
+            ExprKind::AddressOf { .. } => todo!(),
+            ExprKind::Ref { .. } => todo!(),
+            ExprKind::Call { .. } => todo!(),
+            ExprKind::BinOp { .. } => todo!(),
+            ExprKind::StructLit { .. } => todo!(),
+            ExprKind::Neg(_) => todo!(),
+            ExprKind::Not(_) => todo!(),
+            ExprKind::Tuple(_) => todo!(),
+            ExprKind::SliceLit(_) => todo!(),
+            ExprKind::SizeOf(_) => todo!(),
+            ExprKind::Constructor { .. } => todo!(),
+            ExprKind::Metadata(expr) => {
+                let operand = self.build_operand(*expr);
+                MIRRValueKind::Metadata(operand)
+            }
+            _ if let Some(cst) = self.build_expr_as_constant(expr) => {
+                MIRRValueKind::Use(cst.into())
+            }
+            ExprKind::Error => panic!("Can only produce MIR of error-less THIR"),
+            _ => todo!(),
+        };
+        let ty = self.ty(thir_expr.ty);
+        MIRRValue {
+            kind,
+            ty,
+            span: thir_expr.span,
+        }
     }
 
     fn branch(
@@ -418,7 +459,32 @@ impl<'a> ThirToMIR<'a> {
         self.builder.emit(Stmt::Assign { dest, rvalue });
     }
 
+    fn build_expr_as_constant(&mut self, expr: ExprId) -> Option<MIRConstant> {
+        let thir_expr = &self.thir.exprs[expr];
+        match &thir_expr.kind {
+            ExprKind::IntLit(value) => Some(MIRConstant::Integer {
+                value: *value as i128,
+                ty: thir_expr.ty,
+            }),
+            // TODO: Handle unicode one day
+            ExprKind::Charlit(lit) => Some(MIRConstant::Integer {
+                value: *lit as u8 as i128,
+                ty: char_id(self.db).into(),
+            }),
+            ExprKind::CStrLit(str_lit) => Some(MIRConstant::CString {
+                contents: str_lit.interned().contents(self.db),
+                null_terminated: true,
+            }),
+            ExprKind::BoolLit(value) => Some(MIRConstant::Bool(*value)),
+            _ => None,
+        }
+    }
+
     fn build_operand(&mut self, expr: ExprId) -> MIROperand {
+        if let Some(cst) = self.build_expr_as_constant(expr) {
+            return MIROperand::Constant(cst);
+        }
+
         match self.build_rvalue_or_place(expr) {
             Either::Left(rvalue) => {
                 let ty = rvalue.ty;
@@ -426,13 +492,7 @@ impl<'a> ThirToMIR<'a> {
                 self.assign(place.clone(), rvalue);
                 place.into_move()
             }
-            Either::Right(place) => {
-                if place.ty.is_copy(self.db) {
-                    place.into_copy()
-                } else {
-                    place.into_move()
-                }
-            }
+            Either::Right(place) => self.move_or_copy(place),
         }
     }
 

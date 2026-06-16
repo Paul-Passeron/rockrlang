@@ -92,6 +92,7 @@ pub enum MIRRValueKind {
         args: Vec<Operand>,
     },
     Discriminant(Place),
+    Metadata(Operand),
 }
 
 impl Constant {
