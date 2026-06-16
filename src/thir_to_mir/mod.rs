@@ -697,6 +697,10 @@ impl<'a> ThirToMIR<'a> {
 
         self.build_void_ret_if_needed();
 
+        if !self.current_block_is_terminated() {
+            self.build_terminator(MIRTerminator::Diverge);
+        }
+
         self.builder
             .finalize()
             .expect("Something went wrong finalizing the builder")
