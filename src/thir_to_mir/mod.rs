@@ -43,8 +43,10 @@ use crate::{
         stmt::{StmtKind, ThirStmt},
         thir_body,
     },
-    unused,
+    thir_to_mir::lower_match::MatchLowerer,
 };
+
+pub mod lower_match;
 
 pub struct ThirToMIR<'a> {
     db: &'a dyn Db,
@@ -283,14 +285,32 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn spill_operand(&mut self, operand: MIROperand, span: Span) -> MIRPlace {
+        let ty = self.ty(operand.ty(self.db));
+        let as_rvalue = MIRRValue {
+            kind: MIRRValueKind::Use(operand),
+            ty,
+            span,
+        };
+        let place = self.synthetic_place(ty, span);
+        self.builder.emit(Stmt::Assign {
+            dest: place.clone(),
+            rvalue: as_rvalue,
+        });
+        place
+    }
+
     fn build_match_stmt(
         &mut self,
         scrutinee: &ThirExprWithSetup,
         branches: &[ThirMatchBranch],
     ) {
-        let _mir_scrut = self.build_expr_with_setup(scrutinee);
-        unused!(branches);
-        todo!()
+        let scrut_op = self.build_expr_with_setup(scrutinee);
+        let span = self.thir.exprs[scrutinee.expr].span;
+        let scrut_place = self.spill_operand(scrut_op, span);
+        let merge_bb = self.builder.new_block(Some("switch-merge".into()));
+        MatchLowerer::new(self, scrut_place, merge_bb).lower(branches);
+        self.switch_to(merge_bb);
     }
 
     fn build_place_base(&self, base: PlaceBase) -> MIRLocalID {
