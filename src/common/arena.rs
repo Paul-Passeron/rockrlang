@@ -31,6 +31,12 @@ pub struct Arena<T> {
 #[derive(Debug)]
 pub struct Idx<T>(usize, PhantomData<T>);
 
+impl<T> Idx<T> {
+    pub fn into_raw(self) -> usize {
+        self.0
+    }
+}
+
 impl<T> PartialEq for Idx<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.eq(&other.0)
@@ -139,3 +145,19 @@ impl<T: PartialEq> PartialEq for Arena<T> {
 }
 
 impl<T: PartialEq + Eq> Eq for Arena<T> {}
+
+impl<T> Arena<T> {
+    pub fn into_iter(self) -> impl Iterator<Item = (Idx<T>, T)> {
+        self.inner
+            .into_iter()
+            .enumerate()
+            .map(|(i, value)| (Idx(i, PhantomData::default()), value))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (Idx<T>, &T)> {
+        self.inner
+            .iter()
+            .enumerate()
+            .map(|(i, value)| (Idx(i, PhantomData::default()), value))
+    }
+}
