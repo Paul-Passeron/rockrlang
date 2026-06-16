@@ -115,6 +115,13 @@ impl<'a> MIRBuilder<'a> {
 
     pub fn finalize(mut self) -> Option<MIR> {
         if self.finalized_blocks.len() != self.blocks.len() {
+            eprintln!("Not all blocks were finalized: ");
+            for (id, bl) in self.blocks.iter() {
+                if self.finalized_blocks.contains(&id) {
+                    continue;
+                }
+                eprintln!("{:?}", bl.name);
+            }
             return None;
         }
 
