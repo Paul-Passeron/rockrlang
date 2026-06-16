@@ -17,15 +17,28 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, sync::Arc};
 
+use itertools::Either;
+
 use crate::{
     Db,
     common::location::Span,
+    hir::Mutability,
     mir::{
-        MIR, MIRLocal, MIRLocalID, SyntacticSource, basic_block::MIRTerminator,
-        builder::MIRBuilder, operand::MIROperand,
+        MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
+        basic_block::{MIRTerminator, Stmt},
+        builder::MIRBuilder,
+        operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue},
     },
-    ril::{FunctionId, TypeId, TypeRef, void_id},
-    thir::{self, Thir, stmt::ThirStmt, thir_body},
+    ril::{
+        BuiltinTypeId, FunctionId, TypeId, TypeRef, bool_id, char_id, int_id, usize_id,
+        void_id,
+    },
+    thir::{
+        self, ExprId, ExprKind, PlaceBase, PlaceId, Projection, ScopeId, Thir,
+        ThirExprWithSetup, ThirMatchBranch,
+        stmt::{StmtKind, ThirStmt},
+        thir_body,
+    },
 };
 
 pub struct ThirToMIR<'a> {
@@ -36,6 +49,8 @@ pub struct ThirToMIR<'a> {
 
     local_map: HashMap<thir::LocalId, MIRLocalID>,
     params: Vec<MIRLocalID>,
+    loop_begins: HashMap<ScopeId, MIRBlockID>,
+    loop_ends: HashMap<ScopeId, MIRBlockID>,
 }
 
 #[salsa::interned]
@@ -75,6 +90,8 @@ impl<'a> ThirToMIR<'a> {
             subs,
             local_map: HashMap::new(),
             params: Vec::new(),
+            loop_begins: HashMap::new(),
+            loop_ends: HashMap::new(),
         }
     }
 
@@ -168,14 +185,263 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
+    fn synthetic_local(&self, ty: TypeRef, span: Span) -> MIRLocalID {
+        let local = MIRLocal::new(ty, Mutability::Const, span);
+        self.builder.new_local(local)
+    }
+
+    fn place_of_local(&self, local: MIRLocalID) -> MIRPlace {
+        let ty = self.builder.locals[local].ty;
+        MIRPlace {
+            local,
+            projections: vec![],
+            ty,
+        }
+    }
+
+    fn synthetic_place(&self, ty: TypeRef, span: Span) -> MIRPlace {
+        self.place_of_local(self.synthetic_local(ty, span))
+    }
+
+    fn goto(&mut self, next: MIRBlockID, span: Span) {
+        self.builder
+            .terminate(MIRTerminator::Goto { next, span })
+            .unwrap()
+    }
+
     fn build_stmt(&mut self, stmt: &ThirStmt) {
+        match &stmt.kind {
+            // For the moment, we do not have to care about destructors or anything so
+            // we just:
+            StmtKind::Block { stmts, .. } => self.build_stmts(stmts),
+            StmtKind::If {
+                cond, then, else_, ..
+            } => {
+                self.build_if_stmt(
+                    cond,
+                    then,
+                    else_.as_ref().map(|x| x.as_slice()),
+                    stmt.span,
+                );
+            }
+            StmtKind::While { scope, cond, body } => {
+                self.build_while_stmt(*scope, cond, body, stmt.span)
+            }
+            StmtKind::Let { local, init } => {
+                let mir_local = self.local_map[local];
+                let dest = self.place_of_local(mir_local);
+                let rvalue = self.build_rvalue(*init);
+                self.assign(dest, rvalue);
+            }
+            StmtKind::Assign { place, rhs } => {
+                let dest = self.build_place(*place);
+                let rvalue = self.build_rvalue(*rhs);
+                self.assign(dest, rvalue);
+            }
+            StmtKind::Return(expr) => {
+                let value = expr.map(|expr| self.build_operand(expr));
+                self.build_ret(value, stmt.span);
+            }
+            StmtKind::Break(scope_id) => {
+                let bb = self.loop_ends[scope_id];
+                self.goto(bb, stmt.span);
+            }
+            StmtKind::Continue(scope_id) => {
+                let bb = self.loop_begins[scope_id];
+                self.goto(bb, stmt.span);
+            }
+            StmtKind::Match {
+                scrutinee,
+                branches,
+            } => self.build_match_stmt(scrutinee, branches),
+            StmtKind::Expr(idx) => {
+                let ty = self.thir.exprs[*idx].ty;
+                let dest = self.synthetic_place(ty, stmt.span);
+                let rvalue = self.build_rvalue(*idx);
+                self.assign(dest, rvalue);
+            }
+            StmtKind::Error => panic!("Can only produce MIR of error-less THIR"),
+        }
+    }
+
+    fn build_match_stmt(
+        &mut self,
+        scrutinee: &ThirExprWithSetup,
+        branches: &[ThirMatchBranch],
+    ) {
         todo!()
     }
 
+    fn build_place_base(&self, base: PlaceBase) -> MIRLocalID {
+        match base {
+            PlaceBase::Local(local) => self.local_map[&local],
+        }
+    }
+
+    fn build_projection(&mut self, projection: Projection) -> MIRProjection {
+        match projection {
+            Projection::Deref => MIRProjection::Deref,
+            Projection::Field(name, resulting_ty) => {
+                MIRProjection::Field { name, resulting_ty }
+            }
+            Projection::TupleField(index, resulting_ty) => MIRProjection::TupleField {
+                index,
+                resulting_ty,
+            },
+            Projection::Index(expr) => {
+                let index = self.build_operand(expr);
+                MIRProjection::Index { index }
+            }
+        }
+    }
+
+    fn build_place(&mut self, place: PlaceId) -> MIRPlace {
+        let thir_place = &self.thir.places[place];
+
+        let base = self.build_place_base(thir_place.base);
+
+        MIRPlace {
+            local: base,
+            projections: thir_place
+                .projections
+                .iter()
+                .map(|projection| self.build_projection(*projection))
+                .collect(),
+            ty: thir_place.ty,
+        }
+    }
+
+    fn build_rvalue(&mut self, expr: ExprId) -> MIRRValue {
+        todo!()
+    }
+
+    fn branch(
+        &mut self,
+        cond: MIROperand,
+        then_bb: MIRBlockID,
+        else_bb: MIRBlockID,
+        span: Span,
+    ) {
+        self.build_terminator(MIRTerminator::Branch {
+            cond,
+            then: then_bb,
+            else_: else_bb,
+            span,
+        });
+    }
+
+    fn switch_to(&mut self, block: MIRBlockID) {
+        self.builder.switch_to_block(block).unwrap();
+    }
+
+    fn build_while_stmt(
+        &mut self,
+        scope: ScopeId,
+        cond: &ThirExprWithSetup,
+        body: &[ThirStmt],
+        span: Span,
+    ) {
+        let cond_bb = self.builder.new_block(Some("while-condition".into()));
+        let body_bb = self.builder.new_block(Some("while-body".into()));
+        let merge_bb = self.builder.new_block(Some("while-merge".into()));
+
+        self.loop_begins.insert(scope, cond_bb);
+        self.loop_ends.insert(scope, merge_bb);
+
+        self.goto(cond_bb, span);
+
+        self.switch_to(cond_bb);
+        let cond = self.build_expr_with_setup(cond);
+        self.branch(cond, body_bb, merge_bb, span);
+
+        self.switch_to(body_bb);
+        self.build_stmts(body);
+
+        if !self.current_block_is_terminated() {
+            self.goto(cond_bb, span);
+        }
+
+        self.switch_to(merge_bb);
+    }
+
+    fn build_if_stmt(
+        &mut self,
+        cond: &ThirExprWithSetup,
+        then: &[ThirStmt],
+        else_: Option<&[ThirStmt]>,
+        span: Span,
+    ) {
+        let cond = self.build_expr_with_setup(cond);
+
+        let then_bb = self.builder.new_block(Some("if-then".into()));
+        let merge_bb = self.builder.new_block(Some("if-merge".into()));
+
+        let end_span = span.end().span(span.end());
+
+        if let Some(else_stmts) = else_ {
+            let else_bb = self.builder.new_block(Some("if-else".into()));
+
+            self.branch(cond, then_bb, else_bb, span);
+
+            self.switch_to(else_bb);
+            self.build_stmts(else_stmts);
+            if !self.current_block_is_terminated() {
+                self.goto(merge_bb, end_span);
+            }
+        } else {
+            self.branch(cond, then_bb, merge_bb, span);
+        }
+
+        self.switch_to(then_bb);
+        self.build_stmts(then);
+        if !self.current_block_is_terminated() {
+            self.goto(merge_bb, end_span);
+        }
+
+        self.switch_to(merge_bb);
+    }
+
+    fn build_expr_with_setup(&mut self, expr: &ThirExprWithSetup) -> MIROperand {
+        self.build_stmts(&expr.stmts);
+        self.build_operand(expr.expr)
+    }
+
+    fn build_rvalue_or_place(&mut self, expr: ExprId) -> Either<MIRRValue, MIRPlace> {
+        if let ExprKind::Use(place) = &self.thir.exprs[expr].kind {
+            Either::Right(self.build_place(*place))
+        } else {
+            Either::Left(self.build_rvalue(expr))
+        }
+    }
+
+    fn assign(&mut self, dest: MIRPlace, rvalue: MIRRValue) {
+        self.builder.emit(Stmt::Assign { dest, rvalue });
+    }
+
+    fn build_operand(&mut self, expr: ExprId) -> MIROperand {
+        match self.build_rvalue_or_place(expr) {
+            Either::Left(rvalue) => {
+                let ty = rvalue.ty;
+                let place = self.synthetic_place(ty, rvalue.span);
+                self.assign(place.clone(), rvalue);
+                place.into_move()
+            }
+            Either::Right(place) => {
+                if place.ty.is_copy(self.db) {
+                    place.into_copy()
+                } else {
+                    place.into_move()
+                }
+            }
+        }
+    }
+
+    fn build_terminator(&mut self, terminator: MIRTerminator) {
+        self.builder.terminate(terminator).unwrap();
+    }
+
     fn build_ret(&mut self, value: Option<MIROperand>, span: Span) {
-        self.builder
-            .terminate(MIRTerminator::Return { value, span })
-            .unwrap();
+        self.build_terminator(MIRTerminator::Return { value, span })
     }
 
     fn build_void_ret(&mut self, span: Span) {
@@ -216,5 +482,46 @@ impl<'a> ThirToMIR<'a> {
         self.builder
             .finalize()
             .expect("Something went wrong finalizing the builder")
+    }
+}
+
+/// Cheking if a type can be copied. This will be delegated to an interface
+/// check.
+
+impl TypeRef {
+    pub fn is_copy(self, db: &dyn Db) -> bool {
+        match self {
+            TypeRef::Concrete(type_id) => type_id.is_copy(db),
+            _ => false, // TODO
+        }
+    }
+}
+
+impl TypeId {
+    pub fn is_copy(self, db: &dyn Db) -> bool {
+        if self == int_id(db) {
+            return true;
+        }
+        if self == bool_id(db) {
+            return true;
+        }
+        if self == char_id(db) {
+            return true;
+        }
+        if self == usize_id(db) {
+            return true;
+        }
+        let def = self.def(db);
+        if def == BuiltinTypeId::ref_(db).into() {
+            return true;
+        }
+        if def == BuiltinTypeId::mut_ptr(db).into() {
+            return true;
+        }
+        if def == BuiltinTypeId::ptr(db).into() {
+            return true;
+        }
+
+        false
     }
 }
