@@ -15,11 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, check::thir::validate_thir, ril::FunctionId, thir::thir_body};
+use crate::{Db, check::thir::validate_thir, name_resolve::type_expr::get_templates_of_fun, ril::FunctionId, thir::thir_body, thir_to_mir::mir};
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
         println!("{}", thir.display(db));
         validate_thir(db, thir.as_ref());
+
+        let templates = get_templates_of_fun(db, fdef.interned());
+        if templates.is_empty() {
+            let mir = mir(db, fdef, vec![]);
+            println!("{}", mir.display(db))
+        }
+        // TODO: transitively compute other mirs
     }
 }
