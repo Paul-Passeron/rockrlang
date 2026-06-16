@@ -59,6 +59,7 @@ pub enum MIRTerminator {
     Switch {
         discriminant: Operand,
         branches: BTreeMap<u128, BlockID>,
+        default: BlockID,
         span: Span,
     },
 }
