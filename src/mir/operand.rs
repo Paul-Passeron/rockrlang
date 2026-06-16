@@ -15,14 +15,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::collections::HashMap;
+
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::Mutability,
-    mir::{LocalID, Operand, Projection, RValueKind},
+    mir::{ConstructorArgs, LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
     ril::{TypeRef, bool_id, char_id, ptr_of},
-    thir::{EnumRef, FunctionRef},
+    thir::{EnumRef, FunctionRef, StructRef},
 };
 
 use super::{Constant, Place};
@@ -84,15 +86,29 @@ pub enum MIRCallee {
 pub enum MIRRValueKind {
     Use(Operand),
     Ref(Place, Mutability),
+    AddressOf(Place, Mutability),
     BinOp(BinaryOperator, Operand, Operand),
     UnaryOp(UnaryOperator, Operand),
     Constructor {
-        enum_def: EnumRef,
+        enum_ref: EnumRef,
         idx: usize,
-        args: Vec<Operand>,
+        args: ConstructorArgs,
+    },
+    StructLit {
+        struct_ref: StructRef,
+        fields: HashMap<Symbol, Operand>,
     },
     Discriminant(Place),
     Metadata(Operand),
+    SizeOf(TypeRef),
+    Tuple(Vec<Operand>),
+}
+
+#[derive(PartialEq, Eq)]
+pub enum MIRConstructorArgs {
+    None,
+    Tuple(Vec<Operand>),
+    Struct(HashMap<Symbol, Operand>),
 }
 
 impl Constant {

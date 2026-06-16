@@ -86,7 +86,7 @@ pub struct ThirExpr {
 }
 
 // TODO: figure out the right way to do this
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct FunctionRef {
     pub id: FunctionId,
     pub args: Vec<TypeRef>,
@@ -94,7 +94,7 @@ pub struct FunctionRef {
     pub dispatch: Dispatch,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Dispatch {
     Direct,
     Interface(InterfaceRef),
@@ -169,6 +169,7 @@ pub struct ThirExprWithSetup {
     pub expr: ExprId,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum ThirConstructorArgs<T> {
     Tuple(Vec<T>),
     Struct(Vec<(Symbol, T)>),

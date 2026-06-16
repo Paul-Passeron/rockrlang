@@ -25,8 +25,7 @@ use crate::{
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         operand::{
-            MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-            MIRRValueKind,
+            MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind
         },
     },
     ril::TypeRef,
@@ -50,6 +49,7 @@ type Projection = MIRProjection;
 type RValue = MIRRValue;
 type RValueKind = MIRRValueKind;
 type Callee = MIRCallee;
+type ConstructorArgs = MIRConstructorArgs;
 
 pub type MIRBlockID = Idx<BasicBlock>;
 pub type MIRLocalID = Idx<Local>;
