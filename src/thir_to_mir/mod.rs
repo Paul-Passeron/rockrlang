@@ -171,6 +171,7 @@ impl<'a> ThirToMIR<'a> {
             let mir_id = *self.local_map.get(param).expect("Expected all local thir ids to be found in self.local_map. Maybe try calling `build_thir_locals`.");
             self.params.push(mir_id);
         }
+        self.builder.set_parameters(self.params.clone()).unwrap();
     }
 
     fn check_substitution(&self) {
