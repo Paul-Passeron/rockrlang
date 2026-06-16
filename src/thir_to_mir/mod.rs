@@ -262,10 +262,7 @@ impl<'a> ThirToMIR<'a> {
                 branches,
             } => self.build_match_stmt(scrutinee, branches),
             StmtKind::Expr(idx) => {
-                let ty = self.thir.exprs[*idx].ty;
-                let dest = self.synthetic_place(ty, stmt.span);
-                let rvalue = self.build_rvalue(*idx);
-                self.assign(dest, rvalue);
+                self.build_operand(*idx);
             }
             StmtKind::Error => panic!("Can only produce MIR of error-less THIR"),
         }
@@ -413,7 +410,8 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Ref(self.build_place(*place), *mutability)
             }
             ExprKind::Call { called, args } => {
-                self.build_call(called.clone(), args, ty, span)
+                let local = self.build_call(called.clone(), args, ty, span);
+                MIRRValueKind::Use(self.place_of_local(local).into_move())
             }
             ExprKind::BinOp { op, lhs, rhs } => {
                 let lhs = self.build_operand(*lhs);
@@ -487,7 +485,7 @@ impl<'a> ThirToMIR<'a> {
         args: &[ExprId],
         ret_ty: TypeRef,
         span: Span,
-    ) -> MIRRValueKind {
+    ) -> MIRLocalID {
         let callee = MIRCallee::Direct(called);
         let args = args
             .iter()
@@ -508,7 +506,7 @@ impl<'a> ThirToMIR<'a> {
             let unreachable_bb = self.builder.new_block(Some("dead".into()));
             self.switch_to(unreachable_bb);
         }
-        MIRRValueKind::Use(self.place_of_local(local).into_move())
+        local
     }
 
     fn branch(
@@ -603,10 +601,15 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn build_rvalue_or_place(&mut self, expr: ExprId) -> Either<MIRRValue, MIRPlace> {
-        if let ExprKind::Use(place) = &self.thir.exprs[expr].kind {
-            Either::Right(self.build_place(*place))
-        } else {
-            Either::Left(self.build_rvalue(expr))
+        let thir_expr = &self.thir.exprs[expr];
+        match &thir_expr.kind {
+            ExprKind::Use(place) => Either::Right(self.build_place(*place)),
+            ExprKind::Call { called, args } => {
+                let ret_ty = self.ty(thir_expr.ty);
+                let local = self.build_call(called.clone(), args, ret_ty, thir_expr.span);
+                Either::Right(self.place_of_local(local))
+            }
+            _ => Either::Left(self.build_rvalue(expr)),
         }
     }
 
