@@ -1,0 +1,16 @@
+@include core::opt
+
+fun some_opt(): opt<int> {
+    return opt::Some(8);
+}
+
+fun foo(): int {
+    match some_opt() {
+        opt::Some(x) => {
+            return x;
+        }
+        opt::None => {
+            return 0;
+        }
+    }
+}
