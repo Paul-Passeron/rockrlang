@@ -134,6 +134,7 @@ fn fmt_projection_str(db: &dyn Db, proj: &MIRProjection) -> String {
         MIRProjection::Field { name, .. } => format!(".{}", name.to_string(db)),
         MIRProjection::TupleField { index, .. } => format!(".{index}"),
         MIRProjection::Index { index } => format!("[{}]", fmt_operand_str(db, index)),
+        MIRProjection::Downcast { variant } => format!(".downcast#{variant}"),
     }
 }
 

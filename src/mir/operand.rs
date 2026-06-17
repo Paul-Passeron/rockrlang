@@ -62,6 +62,9 @@ pub enum MIRProjection {
     Field { name: Symbol, resulting_ty: TypeRef },
     TupleField { index: u32, resulting_ty: TypeRef },
     Index { index: Operand },
+    Downcast {
+        variant: usize
+    },
 }
 
 #[derive(PartialEq, Eq)]

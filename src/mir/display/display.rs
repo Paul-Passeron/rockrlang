@@ -143,6 +143,7 @@ fn fmt_projection(
             fmt_operand(f, db, index)?;
             write!(f, "]")
         }
+        MIRProjection::Downcast { variant } => write!(f, ".downcast#{variant}"),
     }
 }
 
