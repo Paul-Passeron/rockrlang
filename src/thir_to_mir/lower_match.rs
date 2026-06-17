@@ -3,8 +3,10 @@ use crate::{
     mir::{MIRBlockID, operand::MIRPlace},
     ril::{TypeDefId, TypeId, TypeRef},
     thir::{EnumRef, ThirMatchBranch},
-    thir_to_mir::ThirToMIR,
-    unused,
+    thir_to_mir::{
+        ThirToMIR,
+        decision_tree::{DecisionTree, Matrix, Row},
+    },
 };
 
 pub(super) struct MatchLowerer<'a, 'b> {
@@ -28,33 +30,35 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         }
     }
 
-    fn lower_enum(
-        &mut self,
-        enum_ref: EnumRef,
-        depth: usize,
-        branches: &[ThirMatchBranch],
-    ) {
-        unused!(branches);
-        todo!(
-            "Deref enum_ref {} with depth={depth}",
-            enum_ref.as_type_ref(self.db).to_string(self.db)
-        )
+    fn build_match_matrix(&mut self, branches: &'a [ThirMatchBranch]) -> Matrix<'a> {
+        let rows = branches
+            .iter()
+            .enumerate()
+            .map(|(idx, branch)| -> Row<'a> {
+                assert!(branch.guard.is_none()); // TODO
+                Row {
+                    pats: vec![Some(&branch.pattern)],
+                    branch_idx: idx,
+                    bindings: vec![],
+                }
+            })
+            .collect();
+
+        Matrix {
+            cols: vec![self.scrut.clone()],
+            rows,
+        }
     }
 
-    fn lower_any(&mut self, branches: &[ThirMatchBranch]) {
-        unused!(branches);
-        unused!(self.ctx);
-        unused!(self.merge_bb);
+    fn lower_decision_tree(&mut self, dt: &DecisionTree, branches: &[ThirMatchBranch]) {
         todo!()
     }
 
-    pub fn lower(&mut self, branches: &[ThirMatchBranch]) {
-        let (peeled, depth) = self.scrut.ty.peel_aux(self.db);
-        if let Some(enum_ref) = peeled.as_enum_ref(self.db) {
-            self.lower_enum(enum_ref, depth, branches);
-        } else {
-            self.lower_any(branches);
-        }
+    pub fn lower(&mut self, branches: &'a [ThirMatchBranch]) {
+        let matrix = self.build_match_matrix(branches);
+        let decision_tree = matrix.compile(self.ctx);
+        println!("Tree obtained: {:#?}", decision_tree);
+        self.lower_decision_tree(&decision_tree, branches);
     }
 }
 
