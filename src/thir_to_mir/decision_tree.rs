@@ -183,7 +183,7 @@ impl<'a> Matrix<'a> {
                 rows.push(Row {
                     pats: new_pats,
                     branch_idx: row.branch_idx,
-                    bindings: row.bindings.clone(),
+                    bindings,
                 });
             }
             // else: drop row
