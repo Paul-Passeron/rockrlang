@@ -29,14 +29,14 @@ use crate::{
 
 use super::{Constant, Place};
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MIROperand {
     Constant(Constant),
     Move(Place),
     Copy(Place),
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MIRConstant {
     Integer {
         value: i128,
@@ -49,22 +49,20 @@ pub enum MIRConstant {
     },
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MIRPlace {
     pub local: LocalID,
     pub projections: Vec<Projection>,
     pub ty: TypeRef,
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MIRProjection {
     Deref,
     Field { name: Symbol, resulting_ty: TypeRef },
     TupleField { index: u32, resulting_ty: TypeRef },
     Index { index: Operand },
-    Downcast {
-        variant: usize
-    },
+    Downcast { variant: usize },
 }
 
 #[derive(PartialEq, Eq)]

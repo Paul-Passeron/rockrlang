@@ -36,7 +36,9 @@ use crate::{
 
 // Compiling pattern matching to decision tree, inspired by
 // http://moscova.inria.fr/~maranget/papers/ml05e-maranget.pdf
-enum DecisionTree {
+
+#[derive(Debug)]
+pub enum DecisionTree {
     Leaf {
         branch_idx: usize,
         bindings: Vec<(MIRLocalID, MIRPlace)>,
@@ -50,22 +52,22 @@ enum DecisionTree {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-enum Constructor {
+pub enum Constructor {
     Variant(usize),
     IntLit(i128),
     BoolLit(bool),
     // TODO: maybe add more
 }
 
-struct Matrix<'a> {
-    cols: Vec<MIRPlace>,
-    rows: Vec<Row<'a>>,
+pub struct Matrix<'a> {
+    pub cols: Vec<MIRPlace>,
+    pub rows: Vec<Row<'a>>,
 }
 
-struct Row<'a> {
-    pats: Vec<Option<&'a ThirPattern>>,
-    branch_idx: usize,
-    bindings: Vec<(MIRLocalID, MIRPlace)>,
+pub struct Row<'a> {
+    pub pats: Vec<Option<&'a ThirPattern>>,
+    pub branch_idx: usize,
+    pub bindings: Vec<(MIRLocalID, MIRPlace)>,
 }
 
 impl<'a> Matrix<'a> {

@@ -16,7 +16,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::{
-    any::TypeId,
+    any::{TypeId, type_name},
+    fmt,
     hash::Hash,
     marker::PhantomData,
     ops::{Index, IndexMut},
@@ -28,7 +29,6 @@ pub struct Arena<T> {
     inner: Frozen<T>,
 }
 
-#[derive(Debug)]
 pub struct Idx<T>(usize, PhantomData<T>);
 
 impl<T> Idx<T> {
@@ -60,6 +60,14 @@ impl<T> Ord for Idx<T> {
 impl<T> Clone for Idx<T> {
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+impl<T> fmt::Debug for Idx<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple(format!("Idx<{}>", type_name::<T>()).as_str())
+            .field(&self.0)
+            .finish()
     }
 }
 
