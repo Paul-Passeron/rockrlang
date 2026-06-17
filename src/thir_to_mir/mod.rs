@@ -47,6 +47,7 @@ use crate::{
 };
 
 pub mod lower_match;
+pub mod decision_tree;
 
 pub struct ThirToMIR<'a> {
     db: &'a dyn Db,

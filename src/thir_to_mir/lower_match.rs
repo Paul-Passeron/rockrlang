@@ -49,8 +49,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
     }
 
     pub fn lower(&mut self, branches: &[ThirMatchBranch]) {
-        let ty = self.scrut.ty;
-        let (peeled, depth) = ty.peel_aux(self.db);
+        let (peeled, depth) = self.scrut.ty.peel_aux(self.db);
         if let Some(enum_ref) = peeled.as_enum_ref(self.db) {
             self.lower_enum(enum_ref, depth, branches);
         } else {
