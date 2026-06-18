@@ -15,8 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::mir::MIR;
+use crate::{Db, mir::MIR};
+
+pub mod dead_code_elimination;
 
 pub trait MIRPass {
-    fn run(&self, mir: &MIR) -> MIR;
+    fn run(&self, db: &dyn Db, mir: &MIR) -> MIR;
 }
