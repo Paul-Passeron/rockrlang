@@ -17,3 +17,14 @@ fun foo(): int {
         }
     }
 }
+
+fun bar(): int {
+    match some_opt() {
+        opt::Some(opt::Some(x)) => {
+            return x;
+        }
+        _ => {
+            return 0;
+        }
+    }
+}
