@@ -1,0 +1,30 @@
+@include core::opt
+
+fun some_opt(): opt<opt<&int>> {
+    return opt::Some(opt::Some(&8));
+}
+
+fun foo(): &int {
+    match some_opt() {
+        opt::Some(opt::Some(x)) => {
+            return x;
+        }
+        opt::Some(opt::None) => {
+            return &69;
+        }
+        opt::None => {
+            return &0;
+        }
+    }
+}
+
+fun bar(): int {
+    match some_opt() {
+        opt::Some(opt::Some(x)) => {
+            return *x;
+        }
+        _ => {
+            return 0;
+        }
+    }
+}

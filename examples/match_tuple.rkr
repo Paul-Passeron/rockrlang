@@ -1,0 +1,75 @@
+@include core::opt
+
+fun test_tuple(t: (int, int)): int {
+    match t {
+        (x, y) => {
+            return x;
+        }
+    }
+}
+
+enum Bool {
+    True,
+    False,
+}
+
+fun test_tuple_refutable(t: (opt<int>, Bool)): int {
+    match t {
+        (opt::Some(x), Bool::True) => {
+            return x;
+        }
+        (_, Bool::False) => {
+            return 0;
+        }
+        (opt::None, _) => {
+            return -1;
+        }
+    }
+}
+
+fun test_enum_tuple(o: opt<(int, int)>): int {
+    match o {
+        opt::Some((x, y)) => {
+            return x;
+        }
+        opt::None => {
+            return 0;
+        }
+    }
+}
+
+fun test_two_enums(t: (opt<int>, opt<int>)): int {
+    match t {
+        (opt::Some(x), opt::Some(y)) => {
+            return x;
+        }
+        (opt::Some(x), opt::None) => {
+            return x;
+        }
+        (opt::None, opt::Some(y)) => {
+            return y;
+        }
+        (opt::None, opt::None) => {
+            return 0;
+        }
+    }
+}
+
+fun test_deep_tuple(t: (int, (int, int))): int {
+    match t {
+        (x, (y, z)) => {
+            return y;
+        }
+    }
+}
+
+fun test_tuple_wildcard(t: (opt<int>, int)): int {
+    match t {
+        (opt::Some(x), _) => {
+            return x;
+        }
+        (opt::None, y) => {
+            return y;
+        }
+    }
+}
