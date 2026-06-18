@@ -269,7 +269,10 @@ impl<'db> SanityChecker<'db> {
             ExprKind::BinOp { .. } => {
                 Diag::todo("Check binop here".into(), infos.span).accumulate(self.db);
             }
-            ExprKind::Neg(_) => todo!(),
+            ExprKind::Neg(operand) => {
+                let operand_ty = self.check_expr(*operand);
+                self.check_types(operand_ty, infos.ty, infos.span);
+            },
             ExprKind::Not(operand) => {
                 let operand_ty = self.check_expr(*operand);
                 self.check_types(
