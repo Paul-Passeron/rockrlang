@@ -1,7 +1,7 @@
 use crate::parse_tree::expr::BinaryOperator;
 
-pub mod writer;
 pub mod graphviz;
+pub mod writer;
 
 fn fmt_binop(op: &BinaryOperator) -> &'static str {
     match op {
