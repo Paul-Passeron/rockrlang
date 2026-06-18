@@ -15,6 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+// See https://dl.acm.org/doi/pdf/10.1145/3547647 for possible improvements to the 
+// representation
+
+// Some ideas:
+// - Move data type constructors (Structs, Enums) to Operand instead of RValue
+// - Move tuples to Operand instead of RValue
+// - Differentiate between shared / mutable borrow deref ?
+
 use std::collections::HashMap;
 
 use crate::{
