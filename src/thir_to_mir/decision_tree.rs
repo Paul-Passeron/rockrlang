@@ -100,7 +100,7 @@ impl<'a> Matrix<'a> {
         let ty = place.ty.peeled(ctx.db);
 
         if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct_ref(ctx.db).is_some() {
-            todo!("expand irrefutable pattern")
+            return self.expand_irrefutable(col, ctx).compile(ctx);
         }
 
         let default = if is_complete(ctx.db, &sig, ty) {
@@ -113,6 +113,78 @@ impl<'a> Matrix<'a> {
             place,
             cases,
             default,
+        }
+    }
+
+    fn expand_irrefutable(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
+        let place = &self.cols[col];
+        let ty = place.ty.peeled(ctx.db);
+
+        let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
+            tuple_ref
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    let mut pl = place.clone();
+                    pl.ty = *ty;
+                    pl.projections.push(MIRProjection::TupleField {
+                        index: i as u32,
+                        resulting_ty: *ty,
+                    });
+                    pl
+                })
+                .collect()
+        } else if let Some(struct_ref) = ty.as_struct_ref(ctx.db) {
+            struct_ref
+                .get_fields_ty(ctx.db)
+                .iter()
+                .map(|(name, ty)| {
+                    let mut pl = place.clone();
+                    pl.ty = *ty;
+                    pl.projections.push(MIRProjection::Field {
+                        name: *name,
+                        resulting_ty: *ty,
+                    });
+                    pl
+                })
+                .collect_vec()
+        } else {
+            todo!()
+        };
+
+        let arity = new_places.len();
+
+        let mut new_cols = self.cols.clone();
+        new_cols.splice(col..=col, new_places);
+
+        let new_rows = self
+            .rows
+            .iter()
+            .map(|row| {
+                let mut new_pats = row.pats.clone();
+                let sub_pats = match &row.pats[col] {
+                    Some(ThirPattern {
+                        kind: ThirPatternKind::Tuple(thir_patterns),
+                        ..
+                    }) => thir_patterns.iter().map(Some).collect_vec(),
+                    Some(ThirPattern {
+                        kind: ThirPatternKind::Struct { fields, .. },
+                        ..
+                    }) => fields.iter().map(|(_, p)| Some(p)).collect_vec(),
+                    _ => (0..arity).map(|_| None).collect_vec(),
+                };
+                new_pats.splice(col..=col, sub_pats);
+                Row {
+                    pats: new_pats,
+                    branch_idx: row.branch_idx,
+                    bindings: row.bindings.clone(),
+                }
+            })
+            .collect_vec();
+
+        Self {
+            cols: new_cols,
+            rows: new_rows,
         }
     }
 
