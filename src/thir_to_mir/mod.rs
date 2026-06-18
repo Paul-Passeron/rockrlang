@@ -69,24 +69,22 @@ pub struct MIRKey {
     subs: Vec<TypeRef>,
 }
 
-/// Wrapper to send MIR safely between threads as it is supposed to be read-only
-#[derive(Clone, PartialEq, Eq)]
-struct _MIRWrapper(Arc<MIR>);
-unsafe impl Sync for _MIRWrapper {}
-unsafe impl Send for _MIRWrapper {}
+// /// Wrapper to send MIR safely between threads as it is supposed to be
+// read-only #[derive(Clone, PartialEq, Eq)]
+// struct _MIRWrapper(Arc<MIR>);
+// unsafe impl Sync for _MIRWrapper {}
+// unsafe impl Send for _MIRWrapper {}
 
 #[salsa::tracked]
-fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> _MIRWrapper {
+fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Arc<MIR> {
     let Some(thir) = thir_body(db, key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
     };
-    _MIRWrapper(Arc::new(
-        ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower(),
-    ))
+    Arc::new(ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower())
 }
 
 pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> Arc<MIR> {
-    _mir(db, MIRKey::new(db, fdef, subs)).0
+    _mir(db, MIRKey::new(db, fdef, subs))
 }
 
 impl<'a> ThirToMIR<'a> {
@@ -275,10 +273,10 @@ impl<'a> ThirToMIR<'a> {
     fn spill_rvalue_if_needed(&mut self, rval: MIRRValue, span: Span) {
         match &rval.kind {
             MIRRValueKind::Use(op) => match op {
-                MIROperand::Move(place) | MIROperand::Copy(place) => {
-                    if !place.projections.is_empty() {
-                        self.assign(self.synthetic_place(rval.ty, span), rval);
-                    }
+                MIROperand::Move(place) | MIROperand::Copy(place)
+                    if !place.projections.is_empty() =>
+                {
+                    self.assign(self.synthetic_place(rval.ty, span), rval);
                 }
                 _ => (),
             },
@@ -287,9 +285,8 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn spill_operand(&mut self, operand: MIROperand, span: Span) -> MIRPlace {
-        match operand {
-            MIROperand::Move(place) => return place,
-            _ => (),
+        if let MIROperand::Move(place) = operand {
+            return place;
         }
         let ty = self.ty(operand.ty(self.db));
         let as_rvalue = MIRRValue {
@@ -709,7 +706,7 @@ impl<'a> ThirToMIR<'a> {
                     enum_ref: self.enum_ref(enum_def),
                     idx: *idx,
                     args: self.build_constructor_args(args),
-                    span
+                    span,
                 };
             }
             _ => (),
@@ -778,10 +775,9 @@ impl<'a> ThirToMIR<'a> {
     }
 }
 
-/// Cheking if a type can be copied. This will be delegated to an interface
-/// check.
-
 impl TypeRef {
+    /// Cheking if a type can be copied. This will be delegated to an interface
+    /// check.
     pub fn is_copy(self, db: &dyn Db) -> bool {
         match self {
             TypeRef::Concrete(type_id) => type_id.is_copy(db),

@@ -19,11 +19,12 @@ use std::{
     any::{TypeId, type_name},
     fmt,
     hash::Hash,
+    iter::{Enumerate, Map},
     marker::PhantomData,
     ops::{Index, IndexMut},
 };
 
-use crate::common::frozen::Frozen;
+use crate::common::frozen::{Frozen, FrozenIntoIter};
 
 pub struct Arena<T> {
     inner: Frozen<T>,
@@ -155,17 +156,23 @@ impl<T: PartialEq> PartialEq for Arena<T> {
 impl<T: PartialEq + Eq> Eq for Arena<T> {}
 
 impl<T> Arena<T> {
-    pub fn into_iter(self) -> impl Iterator<Item = (Idx<T>, T)> {
-        self.inner
-            .into_iter()
-            .enumerate()
-            .map(|(i, value)| (Idx(i, PhantomData::default()), value))
-    }
-
     pub fn iter(&self) -> impl Iterator<Item = (Idx<T>, &T)> {
         self.inner
             .iter()
             .enumerate()
-            .map(|(i, value)| (Idx(i, PhantomData::default()), value))
+            .map(|(i, value)| (Idx(i, PhantomData), value))
     }
+}
+
+impl<T> IntoIterator for Arena<T> {
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner
+            .into_iter()
+            .enumerate()
+            .map(|(i, value)| (Idx(i, PhantomData), value))
+    }
+
+    type Item = (Idx<T>, T);
+
+    type IntoIter = Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
 }

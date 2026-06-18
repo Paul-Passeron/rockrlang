@@ -167,18 +167,15 @@ impl<'a> Matrix<'a> {
             } else if pat.is_none_or(|pat| pat.is_wildcard_like()) {
                 let mut new_pats = row.pats.clone();
                 let fresh_wildcards =
-                    std::iter::repeat(None).take(arity.len()).collect_vec();
+                    std::iter::repeat_n(None, arity.len()).collect_vec();
                 new_pats.splice(col..=col, fresh_wildcards);
                 let mut bindings = row.bindings.clone();
-                match pat {
-                    Some(ThirPattern {
-                        kind: ThirPatternKind::Bind { local, .. },
-                        ..
-                    }) => {
-                        bindings.push((ctx.local_map[local], self.cols[col].clone()));
-                    }
-
-                    _ => (),
+                if let Some(ThirPattern {
+                    kind: ThirPatternKind::Bind { local, .. },
+                    ..
+                }) = pat
+                {
+                    bindings.push((ctx.local_map[local], self.cols[col].clone()));
                 }
                 rows.push(Row {
                     pats: new_pats,
@@ -298,10 +295,10 @@ impl<'a> Matrix<'a> {
 
 impl ThirPattern {
     pub fn is_wildcard_like(&self) -> bool {
-        match &self.kind {
-            ThirPatternKind::Bind { .. } | ThirPatternKind::Any => true,
-            _ => false,
-        }
+        matches!(
+            &self.kind,
+            ThirPatternKind::Bind { .. } | ThirPatternKind::Any
+        )
     }
 
     fn constructor(&self) -> Option<Constructor> {
@@ -331,7 +328,7 @@ impl ThirPattern {
                 _ => unreachable!(),
             },
             ThirPatternKind::Tuple(_) | ThirPatternKind::Struct { .. } => unreachable!(),
-            _ => std::iter::repeat(None).take(arity.len()).collect_vec(),
+            _ => std::iter::repeat_n(None, arity.len()).collect_vec(),
         }
     }
 }

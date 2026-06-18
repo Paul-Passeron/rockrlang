@@ -31,7 +31,7 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
             println!("{}:", fdef.sig_to_string(db));
             println!("{}", the_mir.display(db));
             if let Some(tc) = type_check_function(db, fdef) {
-                for (_, call_info) in tc.call_infos(db) {
+                for call_info in tc.call_infos(db).values() {
                     let callee_templates =
                         get_templates_of_fun(db, call_info.callee.interned());
                     if !callee_templates.is_empty() {

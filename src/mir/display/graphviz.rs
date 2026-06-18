@@ -368,7 +368,7 @@ fn fmt_callee_str(db: &dyn Db, callee: &MIRCallee) -> String {
 }
 
 fn dot_escape(s: &str) -> String {
-    s.replace('-', "_").replace(':', "_").replace(' ', "_")
+    s.replace(['-', ':', ' '], "_")
 }
 
 fn dot_escape_label(s: &str) -> String {

@@ -84,7 +84,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let mut scrut_place = place.clone();
                     scrut_place
                         .projections
-                        .extend(std::iter::repeat(MIRProjection::Deref).take(depth));
+                        .extend(std::iter::repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
                     let discr = MIRRValue {
