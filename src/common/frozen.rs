@@ -79,7 +79,7 @@ impl<T> Frozen<T> {
         let bucket_idx = idx / BUCKET_SIZE;
         let data = self.data.borrow();
         let next_bucket_idx = *self.next_bucket_idx.borrow();
-        if bucket_idx > data.len() {
+        if bucket_idx >= data.len() {
             return None;
         }
         let idx = idx - bucket_idx * BUCKET_SIZE;
@@ -150,16 +150,17 @@ impl<T> Frozen<T> {
 
 impl<T> Drop for Frozen<T> {
     fn drop(&mut self) {
-        let data = self.data.borrow();
+        let mut data = self.data.borrow_mut();
         let next_bucket_idx = *self.next_bucket_idx.borrow();
         let last = data.len().wrapping_sub(1);
 
-        for (i, bucket) in data.iter().enumerate() {
+        for (i, bucket) in data.iter_mut().enumerate() {
             let count = if i == last { next_bucket_idx } else { BUCKET_SIZE };
-            for j in 0..count {
-                unsafe {
-                    bucket[j].as_ptr().cast_mut().drop_in_place();
-                }
+            unsafe {
+                bucket
+                    .iter_mut()
+                    .take(count)
+                    .for_each(|elem| elem.assume_init_drop());
             }
         }
     }
