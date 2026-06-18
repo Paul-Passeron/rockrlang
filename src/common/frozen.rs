@@ -16,18 +16,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::{
-    cell::RefCell,
     fmt,
     hash::Hash,
     mem::{self, MaybeUninit, transmute},
     ops::{Index, IndexMut},
+    sync::{
+        Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 const BUCKET_SIZE: usize = 32;
 
 pub struct Frozen<T> {
-    data: RefCell<Vec<Box<[MaybeUninit<T>; BUCKET_SIZE]>>>,
-    next_bucket_idx: RefCell<usize>,
+    data: Mutex<Vec<Box<[MaybeUninit<T>; BUCKET_SIZE]>>>,
+    next_bucket_idx: AtomicUsize,
 }
 
 pub struct FrozenIter<'a, T> {
@@ -49,27 +52,26 @@ pub struct FrozenIntoIter<T> {
 impl<T> Frozen<T> {
     pub fn new() -> Self {
         Self {
-            data: RefCell::new(vec![]),
-            next_bucket_idx: RefCell::new(0),
+            data: Mutex::new(vec![]),
+            next_bucket_idx: AtomicUsize::new(0),
         }
     }
 
     pub fn push(&self, item: T) {
-        if self.data.borrow().is_empty() || *self.next_bucket_idx.borrow() == BUCKET_SIZE
+        let mut data = self.data.lock().unwrap();
+        if data.is_empty() || self.next_bucket_idx.load(Ordering::Relaxed) == BUCKET_SIZE
         {
-            *self.next_bucket_idx.borrow_mut() = 0;
-            self.data
-                .borrow_mut()
-                .push(Box::new([const { MaybeUninit::uninit() }; BUCKET_SIZE]));
+            self.next_bucket_idx.store(0, Ordering::Relaxed);
+            data.push(Box::new([const { MaybeUninit::uninit() }; BUCKET_SIZE]));
         }
-        let mut borrow = self.data.borrow_mut();
-        let entry: &mut MaybeUninit<T> = borrow
-            .last_mut()
+
+        let next_id = self.next_bucket_idx.load(Ordering::Relaxed);
+        data.last_mut()
             .unwrap()
-            .get_mut(*self.next_bucket_idx.borrow())
-            .unwrap();
-        entry.write(item);
-        *self.next_bucket_idx.borrow_mut() += 1;
+            .get_mut(next_id)
+            .unwrap()
+            .write(item);
+        self.next_bucket_idx.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn get(&self, idx: usize) -> Option<&T> {
@@ -77,8 +79,8 @@ impl<T> Frozen<T> {
             return None;
         }
         let bucket_idx = idx / BUCKET_SIZE;
-        let data = self.data.borrow();
-        let next_bucket_idx = *self.next_bucket_idx.borrow();
+        let data = self.data.lock().unwrap();
+        let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
         if bucket_idx >= data.len() {
             return None;
         }
@@ -98,8 +100,8 @@ impl<T> Frozen<T> {
 
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
         let bucket_idx = idx / BUCKET_SIZE;
-        let data = self.data.borrow();
-        let next_bucket_idx = *self.next_bucket_idx.borrow();
+        let data = self.data.lock().unwrap();
+        let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
         if bucket_idx >= data.len() {
             return None;
         }
@@ -108,7 +110,7 @@ impl<T> Frozen<T> {
             return None;
         }
         Some(unsafe {
-            self.data.borrow()[bucket_idx]
+            data[bucket_idx]
                 .as_ptr()
                 .wrapping_add(idx)
                 .cast_mut()
@@ -135,23 +137,25 @@ impl<T> Frozen<T> {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.data.borrow().is_empty()
-            || (self.data.borrow().len() == 1 && *self.next_bucket_idx.borrow() == 0)
+        let data = self.data.lock().unwrap();
+        data.is_empty()
+            || (data.len() == 1 && self.next_bucket_idx.load(Ordering::Relaxed) == 0)
     }
 
     pub fn len(&self) -> usize {
         if self.is_empty() {
             0
         } else {
-            *self.next_bucket_idx.borrow() + (self.data.borrow().len() - 1) * BUCKET_SIZE
+            let data = self.data.lock().unwrap();
+            self.next_bucket_idx.load(Ordering::Relaxed) + (data.len() - 1) * BUCKET_SIZE
         }
     }
 }
 
 impl<T> Drop for Frozen<T> {
     fn drop(&mut self) {
-        let mut data = self.data.borrow_mut();
-        let next_bucket_idx = *self.next_bucket_idx.borrow();
+        let mut data = self.data.lock().unwrap();
+        let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
         let last = data.len().wrapping_sub(1);
 
         for (i, bucket) in data.iter_mut().enumerate() {
@@ -270,12 +274,14 @@ impl<T> IntoIterator for Frozen<T> {
 
     type IntoIter = FrozenIntoIter<T>;
 
-    fn into_iter(mut self) -> Self::IntoIter {
-        if self.data.borrow().is_empty() {
+    fn into_iter(self) -> Self::IntoIter {
+        let mut data = self.data.lock().unwrap();
+        if data.is_empty() {
             return FrozenIntoIter { elems: vec![] };
         }
-        let owned_data = std::mem::take(&mut self.data).into_inner();
-        let last_item = *self.next_bucket_idx.borrow();
+        let mut owned_data = vec![];
+        std::mem::swap(data.as_mut(), &mut owned_data);
+        let last_item = self.next_bucket_idx.load(Ordering::Relaxed);
         let mut res = vec![];
         let last_box = owned_data.len() - 1;
         for (i, bucket) in owned_data.into_iter().enumerate() {
@@ -293,7 +299,7 @@ impl<T> IntoIterator for Frozen<T> {
             }
         }
         res.reverse();
-        *self.next_bucket_idx.borrow_mut() = 0;
+        self.next_bucket_idx.store(0, Ordering::Relaxed);
         FrozenIntoIter { elems: res }
     }
 }
@@ -317,21 +323,18 @@ impl<T: Clone> Clone for Frozen<T> {
         if self.is_empty() {
             return Self::new();
         }
+        let data = self.data.lock().unwrap();
+        let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
         Self {
             data: {
-                let last_bucket = self.data.borrow().len() - 1;
-                let buckets = self
-                    .data
-                    .borrow()
+                let last_bucket = data.len() - 1;
+                let buckets = data
                     .iter()
                     .enumerate()
                     .map(|(i, x)| {
                         let mut arr = [const { MaybeUninit::uninit() }; BUCKET_SIZE];
-                        let max_idx = if i == last_bucket {
-                            *self.next_bucket_idx.borrow()
-                        } else {
-                            BUCKET_SIZE
-                        };
+                        let max_idx =
+                            if i == last_bucket { next_bucket_idx } else { BUCKET_SIZE };
                         for j in 0..max_idx {
                             unsafe {
                                 arr[j].write(x[j].assume_init_ref().clone());
@@ -340,9 +343,9 @@ impl<T: Clone> Clone for Frozen<T> {
                         Box::new(arr)
                     })
                     .collect();
-                RefCell::new(buckets)
+                Mutex::new(buckets)
             },
-            next_bucket_idx: RefCell::new(*self.next_bucket_idx.borrow()),
+            next_bucket_idx: AtomicUsize::new(next_bucket_idx),
         }
     }
 }
