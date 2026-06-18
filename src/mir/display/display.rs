@@ -166,12 +166,15 @@ fn fmt_operand(
             enum_ref,
             idx,
             args,
+            ..
         } => {
             write!(f, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
             fmt_constructor_args(f, db, args)?;
             write!(f, ")")
         }
-        MIROperand::StructLit { struct_ref, fields } => {
+        MIROperand::StructLit {
+            struct_ref, fields, ..
+        } => {
             write!(f, "{} {{", struct_ref.def.name(db).to_string(db))?;
             let mut first = true;
             for (name, operand) in fields {
@@ -184,7 +187,7 @@ fn fmt_operand(
             }
             write!(f, "}}")
         }
-        MIROperand::Tuple(operands) => {
+        MIROperand::Tuple(operands, _) => {
             write!(f, "(")?;
             for (i, operand) in operands.iter().enumerate() {
                 if i > 0 {

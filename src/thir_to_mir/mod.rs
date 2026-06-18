@@ -393,7 +393,7 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
-    fn build_strlit(&mut self, strlit: &str) -> MIRRValueKind {
+    fn build_strlit(&mut self, strlit: &str, span: Span) -> MIRRValueKind {
         let data = MIRConstant::CString {
             contents: strlit.into(),
             null_terminated: false,
@@ -409,6 +409,7 @@ impl<'a> ThirToMIR<'a> {
                 (Symbol::new(self.db, "data"), data.into()),
                 (Symbol::new(self.db, "len"), len.into()),
             ]),
+            span,
         })
     }
 
@@ -417,14 +418,20 @@ impl<'a> ThirToMIR<'a> {
         let ty = self.ty(thir_expr.ty);
         let span = thir_expr.span;
         let kind = match &thir_expr.kind {
-            ExprKind::StrLit(lit) => self.build_strlit(&lit.interned().contents(self.db)),
+            ExprKind::StrLit(lit) => {
+                self.build_strlit(&lit.interned().contents(self.db), span)
+            }
             ExprKind::StructLit {
                 struct_def,
                 fields: thir_fields,
             } => {
                 let struct_ref = self.struct_ref(struct_def);
                 let fields = self.build_fields(thir_fields);
-                MIRRValueKind::Use(MIROperand::StructLit { struct_ref, fields })
+                MIRRValueKind::Use(MIROperand::StructLit {
+                    struct_ref,
+                    fields,
+                    span,
+                })
             }
             ExprKind::Constructor {
                 enum_def,
@@ -434,6 +441,7 @@ impl<'a> ThirToMIR<'a> {
                 enum_ref: self.enum_ref(enum_def),
                 idx: *idx,
                 args: self.build_constructor_args(args),
+                span,
             }),
             ExprKind::Use(place) => {
                 let place = self.build_place(*place);
@@ -467,6 +475,7 @@ impl<'a> ThirToMIR<'a> {
                     .iter()
                     .map(|expr| self.build_operand(*expr))
                     .collect_vec(),
+                span,
             )),
             ExprKind::SizeOf(ty) => MIRRValueKind::SizeOf(self.ty(*ty)),
             ExprKind::Metadata(expr) => {
@@ -676,16 +685,19 @@ impl<'a> ThirToMIR<'a> {
         if let Some(cst) = self.build_expr_as_constant(expr) {
             return MIROperand::Constant(cst);
         }
+        let span = self.thir.exprs[expr].span;
         match &self.thir.exprs[expr].kind {
             ExprKind::StructLit { struct_def, fields } => {
                 return MIROperand::StructLit {
                     struct_ref: self.struct_ref(struct_def),
                     fields: self.build_fields(fields),
+                    span,
                 };
             }
             ExprKind::Tuple(items) => {
                 return MIROperand::Tuple(
                     items.iter().map(|item| self.build_operand(*item)).collect(),
+                    span,
                 );
             }
             ExprKind::Constructor {
@@ -697,6 +709,7 @@ impl<'a> ThirToMIR<'a> {
                     enum_ref: self.enum_ref(enum_def),
                     idx: *idx,
                     args: self.build_constructor_args(args),
+                    span
                 };
             }
             _ => (),

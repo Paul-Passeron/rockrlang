@@ -44,12 +44,14 @@ pub enum MIROperand {
         enum_ref: EnumRef,
         idx: usize,
         args: ConstructorArgs,
+        span: Span,
     },
     StructLit {
         struct_ref: StructRef,
         fields: HashMap<Symbol, Operand>,
+        span: Span,
     },
-    Tuple(Vec<Operand>),
+    Tuple(Vec<Operand>, Span),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -137,7 +139,7 @@ impl Operand {
             MIROperand::StructLit { struct_ref, .. } => {
                 struct_ref.clone().as_type_ref(db)
             }
-            MIROperand::Tuple(miroperands) => {
+            MIROperand::Tuple(miroperands, _) => {
                 tuple_of(db, miroperands.iter().map(|op| op.ty(db)).collect()).into()
             }
         }

@@ -147,6 +147,7 @@ fn fmt_operand_str(db: &dyn Db, operand: &MIROperand) -> String {
             enum_ref,
             idx,
             args,
+            ..
         } => {
             format!(
                 "{}::#{idx}({})",
@@ -154,7 +155,9 @@ fn fmt_operand_str(db: &dyn Db, operand: &MIROperand) -> String {
                 fmt_constructor_args_str(db, args)
             )
         }
-        MIROperand::StructLit { struct_ref, fields } => {
+        MIROperand::StructLit {
+            struct_ref, fields, ..
+        } => {
             let fields_str = fields
                 .iter()
                 .map(|(name, op)| {
@@ -167,7 +170,7 @@ fn fmt_operand_str(db: &dyn Db, operand: &MIROperand) -> String {
                 struct_ref.def.name(db).to_string(db)
             )
         }
-        MIROperand::Tuple(operands) => {
+        MIROperand::Tuple(operands, _) => {
             let inner = operands
                 .iter()
                 .map(|op| fmt_operand_str(db, op))
