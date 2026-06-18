@@ -46,8 +46,8 @@ use crate::{
     thir_to_mir::lower_match::MatchLowerer,
 };
 
-pub mod lower_match;
 pub mod decision_tree;
+pub mod lower_match;
 
 pub struct ThirToMIR<'a> {
     db: &'a dyn Db,
@@ -212,9 +212,9 @@ impl<'a> ThirToMIR<'a> {
         self.place_of_local(self.synthetic_local(ty, span))
     }
 
-    fn goto(&mut self, next: MIRBlockID, span: Span) {
+    fn goto(&mut self, next: MIRBlockID) {
         self.builder
-            .terminate(MIRTerminator::Goto { next, span })
+            .terminate(MIRTerminator::Goto { next })
             .unwrap()
     }
 
@@ -254,11 +254,11 @@ impl<'a> ThirToMIR<'a> {
             }
             StmtKind::Break(scope_id) => {
                 let bb = self.loop_ends[scope_id];
-                self.goto(bb, stmt.span);
+                self.goto(bb);
             }
             StmtKind::Continue(scope_id) => {
                 let bb = self.loop_begins[scope_id];
-                self.goto(bb, stmt.span);
+                self.goto(bb);
             }
             StmtKind::Match {
                 scrutinee,
@@ -287,6 +287,10 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn spill_operand(&mut self, operand: MIROperand, span: Span) -> MIRPlace {
+        match operand {
+            MIROperand::Move(place) => return place,
+            _ => (),
+        }
         let ty = self.ty(operand.ty(self.db));
         let as_rvalue = MIRRValue {
             kind: MIRRValueKind::Use(operand),
@@ -571,7 +575,7 @@ impl<'a> ThirToMIR<'a> {
         self.loop_begins.insert(scope, cond_bb);
         self.loop_ends.insert(scope, merge_bb);
 
-        self.goto(cond_bb, span);
+        self.goto(cond_bb);
 
         self.switch_to(cond_bb);
         let cond = self.build_expr_with_setup(cond);
@@ -581,7 +585,7 @@ impl<'a> ThirToMIR<'a> {
         self.build_stmts(body);
 
         if !self.current_block_is_terminated() {
-            self.goto(cond_bb, span);
+            self.goto(cond_bb);
         }
 
         self.switch_to(merge_bb);
@@ -599,8 +603,6 @@ impl<'a> ThirToMIR<'a> {
         let then_bb = self.builder.new_block(Some("if-then".into()));
         let merge_bb = self.builder.new_block(Some("if-merge".into()));
 
-        let end_span = span.end().span(span.end());
-
         if let Some(else_stmts) = else_ {
             let else_bb = self.builder.new_block(Some("if-else".into()));
 
@@ -609,7 +611,7 @@ impl<'a> ThirToMIR<'a> {
             self.switch_to(else_bb);
             self.build_stmts(else_stmts);
             if !self.current_block_is_terminated() {
-                self.goto(merge_bb, end_span);
+                self.goto(merge_bb);
             }
         } else {
             self.branch(cond, then_bb, merge_bb, span);
@@ -618,7 +620,7 @@ impl<'a> ThirToMIR<'a> {
         self.switch_to(then_bb);
         self.build_stmts(then);
         if !self.current_block_is_terminated() {
-            self.goto(merge_bb, end_span);
+            self.goto(merge_bb);
         }
 
         self.switch_to(merge_bb);

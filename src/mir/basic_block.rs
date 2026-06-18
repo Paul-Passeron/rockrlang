@@ -46,7 +46,6 @@ pub enum MIRTerminator {
 
     Goto {
         next: BlockID,
-        span: Span,
     },
 
     Branch {
