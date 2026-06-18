@@ -41,7 +41,7 @@ fn main() -> std::process::ExitCode {
         .unwrap_or_else(|| std::env::current_dir().unwrap());
     match check_from_disk(root, cfg) {
         Ok(()) => {
-            println!("Compilation finished :)");
+            // println!("Compilation finished :)");
             std::process::ExitCode::SUCCESS
         }
         Err(e) => {

@@ -55,7 +55,7 @@ pub fn run_rkr(p: &Path) -> RunStatus {
 
     let exit_code = match compiler::check_from_disk(p.to_path_buf(), cfg) {
         Ok(()) => {
-            println!("Compilation finished :)");
+            // println!("Compilation finished :)");
             std::process::ExitCode::SUCCESS
         }
         Err(e) => {

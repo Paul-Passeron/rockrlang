@@ -272,7 +272,7 @@ impl<'db> SanityChecker<'db> {
             ExprKind::Neg(operand) => {
                 let operand_ty = self.check_expr(*operand);
                 self.check_types(operand_ty, infos.ty, infos.span);
-            },
+            }
             ExprKind::Not(operand) => {
                 let operand_ty = self.check_expr(*operand);
                 self.check_types(

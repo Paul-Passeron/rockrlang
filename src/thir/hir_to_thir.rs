@@ -21,7 +21,11 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    common::{arena::{Arena, Idx}, location::Span, symbols::Symbol},
+    common::{
+        arena::{Arena, Idx},
+        location::Span,
+        symbols::Symbol,
+    },
     hir::{
         self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,

@@ -22,22 +22,23 @@ use crate::{
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
-        println!("{}", thir.display(db));
         validate_thir(db, thir.as_ref());
 
         let templates = get_templates_of_fun(db, fdef.interned());
         if templates.is_empty() {
             let the_mir = mir(db, fdef, vec![]);
-            println!("{}:", fdef.sig_to_string(db));
-            println!("{}", the_mir.display(db));
+            println!("{}\n", the_mir.dot(db, &fdef.called_to_string(db)));
             if let Some(tc) = type_check_function(db, fdef) {
                 for call_info in tc.call_infos(db).values() {
                     let callee_templates =
                         get_templates_of_fun(db, call_info.callee.interned());
                     if !callee_templates.is_empty() {
-                        println!("{}:", call_info.callee.sig_to_string(db));
-                        println!("{}", the_mir.display(db));
-                        mir(db, call_info.callee, call_info.substitution.clone());
+                        let other_mir =
+                            mir(db, call_info.callee, call_info.substitution.clone());
+                        println!(
+                            "{}\n",
+                            other_mir.dot(db, &call_info.callee.called_to_string(db))
+                        );
                     }
                 }
             }

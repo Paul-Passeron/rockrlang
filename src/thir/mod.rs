@@ -18,7 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     common::{
-        arena::{Arena, Idx}, location::Span, symbols::{StrLit, Symbol}
+        arena::{Arena, Idx},
+        location::Span,
+        symbols::{StrLit, Symbol},
     },
     hir::{self, Mutability, function_ast, hir_body},
     parse_tree::expr::BinaryOperator,
