@@ -1,21 +1,33 @@
-use std::fmt;
-use crate::{
-    Db,
-    mir::operand::UnaryOperator,
-    parse_tree::expr::BinaryOperator,
-};
+/* Rockr programming language
+Copyright (C) 2026  NoRezap
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 use crate::mir::{
     MIRLocalID,
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
-        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
-        MIRProjection, MIRRValue, MIRRValueKind,
+        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection,
+        MIRRValue, MIRRValueKind,
     },
 };
+use crate::{Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
+use std::fmt;
 
 pub mod graphviz;
 pub mod writer;
-
 
 /// Minimal write trait that both `fmt::Formatter` and `String` satisfy,
 /// letting all formatting logic be written once.
@@ -30,7 +42,7 @@ pub trait MIRWrite {
 
 pub struct FmtWriter<'a, 'b>(pub &'a mut fmt::Formatter<'b>);
 
-impl <'a, 'b> MIRWrite for FmtWriter<'a, 'b> {
+impl<'a, 'b> MIRWrite for FmtWriter<'a, 'b> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0.write_str(s)
     }
@@ -58,25 +70,24 @@ pub(crate) use mwrite;
 
 pub(crate) fn fmt_binop(op: &BinaryOperator) -> &'static str {
     match op {
-        BinaryOperator::Plus   => "+",
-        BinaryOperator::Minus  => "-",
-        BinaryOperator::Times  => "*",
-        BinaryOperator::Div    => "/",
+        BinaryOperator::Plus => "+",
+        BinaryOperator::Minus => "-",
+        BinaryOperator::Times => "*",
+        BinaryOperator::Div => "/",
         BinaryOperator::Modulo => "%",
-        BinaryOperator::Eq     => "==",
-        BinaryOperator::Diff   => "!=",
-        BinaryOperator::Lt     => "<",
-        BinaryOperator::Leq    => "<=",
-        BinaryOperator::Gt     => ">",
-        BinaryOperator::Geq    => ">=",
-        BinaryOperator::And    => "&&",
-        BinaryOperator::Or     => "||",
+        BinaryOperator::Eq => "==",
+        BinaryOperator::Diff => "!=",
+        BinaryOperator::Lt => "<",
+        BinaryOperator::Leq => "<=",
+        BinaryOperator::Gt => ">",
+        BinaryOperator::Geq => ">=",
+        BinaryOperator::And => "&&",
+        BinaryOperator::Or => "||",
         BinaryOperator::BitAnd => "&",
-        BinaryOperator::BitOr  => "|",
+        BinaryOperator::BitOr => "|",
         BinaryOperator::BitXor => "^",
     }
 }
-
 
 pub fn fmt_local_id<W: MIRWrite>(w: &mut W, id: MIRLocalID) -> fmt::Result {
     mwrite!(w, "_{}", id.into_raw())
@@ -123,16 +134,25 @@ pub fn fmt_operand<W: MIRWrite>(
             w.write_str("copy ")?;
             fmt_place(w, db, place)
         }
-        MIROperand::Constructor { enum_ref, idx, args, .. } => {
+        MIROperand::Constructor {
+            enum_ref,
+            idx,
+            args,
+            ..
+        } => {
             mwrite!(w, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
             fmt_constructor_args(w, db, args)?;
             w.write_str(")")
         }
-        MIROperand::StructLit { struct_ref, fields, .. } => {
+        MIROperand::StructLit {
+            struct_ref, fields, ..
+        } => {
             mwrite!(w, "{} {{", struct_ref.def.name(db).to_string(db))?;
             let mut first = true;
             for (name, op) in fields {
-                if !first { w.write_str(", ")?; }
+                if !first {
+                    w.write_str(", ")?;
+                }
                 first = false;
                 mwrite!(w, "{}: ", name.to_string(db))?;
                 fmt_operand(w, db, op)?;
@@ -142,7 +162,9 @@ pub fn fmt_operand<W: MIRWrite>(
         MIROperand::Tuple(operands, _) => {
             w.write_str("(")?;
             for (i, op) in operands.iter().enumerate() {
-                if i > 0 { w.write_str(", ")?; }
+                if i > 0 {
+                    w.write_str(", ")?;
+                }
                 fmt_operand(w, db, op)?;
             }
             w.write_str(")")
@@ -158,7 +180,10 @@ pub fn fmt_constant<W: MIRWrite>(
     match constant {
         MIRConstant::Integer { value, ty } => mwrite!(w, "{value}_{}", ty.to_string(db)),
         MIRConstant::Bool(b) => mwrite!(w, "{b}"),
-        MIRConstant::CString { contents, null_terminated } => {
+        MIRConstant::CString {
+            contents,
+            null_terminated,
+        } => {
             if *null_terminated {
                 mwrite!(w, "c\"{contents}\"")
             } else {
@@ -168,7 +193,11 @@ pub fn fmt_constant<W: MIRWrite>(
     }
 }
 
-pub fn fmt_rvalue<W: MIRWrite>(w: &mut W, db: &dyn Db, rvalue: &MIRRValue) -> fmt::Result {
+pub fn fmt_rvalue<W: MIRWrite>(
+    w: &mut W,
+    db: &dyn Db,
+    rvalue: &MIRRValue,
+) -> fmt::Result {
     match &rvalue.kind {
         MIRRValueKind::Use(operand) => fmt_operand(w, db, operand),
         MIRRValueKind::Ref(place, mutability) => {
@@ -186,7 +215,7 @@ pub fn fmt_rvalue<W: MIRWrite>(w: &mut W, db: &dyn Db, rvalue: &MIRRValue) -> fm
         }
         MIRRValueKind::UnaryOp(op, operand) => {
             w.write_str(match op {
-                UnaryOperator::Neg  => "-",
+                UnaryOperator::Neg => "-",
                 UnaryOperator::LNot => "!",
             })?;
             fmt_operand(w, db, operand)
@@ -214,7 +243,9 @@ pub fn fmt_constructor_args<W: MIRWrite>(
         MIRConstructorArgs::None => Ok(()),
         MIRConstructorArgs::Tuple(operands) => {
             for (i, op) in operands.iter().enumerate() {
-                if i > 0 { w.write_str(", ")?; }
+                if i > 0 {
+                    w.write_str(", ")?;
+                }
                 fmt_operand(w, db, op)?;
             }
             Ok(())
@@ -222,7 +253,9 @@ pub fn fmt_constructor_args<W: MIRWrite>(
         MIRConstructorArgs::Struct(fields) => {
             let mut first = true;
             for (name, op) in fields {
-                if !first { w.write_str(", ")?; }
+                if !first {
+                    w.write_str(", ")?;
+                }
                 first = false;
                 mwrite!(w, "{}: ", name.to_string(db))?;
                 fmt_operand(w, db, op)?;
@@ -232,14 +265,20 @@ pub fn fmt_constructor_args<W: MIRWrite>(
     }
 }
 
-pub fn fmt_callee<W: MIRWrite>(w: &mut W, db: &dyn Db, callee: &MIRCallee) -> fmt::Result {
+pub fn fmt_callee<W: MIRWrite>(
+    w: &mut W,
+    db: &dyn Db,
+    callee: &MIRCallee,
+) -> fmt::Result {
     match callee {
         MIRCallee::Direct(fref) => {
             mwrite!(w, "{}", fref.id.called_to_string(db))?;
             if !fref.args.is_empty() {
                 w.write_str("::<")?;
                 for (i, ty) in fref.args.iter().enumerate() {
-                    if i > 0 { w.write_str(", ")?; }
+                    if i > 0 {
+                        w.write_str(", ")?;
+                    }
                     mwrite!(w, "{}", ty.to_string(db))?;
                 }
                 w.write_str(">")?;
@@ -264,12 +303,19 @@ pub fn fmt_terminator<W: MIRWrite>(
             }
             None => w.write_str("return"),
         },
-        MIRTerminator::Branch { cond, then, else_, .. } => {
+        MIRTerminator::Branch {
+            cond, then, else_, ..
+        } => {
             w.write_str("branch ")?;
             fmt_operand(w, db, cond)?;
             mwrite!(w, " ? bb{} : bb{}", then.into_raw(), else_.into_raw())
         }
-        MIRTerminator::Switch { discriminant, branches, default, .. } => {
+        MIRTerminator::Switch {
+            discriminant,
+            branches,
+            default,
+            ..
+        } => {
             w.write_str("switch ")?;
             fmt_operand(w, db, discriminant)?;
             w.write_str(" {")?;
@@ -278,13 +324,21 @@ pub fn fmt_terminator<W: MIRWrite>(
             }
             mwrite!(w, " _ => bb{} }}", default.into_raw())
         }
-        MIRTerminator::Call { callee, arguments, dest, next, .. } => {
+        MIRTerminator::Call {
+            callee,
+            arguments,
+            dest,
+            next,
+            ..
+        } => {
             fmt_local_id(w, *dest)?;
             w.write_str(" = call ")?;
             fmt_callee(w, db, callee)?;
             w.write_str("(")?;
             for (i, arg) in arguments.iter().enumerate() {
-                if i > 0 { w.write_str(", ")?; }
+                if i > 0 {
+                    w.write_str(", ")?;
+                }
                 fmt_operand(w, db, arg)?;
             }
             mwrite!(w, ") -> bb{}", next.into_raw())
