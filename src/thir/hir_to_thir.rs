@@ -18,11 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::HashMap, sync::Arc};
 
 use itertools::Itertools;
-use la_arena::{Arena, Idx};
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
+    common::{arena::{Arena, Idx}, location::Span, symbols::Symbol},
     hir::{
         self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
@@ -64,17 +63,17 @@ impl<'db> ThirBuilder<'db> {
         }
     }
 
-    pub fn new_local(&mut self, local: ThirLocal) -> LocalId {
-        self.locals.alloc(local)
+    pub fn new_local(&self, local: ThirLocal) -> LocalId {
+        self.locals.insert(local)
     }
-    pub fn new_expr(&mut self, expr: ThirExpr) -> ExprId {
-        self.exprs.alloc(expr)
+    pub fn new_expr(&self, expr: ThirExpr) -> ExprId {
+        self.exprs.insert(expr)
     }
-    pub fn new_place(&mut self, place: ThirPlace) -> PlaceId {
-        self.places.alloc(place)
+    pub fn new_place(&self, place: ThirPlace) -> PlaceId {
+        self.places.insert(place)
     }
-    pub fn new_scope(&mut self, scope: ThirScope) -> ScopeId {
-        self.scopes.alloc(scope)
+    pub fn new_scope(&self, scope: ThirScope) -> ScopeId {
+        self.scopes.insert(scope)
     }
 
     pub fn get_local(&self, idx: Idx<ThirLocal>) -> &ThirLocal {

@@ -413,12 +413,12 @@ impl<'a> ThirPrinter<'a> {
         let l = &self.thir.locals[local];
         match &l.source {
             Some((_, sym)) => sym.to_string(self.db),
-            None => format!("_{}", u32::from(local.into_raw())),
+            None => format!("_{}", local.into_raw()),
         }
     }
 
     fn scope_label(&self, s: ScopeId) -> String {
-        format!("'s{}", u32::from(s.into_raw()))
+        format!("'s{}", s.into_raw())
     }
 
     fn targs(&self, args: &[TypeRef]) -> String {

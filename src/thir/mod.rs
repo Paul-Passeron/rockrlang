@@ -18,8 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     common::{
-        location::Span,
-        symbols::{StrLit, Symbol},
+        arena::{Arena, Idx}, location::Span, symbols::{StrLit, Symbol}
     },
     hir::{self, Mutability, function_ast, hir_body},
     parse_tree::expr::BinaryOperator,
@@ -27,7 +26,6 @@ use crate::{
     thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };
-use la_arena::{Arena, Idx};
 use std::sync::Arc;
 
 pub mod display;
