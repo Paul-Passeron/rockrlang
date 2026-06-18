@@ -37,6 +37,7 @@ pub mod basic_block;
 pub mod builder;
 pub mod display;
 pub mod operand;
+pub mod passes;
 
 // MIR-local type aliases
 type BasicBlock = MIRBasicBlock;
