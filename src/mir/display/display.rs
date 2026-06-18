@@ -162,6 +162,38 @@ fn fmt_operand(
             write!(f, "copy ")?;
             fmt_place(f, db, place)
         }
+        MIROperand::Constructor {
+            enum_ref,
+            idx,
+            args,
+        } => {
+            write!(f, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
+            fmt_constructor_args(f, db, args)?;
+            write!(f, ")")
+        }
+        MIROperand::StructLit { struct_ref, fields } => {
+            write!(f, "{} {{", struct_ref.def.name(db).to_string(db))?;
+            let mut first = true;
+            for (name, operand) in fields {
+                if !first {
+                    write!(f, ", ")?;
+                }
+                first = false;
+                write!(f, "{}: ", name.to_string(db))?;
+                fmt_operand(f, db, operand)?;
+            }
+            write!(f, "}}")
+        }
+        MIROperand::Tuple(operands) => {
+            write!(f, "(")?;
+            for (i, operand) in operands.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                fmt_operand(f, db, operand)?;
+            }
+            write!(f, ")")
+        }
     }
 }
 
@@ -231,28 +263,6 @@ fn fmt_rvalue_kind(
             }
             fmt_operand(f, db, operand)
         }
-        MIRRValueKind::Constructor {
-            enum_ref,
-            idx,
-            args,
-        } => {
-            write!(f, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
-            fmt_constructor_args(f, db, args)?;
-            write!(f, ")")
-        }
-        MIRRValueKind::StructLit { struct_ref, fields } => {
-            write!(f, "{} {{", struct_ref.def.name(db).to_string(db))?;
-            let mut first = true;
-            for (name, operand) in fields {
-                if !first {
-                    write!(f, ", ")?;
-                }
-                first = false;
-                write!(f, "{}: ", name.to_string(db))?;
-                fmt_operand(f, db, operand)?;
-            }
-            write!(f, "}}")
-        }
         MIRRValueKind::Discriminant(place) => {
             write!(f, "discriminant(")?;
             fmt_place(f, db, place)?;
@@ -265,16 +275,6 @@ fn fmt_rvalue_kind(
         }
         MIRRValueKind::SizeOf(ty) => {
             write!(f, "@sizeof({})", ty.to_string(db))
-        }
-        MIRRValueKind::Tuple(operands) => {
-            write!(f, "(")?;
-            for (i, operand) in operands.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                fmt_operand(f, db, operand)?;
-            }
-            write!(f, ")")
         }
     }
 }

@@ -10,7 +10,7 @@ use crate::{
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
     ril::{TypeDefId, TypeId, TypeRef, int_id},
-    thir::{EnumRef, ThirMatchBranch},
+    thir::{EnumRef, StructRef, ThirMatchBranch},
     thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
@@ -173,6 +173,12 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
 impl EnumRef {
     pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
         TypeId::new(db, TypeDefId::Enum(self.def), self.args).into()
+    }
+}
+
+impl StructRef {
+    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
+        TypeId::new(db, TypeDefId::Struct(self.def), self.args).into()
     }
 }
 

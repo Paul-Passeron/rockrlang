@@ -143,6 +143,38 @@ fn fmt_operand_str(db: &dyn Db, operand: &MIROperand) -> String {
         MIROperand::Constant(c) => fmt_constant_str(db, c),
         MIROperand::Move(place) => format!("move {}", fmt_place_str(db, place)),
         MIROperand::Copy(place) => format!("copy {}", fmt_place_str(db, place)),
+        MIROperand::Constructor {
+            enum_ref,
+            idx,
+            args,
+        } => {
+            format!(
+                "{}::#{idx}({})",
+                enum_ref.def.name(db).to_string(db),
+                fmt_constructor_args_str(db, args)
+            )
+        }
+        MIROperand::StructLit { struct_ref, fields } => {
+            let fields_str = fields
+                .iter()
+                .map(|(name, op)| {
+                    format!("{}: {}", name.to_string(db), fmt_operand_str(db, op))
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "{} {{ {fields_str} }}",
+                struct_ref.def.name(db).to_string(db)
+            )
+        }
+        MIROperand::Tuple(operands) => {
+            let inner = operands
+                .iter()
+                .map(|op| fmt_operand_str(db, op))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("({inner})")
+        }
     }
 }
 
@@ -195,30 +227,6 @@ fn fmt_rvalue_str(db: &dyn Db, rvalue: &MIRRValue) -> String {
             };
             format!("{op_str}{}", fmt_operand_str(db, operand))
         }
-        MIRRValueKind::Constructor {
-            enum_ref,
-            idx,
-            args,
-        } => {
-            format!(
-                "{}::#{idx}({})",
-                enum_ref.def.name(db).to_string(db),
-                fmt_constructor_args_str(db, args)
-            )
-        }
-        MIRRValueKind::StructLit { struct_ref, fields } => {
-            let fields_str = fields
-                .iter()
-                .map(|(name, op)| {
-                    format!("{}: {}", name.to_string(db), fmt_operand_str(db, op))
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!(
-                "{} {{ {fields_str} }}",
-                struct_ref.def.name(db).to_string(db)
-            )
-        }
         MIRRValueKind::Discriminant(place) => {
             format!("discriminant({})", fmt_place_str(db, place))
         }
@@ -226,14 +234,6 @@ fn fmt_rvalue_str(db: &dyn Db, rvalue: &MIRRValue) -> String {
             format!("@metadata({})", fmt_operand_str(db, operand))
         }
         MIRRValueKind::SizeOf(ty) => format!("@sizeof({})", ty.to_string(db)),
-        MIRRValueKind::Tuple(operands) => {
-            let inner = operands
-                .iter()
-                .map(|op| fmt_operand_str(db, op))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("({inner})")
-        }
     }
 }
 

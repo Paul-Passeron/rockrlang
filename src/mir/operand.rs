@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// See https://dl.acm.org/doi/pdf/10.1145/3547647 for possible improvements to the 
+// See https://dl.acm.org/doi/pdf/10.1145/3547647 for possible improvements to the
 // representation
 
 // Some ideas:
-// - Move data type constructors (Structs, Enums) to Operand instead of RValue
-// - Move tuples to Operand instead of RValue
 // - Differentiate between shared / mutable borrow deref ?
 
 use std::collections::HashMap;
@@ -31,7 +29,7 @@ use crate::{
     hir::Mutability,
     mir::{ConstructorArgs, LocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::{TypeRef, bool_id, char_id, ptr_of},
+    ril::{TypeRef, bool_id, char_id, ptr_of, tuple_of},
     thir::{EnumRef, FunctionRef, StructRef},
 };
 
@@ -42,6 +40,16 @@ pub enum MIROperand {
     Constant(Constant),
     Move(Place),
     Copy(Place),
+    Constructor {
+        enum_ref: EnumRef,
+        idx: usize,
+        args: ConstructorArgs,
+    },
+    StructLit {
+        struct_ref: StructRef,
+        fields: HashMap<Symbol, Operand>,
+    },
+    Tuple(Vec<Operand>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -98,22 +106,12 @@ pub enum MIRRValueKind {
     AddressOf(Place, Mutability),
     BinOp(BinaryOperator, Operand, Operand),
     UnaryOp(UnaryOperator, Operand),
-    Constructor {
-        enum_ref: EnumRef,
-        idx: usize,
-        args: ConstructorArgs,
-    },
-    StructLit {
-        struct_ref: StructRef,
-        fields: HashMap<Symbol, Operand>,
-    },
     Discriminant(Place),
     Metadata(Operand),
     SizeOf(TypeRef),
-    Tuple(Vec<Operand>),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MIRConstructorArgs {
     None,
     Tuple(Vec<Operand>),
@@ -135,6 +133,13 @@ impl Operand {
         match self {
             MIROperand::Constant(mirconstant) => mirconstant.ty(db),
             MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
+            MIROperand::Constructor { enum_ref, .. } => enum_ref.clone().as_type_ref(db),
+            MIROperand::StructLit { struct_ref, .. } => {
+                struct_ref.clone().as_type_ref(db)
+            }
+            MIROperand::Tuple(miroperands) => {
+                tuple_of(db, miroperands.iter().map(|op| op.ty(db)).collect()).into()
+            }
         }
     }
 }
