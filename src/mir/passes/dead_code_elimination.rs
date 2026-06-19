@@ -74,36 +74,9 @@ impl<'a> DCECtx<'a> {
         }
     }
 
-    fn _compute_reachable(&self, s: &mut BTreeSet<OldBlockID>, blk: OldBlockID) {
-        if !s.insert(blk) {
-            return;
-        }
-
-        match &self.mir.blocks[blk].terminator {
-            MIRTerminator::Return { .. } | MIRTerminator::Diverge => (),
-            MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
-                self._compute_reachable(s, *next)
-            }
-            MIRTerminator::Branch { then, else_, .. } => {
-                self._compute_reachable(s, *then);
-                self._compute_reachable(s, *else_);
-            }
-            MIRTerminator::Switch {
-                branches, default, ..
-            } => {
-                branches
-                    .iter()
-                    .map(|b| b.1)
-                    .chain(once(default))
-                    .for_each(|next| self._compute_reachable(s, *next));
-            }
-        }
-    }
-
     fn compute_reachable(&mut self) {
-        let mut res = BTreeSet::new();
-        self._compute_reachable(&mut res, self.mir.entry);
-        self.reachable = res;
+        let reachable = self.mir.compute_reachable(self.mir.entry);
+        self.reachable = reachable.into_iter().collect();
     }
 
     fn add_and_get_local_to_mapping(&mut self, original: MIRLocalID) -> MIRLocalID {
@@ -462,9 +435,11 @@ impl<'a> DCECtx<'a> {
 
     pub fn run(mut self) -> MIR {
         self.add_parameters();
+
         self.compute_reachable();
         self.compute_successors();
         self.compute_predecessors();
+
         let paths = self.compute_paths();
         self.compute_path_bodies(paths);
         self.b.finalize().unwrap()
