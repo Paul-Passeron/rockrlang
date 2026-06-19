@@ -192,26 +192,19 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_successors(&mut self) {
+        // TODO: Maybe don't do that :)
+        let rs: HashSet<_> = self.reachable.iter().copied().collect();
         let succs =
-            self.reachable
-                .iter()
-                .map(|blk| {
-                    let succs = match &self.mir.blocks[*blk].terminator {
-                        MIRTerminator::Return { .. } | MIRTerminator::Diverge => {
-                            HashSet::new()
-                        }
-                        MIRTerminator::Goto { next }
-                        | MIRTerminator::Call { next, .. } => HashSet::from([*next]),
-                        MIRTerminator::Branch { then, else_, .. } => {
-                            HashSet::from([*then, *else_])
-                        }
-                        MIRTerminator::Switch {
-                            branches, default, ..
-                        } => branches.iter().map(|b| *b.1).chain([*default]).collect(),
-                    };
-                    (*blk, succs)
-                })
-                .collect_vec();
+            self.mir
+                .compute_successors()
+                .into_iter()
+                .filter_map(|(blk, succs)| {
+                    if rs.contains(&blk) {
+                        Some((blk, succs.intersection(&rs).copied().collect()))
+                    } else {
+                        None
+                    }
+                });
         self.successors.extend(succs);
     }
 
