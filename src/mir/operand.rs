@@ -101,7 +101,7 @@ pub enum MIRCallee {
     Direct(FunctionRef),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum MIRRValueKind {
     Use(Operand),
     Ref(Place, Mutability),
