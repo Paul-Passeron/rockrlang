@@ -152,14 +152,13 @@ impl<'a> DCECtx<'a> {
             return None;
         }
 
-        if self.successors[&p1_last].len() != 1 || self.predecessors[&p2_fst].len() != 1 {
+        if self.successors[&p1_last].len() != 1 {
             return None;
         }
 
         let p1_next = *self.successors[&p1_last].iter().next().unwrap();
-        let p2_before = *self.predecessors[&p2_fst].iter().next().unwrap();
 
-        if p1_next != p2_fst || p2_before != p1_last {
+        if p1_next != p2_fst {
             return None;
         }
 
