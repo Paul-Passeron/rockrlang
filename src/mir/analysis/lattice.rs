@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -55,6 +55,25 @@ pub trait Lattice: Eq + Clone {
 // A map from key to lattice values is itself a lattice. This is gonna be useful
 // when we have locals to lattice values and want to relate that to blocks,
 // etc...
+
+impl<L> Lattice for HashSet<L>
+where
+    L: Eq + Hash + Clone,
+{
+    fn bottom() -> Self {
+        HashSet::new()
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        self.iter().chain(other).cloned().collect()
+    }
+
+    fn join_assign(&mut self, other: &Self) -> LatticeChange {
+        let l = self.len();
+        self.extend(other.iter().cloned());
+        (self.len() != l).into()
+    }
+}
 
 impl<K, V> Lattice for HashMap<K, V>
 where
