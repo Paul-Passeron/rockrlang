@@ -21,13 +21,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // Some ideas:
 // - Differentiate between shared / mutable borrow deref ?
 
-use std::collections::HashMap;
+use std::{collections::{HashMap, HashSet}, iter::once};
 
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::Mutability,
-    mir::{ConstructorArgs, LocalID, Operand, Projection, RValueKind},
+    mir::{ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
     ril::{TypeRef, bool_id, char_id, ptr_of, tuple_of},
     thir::{EnumRef, FunctionRef, StructRef},
@@ -171,5 +171,63 @@ impl From<FunctionRef> for MIRCallee {
 impl Constant {
     pub fn int(value: i128, ty: TypeRef) -> Self {
         Self::Integer { value, ty }
+    }
+}
+
+
+impl MIRRValue {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match &self.kind {
+            MIRRValueKind::Ref(p, _)
+            | MIRRValueKind::AddressOf(p, _)
+            | MIRRValueKind::Discriminant(p) => p.uses(),
+            MIRRValueKind::BinOp(_, l, r) => l.uses().union(&r.uses()).copied().collect(),
+            MIRRValueKind::Use(op)
+            | MIRRValueKind::UnaryOp(_, op)
+            | MIRRValueKind::Metadata(op) => op.uses(),
+            MIRRValueKind::SizeOf(_) => HashSet::new(),
+        }
+    }
+}
+
+impl MIROperand {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match self {
+            MIROperand::Constant(_) => HashSet::new(),
+            MIROperand::Move(p) | MIROperand::Copy(p) => p.uses(),
+            MIROperand::Constructor { args, .. } => match args {
+                MIRConstructorArgs::None => HashSet::new(),
+                MIRConstructorArgs::Tuple(ops) => {
+                    ops.iter().flat_map(|op| op.uses()).collect()
+                }
+                MIRConstructorArgs::Struct(fields) => {
+                    fields.iter().flat_map(|field| field.1.uses()).collect()
+                }
+            },
+            MIROperand::StructLit { fields, .. } => {
+                fields.iter().flat_map(|field| field.1.uses()).collect()
+            }
+            MIROperand::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
+        }
+    }
+}
+
+impl MIRPlace {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        once(self.local)
+            .chain(self.projections.iter().flat_map(|proj| proj.uses()))
+            .collect()
+    }
+}
+
+impl MIRProjection {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match self {
+            MIRProjection::TupleField { .. }
+            | MIRProjection::Field { .. }
+            | MIRProjection::Downcast { .. }
+            | MIRProjection::Deref => HashSet::new(),
+            MIRProjection::Index { index } => index.uses(),
+        }
     }
 }

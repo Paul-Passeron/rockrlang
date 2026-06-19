@@ -18,22 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    iter::once,
 };
 
 use itertools::Itertools;
 
 use crate::{
     Db,
-    mir::{
-        MIR, MIRBlockID, MIRLocalID,
-        analysis::MIRAnalysis,
-        basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
-        operand::{
-            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-            MIRRValueKind,
-        },
-    },
+    mir::{MIR, MIRBlockID, MIRLocalID, analysis::MIRAnalysis},
 };
 
 pub struct MIRLivenessAnalysis;
@@ -112,108 +103,6 @@ impl<'a> LivCtx<'a> {
             .iter()
             .map(|(id, _)| (id, HashSet::new()))
             .collect()
-    }
-}
-
-impl MIRBasicBlock {
-    pub fn defs(&self) -> HashSet<MIRLocalID> {
-        let mut res = self.terminator.defs();
-        res.extend(self.stmts.iter().map(|stmt| match stmt {
-            Stmt::Assign { dest, .. } => dest.local,
-        }));
-        res
-    }
-
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        self.stmts
-            .iter()
-            .flat_map(|stmt| match stmt {
-                Stmt::Assign { rvalue, .. } => rvalue.uses(),
-            })
-            .chain(self.terminator.uses())
-            .collect()
-    }
-}
-
-impl MIRRValue {
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        match &self.kind {
-            MIRRValueKind::Ref(p, _)
-            | MIRRValueKind::AddressOf(p, _)
-            | MIRRValueKind::Discriminant(p) => p.uses(),
-            MIRRValueKind::BinOp(_, l, r) => l.uses().union(&r.uses()).copied().collect(),
-            MIRRValueKind::Use(op)
-            | MIRRValueKind::UnaryOp(_, op)
-            | MIRRValueKind::Metadata(op) => op.uses(),
-            MIRRValueKind::SizeOf(_) => HashSet::new(),
-        }
-    }
-}
-
-impl MIRTerminator {
-    pub fn defs(&self) -> HashSet<MIRLocalID> {
-        match self {
-            MIRTerminator::Call { dest, .. } => HashSet::from([*dest]),
-            _ => HashSet::new(),
-        }
-    }
-
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        match self {
-            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => HashSet::new(),
-            MIRTerminator::Call { arguments, .. } => {
-                arguments.iter().flat_map(|op| op.uses()).collect()
-            }
-            MIRTerminator::Return { value: op, .. } => {
-                op.iter().flat_map(|op| op.uses()).collect()
-            }
-            MIRTerminator::Switch {
-                discriminant: op, ..
-            }
-            | MIRTerminator::Branch { cond: op, .. } => op.uses(),
-        }
-    }
-}
-
-impl MIROperand {
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        match self {
-            MIROperand::Constant(_) => HashSet::new(),
-            MIROperand::Move(p) | MIROperand::Copy(p) => p.uses(),
-            MIROperand::Constructor { args, .. } => match args {
-                MIRConstructorArgs::None => HashSet::new(),
-                MIRConstructorArgs::Tuple(ops) => {
-                    ops.iter().flat_map(|op| op.uses()).collect()
-                }
-                MIRConstructorArgs::Struct(fields) => {
-                    fields.iter().flat_map(|field| field.1.uses()).collect()
-                }
-            },
-            MIROperand::StructLit { fields, .. } => {
-                fields.iter().flat_map(|field| field.1.uses()).collect()
-            }
-            MIROperand::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
-        }
-    }
-}
-
-impl MIRPlace {
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        once(self.local)
-            .chain(self.projections.iter().flat_map(|proj| proj.uses()))
-            .collect()
-    }
-}
-
-impl MIRProjection {
-    pub fn uses(&self) -> HashSet<MIRLocalID> {
-        match self {
-            MIRProjection::TupleField { .. }
-            | MIRProjection::Field { .. }
-            | MIRProjection::Downcast { .. }
-            | MIRProjection::Deref => HashSet::new(),
-            MIRProjection::Index { index } => index.uses(),
-        }
     }
 }
 

@@ -15,11 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use crate::{
     common::location::Span,
-    mir::{Callee, Place, RValue, Terminator},
+    mir::{Callee, MIRLocalID, Place, RValue, Terminator},
 };
 
 use super::{BlockID, LocalID, Operand};
@@ -87,6 +87,51 @@ impl MIRBasicBlock {
             stmts: vec![],
             terminator,
             name,
+        }
+    }
+}
+
+impl MIRBasicBlock {
+    pub fn defs(&self) -> HashSet<MIRLocalID> {
+        let mut res = self.terminator.defs();
+        res.extend(self.stmts.iter().map(|stmt| match stmt {
+            Stmt::Assign { dest, .. } => dest.local,
+        }));
+        res
+    }
+
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        self.stmts
+            .iter()
+            .flat_map(|stmt| match stmt {
+                Stmt::Assign { rvalue, .. } => rvalue.uses(),
+            })
+            .chain(self.terminator.uses())
+            .collect()
+    }
+}
+
+impl MIRTerminator {
+    pub fn defs(&self) -> HashSet<MIRLocalID> {
+        match self {
+            MIRTerminator::Call { dest, .. } => HashSet::from([*dest]),
+            _ => HashSet::new(),
+        }
+    }
+
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match self {
+            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => HashSet::new(),
+            MIRTerminator::Call { arguments, .. } => {
+                arguments.iter().flat_map(|op| op.uses()).collect()
+            }
+            MIRTerminator::Return { value: op, .. } => {
+                op.iter().flat_map(|op| op.uses()).collect()
+            }
+            MIRTerminator::Switch {
+                discriminant: op, ..
+            }
+            | MIRTerminator::Branch { cond: op, .. } => op.uses(),
         }
     }
 }
