@@ -16,8 +16,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db, check::thir::validate_thir, name_resolve::type_expr::get_templates_of_fun,
-    ril::FunctionId, thir::thir_body, thir_to_mir::mir, typecheck::type_check_function,
+    Db,
+    check::thir::validate_thir,
+    mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
+    name_resolve::type_expr::get_templates_of_fun,
+    ril::FunctionId,
+    thir::thir_body,
+    thir_to_mir::mir,
+    typecheck::type_check_function,
 };
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
@@ -27,7 +33,13 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
         let templates = get_templates_of_fun(db, fdef.interned());
         if templates.is_empty() {
             let the_mir = mir(db, fdef, vec![]);
-            println!("{}\n", the_mir.dot(db, &fdef.called_to_string(db)));
+            let the_mir = DeadCodeElimination.run(db, the_mir.as_ref());
+            println!(
+                "{}: {}\n{}\n",
+                fdef.span(db).start().loc_info(db),
+                fdef.called_to_string(db),
+                the_mir.display(db)
+            );
             if let Some(tc) = type_check_function(db, fdef) {
                 for call_info in tc.call_infos(db).values() {
                     let callee_templates =
@@ -35,9 +47,13 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
                     if !callee_templates.is_empty() {
                         let other_mir =
                             mir(db, call_info.callee, call_info.substitution.clone());
+                        let other_mir = DeadCodeElimination.run(db, other_mir.as_ref());
+
                         println!(
-                            "{}\n",
-                            other_mir.dot(db, &call_info.callee.called_to_string(db))
+                            "{}: {}\n{}\n",
+                            call_info.callee.span(db).start().loc_info(db),
+                            call_info.callee.called_to_string(db),
+                            other_mir.display(db)
                         );
                     }
                 }
