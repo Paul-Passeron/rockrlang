@@ -34,10 +34,10 @@ pub struct MIRLivenessResult {
     pub live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
 }
 
-impl MIRAnalysis for MIRLivenessAnalysis {
+impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
     type Out = MIRLivenessResult;
 
-    fn run<'db, 'mir>(&self, _db: &'db dyn Db, mir: &'mir MIR) -> Self::Out {
+    fn run(&self, _db: &dyn Db, mir: & MIR) -> Self::Out {
         LivCtx::new(mir).run()
     }
 }
@@ -74,17 +74,12 @@ impl<'a> LivCtx<'a> {
             .collect();
         std::mem::swap(self.live_in.get_mut(&blk).unwrap(), &mut new_live_in);
         std::mem::swap(self.live_out.get_mut(&blk).unwrap(), &mut new_live_out);
-        new_live_in != self.live_in[&blk] || new_live_out != self.live_out[&blk]
+        new_live_in == self.live_in[&blk] && new_live_out == self.live_out[&blk]
     }
 
     pub fn run(mut self) -> MIRLivenessResult {
         loop {
-            if !self
-                .mir
-                .blocks
-                .iter()
-                .fold(false, |changed, blk| changed || self.step_for(blk.0))
-            {
+            if self.mir.blocks.iter().all(|blk| !self.step_for(blk.0)) {
                 break;
             }
         }

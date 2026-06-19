@@ -19,8 +19,8 @@ use crate::{Db, mir::MIR};
 
 pub mod liveness;
 
-pub trait MIRAnalysis {
+pub trait MIRAnalysis<'db, 'mir> {
     type Out;
 
-    fn run<'db, 'mir>(&self, db: &'db dyn Db, mir: &'mir MIR) -> Self::Out;
+    fn run(&self, db: &'db dyn Db, mir: &'mir MIR) -> Self::Out;
 }

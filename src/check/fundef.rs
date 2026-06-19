@@ -23,7 +23,10 @@ use crate::{
     Db,
     check::thir::validate_thir,
     hir::function_ast,
-    mir::{analysis::{MIRAnalysis, liveness::MIRLivenessAnalysis}, passes::{MIRPass, dead_code_elimination::DeadCodeElimination}},
+    mir::{
+        analysis::{MIRAnalysis, liveness::MIRLivenessAnalysis},
+        passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
+    },
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeRef},
     thir::thir_body,

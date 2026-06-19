@@ -21,7 +21,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // Some ideas:
 // - Differentiate between shared / mutable borrow deref ?
 
-use std::{collections::{HashMap, HashSet}, iter::once};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use crate::{
     Db,
@@ -173,7 +176,6 @@ impl Constant {
         Self::Integer { value, ty }
     }
 }
-
 
 impl MIRRValue {
     pub fn uses(&self) -> HashSet<MIRLocalID> {

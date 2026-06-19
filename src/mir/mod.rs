@@ -154,27 +154,26 @@ impl MIR {
     }
 
     fn compute_successors(&self) -> HashMap<BlockID, HashSet<BlockID>> {
-        let succs =
-            self.blocks
-                .iter()
-                .map(|(blk, infos)| {
-                    let succs = match &infos.terminator {
-                        MIRTerminator::Return { .. } | MIRTerminator::Diverge => {
-                            HashSet::new()
-                        }
-                        MIRTerminator::Goto { next }
-                        | MIRTerminator::Call { next, .. } => HashSet::from([*next]),
-                        MIRTerminator::Branch { then, else_, .. } => {
-                            HashSet::from([*then, *else_])
-                        }
-                        MIRTerminator::Switch {
-                            branches, default, ..
-                        } => branches.iter().map(|b| *b.1).chain([*default]).collect(),
-                    };
-                    (blk, succs)
-                })
-                .collect();
-        succs
+        self.blocks
+            .iter()
+            .map(|(blk, infos)| {
+                let succs = match &infos.terminator {
+                    MIRTerminator::Return { .. } | MIRTerminator::Diverge => {
+                        HashSet::new()
+                    }
+                    MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
+                        HashSet::from([*next])
+                    }
+                    MIRTerminator::Branch { then, else_, .. } => {
+                        HashSet::from([*then, *else_])
+                    }
+                    MIRTerminator::Switch {
+                        branches, default, ..
+                    } => branches.iter().map(|b| *b.1).chain([*default]).collect(),
+                };
+                (blk, succs)
+            })
+            .collect()
     }
 
     #[allow(unused)]
