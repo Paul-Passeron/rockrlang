@@ -72,7 +72,7 @@ pub struct MIRBasicBlock {
     pub name: Option<String>,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Stmt {
     Assign { dest: Place, rvalue: RValue },
 }

@@ -83,7 +83,7 @@ pub enum MIRProjection {
     Downcast { variant: usize },
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct MIRRValue {
     pub kind: RValueKind,
     pub ty: TypeRef,
@@ -96,7 +96,7 @@ pub enum UnaryOperator {
     LNot, // `!` in !x
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum MIRCallee {
     Direct(FunctionRef),
 }
