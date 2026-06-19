@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::{collections::{HashMap, HashSet}, iter::once};
+
 use crate::{
     common::{
         arena::{Arena, Idx},
@@ -112,5 +114,79 @@ impl MIRLocal {
         let mut this = self;
         this.syn_src = Some(src);
         this
+    }
+}
+
+impl MIR {
+    fn _compute_reachable(&self, s: &mut HashSet<BlockID>, blk: BlockID) {
+        if !s.insert(blk) {
+            return;
+        }
+
+        match &self.blocks[blk].terminator {
+            MIRTerminator::Return { .. } | MIRTerminator::Diverge => (),
+            MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
+                self._compute_reachable(s, *next)
+            }
+            MIRTerminator::Branch { then, else_, .. } => {
+                self._compute_reachable(s, *then);
+                self._compute_reachable(s, *else_);
+            }
+            MIRTerminator::Switch {
+                branches, default, ..
+            } => {
+                branches
+                    .iter()
+                    .map(|b| b.1)
+                    .chain(once(default))
+                    .for_each(|next| self._compute_reachable(s, *next));
+            }
+        }
+    }
+
+    fn compute_reachable(&self, from: BlockID) -> HashSet<BlockID> {
+        let mut res = HashSet::new();
+        self._compute_reachable(&mut res, from);
+        res
+    }
+
+    fn compute_successors(&self) -> HashMap<BlockID, HashSet<BlockID>> {
+        let succs =
+            self.blocks
+                .iter()
+                .map(|(blk, infos)| {
+                    let succs = match &infos.terminator {
+                        MIRTerminator::Return { .. } | MIRTerminator::Diverge => {
+                            HashSet::new()
+                        }
+                        MIRTerminator::Goto { next }
+                        | MIRTerminator::Call { next, .. } => HashSet::from([*next]),
+                        MIRTerminator::Branch { then, else_, .. } => {
+                            HashSet::from([*then, *else_])
+                        }
+                        MIRTerminator::Switch {
+                            branches, default, ..
+                        } => branches.iter().map(|b| *b.1).chain([*default]).collect(),
+                    };
+                    (blk, succs)
+                })
+                .collect();
+        succs
+    }
+
+    fn compute_predecessors(
+        &self,
+        successors: &HashMap<BlockID, HashSet<BlockID>>,
+    ) -> HashMap<BlockID, HashSet<BlockID>> {
+        let mut res: HashMap<BlockID, HashSet<BlockID>> = HashMap::new();
+        successors.iter().for_each(|(pred, succs)| {
+            succs.iter().for_each(|succ| {
+                res.entry(*succ).or_default().insert(*pred);
+            });
+        });
+        self.blocks.iter().for_each(|(blk, _)| {
+            res.entry(blk).or_default();
+        });
+        res
     }
 }
