@@ -17,8 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     iter::once,
 };
+
+use itertools::Itertools;
 
 use crate::{
     Db,
@@ -26,7 +29,10 @@ use crate::{
         MIR, MIRBlockID, MIRLocalID,
         analysis::MIRAnalysis,
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
-        operand::{MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection},
+        operand::{
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
+            MIRRValueKind,
+        },
     },
 };
 
@@ -75,7 +81,7 @@ impl<'a> LivCtx<'a> {
             .flat_map(|s| &self.live_in[s])
             .copied()
             .collect();
-        std::mem::swap(self.live_out.get_mut(&blk).unwrap(), &mut new_live_in);
+        std::mem::swap(self.live_in.get_mut(&blk).unwrap(), &mut new_live_in);
         std::mem::swap(self.live_out.get_mut(&blk).unwrap(), &mut new_live_out);
         new_live_in != self.live_in[&blk] || new_live_out != self.live_out[&blk]
     }
@@ -119,7 +125,28 @@ impl MIRBasicBlock {
     }
 
     pub fn uses(&self) -> HashSet<MIRLocalID> {
-        todo!()
+        self.stmts
+            .iter()
+            .flat_map(|stmt| match stmt {
+                Stmt::Assign { rvalue, .. } => rvalue.uses(),
+            })
+            .chain(self.terminator.uses())
+            .collect()
+    }
+}
+
+impl MIRRValue {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match &self.kind {
+            MIRRValueKind::Ref(p, _)
+            | MIRRValueKind::AddressOf(p, _)
+            | MIRRValueKind::Discriminant(p) => p.uses(),
+            MIRRValueKind::BinOp(_, l, r) => l.uses().union(&r.uses()).copied().collect(),
+            MIRRValueKind::Use(op)
+            | MIRRValueKind::UnaryOp(_, op)
+            | MIRRValueKind::Metadata(op) => op.uses(),
+            MIRRValueKind::SizeOf(_) => HashSet::new(),
+        }
     }
 }
 
