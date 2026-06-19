@@ -24,7 +24,9 @@ use crate::{
     check::thir::validate_thir,
     hir::function_ast,
     mir::{
-        analysis::{MIRAnalysis, liveness::MIRLivenessAnalysis},
+        analysis::{
+            MIRAnalysis, init_tracking::MIRInitAnalysis, liveness::MIRLivenessAnalysis,
+        },
         passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
     },
     name_resolve::type_expr::get_templates_of_fun,
@@ -112,7 +114,11 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
 
     let liveness = MIRLivenessAnalysis.run(db, the_mir.as_ref());
     println!("Liveness analysis:");
-    println!("{}", liveness);
+    println!("{liveness}");
+
+    let init = MIRInitAnalysis.run(db, the_mir.as_ref());
+    println!("init analysis:");
+    println!("{init}");
 
     let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
 
