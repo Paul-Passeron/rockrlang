@@ -132,14 +132,6 @@ impl<'a> DCECtx<'a> {
         p1: &[OldBlockID],
         p2: &[OldBlockID],
     ) -> Option</* reversed */ bool> {
-        assert!(!p1.is_empty());
-        assert!(!p2.is_empty());
-
-        if p1.iter().chain(p2).unique().count() != p1.len() + p2.len() {
-            // duplicate blocks in path, can't merge
-            return None;
-        }
-
         let (p1, p2, reversed) = {
             let p1_fst = p1.first().unwrap();
             let p2_last = p2.last().unwrap();
@@ -160,17 +152,12 @@ impl<'a> DCECtx<'a> {
             return None;
         }
 
-        let preds = self.predecessors[&p2_fst]
-            .intersection(&self.reachable.iter().copied().collect())
-            .copied()
-            .collect_vec();
-
-        if self.successors[&p1_last].len() != 1 || preds.len() != 1 {
+        if self.successors[&p1_last].len() != 1 || self.predecessors[&p2_fst].len() != 1 {
             return None;
         }
 
         let p1_next = *self.successors[&p1_last].iter().next().unwrap();
-        let p2_before = preds[0];
+        let p2_before = *self.predecessors[&p2_fst].iter().next().unwrap();
 
         if p1_next != p2_fst || p2_before != p1_last {
             return None;
