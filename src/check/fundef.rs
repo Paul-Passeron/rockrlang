@@ -33,12 +33,13 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
         let templates = get_templates_of_fun(db, fdef.interned());
         if templates.is_empty() {
             let the_mir = mir(db, fdef, vec![]);
-            let the_mir = DeadCodeElimination.run(db, the_mir.as_ref());
+            let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
             println!(
-                "{}: {}\n{}\n",
+                "{}: {}\nBEFORE DCE {}\nAFTER DCE {}",
                 fdef.span(db).start().loc_info(db),
                 fdef.called_to_string(db),
-                the_mir.display(db)
+                the_mir.display(db),
+                dce_mir.display(db),
             );
             if let Some(tc) = type_check_function(db, fdef) {
                 for call_info in tc.call_infos(db).values() {
@@ -47,13 +48,14 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
                     if !callee_templates.is_empty() {
                         let other_mir =
                             mir(db, call_info.callee, call_info.substitution.clone());
-                        let other_mir = DeadCodeElimination.run(db, other_mir.as_ref());
+                        let dce_mir = DeadCodeElimination.run(db, other_mir.as_ref());
 
                         println!(
-                            "{}: {}\n{}\n",
+                            "{}: {}\nBEFORE DCE {}\nAFTER DCE {}",
                             call_info.callee.span(db).start().loc_info(db),
                             call_info.callee.called_to_string(db),
-                            other_mir.display(db)
+                            other_mir.display(db),
+                            dce_mir.display(db),
                         );
                     }
                 }
