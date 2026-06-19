@@ -144,24 +144,29 @@ impl<'a> DCECtx<'a> {
             }
         };
 
-        let p1_last = p1.last().unwrap();
-        let p2_fst = p2.first().unwrap();
+        let p1_last = *p1.last().unwrap();
+        let p2_fst = *p2.first().unwrap();
 
         if !matches!(
-            &self.mir.blocks[*p1_last].terminator,
+            &self.mir.blocks[p1_last].terminator,
             MIRTerminator::Goto { .. },
         ) {
             return None;
         }
 
-        if self.successors[p1_last].len() != 1 || self.predecessors[p2_fst].len() != 1 {
+        let preds = self.predecessors[&p2_fst]
+            .intersection(&self.reachable.iter().copied().collect())
+            .copied()
+            .collect_vec();
+
+        if self.successors[&p1_last].len() != 1 || preds.len() != 1 {
             return None;
         }
 
-        let p1_next = *self.successors[p1_last].iter().next().unwrap();
-        let p2_before = *self.predecessors[p2_fst].iter().next().unwrap();
+        let p1_next = *self.successors[&p1_last].iter().next().unwrap();
+        let p2_before = *preds.iter().next().unwrap();
 
-        if p1_next != p2_before {
+        if p1_next != p2_fst || p2_before != p1_last {
             return None;
         }
 
@@ -235,7 +240,6 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_predecessors(&mut self) {
-        
         self.successors.iter().for_each(|(pred, succs)| {
             succs.into_iter().for_each(|succ| {
                 self.predecessors.entry(*succ).or_default().insert(*pred);
@@ -243,7 +247,6 @@ impl<'a> DCECtx<'a> {
         });
         self.reachable.iter().for_each(|blk| {
             self.predecessors.entry(*blk).or_default();
-            
         });
     }
 
@@ -414,10 +417,11 @@ impl<'a> DCECtx<'a> {
             .iter()
             .map(|p| {
                 assert!(!p.is_empty());
+                let name = self.salvage_path_name(p);
                 if *p.first().unwrap() == self.mir.entry {
+                    self.b.blocks[self.b.entry].name = name;
                     self.b.entry
                 } else {
-                    let name = self.salvage_path_name(p);
                     self.b.new_block(name)
                 }
             })
