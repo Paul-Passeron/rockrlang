@@ -47,9 +47,16 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
         let FixedPointIterRes {
             block_in,
             block_out,
-        } = mir.fixed_point_iter(
+        } = mir.fixed_point_iter::<HashSet<_>>(
             Direction::Backward,
-            |blk, old_out| Self::transfer(mir, blk, old_out),
+            |blk, old_out| {
+                let infos = &mir.blocks[blk];
+                let uses = infos.uses();
+                let defs = infos.defs();
+                uses.into_iter()
+                    .chain(old_out.difference(&defs).copied())
+                    .collect()
+            },
             None,
             None,
         );
@@ -58,21 +65,6 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
             live_in: block_in,
             live_out: block_out,
         }
-    }
-}
-
-impl MIRLivenessAnalysis {
-    fn transfer(
-        mir: &MIR,
-        blk: MIRBlockID,
-        old_out: &HashSet<MIRLocalID>,
-    ) -> HashSet<MIRLocalID> {
-        let infos = &mir.blocks[blk];
-        let uses = infos.uses();
-        let defs = infos.defs();
-        uses.into_iter()
-            .chain(old_out.difference(&defs).copied())
-            .collect()
     }
 }
 
