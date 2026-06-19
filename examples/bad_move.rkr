@@ -1,0 +1,40 @@
+fun simple_use_after_move(x: int): int {
+    let y = x;
+    return x + y;
+}
+
+fun move_then_use(s: str): str {
+    let t = s;
+    return s;
+}
+
+fun move_in_one_branch(cond: bool, s: str): str {
+    if cond {
+        let t = s;
+    }
+    return s;
+}
+
+fun move_in_loop(n: int, s: str): str {
+    let mut i = 0;
+    while i < n {
+        let t = s;
+        i = i + 1;
+    }
+    return s;
+}
+
+fun move_then_reassign_then_use(s: str): str {
+    let mut x = s;
+    x = "hello";
+    return x;
+}
+
+fun move_both_branches_then_use(cond: bool, s: str): str {
+    if cond {
+        let t = s;
+    } else {
+        let u = s;
+    }
+    return s;
+}
