@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::{HashMap, HashSet}, iter::once};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use crate::{
     common::{
@@ -174,6 +177,7 @@ impl MIR {
         succs
     }
 
+    #[allow(unused)]
     fn compute_predecessors(
         &self,
         successors: &HashMap<BlockID, HashSet<BlockID>>,
