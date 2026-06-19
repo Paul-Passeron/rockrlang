@@ -407,6 +407,13 @@ impl FunctionLikeAst {
             FunctionLikeAst::TraitMethod(spanned) => &spanned.data.return_type,
         }
     }
+
+    pub fn has_body(&self) -> bool {
+        !matches!(
+            self,
+            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
+        )
+    }
 }
 
 #[salsa::tracked]

@@ -63,10 +63,10 @@ pub struct ThirToMIR<'a> {
 
 #[salsa::interned]
 pub struct MIRKey {
-    fdef: FunctionId,
+    pub fdef: FunctionId,
 
     #[returns(ref)]
-    subs: Vec<TypeRef>,
+    pub subs: Vec<TypeRef>,
 }
 
 // /// Wrapper to send MIR safely between threads as it is supposed to be
@@ -76,7 +76,7 @@ pub struct MIRKey {
 // unsafe impl Send for _MIRWrapper {}
 
 #[salsa::tracked]
-fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Arc<MIR> {
+pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Arc<MIR> {
     let Some(thir) = thir_body(db, key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
     };

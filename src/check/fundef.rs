@@ -15,51 +15,99 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::collections::HashSet;
+
+use itertools::Itertools;
+
 use crate::{
     Db,
     check::thir::validate_thir,
+    hir::function_ast,
     mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
     name_resolve::type_expr::get_templates_of_fun,
-    ril::FunctionId,
+    ril::{FunctionId, TypeRef},
     thir::thir_body,
-    thir_to_mir::mir,
+    thir_to_mir::{_mir, MIRKey},
     typecheck::type_check_function,
 };
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
         validate_thir(db, thir.as_ref());
+    }
 
-        let templates = get_templates_of_fun(db, fdef.interned());
-        if templates.is_empty() {
-            let the_mir = mir(db, fdef, vec![]);
-            let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
-            println!(
-                "{}: {}\nBEFORE DCE {}\nAFTER DCE {}",
-                fdef.span(db).start().loc_info(db),
-                fdef.called_to_string(db),
-                the_mir.display(db),
-                dce_mir.display(db),
-            );
-            if let Some(tc) = type_check_function(db, fdef) {
-                for call_info in tc.call_infos(db).values() {
-                    let callee_templates =
-                        get_templates_of_fun(db, call_info.callee.interned());
-                    if !callee_templates.is_empty() {
-                        let other_mir =
-                            mir(db, call_info.callee, call_info.substitution.clone());
-                        let dce_mir = DeadCodeElimination.run(db, other_mir.as_ref());
+    for (fdef, subs) in reachable_mir_instances(db, fdef) {
+        process_mir_instance(db, fdef, subs);
+    }
+}
 
-                        println!(
-                            "{}: {}\nBEFORE DCE {}\nAFTER DCE {}",
-                            call_info.callee.span(db).start().loc_info(db),
-                            call_info.callee.called_to_string(db),
-                            other_mir.display(db),
-                            dce_mir.display(db),
-                        );
-                    }
-                }
+fn reachable_mir_instances(
+    db: &dyn Db,
+    root: FunctionId,
+) -> Vec<(FunctionId, Vec<TypeRef>)> {
+    let mut seen: HashSet<MIRKey> = HashSet::new();
+    let mut worklist: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
+    let mut res = vec![];
+
+    if !function_ast(db, root.into()).inner(db).has_body() {
+        return res;
+    }
+
+    if get_templates_of_fun(db, root.interned()).is_empty() {
+        worklist.push((root, vec![]));
+    }
+
+    while let Some((fdef, subs)) = worklist.pop() {
+        if !seen.insert(MIRKey::new(db, fdef, subs.clone())) {
+            continue;
+        }
+        res.push((fdef, subs.clone()));
+
+        let Some(tc) = type_check_function(db, fdef) else {
+            // ensure there is a body to typecheck
+            continue;
+        };
+        for call_info in tc.call_infos(db).values() {
+            let callee_templates = get_templates_of_fun(db, call_info.callee.interned());
+            if !callee_templates.is_empty() {
+                worklist.push((call_info.callee, call_info.substitution.clone()));
+            } else if !seen.contains(&MIRKey::new(db, call_info.callee, vec![])) {
+                worklist.push((call_info.callee, vec![]));
             }
         }
     }
+
+    res
+}
+
+fn process_mir_instance(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) {
+    _process_mir_instance(db, MIRKey::new(db, fdef, subs));
+}
+
+#[salsa::tracked]
+fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
+    let fdef = key.fdef(db);
+    let subs = key.subs(db);
+
+    let the_mir = _mir(db, key);
+
+    println!(
+        "{}: {}{}",
+        fdef.span(db).start().loc_info(db),
+        fdef.called_to_string(db),
+        if subs.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " with substitutions <{}>",
+                subs.iter().map(|ty| ty.to_string(db)).join(", ")
+            )
+        }
+    );
+
+    println!("BEFORE DCE {}", the_mir.display(db),);
+
+    let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
+
+    println!("AFTER DCE {}", dce_mir.display(db),);
 }
