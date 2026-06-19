@@ -1,0 +1,19 @@
+fun foo<T>(x: T): T {
+    return x;
+}
+
+enum A {
+    Foo(str),
+    Bar(int),
+}
+
+fun bar(a: A): A {
+    match a {
+        A::Foo(s) => {
+            return A::Foo(foo(s));
+        }
+        A::Bar(i) => {
+            return A::Bar(foo(i));
+        }
+    }
+}
