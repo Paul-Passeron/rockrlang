@@ -7,13 +7,15 @@ enum A {
     Bar(int),
 }
 
-fun bar(a: A): A {
-    match a {
-        A::Foo(s) => {
-            return A::Foo(foo(s));
-        }
-        A::Bar(i) => {
-            return A::Bar(foo(i));
+impl A {
+    fun apply_foo(self): Self {
+        match self {
+            A::Foo(s) => {
+                return A::Foo(foo(s));
+            }
+            A::Bar(i) => {
+                return A::Bar(foo(i));
+            }
         }
     }
 }
