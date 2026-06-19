@@ -20,7 +20,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::mir::{MIR, MIRBlockID};
+use crate::mir::{MIR, MIRBlockID, MIRLocalID};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LatticeChange {
@@ -138,6 +138,7 @@ pub enum Direction {
     Backward,
 }
 
+pub type LocalMap<T> = HashMap<MIRLocalID, T>;
 pub type BlockMap<L> = HashMap<MIRBlockID, L>;
 
 pub struct FixedPointIterRes<L: Lattice> {
@@ -158,14 +159,8 @@ impl MIR {
         out_seed: Option<BlockMap<L>>,
     ) -> FixedPointIterRes<L> {
         let mut block_in = BlockMap::from_iter(self.get_block_bottoms::<L>());
-        if let Some(in_seed) = in_seed {
-            block_in.join_assign(&in_seed);
-        }
 
         let mut block_out = BlockMap::from_iter(self.get_block_bottoms::<L>());
-        if let Some(out_seed) = out_seed {
-            block_out.join_assign(&out_seed);
-        }
 
         let succs = self.compute_successors();
         let preds = self.compute_predecessors(&succs);
@@ -174,20 +169,32 @@ impl MIR {
 
         while let Some(blk) = worklist.pop_last() {
             let new_in = match direction {
-                Direction::Forward => preds
-                    .get(&blk)
-                    .into_iter()
-                    .flatten()
-                    .fold(L::bottom(), |l, p| l.join(&block_out[p])),
+                Direction::Forward => {
+                    let from_preds = preds
+                        .get(&blk)
+                        .into_iter()
+                        .flatten()
+                        .fold(L::bottom(), |l, p| l.join(&block_out[p]));
+                    match in_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_preds.join(seed),
+                        None => from_preds,
+                    }
+                }
                 Direction::Backward => transfer(blk, &block_out[&blk]),
             };
             let new_out = match direction {
                 Direction::Forward => transfer(blk, &block_in[&blk]),
-                Direction::Backward => succs
-                    .get(&blk)
-                    .into_iter()
-                    .flatten()
-                    .fold(L::bottom(), |l, p| l.join(&block_in[p])),
+                Direction::Backward => {
+                    let from_succs = succs
+                        .get(&blk)
+                        .into_iter()
+                        .flatten()
+                        .fold(L::bottom(), |l, p| l.join(&block_in[p]));
+                    match out_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_succs.join(seed),
+                        None => from_succs,
+                    }
+                }
             };
 
             let changed = block_in[&blk] != new_in || block_out[&blk] != new_out;
