@@ -168,32 +168,32 @@ impl MIR {
         let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.blocks.keys());
 
         while let Some(blk) = worklist.pop_last() {
-            let new_in = match direction {
+            let (new_in, new_out) = match direction {
                 Direction::Forward => {
                     let from_preds = preds
                         .get(&blk)
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&block_out[p]));
-                    match in_seed.as_ref().and_then(|s| s.get(&blk)) {
+                    let new_in = match in_seed.as_ref().and_then(|s| s.get(&blk)) {
                         Some(seed) => from_preds.join(seed),
                         None => from_preds,
-                    }
+                    };
+                    let new_out = transfer(blk, &new_in);
+                    (new_in, new_out)
                 }
-                Direction::Backward => transfer(blk, &block_out[&blk]),
-            };
-            let new_out = match direction {
-                Direction::Forward => transfer(blk, &block_in[&blk]),
                 Direction::Backward => {
                     let from_succs = succs
                         .get(&blk)
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&block_in[p]));
-                    match out_seed.as_ref().and_then(|s| s.get(&blk)) {
+                    let new_out = match out_seed.as_ref().and_then(|s| s.get(&blk)) {
                         Some(seed) => from_succs.join(seed),
                         None => from_succs,
-                    }
+                    };
+                    let new_in = transfer(blk, &new_out);
+                    (new_in, new_out)
                 }
             };
 
