@@ -17,8 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Db, mir::MIR};
 
-pub mod liveness;
+pub mod init_tracking;
 pub mod lattice;
+pub mod liveness;
 
 pub trait MIRAnalysis<'db, 'mir> {
     type Out;
