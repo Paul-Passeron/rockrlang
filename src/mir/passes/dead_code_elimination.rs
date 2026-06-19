@@ -164,7 +164,7 @@ impl<'a> DCECtx<'a> {
         }
 
         let p1_next = *self.successors[&p1_last].iter().next().unwrap();
-        let p2_before = *preds.iter().next().unwrap();
+        let p2_before = preds[0];
 
         if p1_next != p2_fst || p2_before != p1_last {
             return None;
@@ -241,7 +241,7 @@ impl<'a> DCECtx<'a> {
 
     fn compute_predecessors(&mut self) {
         self.successors.iter().for_each(|(pred, succs)| {
-            succs.into_iter().for_each(|succ| {
+            succs.iter().for_each(|succ| {
                 self.predecessors.entry(*succ).or_default().insert(*pred);
             });
         });
@@ -434,7 +434,7 @@ impl<'a> DCECtx<'a> {
                 .flat_map(|blk| self.mir.blocks[*blk].stmts.clone())
                 .collect_vec();
             stmts.iter().for_each(|stmt| {
-                let new_stmt = self.copy_stmt(&stmt);
+                let new_stmt = self.copy_stmt(stmt);
                 self.b.emit(new_stmt);
             });
             let terminator = &self.mir.blocks[*p.last().unwrap()].terminator;
@@ -446,8 +446,7 @@ impl<'a> DCECtx<'a> {
     fn salvage_path_name(&self, path: &[OldBlockID]) -> Option<String> {
         let names = path
             .iter()
-            .map(|blk| self.mir.blocks[*blk].name.as_ref())
-            .flatten()
+            .filter_map(|blk| self.mir.blocks[*blk].name.as_ref())
             .collect_vec();
         if names.is_empty() {
             return None;
