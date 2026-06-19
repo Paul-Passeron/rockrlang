@@ -40,31 +40,38 @@ pub struct MIRLivenessResult {
     pub live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
 }
 
+impl From<FixedPointIterRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
+    fn from(
+        FixedPointIterRes {
+            block_in,
+            block_out,
+        }: FixedPointIterRes<HashSet<MIRLocalID>>,
+    ) -> Self {
+        Self {
+            live_in: block_in,
+            live_out: block_out,
+        }
+    }
+}
+
 impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
     type Out = MIRLivenessResult;
 
     fn run(&self, _db: &dyn Db, mir: &MIR) -> Self::Out {
-        let FixedPointIterRes {
-            block_in,
-            block_out,
-        } = mir.fixed_point_iter::<HashSet<_>>(
+        mir.fixed_point_iter::<HashSet<_>>(
             Direction::Backward,
             |blk, old_out| {
                 let infos = &mir.blocks[blk];
-                let uses = infos.uses();
-                let defs = infos.defs();
-                uses.into_iter()
-                    .chain(old_out.difference(&defs).copied())
+                infos
+                    .uses()
+                    .into_iter()
+                    .chain(old_out.difference(&infos.defs()).copied())
                     .collect()
             },
             None,
             None,
-        );
-
-        MIRLivenessResult {
-            live_in: block_in,
-            live_out: block_out,
-        }
+        )
+        .into()
     }
 }
 
