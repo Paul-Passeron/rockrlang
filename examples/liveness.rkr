@@ -1,0 +1,83 @@
+@include core::opt
+
+fun simple_dead(): int {
+    let x = 1;
+    let y = 2;
+    return x;
+}
+
+fun simple_live(): int {
+    let x = 1;
+    let y = 2;
+    return x + y;
+}
+
+fun conditional_use(cond: bool): int {
+    let x = 1;
+    let y = 2;
+    if cond {
+        return x;
+    }
+    return y;
+}
+
+fun reassigned_before_use(): int {
+    let mut x = 1;
+    x = 2;
+    return x;
+}
+
+fun loop_carried(n: int): int {
+    let mut acc = 0;
+    let mut i = 0;
+    while i < n {
+        acc = acc + i;
+        i = i + 1;
+    }
+    return acc;
+}
+
+fun dead_after_loop(n: int): int {
+    let mut i = 0;
+    while i < n {
+        i = i + 1;
+    }
+    let unused = 42;
+    return i;
+}
+
+fun overwritten_in_branch(cond: bool): int {
+    let mut x = 1;
+    if cond {
+        x = 2;
+    } else {
+        x = 3;
+    }
+    return x;
+}
+
+fun live_across_branch(cond: bool): int {
+    let x = 10;
+    if cond {
+        let y = 1;
+    } else {
+        let y = 2;
+    }
+    return x;
+}
+
+fun match_arm_liveness(o: opt<int>): int {
+    let fallback = 99;
+    match o {
+        opt::Some(x) => {
+            return x;
+        }
+        opt::None => {
+            return fallback;
+        }
+    }
+}
+
+fun param_liveness(a: int, b: int): int {
+    return a;
+}
