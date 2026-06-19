@@ -15,4 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::{Db, mir::MIR};
+
 pub mod liveness;
+
+pub trait MIRAnalysis {
+    type Out;
+
+    fn run<'db, 'mir>(&self, db: &'db dyn Db, mir: &'mir MIR) -> Self::Out;
+}
