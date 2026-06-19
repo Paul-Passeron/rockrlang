@@ -24,7 +24,13 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    mir::{MIR, MIRBlockID, MIRLocalID, analysis::MIRAnalysis},
+    mir::{
+        MIR, MIRBlockID, MIRLocalID,
+        analysis::{
+            MIRAnalysis,
+            lattice::{Direction, FixedPointIterRes},
+        },
+    },
 };
 
 pub struct MIRLivenessAnalysis;
@@ -37,66 +43,35 @@ pub struct MIRLivenessResult {
 impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
     type Out = MIRLivenessResult;
 
-    fn run(&self, _db: &dyn Db, mir: & MIR) -> Self::Out {
-        LivCtx::new(mir).run()
-    }
-}
+    fn run(&self, _db: &dyn Db, mir: &MIR) -> Self::Out {
+        let FixedPointIterRes {
+            block_in,
+            block_out,
+        } = mir.fixed_point_iter(
+            Direction::Backward,
+            |blk, old_out| Self::transfer(mir, blk, old_out),
+            None,
+            None,
+        );
 
-struct LivCtx<'a> {
-    mir: &'a MIR,
-    live_in: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
-    live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
-
-    successors: HashMap<MIRBlockID, HashSet<MIRBlockID>>,
-}
-
-impl<'a> LivCtx<'a> {
-    pub fn new(mir: &'a MIR) -> Self {
-        Self {
-            mir,
-            live_in: Self::get_start_live(mir),
-            live_out: Self::get_start_live(mir),
-            successors: mir.compute_successors(),
-        }
-    }
-
-    pub fn step_for(&mut self, blk: MIRBlockID) -> bool {
-        let infos = &self.mir.blocks[blk];
-        let mut new_live_in: HashSet<MIRLocalID> = infos
-            .uses()
-            .into_iter()
-            .chain(self.live_out[&blk].difference(&infos.defs()).copied())
-            .collect();
-        let mut new_live_out: HashSet<_> = self.successors[&blk]
-            .iter()
-            .flat_map(|s| &self.live_in[s])
-            .copied()
-            .collect();
-        std::mem::swap(self.live_in.get_mut(&blk).unwrap(), &mut new_live_in);
-        std::mem::swap(self.live_out.get_mut(&blk).unwrap(), &mut new_live_out);
-        new_live_in == self.live_in[&blk] && new_live_out == self.live_out[&blk]
-    }
-
-    pub fn run(mut self) -> MIRLivenessResult {
-        loop {
-            if self.mir.blocks.iter().all(|blk| !self.step_for(blk.0)) {
-                break;
-            }
-        }
-        self.finalize()
-    }
-
-    fn finalize(self) -> MIRLivenessResult {
         MIRLivenessResult {
-            live_in: self.live_in,
-            live_out: self.live_out,
+            live_in: block_in,
+            live_out: block_out,
         }
     }
+}
 
-    fn get_start_live(mir: &MIR) -> HashMap<MIRBlockID, HashSet<MIRLocalID>> {
-        mir.blocks
-            .iter()
-            .map(|(id, _)| (id, HashSet::new()))
+impl MIRLivenessAnalysis {
+    fn transfer(
+        mir: &MIR,
+        blk: MIRBlockID,
+        old_out: &HashSet<MIRLocalID>,
+    ) -> HashSet<MIRLocalID> {
+        let infos = &mir.blocks[blk];
+        let uses = infos.uses();
+        let defs = infos.defs();
+        uses.into_iter()
+            .chain(old_out.difference(&defs).copied())
             .collect()
     }
 }
