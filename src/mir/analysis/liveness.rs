@@ -216,3 +216,31 @@ impl MIRProjection {
         }
     }
 }
+
+impl fmt::Display for MIRLivenessResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "live-in:")?;
+        for (bb, live) in self.live_in.iter() {
+            writeln!(
+                f,
+                "    bb{}: {{{}}}",
+                bb.raw(),
+                live.iter()
+                    .map(|local| format!("_{}", local.raw()))
+                    .join(", ")
+            )?;
+        }
+        writeln!(f, "live-out:")?;
+        for (bb, live) in self.live_out.iter() {
+            writeln!(
+                f,
+                "    bb{}: {{{}}}",
+                bb.raw(),
+                live.iter()
+                    .map(|local| format!("_{}", local.raw()))
+                    .join(", ")
+            )?;
+        }
+        Ok(())
+    }
+}
