@@ -54,6 +54,12 @@ pub struct DCECtx<'a> {
     successors: HashMap<OldBlockID, HashSet<OldBlockID>>,
 }
 
+struct PathCompressionRes {
+    i: usize,
+    j: usize,
+    reversed: bool,
+}
+
 impl<'a> DCECtx<'a> {
     pub fn new(db: &'a dyn Db, mir: &'a MIR) -> Self {
         let entry_name = mir.blocks[mir.entry].name.clone();
@@ -173,33 +179,40 @@ impl<'a> DCECtx<'a> {
         Some(reversed)
     }
 
+    fn find_next_path_compression(
+        &self,
+        paths: &[Vec<OldBlockID>],
+    ) -> Option<PathCompressionRes> {
+        (0..paths.len())
+            .flat_map(|i| (0..i).map(|j| (i, j)).collect_vec())
+            .find_map(|(i, j)| {
+                let reversed = self.can_compress_paths(&paths[i], &paths[j])?;
+                Some(PathCompressionRes { i, j, reversed })
+            })
+    }
+
+    fn compress_paths(
+        &self,
+        paths: &mut Vec<Vec<OldBlockID>>,
+        i: usize,
+        j: usize,
+        reversed: bool,
+    ) {
+        if reversed {
+            let p2 = paths.remove(i);
+            paths[j].extend(p2);
+        } else {
+            let p2 = paths.remove(j);
+            paths[i - 1].extend(p2);
+        }
+    }
+
     fn compute_paths(&mut self) -> Vec<Vec<OldBlockID>> {
         let mut paths = self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
-        loop {
-            if paths.len() == 1 {
-                break;
-            }
-            let mut found = None;
-            'outer: for i in 0..paths.len() {
-                for j in 0..i {
-                    if let Some(reversed) = self.can_compress_paths(&paths[i], &paths[j])
-                    {
-                        found = Some((i, j, reversed));
-                        break 'outer;
-                    }
-                }
-            }
-            if let Some((i, j, reversed)) = found {
-                if reversed {
-                    let p2 = paths.remove(i);
-                    paths[j].extend(p2);
-                } else {
-                    let p2 = paths.remove(j);
-                    paths[i - 1].extend(p2);
-                }
-            } else {
-                break;
-            }
+        while let Some(PathCompressionRes { i, j, reversed }) =
+            self.find_next_path_compression(&paths)
+        {
+            self.compress_paths(&mut paths, i, j, reversed);
         }
         paths
     }
