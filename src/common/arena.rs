@@ -24,7 +24,7 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use crate::common::frozen::{Frozen, FrozenIntoIter};
+use crate::common::frozen::{Frozen, FrozenIntoIter, FrozenIter};
 
 pub struct Arena<T> {
     inner: Frozen<T>,
@@ -162,6 +162,10 @@ impl<T> Arena<T> {
             .enumerate()
             .map(|(i, value)| (Idx(i, PhantomData), value))
     }
+
+    pub fn keys(&self) -> impl Iterator<Item = Idx<T>> {
+        self.iter().map(|e| e.0)
+    }
 }
 
 impl<T> IntoIterator for Arena<T> {
@@ -175,4 +179,18 @@ impl<T> IntoIterator for Arena<T> {
     type Item = (Idx<T>, T);
 
     type IntoIter = Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
+}
+
+impl<'a, T> IntoIterator for &'a Arena<T> {
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner
+            .iter()
+            .enumerate()
+            .map(|(i, value)| (Idx(i, PhantomData), value))
+    }
+
+    type Item = (Idx<T>, &'a T);
+
+    type IntoIter =
+        Map<Enumerate<FrozenIter<'a, T>>, fn((usize, &'a T)) -> (Idx<T>, &'a T)>;
 }
