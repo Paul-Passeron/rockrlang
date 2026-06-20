@@ -17,8 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     collections::{HashMap, HashSet},
-    ops::Index,
+    fmt,
 };
+
+use itertools::Itertools;
 
 use crate::{
     Db,
@@ -31,7 +33,8 @@ use crate::{
             lattice::{BlockMap, LocalMap},
         },
         basic_block::Stmt,
-        operand::{MIRPlace, MIRRValueKind},
+        display::{MIRWrite, StringWriter, fmt_place},
+        operand::{MIRPlace, MIRProjection, MIRRValueKind},
     },
 };
 
@@ -109,7 +112,8 @@ impl MIRLoanAnalysis {
                 (
                     *blk,
                     ids.iter()
-                        .flat_map(|local| by_holder[local].iter().copied())
+                        .flat_map(|local| Some(by_holder.get(local)?.iter().copied()))
+                        .flatten()
                         .collect(),
                 )
             })
@@ -127,10 +131,56 @@ impl Arena<Loan> {
     }
 }
 
-impl Index<MIRStmtIndex> for MIR {
-    type Output = Stmt;
+struct MIRLoanOutDisplay<'a, 'b> {
+    db: &'b dyn Db,
+    out: &'a MIRLoanOut,
+}
 
-    fn index(&self, index: MIRStmtIndex) -> &Self::Output {
-        &self.blocks[index.0].stmts[index.1]
+impl MIRLoanOut {
+    pub fn display(&self, db: &dyn Db) -> impl fmt::Display {
+        MIRLoanOutDisplay { db, out: self }
+    }
+}
+
+impl fmt::Display for MIRLoanOutDisplay<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "loans:")?;
+        for (id, loan) in &self.out.loans {
+            let mut w = StringWriter(String::new());
+            fmt_place(&mut w, self.db, &loan.place)?;
+
+            writeln!(
+                f,
+                "    L{}: {} {} = {}_0..{} (holder: _{})",
+                id.raw(),
+                if loan.mutability.is_mut() { "&mut " } else { "&" },
+                w.0,
+                loan.created_at.0.raw(),
+                loan.created_at.1,
+                loan.holder.raw(),
+            )?;
+        }
+
+        writeln!(f, "loans-live-in:")?;
+        for (blk, ids) in &self.out.loans_live_in {
+            writeln!(
+                f,
+                "    bb{}: {{{}}}",
+                blk.raw(),
+                ids.iter().map(|id| format!("L{}", id.raw())).join(", ")
+            )?;
+        }
+
+        writeln!(f, "loans-live-out:")?;
+        for (blk, ids) in &self.out.loans_live_out {
+            writeln!(
+                f,
+                "    bb{}: {{{}}}",
+                blk.raw(),
+                ids.iter().map(|id| format!("L{}", id.raw())).join(", ")
+            )?;
+        }
+
+        Ok(())
     }
 }
