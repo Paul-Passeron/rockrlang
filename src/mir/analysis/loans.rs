@@ -82,8 +82,8 @@ impl MIRLoanAnalysis {
         for (blk, infos) in &mir.blocks {
             for (idx, stmt) in infos.stmts.iter().enumerate() {
                 match stmt {
-                    Stmt::Assign { dest, rvalue } => match &rvalue.kind {
-                        MIRRValueKind::Ref(place, mutability) => {
+                    Stmt::Assign { dest, rvalue } => {
+                        if let MIRRValueKind::Ref(place, mutability) = &rvalue.kind {
                             let loan = Loan {
                                 place: place.clone(),
                                 mutability: *mutability,
@@ -92,8 +92,7 @@ impl MIRLoanAnalysis {
                             };
                             loans.insert(loan);
                         }
-                        _ => (),
-                    },
+                    }
                 }
             }
         }

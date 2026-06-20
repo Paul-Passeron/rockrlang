@@ -99,11 +99,11 @@ impl MIRPlace {
         match state {
             InitState::Init => (),
             InitState::Maybe => {
-                Diag::generic_error(format!("Use after move (maybe)"), self.span)
+                Diag::generic_error("Use after move (maybe)".to_string(), self.span)
                     .accumulate(db)
             }
             InitState::Uninit => {
-                Diag::generic_error(format!("Use after move"), self.span).accumulate(db);
+                Diag::generic_error("Use after move".to_string(), self.span).accumulate(db);
             }
         }
     }
