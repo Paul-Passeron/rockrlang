@@ -112,17 +112,21 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
         }
     );
 
-    println!("BEFORE DCE {}", the_mir.display(db),);
+    println!("{}", the_mir.display(db),);
 
-    let liveness = MIRLivenessAnalysis.run(db, the_mir.as_ref());
+    let liveness = the_mir.as_ref().liveness(db);
     println!("Liveness analysis:");
     println!("{liveness}");
 
-    let init = MIRInitAnalysis.run(db, the_mir.as_ref());
+    let init = the_mir.init_tracking(db);
     println!("init analysis:");
     println!("{init}");
 
-    let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
+    let loans = the_mir.loans(db);
+    println!("loans analysis:");
+    println!("{}", loans.display(db));
 
-    println!("AFTER DCE {}", dce_mir.display(db));
+    // let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
+
+    // println!("AFTER DCE {}", dce_mir.display(db));
 }

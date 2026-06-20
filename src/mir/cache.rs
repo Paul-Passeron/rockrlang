@@ -9,6 +9,7 @@ use crate::{
             init_tracking::{MIRInitAnalysis, MIRInitOut},
             lattice::BlockMap,
             liveness::{MIRLivenessAnalysis, MIRLivenessResult},
+            loans::{MIRLoanAnalysis, MIRLoanOut},
         },
     },
 };
@@ -18,6 +19,7 @@ pub(super) struct MIRCache {
     init_tracking: OnceLock<MIRInitOut>,
     successors: OnceLock<BlockMap<HashSet<MIRBlockID>>>,
     predecessors: OnceLock<BlockMap<HashSet<MIRBlockID>>>,
+    loans: OnceLock<MIRLoanOut>,
 }
 
 impl MIRCache {
@@ -27,6 +29,7 @@ impl MIRCache {
             init_tracking: OnceLock::new(),
             successors: OnceLock::new(),
             predecessors: OnceLock::new(),
+            loans: OnceLock::new(),
         }
     }
 }
@@ -54,5 +57,11 @@ impl MIR {
         self.cache
             .predecessors
             .get_or_init(|| self.compute_predecessors())
+    }
+
+    pub fn loans(&self, db: &dyn Db) -> &MIRLoanOut {
+        self.cache
+            .loans
+            .get_or_init(|| MIRLoanAnalysis.run(db, self))
     }
 }
