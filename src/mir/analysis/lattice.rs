@@ -78,7 +78,26 @@ where
     L: Eq + Hash + Clone,
 {
     fn bottom() -> Self {
-        HashSet::new()
+        Self::new()
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        self.iter().chain(other).cloned().collect()
+    }
+
+    fn join_assign(&mut self, other: &Self) -> LatticeChange {
+        let l = self.len();
+        self.extend(other.iter().cloned());
+        (self.len() != l).into()
+    }
+}
+
+impl<L> Lattice for BTreeSet<L>
+where
+    L: Eq + Ord + Clone,
+{
+    fn bottom() -> Self {
+        Self::new()
     }
 
     fn join(&self, other: &Self) -> Self {
