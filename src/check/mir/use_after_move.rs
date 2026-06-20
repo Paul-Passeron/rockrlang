@@ -19,7 +19,6 @@ use salsa::Accumulator;
 
 use crate::{
     Db,
-    common::location::Span,
     compiler::diagnostic::Diag,
     mir::{
         MIR,
@@ -44,34 +43,30 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
                 }
             }
         }
-        match &infos.terminator {
+        infos.terminator.check(db, &mut state);
+    }
+}
+
+impl MIRTerminator {
+    fn check(&self, db: &dyn Db, state: &mut LocalMap<InitState>) {
+        match self {
             MIRTerminator::Goto { .. } | MIRTerminator::Diverge => (),
             MIRTerminator::Call { arguments, .. } => {
-                arguments.iter().for_each(|op| op.check(db, &mut state));
+                arguments.iter().for_each(|op| op.check(db, state));
             }
             MIRTerminator::Return { value, .. } => {
-                value.iter().for_each(|op| op.check(db, &mut state))
+                value.iter().for_each(|op| op.check(db, state))
             }
             MIRTerminator::Branch { cond: op, .. }
             | MIRTerminator::Switch {
                 discriminant: op, ..
-            } => op.check(db, &mut state),
+            } => op.check(db, state),
         }
     }
 }
 
 impl MIROperand {
-    pub fn span(&self) -> Span {
-        match self {
-            MIROperand::Constant(_, span)
-            | MIROperand::Constructor { span, .. }
-            | MIROperand::StructLit { span, .. }
-            | MIROperand::Tuple(_, span) => *span,
-            MIROperand::Move(p) | MIROperand::Copy(p) => p.span,
-        }
-    }
-
-    pub fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
+    fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
         match self {
             MIROperand::Constant(_, _) => (),
             MIROperand::Move(p) | MIROperand::Copy(p) => p.check(db, m),
@@ -99,7 +94,7 @@ impl MIROperand {
 }
 
 impl MIRPlace {
-    pub fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
+    fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
         let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
         match state {
             InitState::Init => (),

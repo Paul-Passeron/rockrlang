@@ -150,7 +150,6 @@ impl Operand {
     }
 }
 
-
 impl Place {
     pub fn into_move(self) -> Operand {
         Operand::Move(self)
@@ -226,6 +225,18 @@ impl MIRProjection {
             | MIRProjection::Downcast { .. }
             | MIRProjection::Deref => HashSet::new(),
             MIRProjection::Index { index } => index.uses(),
+        }
+    }
+}
+
+impl MIROperand {
+    pub fn span(&self) -> Span {
+        match self {
+            MIROperand::Constant(_, span)
+            | MIROperand::Constructor { span, .. }
+            | MIROperand::StructLit { span, .. }
+            | MIROperand::Tuple(_, span) => *span,
+            MIROperand::Move(p) | MIROperand::Copy(p) => p.span,
         }
     }
 }
