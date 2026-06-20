@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -92,22 +92,66 @@ where
     }
 }
 
-impl<K, V> Lattice for HashMap<K, V>
+pub trait MapLike {
+    type Key;
+    type Value;
+    fn new_empty() -> Self;
+    fn get_mut(&mut self, key: &Self::Key) -> Option<&mut Self::Value>;
+    fn insert(&mut self, key: Self::Key, value: Self::Value);
+    fn iter(&self) -> impl Iterator<Item = (&Self::Key, &Self::Value)>;
+}
+
+impl<K: Eq + Hash, V> MapLike for HashMap<K, V> {
+    type Key = K;
+    type Value = V;
+    fn new_empty() -> Self {
+        HashMap::new()
+    }
+    fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        HashMap::get_mut(self, key)
+    }
+    fn insert(&mut self, key: K, value: V) {
+        HashMap::insert(self, key, value);
+    }
+    fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        HashMap::iter(self)
+    }
+}
+
+impl<K: Ord, V> MapLike for BTreeMap<K, V> {
+    type Key = K;
+    type Value = V;
+
+    fn new_empty() -> Self {
+        BTreeMap::new()
+    }
+    fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        BTreeMap::get_mut(self, key)
+    }
+    fn insert(&mut self, key: K, value: V) {
+        BTreeMap::insert(self, key, value);
+    }
+    fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        BTreeMap::iter(self)
+    }
+}
+
+impl<M> Lattice for M
 where
-    K: Eq + Hash + Clone,
-    V: Lattice,
+    M: MapLike + Clone + Eq,
+    M::Key: Clone,
+    M::Value: Lattice,
 {
     fn bottom() -> Self {
-        HashMap::new()
+        M::new_empty()
     }
 
     fn join(&self, other: &Self) -> Self {
         let mut res = self.clone();
-        for (key, other_value) in other {
+        for (key, other_value) in other.iter() {
             if let Some(value) = res.get_mut(key) {
                 value.join_assign(other_value);
             } else {
-                // Like joining with bottom
                 res.insert(key.clone(), other_value.clone());
             }
         }
@@ -116,14 +160,13 @@ where
 
     fn join_assign(&mut self, other: &Self) -> LatticeChange {
         let mut change = LatticeChange::Unchanged;
-        for (key, other_value) in other {
+        for (key, other_value) in other.iter() {
             if let Some(value) = self.get_mut(key) {
                 let changed = value.join_assign(other_value);
                 change.join_assign(&changed);
             } else {
-                // Like joining with bottom. Wonder if we should
                 self.insert(key.clone(), other_value.clone());
-                if other_value == &V::bottom() {
+                if other_value == &M::Value::bottom() {
                     change = LatticeChange::Changed;
                 }
             }
