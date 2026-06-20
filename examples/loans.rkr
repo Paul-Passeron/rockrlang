@@ -1,0 +1,49 @@
+fun simple_borrow(): int {
+    let x = 5;
+    let r = &x;
+    return *r;
+}
+
+fun two_disjoint_borrows(): int {
+    let x = 1;
+    let y = 2;
+    let rx = &x;
+    let ry = &y;
+    return *rx + *ry;
+}
+
+fun borrow_dead_before_use(): int {
+    let x = 5;
+    let r = &x;
+    let y = 10;
+    return y;
+}
+
+fun borrow_across_branch(cond: bool): int {
+    let x = 5;
+    let r = &x;
+    if cond {
+        return *r;
+    }
+    return 0;
+}
+
+fun reassigned_borrow(): int {
+    let a = 1;
+    let b = 2;
+    let mut r = &a;
+    r = &b;
+    return *r;
+}
+
+fun borrow_in_loop(n: int): int {
+    let x = 5;
+    let mut i = 0;
+    let mut acc = 0;
+    while i < n {
+        let r = &x;
+        acc = acc + *r;
+        i = i + 1;
+    }
+    return acc;
+}
