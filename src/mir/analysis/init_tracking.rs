@@ -25,13 +25,6 @@ pub enum InitState {
     Uninit,
 }
 
-type FPRes = FixedPointIterRes<LocalMap<InitState>>;
-
-pub struct MIRInitOut {
-    pub init_in: BlockMap<LocalMap<InitState>>,
-    pub init_out: BlockMap<LocalMap<InitState>>,
-}
-
 impl Lattice for InitState {
     fn bottom() -> Self {
         Self::Uninit
@@ -44,6 +37,13 @@ impl Lattice for InitState {
             _ => Self::Maybe,
         }
     }
+}
+
+type FPRes = FixedPointIterRes<LocalMap<InitState>>;
+
+pub struct MIRInitOut {
+    pub init_in: BlockMap<LocalMap<InitState>>,
+    pub init_out: BlockMap<LocalMap<InitState>>,
 }
 
 impl From<FPRes> for MIRInitOut {
@@ -84,20 +84,16 @@ impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
 impl MIRBasicBlock {
     pub fn init_states(&self, state: &LocalMap<InitState>) -> LocalMap<InitState> {
         let mut res = state.clone();
-        self._init_states(&mut res);
-        res
-    }
-
-    fn _init_states(&self, state: &mut LocalMap<InitState>) {
         for stmt in &self.stmts {
             match stmt {
                 Stmt::Assign { dest, rvalue } => {
-                    rvalue.for_each_operand(|op| op.apply(state));
-                    state.insert(dest.local, InitState::Init);
+                    rvalue.for_each_operand(|op| op.apply(&mut res));
+                    res.insert(dest.local, InitState::Init);
                 }
             }
         }
-        self.terminator.init_states(state);
+        self.terminator.init_states(&mut res);
+        res
     }
 }
 
