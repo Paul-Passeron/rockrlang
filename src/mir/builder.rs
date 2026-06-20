@@ -20,7 +20,10 @@ use std::collections::HashSet;
 use crate::{
     Db,
     common::arena::Arena,
-    mir::{BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt},
+    mir::{
+        BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt,
+        cache::MIRCache,
+    },
 };
 
 pub struct MIRBuilder<'a> {
@@ -132,6 +135,7 @@ impl<'a> MIRBuilder<'a> {
             locals: self.locals,
             entry: self.entry,
             parameters,
+            cache: MIRCache::empty(),
         })
     }
 }

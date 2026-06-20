@@ -29,6 +29,7 @@ use crate::{
     hir::{self, Mutability},
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
+        cache::MIRCache,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind,
@@ -41,6 +42,7 @@ use crate::{
 pub mod analysis;
 pub mod basic_block;
 pub mod builder;
+pub mod cache;
 pub mod display;
 pub mod operand;
 pub mod passes;
@@ -69,12 +71,13 @@ pub struct SyntacticSource {
     pub id: hir::LocalId,
 }
 
-#[derive(PartialEq, Eq)]
 pub struct MIR {
     pub blocks: Arena<BasicBlock>,
     pub locals: Arena<Local>,
     pub parameters: Vec<LocalID>,
     pub entry: BlockID,
+
+    cache: MIRCache,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -176,7 +179,6 @@ impl MIR {
             .collect()
     }
 
-    #[allow(unused)]
     fn compute_predecessors(
         &self,
         successors: &HashMap<BlockID, HashSet<BlockID>>,
@@ -193,3 +195,14 @@ impl MIR {
         res
     }
 }
+
+impl PartialEq for MIR {
+    fn eq(&self, other: &Self) -> bool {
+        self.blocks == other.blocks
+            && self.locals == other.locals
+            && self.parameters == other.parameters
+            && self.entry == other.entry
+    }
+}
+
+impl Eq for MIR {}
