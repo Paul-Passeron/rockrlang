@@ -162,8 +162,8 @@ impl MIR {
 
         let mut block_out = BlockMap::from_iter(self.get_block_bottoms::<L>());
 
-        let succs = self.compute_successors();
-        let preds = self.compute_predecessors(&succs);
+        let succs = self.successors();
+        let preds = self.predecessors();
 
         let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.blocks.keys());
 

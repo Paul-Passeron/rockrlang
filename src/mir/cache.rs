@@ -53,6 +53,6 @@ impl MIR {
     pub fn predecessors(&self) -> &BlockMap<HashSet<MIRBlockID>> {
         self.cache
             .predecessors
-            .get_or_init(|| self.compute_predecessors(self.successors()))
+            .get_or_init(|| self.compute_predecessors())
     }
 }

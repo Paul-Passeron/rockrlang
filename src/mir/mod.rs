@@ -179,12 +179,9 @@ impl MIR {
             .collect()
     }
 
-    fn compute_predecessors(
-        &self,
-        successors: &HashMap<BlockID, HashSet<BlockID>>,
-    ) -> HashMap<BlockID, HashSet<BlockID>> {
+    fn compute_predecessors(&self) -> HashMap<BlockID, HashSet<BlockID>> {
         let mut res: HashMap<BlockID, HashSet<BlockID>> = HashMap::new();
-        successors.iter().for_each(|(pred, succs)| {
+        self.successors().iter().for_each(|(pred, succs)| {
             succs.iter().for_each(|succ| {
                 res.entry(*succ).or_default().insert(*pred);
             });
