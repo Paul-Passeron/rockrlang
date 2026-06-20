@@ -23,18 +23,14 @@ use crate::{
     compiler::diagnostic::Diag,
     mir::{
         MIR,
-        analysis::{
-            MIRAnalysis,
-            init_tracking::{InitState, MIRInitAnalysis},
-            lattice::LocalMap,
-        },
+        analysis::{init_tracking::InitState, lattice::LocalMap},
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRConstructorArgs, MIROperand, MIRPlace},
     },
 };
 
 pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
-    let init = MIRInitAnalysis.run(db, mir);
+    let init = mir.init_tracking(db);
     for (blk, infos) in &mir.blocks {
         let mut state = init.init_in[&blk].clone();
 
@@ -107,7 +103,10 @@ impl MIRPlace {
         let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
         match state {
             InitState::Init => (),
-            InitState::Maybe => Diag::generic_error(format!("Use after move (maybe)"), self.span).accumulate(db),
+            InitState::Maybe => {
+                Diag::generic_error(format!("Use after move (maybe)"), self.span)
+                    .accumulate(db)
+            }
             InitState::Uninit => {
                 Diag::generic_error(format!("Use after move"), self.span).accumulate(db);
             }
