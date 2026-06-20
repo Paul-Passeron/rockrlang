@@ -101,13 +101,29 @@ impl MIRBasicBlock {
     }
 
     pub fn uses(&self) -> HashSet<MIRLocalID> {
-        self.stmts
-            .iter()
-            .flat_map(|stmt| match stmt {
-                Stmt::Assign { rvalue, .. } => rvalue.uses(),
-            })
-            .chain(self.terminator.uses())
-            .collect()
+        let mut uses = HashSet::new();
+        let mut defined_so_far: HashSet<MIRLocalID> = HashSet::new();
+
+        for stmt in &self.stmts {
+            match stmt {
+                Stmt::Assign { dest, rvalue } => {
+                    for local in rvalue.uses() {
+                        if !defined_so_far.contains(&local) {
+                            uses.insert(local);
+                        }
+                    }
+                    defined_so_far.insert(dest.local);
+                }
+            }
+        }
+
+        for local in self.terminator.uses() {
+            if !defined_so_far.contains(&local) {
+                uses.insert(local);
+            }
+        }
+
+        uses
     }
 }
 
