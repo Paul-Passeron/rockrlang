@@ -256,6 +256,7 @@ impl<'a> DCECtx<'a> {
             local: self.add_and_get_local_to_mapping(place.local),
             projections: place.projections.clone(),
             ty: place.ty,
+            span: place.span
         }
     }
 
@@ -276,7 +277,7 @@ impl<'a> DCECtx<'a> {
 
     fn copy_operand(&mut self, operand: &MIROperand) -> MIROperand {
         match operand {
-            MIROperand::Constant(cst) => MIROperand::Constant(cst.clone()),
+            MIROperand::Constant(cst, span) => MIROperand::Constant(cst.clone(), *span),
             MIROperand::Move(p) => MIROperand::Move(self.copy_place(p)),
             MIROperand::Copy(p) => MIROperand::Copy(self.copy_place(p)),
             MIROperand::Constructor {

@@ -473,6 +473,7 @@ impl<'a> ThirToMIR<'a> {
             local: base.local,
             projections,
             ty: resulting_ty,
+            span: base.span,
         }
     }
 
@@ -505,6 +506,7 @@ impl<'a> ThirToMIR<'a> {
             local: base.local,
             projections,
             ty: resulting_ty,
+            span: base.span,
         }
     }
 }

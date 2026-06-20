@@ -40,7 +40,7 @@ use super::{Constant, Place};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MIROperand {
-    Constant(Constant),
+    Constant(Constant, Span),
     Move(Place),
     Copy(Place),
     Constructor {
@@ -75,6 +75,7 @@ pub struct MIRPlace {
     pub local: LocalID,
     pub projections: Vec<Projection>,
     pub ty: TypeRef,
+    pub span: Span,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -136,7 +137,7 @@ impl Constant {
 impl Operand {
     pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
-            MIROperand::Constant(mirconstant) => mirconstant.ty(db),
+            MIROperand::Constant(mirconstant, _) => mirconstant.ty(db),
             MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
             MIROperand::Constructor { enum_ref, .. } => enum_ref.clone().as_type_ref(db),
             MIROperand::StructLit { struct_ref, .. } => {
@@ -149,11 +150,6 @@ impl Operand {
     }
 }
 
-impl From<Constant> for Operand {
-    fn from(value: Constant) -> Self {
-        Self::Constant(value)
-    }
-}
 
 impl Place {
     pub fn into_move(self) -> Operand {
@@ -195,7 +191,7 @@ impl MIRRValue {
 impl MIROperand {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIROperand::Constant(_) => HashSet::new(),
+            MIROperand::Constant(_, _) => HashSet::new(),
             MIROperand::Move(p) | MIROperand::Copy(p) => p.uses(),
             MIROperand::Constructor { args, .. } => match args {
                 MIRConstructorArgs::None => HashSet::new(),

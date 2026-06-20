@@ -1,4 +1,4 @@
-use std::{fmt};
+use std::fmt;
 
 use itertools::Itertools;
 
@@ -28,8 +28,8 @@ pub enum InitState {
 type FPRes = FixedPointIterRes<LocalMap<InitState>>;
 
 pub struct MIRInitOut {
-    init_in: BlockMap<LocalMap<InitState>>,
-    init_out: BlockMap<LocalMap<InitState>>,
+    pub init_in: BlockMap<LocalMap<InitState>>,
+    pub init_out: BlockMap<LocalMap<InitState>>,
 }
 
 impl Lattice for InitState {
@@ -173,7 +173,7 @@ impl MIROperand {
             }
             | MIROperand::Tuple(ops, _) => ops.iter().for_each(|op| op.apply(state)),
             MIROperand::Copy(_)
-            | MIROperand::Constant(_)
+            | MIROperand::Constant(_, _)
             | MIROperand::Constructor { .. } => (),
         }
     }

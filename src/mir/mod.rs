@@ -147,7 +147,7 @@ impl MIR {
         }
     }
 
-    fn compute_reachable(&self, from: BlockID) -> HashSet<BlockID> {
+    pub fn compute_reachable(&self, from: BlockID) -> HashSet<BlockID> {
         let mut res = HashSet::new();
         self._compute_reachable(&mut res, from);
         res

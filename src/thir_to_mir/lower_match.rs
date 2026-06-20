@@ -68,7 +68,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let ty = self.ctx.builder.locals[*local].ty;
                     let rvalue = self.ctx.wrap_ref_to_fit(ty, place);
                     self.ctx.builder.emit(Stmt::Assign {
-                        dest: self.ctx.place_of_local(*local),
+                        dest: self.ctx.place_of_local(*local, place.span),
                         rvalue,
                     });
                 }

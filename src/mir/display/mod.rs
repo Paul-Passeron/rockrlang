@@ -125,7 +125,7 @@ pub fn fmt_operand<W: MIRWrite>(
     operand: &MIROperand,
 ) -> fmt::Result {
     match operand {
-        MIROperand::Constant(c) => fmt_constant(w, db, c),
+        MIROperand::Constant(c, _) => fmt_constant(w, db, c),
         MIROperand::Move(place) => {
             w.write_str("move ")?;
             fmt_place(w, db, place)
