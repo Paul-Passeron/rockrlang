@@ -134,6 +134,20 @@ impl MIRRValue {
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => vec![op],
             MIRRValueKind::SizeOf(_) => vec![],
+            MIRRValueKind::Constructor { args, .. } => args.iter_each_operand().collect(),
+            MIRRValueKind::StructLit { fields, .. } => fields.values().collect(),
+            MIRRValueKind::Tuple(ops, _) => ops.iter().collect(),
+        }
+        .into_iter()
+    }
+}
+
+impl MIRConstructorArgs {
+    pub fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
+        match self {
+            MIRConstructorArgs::None => vec![],
+            MIRConstructorArgs::Tuple(ops) => ops.iter().collect(),
+            MIRConstructorArgs::Struct(fields) => fields.values().collect(),
         }
         .into_iter()
     }
@@ -153,25 +167,8 @@ impl MIRPlace {
 
 impl MIROperand {
     pub fn apply(&self, state: &mut LocalMap<InitState>) {
-        match self {
-            MIROperand::Move(p) => {
-                state.insert(p.local, InitState::Uninit);
-            }
-            MIROperand::Constructor {
-                args: MIRConstructorArgs::Struct(fields),
-                ..
-            }
-            | MIROperand::StructLit { fields, .. } => {
-                fields.iter().for_each(|f| f.1.apply(state))
-            }
-            MIROperand::Constructor {
-                args: MIRConstructorArgs::Tuple(ops),
-                ..
-            }
-            | MIROperand::Tuple(ops, _) => ops.iter().for_each(|op| op.apply(state)),
-            MIROperand::Copy(_)
-            | MIROperand::Constant(_, _)
-            | MIROperand::Constructor { .. } => (),
+        if let MIROperand::Move(p) = self {
+            state.insert(p.local, InitState::Uninit);
         }
     }
 }

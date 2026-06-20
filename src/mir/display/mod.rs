@@ -134,41 +134,6 @@ pub fn fmt_operand<W: MIRWrite>(
             w.write_str("copy ")?;
             fmt_place(w, db, place)
         }
-        MIROperand::Constructor {
-            enum_ref,
-            idx,
-            args,
-            ..
-        } => {
-            mwrite!(w, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
-            fmt_constructor_args(w, db, args)?;
-            w.write_str(")")
-        }
-        MIROperand::StructLit {
-            struct_ref, fields, ..
-        } => {
-            mwrite!(w, "{} {{", struct_ref.def.name(db).to_string(db))?;
-            let mut first = true;
-            for (name, op) in fields {
-                if !first {
-                    w.write_str(", ")?;
-                }
-                first = false;
-                mwrite!(w, "{}: ", name.to_string(db))?;
-                fmt_operand(w, db, op)?;
-            }
-            w.write_str("}")
-        }
-        MIROperand::Tuple(operands, _) => {
-            w.write_str("(")?;
-            for (i, op) in operands.iter().enumerate() {
-                if i > 0 {
-                    w.write_str(", ")?;
-                }
-                fmt_operand(w, db, op)?;
-            }
-            w.write_str(")")
-        }
     }
 }
 
@@ -231,6 +196,41 @@ pub fn fmt_rvalue<W: MIRWrite>(
             w.write_str(")")
         }
         MIRRValueKind::SizeOf(ty) => mwrite!(w, "@sizeof({})", ty.to_string(db)),
+        MIRRValueKind::Constructor {
+            enum_ref,
+            idx,
+            args,
+            ..
+        } => {
+            mwrite!(w, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
+            fmt_constructor_args(w, db, args)?;
+            w.write_str(")")
+        }
+        MIRRValueKind::StructLit {
+            struct_ref, fields, ..
+        } => {
+            mwrite!(w, "{} {{", struct_ref.def.name(db).to_string(db))?;
+            let mut first = true;
+            for (name, op) in fields {
+                if !first {
+                    w.write_str(", ")?;
+                }
+                first = false;
+                mwrite!(w, "{}: ", name.to_string(db))?;
+                fmt_operand(w, db, op)?;
+            }
+            w.write_str("}")
+        }
+        MIRRValueKind::Tuple(operands, _) => {
+            w.write_str("(")?;
+            for (i, op) in operands.iter().enumerate() {
+                if i > 0 {
+                    w.write_str(", ")?;
+                }
+                fmt_operand(w, db, op)?;
+            }
+            w.write_str(")")
+        }
     }
 }
 

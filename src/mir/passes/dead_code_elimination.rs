@@ -230,6 +230,33 @@ impl<'a> DCECtx<'a> {
             }
             MIRRValueKind::Metadata(op) => MIRRValueKind::Metadata(self.copy_operand(op)),
             MIRRValueKind::SizeOf(t) => MIRRValueKind::SizeOf(*t),
+            MIRRValueKind::Constructor {
+                enum_ref,
+                idx,
+                args,
+                span,
+            } => MIRRValueKind::Constructor {
+                enum_ref: enum_ref.clone(),
+                idx: *idx,
+                args: self.copy_cons_args(args),
+                span: *span,
+            },
+            MIRRValueKind::StructLit {
+                struct_ref,
+                fields,
+                span,
+            } => MIRRValueKind::StructLit {
+                struct_ref: struct_ref.clone(),
+                fields: fields
+                    .iter()
+                    .map(|f| (*f.0, self.copy_operand(f.1)))
+                    .collect(),
+                span: *span,
+            },
+            MIRRValueKind::Tuple(ops, span) => MIRRValueKind::Tuple(
+                ops.iter().map(|op| self.copy_operand(op)).collect(),
+                *span,
+            ),
         };
         MIRRValue {
             kind,
@@ -276,33 +303,6 @@ impl<'a> DCECtx<'a> {
             MIROperand::Constant(cst, span) => MIROperand::Constant(cst.clone(), *span),
             MIROperand::Move(p) => MIROperand::Move(self.copy_place(p)),
             MIROperand::Copy(p) => MIROperand::Copy(self.copy_place(p)),
-            MIROperand::Constructor {
-                enum_ref,
-                idx,
-                args,
-                span,
-            } => MIROperand::Constructor {
-                enum_ref: enum_ref.clone(),
-                idx: *idx,
-                args: self.copy_cons_args(args),
-                span: *span,
-            },
-            MIROperand::StructLit {
-                struct_ref,
-                fields,
-                span,
-            } => MIROperand::StructLit {
-                struct_ref: struct_ref.clone(),
-                fields: fields
-                    .iter()
-                    .map(|(key, val)| (*key, self.copy_operand(val)))
-                    .collect(),
-                span: *span,
-            },
-            MIROperand::Tuple(ops, span) => MIROperand::Tuple(
-                ops.iter().map(|op| self.copy_operand(op)).collect(),
-                *span,
-            ),
         }
     }
 

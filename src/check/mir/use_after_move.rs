@@ -24,7 +24,7 @@ use crate::{
         MIR,
         analysis::{init_tracking::InitState, lattice::LocalMap},
         basic_block::{MIRTerminator, Stmt},
-        operand::{MIRConstructorArgs, MIROperand, MIRPlace},
+        operand::{MIROperand, MIRPlace},
     },
 };
 
@@ -67,27 +67,8 @@ impl MIRTerminator {
 
 impl MIROperand {
     fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
-        match self {
-            MIROperand::Constant(_, _) => (),
-            MIROperand::Move(p) | MIROperand::Copy(p) => p.check(db, m),
-            MIROperand::Constructor {
-                args: MIRConstructorArgs::None,
-                ..
-            } => (),
-            MIROperand::Constructor {
-                args: MIRConstructorArgs::Struct(fields),
-                ..
-            }
-            | MIROperand::StructLit { fields, .. } => {
-                fields.iter().for_each(|f| f.1.check(db, m));
-            }
-            MIROperand::Constructor {
-                args: MIRConstructorArgs::Tuple(ops),
-                ..
-            }
-            | MIROperand::Tuple(ops, _) => {
-                ops.iter().for_each(|op| op.check(db, m));
-            }
+        if let MIROperand::Move(p) | MIROperand::Copy(p) = self {
+            p.check(db, m)
         }
         self.apply(m);
     }
@@ -103,7 +84,8 @@ impl MIRPlace {
                     .accumulate(db)
             }
             InitState::Uninit => {
-                Diag::generic_error("Use after move".to_string(), self.span).accumulate(db);
+                Diag::generic_error("Use after move".to_string(), self.span)
+                    .accumulate(db);
             }
         }
     }

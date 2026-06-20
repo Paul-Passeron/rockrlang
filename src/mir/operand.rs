@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // - Differentiate between shared / mutable borrow deref ?
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     iter::once,
 };
 
@@ -43,18 +43,6 @@ pub enum MIROperand {
     Constant(Constant, Span),
     Move(Place),
     Copy(Place),
-    Constructor {
-        enum_ref: EnumRef,
-        idx: usize,
-        args: ConstructorArgs,
-        span: Span,
-    },
-    StructLit {
-        struct_ref: StructRef,
-        fields: BTreeMap<Symbol, Operand>,
-        span: Span,
-    },
-    Tuple(Vec<Operand>, Span),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -115,6 +103,18 @@ pub enum MIRRValueKind {
     Discriminant(Place),
     Metadata(Operand),
     SizeOf(TypeRef),
+    Constructor {
+        enum_ref: EnumRef,
+        idx: usize,
+        args: ConstructorArgs,
+        span: Span,
+    },
+    StructLit {
+        struct_ref: StructRef,
+        fields: BTreeMap<Symbol, Operand>,
+        span: Span,
+    },
+    Tuple(Vec<Operand>, Span),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -139,13 +139,6 @@ impl Operand {
         match self {
             MIROperand::Constant(mirconstant, _) => mirconstant.ty(db),
             MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
-            MIROperand::Constructor { enum_ref, .. } => enum_ref.clone().as_type_ref(db),
-            MIROperand::StructLit { struct_ref, .. } => {
-                struct_ref.clone().as_type_ref(db)
-            }
-            MIROperand::Tuple(miroperands, _) => {
-                tuple_of(db, miroperands.iter().map(|op| op.ty(db)).collect()).into()
-            }
         }
     }
 }
@@ -183,6 +176,25 @@ impl MIRRValue {
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => op.uses(),
             MIRRValueKind::SizeOf(_) => HashSet::new(),
+            MIRRValueKind::Constructor { args, .. } => args.uses(),
+            MIRRValueKind::StructLit { fields, .. } => {
+                fields.values().flat_map(|op| op.uses()).collect()
+            }
+            MIRRValueKind::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
+        }
+    }
+}
+
+impl MIRConstructorArgs {
+    pub fn uses(&self) -> HashSet<MIRLocalID> {
+        match self {
+            MIRConstructorArgs::None => HashSet::new(),
+            MIRConstructorArgs::Tuple(ops) => {
+                ops.iter().flat_map(|op| op.uses()).collect()
+            }
+            MIRConstructorArgs::Struct(fields) => {
+                fields.values().flat_map(|op| op.uses()).collect()
+            }
         }
     }
 }
@@ -192,19 +204,6 @@ impl MIROperand {
         match self {
             MIROperand::Constant(_, _) => HashSet::new(),
             MIROperand::Move(p) | MIROperand::Copy(p) => p.uses(),
-            MIROperand::Constructor { args, .. } => match args {
-                MIRConstructorArgs::None => HashSet::new(),
-                MIRConstructorArgs::Tuple(ops) => {
-                    ops.iter().flat_map(|op| op.uses()).collect()
-                }
-                MIRConstructorArgs::Struct(fields) => {
-                    fields.iter().flat_map(|field| field.1.uses()).collect()
-                }
-            },
-            MIROperand::StructLit { fields, .. } => {
-                fields.iter().flat_map(|field| field.1.uses()).collect()
-            }
-            MIROperand::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
         }
     }
 }
@@ -232,10 +231,7 @@ impl MIRProjection {
 impl MIROperand {
     pub fn span(&self) -> Span {
         match self {
-            MIROperand::Constant(_, span)
-            | MIROperand::Constructor { span, .. }
-            | MIROperand::StructLit { span, .. }
-            | MIROperand::Tuple(_, span) => *span,
+            MIROperand::Constant(_, span) => *span,
             MIROperand::Move(p) | MIROperand::Copy(p) => p.span,
         }
     }
