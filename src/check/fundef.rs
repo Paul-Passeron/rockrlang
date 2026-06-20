@@ -23,12 +23,6 @@ use crate::{
     Db,
     check::{mir::check_mir, thir::validate_thir},
     hir::function_ast,
-    mir::{
-        analysis::{
-            MIRAnalysis, init_tracking::MIRInitAnalysis, liveness::MIRLivenessAnalysis,
-        },
-        passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
-    },
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeRef},
     thir::thir_body,
@@ -97,7 +91,7 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
     let the_mir = _mir(db, key);
 
     check_mir(db, the_mir.as_ref());
-    
+
     println!(
         "{}: {}{}",
         fdef.span(db).start().loc_info(db),

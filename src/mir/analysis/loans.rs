@@ -33,8 +33,8 @@ use crate::{
             lattice::{BlockMap, LocalMap},
         },
         basic_block::Stmt,
-        display::{MIRWrite, StringWriter, fmt_place},
-        operand::{MIRPlace, MIRProjection, MIRRValueKind},
+        display::{StringWriter, fmt_place},
+        operand::{MIRPlace, MIRRValueKind},
     },
 };
 
