@@ -35,6 +35,7 @@ use crate::{
 
 pub struct MIRLivenessAnalysis;
 
+#[derive(PartialEq, Eq)]
 pub struct MIRLivenessResult {
     pub live_in: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
     pub live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,

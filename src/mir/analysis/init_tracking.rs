@@ -41,6 +41,7 @@ impl Lattice for InitState {
 
 type FPRes = FixedPointIterRes<LocalMap<InitState>>;
 
+#[derive(PartialEq, Eq)]
 pub struct MIRInitOut {
     pub init_in: BlockMap<LocalMap<InitState>>,
     pub init_out: BlockMap<LocalMap<InitState>>,
