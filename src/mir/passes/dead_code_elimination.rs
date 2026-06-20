@@ -191,17 +191,13 @@ impl<'a> DCECtx<'a> {
     fn compute_successors(&mut self) {
         // TODO: Maybe don't do that :)
         let rs: HashSet<_> = self.reachable.iter().copied().collect();
-        let succs =
-            self.mir
-                .compute_successors()
-                .into_iter()
-                .filter_map(|(blk, succs)| {
-                    if rs.contains(&blk) {
-                        Some((blk, succs.intersection(&rs).copied().collect()))
-                    } else {
-                        None
-                    }
-                });
+        let succs = self.mir.successors().iter().filter_map(|(blk, succs)| {
+            if rs.contains(blk) {
+                Some((*blk, succs.intersection(&rs).copied().collect()))
+            } else {
+                None
+            }
+        });
         self.successors.extend(succs);
     }
 
@@ -256,7 +252,7 @@ impl<'a> DCECtx<'a> {
             local: self.add_and_get_local_to_mapping(place.local),
             projections: place.projections.clone(),
             ty: place.ty,
-            span: place.span
+            span: place.span,
         }
     }
 
