@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    check::thir::validate_thir,
+    check::{mir::check_mir, thir::validate_thir},
     hir::function_ast,
     mir::{
         analysis::{
@@ -96,6 +96,8 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
 
     let the_mir = _mir(db, key);
 
+    check_mir(db, the_mir.as_ref());
+    
     println!(
         "{}: {}{}",
         fdef.span(db).start().loc_info(db),
