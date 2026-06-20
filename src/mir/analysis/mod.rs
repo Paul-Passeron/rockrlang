@@ -20,6 +20,7 @@ use crate::{Db, mir::MIR};
 pub mod init_tracking;
 pub mod lattice;
 pub mod liveness;
+pub mod loans;
 
 pub trait MIRAnalysis<'db, 'mir> {
     type Out;

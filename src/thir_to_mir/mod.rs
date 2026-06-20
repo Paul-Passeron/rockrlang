@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use itertools::{Either, Itertools};
 
@@ -411,7 +414,7 @@ impl<'a> ThirToMIR<'a> {
 
         MIRRValueKind::Use(MIROperand::StructLit {
             struct_ref: self.get_str_struct_ref(),
-            fields: HashMap::from_iter(vec![
+            fields: BTreeMap::from_iter(vec![
                 (Symbol::new(self.db, "data"), data),
                 (Symbol::new(self.db, "len"), len),
             ]),
@@ -502,11 +505,14 @@ impl<'a> ThirToMIR<'a> {
     fn build_fields(
         &mut self,
         fields: &[(Symbol, ExprId)],
-    ) -> HashMap<Symbol, MIROperand> {
-        HashMap::from_iter(fields.iter().map(|(name, expr)| {
-            let operand = self.build_operand(*expr);
-            (*name, operand)
-        }))
+    ) -> BTreeMap<Symbol, MIROperand> {
+        fields
+            .iter()
+            .map(|(name, expr)| {
+                let operand = self.build_operand(*expr);
+                (*name, operand)
+            })
+            .collect()
     }
 
     fn build_constructor_args(

@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // - Differentiate between shared / mutable borrow deref ?
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     iter::once,
 };
 
@@ -38,7 +38,7 @@ use crate::{
 
 use super::{Constant, Place};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIROperand {
     Constant(Constant, Span),
     Move(Place),
@@ -51,13 +51,13 @@ pub enum MIROperand {
     },
     StructLit {
         struct_ref: StructRef,
-        fields: HashMap<Symbol, Operand>,
+        fields: BTreeMap<Symbol, Operand>,
         span: Span,
     },
     Tuple(Vec<Operand>, Span),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRConstant {
     Integer {
         value: i128,
@@ -70,7 +70,7 @@ pub enum MIRConstant {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct MIRPlace {
     pub local: LocalID,
     pub projections: Vec<Projection>,
@@ -78,7 +78,7 @@ pub struct MIRPlace {
     pub span: Span,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRProjection {
     Deref,
     Field { name: Symbol, resulting_ty: TypeRef },
@@ -117,11 +117,11 @@ pub enum MIRRValueKind {
     SizeOf(TypeRef),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRConstructorArgs {
     None,
     Tuple(Vec<Operand>),
-    Struct(HashMap<Symbol, Operand>),
+    Struct(BTreeMap<Symbol, Operand>),
 }
 
 impl Constant {

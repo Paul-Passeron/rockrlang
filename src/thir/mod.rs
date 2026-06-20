@@ -100,13 +100,13 @@ pub enum Dispatch {
     Interface(InterfaceRef),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructRef {
     pub def: StructId,
     pub args: Vec<TypeRef>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EnumRef {
     pub def: EnumId,
     pub args: Vec<TypeRef>,
