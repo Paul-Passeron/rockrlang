@@ -44,12 +44,13 @@ pub type LoanID = Idx<Loan>;
 
 pub struct MIRLoanOut {
     pub loans: Arena<Loan>,
+    pub indices: HashMap<MIRStmtIndex, LoanID>,
     pub loans_live_in: BlockMap<HashSet<LoanID>>,
     pub loans_live_out: BlockMap<HashSet<LoanID>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MIRStmtIndex(MIRBlockID, usize);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MIRStmtIndex(pub MIRBlockID, pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Loan {
@@ -68,8 +69,13 @@ impl MIRAnalysis<'_, '_> for MIRLoanAnalysis {
         let liveness = mir.liveness(db);
         let loans_live_in = self.project_liveness(&liveness.live_in, &by_holder);
         let loans_live_out = self.project_liveness(&liveness.live_out, &by_holder);
+        let indices = loans
+            .iter()
+            .map(|(id, loan)| (loan.created_at, id))
+            .collect();
         MIRLoanOut {
             loans,
+            indices,
             loans_live_in,
             loans_live_out,
         }
@@ -83,7 +89,9 @@ impl MIRLoanAnalysis {
             for (idx, stmt) in infos.stmts.iter().enumerate() {
                 match stmt {
                     Stmt::Assign { dest, rvalue } => {
-                        if let MIRRValueKind::Ref(place, mutability) = &rvalue.kind {
+                        if let MIRRValueKind::Ref(place, mutability)
+                        | MIRRValueKind::AddressOf(place, mutability) = &rvalue.kind
+                        {
                             let loan = Loan {
                                 place: place.clone(),
                                 mutability: *mutability,

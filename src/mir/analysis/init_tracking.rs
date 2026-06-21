@@ -119,11 +119,15 @@ impl MIRTerminator {
     }
 }
 
-impl MIRRValue {
-    pub fn for_each_operand(&self, f: impl FnMut(&MIROperand)) {
+pub trait IterOperand {
+    fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand>;
+
+    fn for_each_operand(&self, f: impl FnMut(&MIROperand)) {
         self.iter_each_operand().for_each(f);
     }
+}
 
+impl IterOperand for MIRRValue {
     fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
         match &self.kind {
             MIRRValueKind::BinOp(_, a, b) => vec![a, b],
@@ -142,8 +146,8 @@ impl MIRRValue {
     }
 }
 
-impl MIRConstructorArgs {
-    pub fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
+impl IterOperand for MIRConstructorArgs {
+    fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
         match self {
             MIRConstructorArgs::None => vec![],
             MIRConstructorArgs::Tuple(ops) => ops.iter().collect(),
@@ -153,8 +157,8 @@ impl MIRConstructorArgs {
     }
 }
 
-impl MIRPlace {
-    pub fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
+impl IterOperand for MIRPlace {
+    fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
         self.projections.iter().flat_map(|proj| match proj {
             MIRProjection::Field { .. }
             | MIRProjection::TupleField { .. }

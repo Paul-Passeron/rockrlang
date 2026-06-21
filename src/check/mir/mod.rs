@@ -22,5 +22,5 @@ pub mod loans;
 
 pub fn check_mir(db: &dyn Db, mir: &MIR) {
     check_use_after_move(db, mir);
-    // check_loans(db, mir);
+    check_loans(db, mir);
 }

@@ -22,7 +22,10 @@ use crate::{
     compiler::diagnostic::Diag,
     mir::{
         MIR,
-        analysis::{init_tracking::InitState, lattice::LocalMap},
+        analysis::{
+            init_tracking::{InitState, IterOperand},
+            lattice::LocalMap,
+        },
         basic_block::{MIRTerminator, Stmt},
         operand::{MIROperand, MIRPlace},
     },

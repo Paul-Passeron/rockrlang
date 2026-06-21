@@ -1,11 +1,18 @@
 use std::collections::HashSet;
 
+use salsa::Accumulator;
+
 use crate::{
     Db,
+    compiler::diagnostic::Diag,
     mir::{
         MIR, MIRBlockID,
-        analysis::loans::{LoanID, MIRLoanOut},
+        analysis::{
+            init_tracking::IterOperand,
+            loans::{LoanID, MIRLoanOut, MIRStmtIndex},
+        },
         basic_block::{MIRTerminator, Stmt},
+        operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
 };
 
@@ -22,26 +29,171 @@ fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     block
         .stmts
         .iter()
-        .for_each(|stmt| check_stmt(db, mir, stmt, loans, &mut state));
-    check_terminator(db, mir, &block.terminator, loans, &mut state);
+        .enumerate()
+        .for_each(|(i, stmt)| check_stmt(db, blk, stmt, i, loans, &mut state));
+    check_terminator(db, &block.terminator, loans, &state);
 }
 
 fn check_stmt(
     db: &dyn Db,
-    mir: &MIR,
+    blk: MIRBlockID,
     stmt: &Stmt,
+    stmt_idx: usize,
     loans: &MIRLoanOut,
     state: &mut HashSet<LoanID>,
 ) {
     let Stmt::Assign { dest, rvalue } = stmt;
+    check_rvalue_conflicts(db, rvalue, state, loans);
+
+    state.retain(|loan_id| loans.loans[*loan_id].holder != dest.local);
+
+    if let MIRRValueKind::Ref(_, _) | MIRRValueKind::AddressOf(_, _) = &rvalue.kind {
+        if let Some(loan_id) = loans.loan_at(blk, stmt_idx) {
+            state.insert(loan_id);
+        }
+    }
+}
+
+impl MIROperand {
+    pub fn as_access(&self) -> Option<(AccessKind, &MIRPlace)> {
+        match self {
+            MIROperand::Constant(_, _) => None,
+            MIROperand::Move(place) => Some((AccessKind::Move, place)),
+            MIROperand::Copy(place) => Some((AccessKind::Copy, place)),
+        }
+    }
+}
+
+fn check_operand(
+    db: &dyn Db,
+    op: &MIROperand,
+    state: &HashSet<LoanID>,
+    loans: &MIRLoanOut,
+) {
+    if let Some((access, place)) = op.as_access() {
+        check_access(db, place, access, state, loans)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AccessKind {
+    Copy,
+    Move,
+}
+
+fn check_access(
+    db: &dyn Db,
+    place: &MIRPlace,
+    access_kind: AccessKind,
+    state: &HashSet<LoanID>,
+    loans: &MIRLoanOut,
+) {
+    place.for_each_operand(|op| check_operand(db, op, state, loans));
+    for loan_id in state {
+        let loan = &loans.loans[*loan_id];
+        if !places_conflict(&loan.place, place) {
+            continue;
+        }
+        let violates = match access_kind {
+            AccessKind::Move => true,
+            AccessKind::Copy => loan.mutability.is_mut(),
+        };
+        if violates {
+            Diag::generic_error("Conflict here (place)!".to_string(), place.span)
+                .accumulate(db);
+        }
+    }
 }
 
 fn check_terminator(
     db: &dyn Db,
-    mir: &MIR,
     terminator: &MIRTerminator,
     loans: &MIRLoanOut,
-    state: &mut HashSet<LoanID>,
+    state: &HashSet<LoanID>,
 ) {
-    todo!()
+    match terminator {
+        MIRTerminator::Diverge | MIRTerminator::Goto { .. } => (),
+        MIRTerminator::Call { arguments: ops, .. } => ops
+            .iter()
+            .for_each(|op| check_operand(db, op, state, loans)),
+        MIRTerminator::Return {
+            value: Some(op), ..
+        }
+        | MIRTerminator::Branch { cond: op, .. }
+        | MIRTerminator::Switch {
+            discriminant: op, ..
+        } => check_operand(db, op, state, loans),
+        MIRTerminator::Return { .. } => (),
+    }
+}
+
+fn check_rvalue_conflicts(
+    db: &dyn Db,
+    rvalue: &MIRRValue,
+    state: &HashSet<LoanID>,
+    loans: &MIRLoanOut,
+) {
+    match &rvalue.kind {
+        MIRRValueKind::Ref(p, mutability) | MIRRValueKind::AddressOf(p, mutability) => {
+            p.for_each_operand(|op| check_operand(db, op, state, loans));
+
+            for loan_id in state {
+                let existing = &loans.loans[*loan_id];
+                if places_conflict(p, &existing.place) {
+                    let incompatible =
+                        mutability.is_mut() || existing.mutability.is_mut();
+                    if incompatible {
+                        Diag::generic_error("Conflict here !".to_string(), rvalue.span)
+                            .accumulate(db);
+                    }
+                }
+            }
+        }
+        _ => rvalue.for_each_operand(|op| check_operand(db, op, state, loans)),
+    }
+}
+
+fn places_conflict(place: &MIRPlace, other: &MIRPlace) -> bool {
+    if place.local != other.local {
+        return false;
+    }
+
+    for (pa, pb) in place.projections.iter().zip(&other.projections) {
+        match (pa, pb) {
+            (
+                MIRProjection::Field { name: n1, .. },
+                MIRProjection::Field { name: n2, .. },
+            ) => {
+                if n1 != n2 {
+                    return false;
+                }
+            }
+            (
+                MIRProjection::TupleField { index: i1, .. },
+                MIRProjection::TupleField { index: i2, .. },
+            ) => {
+                if i1 != i2 {
+                    return false;
+                }
+            }
+            (
+                MIRProjection::Downcast { variant: v1 },
+                MIRProjection::Downcast { variant: v2 },
+            ) => {
+                if v1 != v2 {
+                    return false;
+                }
+            }
+            (MIRProjection::Deref, MIRProjection::Deref) => {}
+            (MIRProjection::Index { .. }, MIRProjection::Index { .. }) => {}
+            _ => {}
+        }
+    }
+    true
+}
+
+impl MIRLoanOut {
+    pub fn loan_at(&self, block: MIRBlockID, idx: usize) -> Option<LoanID> {
+        self.indices.get(&MIRStmtIndex(block, idx)).copied()
+    }
 }

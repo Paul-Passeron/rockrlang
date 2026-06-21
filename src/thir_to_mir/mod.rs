@@ -147,7 +147,7 @@ impl<'a> ThirToMIR<'a> {
             _ => ty,
         };
         if !self.is_valid_ty(res) {
-            panic!("Not a valid ty")
+            panic!("Not a valid ty: {}", res.to_string(self.db))
         }
         res
     }
