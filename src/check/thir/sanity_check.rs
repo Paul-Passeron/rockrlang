@@ -24,6 +24,7 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     compiler::{diagnostic::Diag, get_sig_of_function},
+    hir::Mutability,
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
     ril::{
@@ -131,29 +132,22 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    fn ref_depth(&mut self, ref_ty: TypeRef, from: TypeRef, span: Span) -> usize {
-        let mut cur = ref_ty;
-        let mut cnt = 0;
-        while cur != from
-            && let Some((_, inner_ty)) = cur.as_ref(self.db)
-        {
-            cnt += 1;
-            cur = inner_ty;
-        }
-        self.check_types(from, cur, span);
-        cnt
-    }
-
-    fn reref(&self, ty: TypeRef, cnt: usize) -> TypeRef {
-        let mut cur = ty;
-        for _ in 0..cnt {
-            cur = TypeRef::Concrete(ref_of(self.db, cur, false))
-        }
-        cur
+    fn get_peeled(
+        &mut self,
+        expected_ty: TypeRef,
+        ty: TypeRef,
+        span: Span,
+    ) -> RefWrappedTy {
+        RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
+            self.check_types(expected_ty, ty, span);
+            RefWrappedTy::from_type_ref(self.db, ty)
+        })
     }
 
     fn check_pattern(&mut self, expected_ty: TypeRef, pat: &ThirPattern) {
-        let depth = self.ref_depth(expected_ty, pat.ty, pat.span);
+        let peeled = self.get_peeled(expected_ty, pat.ty, pat.span);
+
+        // let depth = self.ref_depth(expected_ty, pat.ty, pat.span);
         match &pat.kind {
             ThirPatternKind::Error
             | ThirPatternKind::Any
@@ -166,7 +160,9 @@ impl<'db> SanityChecker<'db> {
             ThirPatternKind::Struct { def, fields } => {
                 let actual = def.get_fields_ty(self.db);
                 for (sym, fpat) in fields {
-                    self.check_pattern(self.reref(actual[sym], depth), fpat);
+                    let ty = peeled.wrap_like(self.db, actual[sym]);
+                    self.check_pattern(ty, fpat);
+                    // self.check_pattern(self.reref(actual[sym], depth), fpat);
                 }
                 let bare = TypeRef::Concrete(TypeId::new(
                     self.db,
@@ -183,7 +179,7 @@ impl<'db> SanityChecker<'db> {
                 ));
                 self.check_types(enum_ty, pat.ty, pat.span);
                 if let Some(cty) = def.get_cons(self.db, *idx) {
-                    self.check_constructor_pat(&cty, args, depth);
+                    self.check_constructor_pat(&cty, args, &peeled);
                 } else {
                     todo!()
                 }
@@ -536,7 +532,7 @@ impl<'db> SanityChecker<'db> {
         &mut self,
         ty: &ConstructorType,
         pat: &ThirConstructorArgs<ThirPattern>,
-        depth: usize,
+        peeled: &RefWrappedTy,
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
@@ -544,13 +540,15 @@ impl<'db> SanityChecker<'db> {
                 assert_eq!(tys.len(), pats.len());
                 for (sym, fty) in tys {
                     let fpat = &pats.iter().find(|p| p.0 == *sym).unwrap().1;
-                    self.check_pattern(self.reref(*fty, depth), fpat);
+                    self.check_pattern(peeled.wrap_like(self.db, *fty), fpat);
+                    // self.check_pattern(self.reref(*fty, depth), fpat);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 tys.iter().zip(pats).for_each(|(ty, pat)| {
-                    self.check_pattern(self.reref(*ty, depth), pat);
+                    self.check_pattern(peeled.wrap_like(self.db, *ty), pat);
+                    // self.check_pattern(self.reref(*ty, depth), pat);
                 });
             }
             _ => todo!(),
@@ -742,5 +740,64 @@ impl TypeRef {
         } else {
             None
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WrapKind {
+    Ref(Mutability),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefWrappedTy {
+    pub inner: TypeRef,
+    pub refs: Vec<WrapKind>, // [&A, &B, &C] means &C &B &A T
+}
+
+impl RefWrappedTy {
+    pub fn wrap_like(&self, db: &dyn Db, to_wrap: TypeRef) -> TypeRef {
+        self.refs
+            .iter()
+            .fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty))
+    }
+
+    pub fn as_type_ref(&self, db: &dyn Db) -> TypeRef {
+        self.wrap_like(db, self.inner)
+    }
+
+    pub fn peel_until(db: &dyn Db, to_peel: TypeRef, target: TypeRef) -> Option<Self> {
+        let mut refs = vec![];
+        let mut inner = to_peel;
+        while inner != target
+            && let Some((mutability, ty)) = inner.as_ref(db)
+        {
+            inner = ty;
+            refs.push(WrapKind::Ref(mutability));
+        }
+        if inner != target {
+            return None;
+        }
+        Some(Self { inner, refs })
+    }
+
+    pub fn from_type_ref(db: &dyn Db, ty: TypeRef) -> Self {
+        let mut refs = vec![];
+        let mut inner = ty;
+        while let Some((mutability, ty)) = ty.as_ref(db) {
+            inner = ty;
+            refs.push(WrapKind::Ref(mutability));
+        }
+        Self { inner, refs }
+    }
+
+    pub fn depth(&self) -> usize {
+        self.refs.len()
+    }
+}
+
+impl WrapKind {
+    pub fn wrap(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
+        let Self::Ref(mutability) = self;
+        ref_of(db, ty, mutability.is_mut()).into()
     }
 }

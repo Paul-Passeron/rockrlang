@@ -22,7 +22,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // - Differentiate between shared / mutable borrow deref ?
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashSet},
     iter::once,
 };
 
@@ -32,7 +32,7 @@ use crate::{
     hir::Mutability,
     mir::{ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::{TypeRef, bool_id, char_id, ptr_of, tuple_of},
+    ril::{TypeRef, bool_id, char_id, ptr_of},
     thir::{EnumRef, FunctionRef, StructRef},
 };
 
