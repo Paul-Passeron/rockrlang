@@ -6,7 +6,7 @@ use crate::{
     Db,
     compiler::diagnostic::Diag,
     mir::{
-        MIR, MIRBlockID,
+        MIR, MIRBlockID, MIRLocalID,
         analysis::{
             init_tracking::IterOperand,
             loans::{LoanID, MIRLoanOut, MIRStmtIndex},
@@ -26,12 +26,25 @@ pub(super) fn check_loans(db: &dyn Db, mir: &MIR) {
 fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     let mut state = loans.loans_live_in[&blk].clone();
     let block = &mir.blocks[blk];
-    block
-        .stmts
-        .iter()
-        .enumerate()
-        .for_each(|(i, stmt)| check_stmt(db, blk, stmt, i, loans, &mut state));
+    let live_in_per_stmt = live_in_per_stmt(db, mir, blk);
+    block.stmts.iter().enumerate().for_each(|(i, stmt)| {
+        check_stmt(db, blk, stmt, i, loans, &live_in_per_stmt[i], &mut state)
+    });
     check_terminator(db, &block.terminator, loans, &state);
+}
+
+fn live_in_per_stmt(db: &dyn Db, mir: &MIR, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
+    let seed = mir.liveness(db).live_out[&blk].clone();
+    let mut res = vec![seed];
+    for stmt in mir.blocks[blk].stmts.iter().rev() {
+        let mut current = res.last().unwrap().clone();
+        let Stmt::Assign { dest, rvalue } = stmt;
+        current.remove(&dest.local);
+        current.extend(rvalue.uses());
+        res.push(current);
+    }
+    res.reverse();
+    res
 }
 
 fn check_stmt(
@@ -40,12 +53,17 @@ fn check_stmt(
     stmt: &Stmt,
     stmt_idx: usize,
     loans: &MIRLoanOut,
+    live_in_this_stmt: &HashSet<MIRLocalID>,
     state: &mut HashSet<LoanID>,
 ) {
     let Stmt::Assign { dest, rvalue } = stmt;
-    check_rvalue_conflicts(db, rvalue, state, loans);
 
-    state.retain(|loan_id| loans.loans[*loan_id].holder != dest.local);
+    state.retain(|loan_id| {
+        let holder = loans.loans[*loan_id].holder;
+        holder != dest.local && live_in_this_stmt.contains(&holder)
+    });
+
+    check_rvalue_conflicts(db, rvalue, state, loans);
 
     if let MIRRValueKind::Ref(_, _) | MIRRValueKind::AddressOf(_, _) = &rvalue.kind {
         if let Some(loan_id) = loans.loan_at(blk, stmt_idx) {

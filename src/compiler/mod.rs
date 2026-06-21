@@ -384,12 +384,18 @@ fn load_workspace_from_disk(
     Ok(db)
 }
 
+fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
+    let ws = Workspace::get(db);
+    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
+    let has_errors = raw_diags.iter().any(|d| d.severity == Severity::Error);
+    (has_errors, raw_diags)
+}
+
 pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
-    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(&db, ws);
-    let has_errors = raw_diags.iter().any(|d| d.severity == Severity::Error);
+    let (has_errors, raw_diags) = program_has_errors(&db);
 
     let mut diags: Vec<(LocationInfo, &Diag)> = raw_diags
         .into_iter()
