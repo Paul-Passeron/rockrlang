@@ -4,6 +4,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
+    check::thir::sanity_check::RefWrappedTy,
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
@@ -79,7 +80,10 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 cases,
                 default,
             } => {
-                let (ty, depth) = place.ty.peel_aux(self.db);
+                let wrapped = RefWrappedTy::from_type_ref(self.db, place.ty);
+                let ty = wrapped.inner;
+                let depth = wrapped.depth();
+                // let (ty, depth) = place.ty.peel_aux(self.db);
                 if ty.as_enum_ref(self.db).is_some() {
                     let mut scrut_place = place.clone();
                     scrut_place

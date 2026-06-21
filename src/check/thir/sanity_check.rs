@@ -139,6 +139,7 @@ impl<'db> SanityChecker<'db> {
         span: Span,
     ) -> RefWrappedTy {
         RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
+            println!("ERROR");
             self.check_types(expected_ty, ty, span);
             RefWrappedTy::from_type_ref(self.db, ty)
         })
@@ -146,8 +147,6 @@ impl<'db> SanityChecker<'db> {
 
     fn check_pattern(&mut self, expected_ty: TypeRef, pat: &ThirPattern) {
         let peeled = self.get_peeled(expected_ty, pat.ty, pat.span);
-
-        // let depth = self.ref_depth(expected_ty, pat.ty, pat.span);
         match &pat.kind {
             ThirPatternKind::Error
             | ThirPatternKind::Any
@@ -783,7 +782,7 @@ impl RefWrappedTy {
     pub fn from_type_ref(db: &dyn Db, ty: TypeRef) -> Self {
         let mut refs = vec![];
         let mut inner = ty;
-        while let Some((mutability, ty)) = ty.as_ref(db) {
+        while let Some((mutability, ty)) = inner.as_ref(db) {
             inner = ty;
             refs.push(WrapKind::Ref(mutability));
         }

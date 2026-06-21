@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    check::thir::sanity_check::ConstructorType,
+    check::thir::sanity_check::{ConstructorType, RefWrappedTy},
     common::symbols::Symbol,
     mir::{
         MIRLocalID,
@@ -97,7 +97,8 @@ impl<'a> Matrix<'a> {
             .collect_vec();
 
         let place = self.cols[col].clone();
-        let ty = place.ty.peeled(ctx.db);
+        let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
+        let ty = wrapped.inner;
 
         if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct_ref(ctx.db).is_some() {
             return self.expand_irrefutable(col, ctx).compile(ctx);
@@ -118,7 +119,8 @@ impl<'a> Matrix<'a> {
 
     fn expand_irrefutable(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
         let place = &self.cols[col];
-        let ty = place.ty.peeled(ctx.db);
+        let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
+        let ty = wrapped.inner;
 
         let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
             tuple_ref
@@ -297,7 +299,8 @@ impl<'a> Matrix<'a> {
         ctor: Constructor,
         ctx: &mut ThirToMIR,
     ) -> VariantArity {
-        let ty = self.cols[col].ty.peeled(ctx.db);
+        let wrapped = RefWrappedTy::from_type_ref(ctx.db, self.cols[col].ty);
+        let ty = wrapped.inner;
         match ctor {
             Constructor::Variant(idx) => {
                 let id = ty.as_enum_ref(ctx.db).expect("This should be an enum").def;

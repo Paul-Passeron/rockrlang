@@ -21,6 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
+    check::thir::sanity_check::{RefWrappedTy, WrapKind},
     common::{
         arena::{Arena, Idx},
         location::Span,
@@ -616,12 +617,11 @@ impl<'db> ThirTranslator<'db> {
                 let fresh = b.new_synthetic_local(ty, Mutability::Const, pat.span);
                 v.push(ThirStmt::let_(fresh, value, span));
                 let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
-                let inner_ty = ty.peeled(self.db);
-                let depth = ty.ref_depth(self.db);
-                let def = inner_ty.as_struct_ref(self.db).unwrap_or_else(|| {
+                let wrapped = RefWrappedTy::from_type_ref(self.db, ty);
+                let def = wrapped.inner.as_struct_ref(self.db).unwrap_or_else(|| {
                     todo!(
                         "handle bad case: inner_ty = {}",
-                        inner_ty.to_string(self.db)
+                        wrapped.inner.to_string(self.db)
                     )
                 });
                 for pat_field in fields {
@@ -633,7 +633,7 @@ impl<'db> ThirTranslator<'db> {
                         def.typeof_field(self.db, name).unwrap_or(TypeRef::Error),
                     );
                     let mut place = place;
-                    for _ in 0..depth {
+                    for _ in 0..wrapped.depth() {
                         let new_ty = self.canonicalize_type(
                             b.places[place].ty.as_ref(self.db).unwrap().1,
                         );
@@ -646,30 +646,39 @@ impl<'db> ThirTranslator<'db> {
                         field_ty,
                     );
 
-                    let field_value = if depth == 0 {
+                    let field_value = if wrapped.depth() == 0 {
                         b.new_expr(ThirExpr::use_place(field_place, b, span))
                     } else {
+                        let mutability = if let Some(WrapKind::Ref(mutability)) =
+                            wrapped.refs.first()
+                        {
+                            *mutability
+                        } else {
+                            Mutability::Const
+                        };
                         let mut cur_ty = field_ty;
                         let mut val = b.new_expr(ThirExpr {
                             kind: ExprKind::Ref {
                                 place: field_place,
-                                mutability: Mutability::Const,
+                                mutability,
                             },
-                            ty: cur_ty.wrap_ref(self.db, false),
+                            ty: cur_ty.wrap_ref(self.db, mutability.is_mut()),
                             span,
                         });
-                        for _ in 1..depth {
-                            cur_ty = cur_ty.wrap_ref(self.db, false);
-                            let tmp =
-                                b.new_synthetic_local(cur_ty, Mutability::Const, span);
+                        let depth = wrapped.depth();
+                        for wrapped in wrapped.refs[0..depth - 1].iter().rev() {
+                            let WrapKind::Ref(mutability) = wrapped;
+                            let mutable = mutability.is_mut();
+                            cur_ty = cur_ty.wrap_ref(self.db, mutable);
+                            let tmp = b.new_synthetic_local(cur_ty, *mutability, span);
                             v.push(ThirStmt::let_(tmp, val, span));
                             let tmp_place = b.new_place(ThirPlace::local(tmp, b, span));
                             val = b.new_expr(ThirExpr {
                                 kind: ExprKind::Ref {
                                     place: tmp_place,
-                                    mutability: Mutability::Const,
+                                    mutability: *mutability,
                                 },
-                                ty: cur_ty.wrap_ref(self.db, false),
+                                ty: cur_ty.wrap_ref(self.db, mutable),
                                 span,
                             });
                         }
@@ -1273,23 +1282,23 @@ impl PartialTypeRef {
 }
 
 impl TypeRef {
-    pub fn peel_aux(self, db: &dyn Db) -> (Self, usize) {
-        let mut cur = self;
-        let mut cnt = 0;
-        while let Some((_, inner)) = cur.as_ref(db) {
-            cur = inner;
-            cnt += 1;
-        }
-        (cur, cnt)
-    }
+    // pub fn peel_aux(self, db: &dyn Db) -> (Self, usize) {
+    //     let mut cur = self;
+    //     let mut cnt = 0;
+    //     while let Some((_, inner)) = cur.as_ref(db) {
+    //         cur = inner;
+    //         cnt += 1;
+    //     }
+    //     (cur, cnt)
+    // }
 
-    pub fn peeled(self, db: &dyn Db) -> Self {
-        self.peel_aux(db).0
-    }
+    // pub fn peeled(self, db: &dyn Db) -> Self {
+    //     self.peel_aux(db).0
+    // }
 
-    pub fn ref_depth(self, db: &dyn Db) -> usize {
-        self.peel_aux(db).1
-    }
+    // pub fn ref_depth(self, db: &dyn Db) -> usize {
+    //     self.peel_aux(db).1
+    // }
 
     pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
