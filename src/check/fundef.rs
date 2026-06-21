@@ -32,6 +32,7 @@ use crate::{
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
+        println!("{}", thir.display(db));
         validate_thir(db, thir.as_ref());
     }
 
@@ -119,8 +120,4 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
     let loans = the_mir.loans(db);
     println!("loans analysis:");
     println!("{}", loans.display(db));
-
-    // let dce_mir = DeadCodeElimination.run(db, the_mir.as_ref());
-
-    // println!("AFTER DCE {}", dce_mir.display(db));
 }

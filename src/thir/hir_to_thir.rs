@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, sync::Arc};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use crate::{
     Db,
@@ -268,11 +268,23 @@ impl<'db> ThirTranslator<'db> {
         ThirStmt::block(scope, stmts, span)
     }
 
+    fn expr_or_place(
+        &mut self,
+        b: &mut ThirBuilder,
+        expr: &HirExpr,
+        stmts: &mut Vec<ThirStmt>,
+    ) -> Either<ExprId, PlaceId> {
+        match &expr.data {
+            HirExprDesc::Use(place) => Either::Right(self.place(b, place, stmts)),
+            _ => Either::Left(self.expr(b, expr, stmts)),
+        }
+    }
+
     fn handle_stmt(&mut self, b: &mut ThirBuilder, stmt: &HirStmt) -> Vec<ThirStmt> {
         match &stmt.kind {
             HirStmtKind::Let { pattern, init, .. } => {
                 let mut res = vec![];
-                let value = self.expr(b, init, &mut res);
+                let value = self.expr_or_place(b, init, &mut res);
                 res.extend(self.destructure_pattern_init(b, pattern, value, stmt.span));
                 res
             }
@@ -574,11 +586,33 @@ impl<'db> ThirTranslator<'db> {
             .copied()
     }
 
+    fn place_or_expr_as_expr(
+        &mut self,
+        b: &mut ThirBuilder,
+        p_or_e: Either<ExprId, PlaceId>,
+    ) -> ExprId {
+        match p_or_e {
+            Either::Left(expr) => expr,
+            Either::Right(place) => {
+                let (ty, span) = {
+                    let infos = &b.places[place];
+                    (infos.ty, infos.span)
+                };
+
+                b.new_expr(ThirExpr {
+                    kind: ExprKind::Use(place),
+                    ty,
+                    span,
+                })
+            }
+        }
+    }
+
     fn _destructure_pattern_init(
         &mut self,
         b: &mut ThirBuilder,
         pat: &HirPattern,
-        value: ExprId,
+        value: Either<ExprId, PlaceId>,
         span: Span,
         v: &mut Vec<ThirStmt>,
     ) {
@@ -586,16 +620,23 @@ impl<'db> ThirTranslator<'db> {
             HirPatternDesc::Bind { id, .. } => {
                 let thir_local = b.local_map[id];
                 // Better span maybe
-                v.push(ThirStmt::let_(thir_local, value, span))
+                v.push(ThirStmt::let_(
+                    thir_local,
+                    self.place_or_expr_as_expr(b, value),
+                    span,
+                ))
             }
             HirPatternDesc::Any => {
                 // Just compute the expression
-                v.push(ThirStmt::expr(value, span));
+                let expr = self.place_or_expr_as_expr(b, value);
+                v.push(ThirStmt::expr(expr, span));
             }
             HirPatternDesc::Tuple(hir_patterns) => {
-                let ty = self.canonicalize_type(b.get_expr(value).ty);
+                // TODO: handle tuple destructuring with place.
+                let expr = self.place_or_expr_as_expr(b, value);
+                let ty = self.canonicalize_type(b.get_expr(expr).ty);
                 let the_tuple_local = b.new_synthetic_local(ty, Mutability::Const, span);
-                v.push(ThirStmt::let_(the_tuple_local, value, span));
+                v.push(ThirStmt::let_(the_tuple_local, expr, span));
                 let the_tuple_place =
                     b.new_place(ThirPlace::local(the_tuple_local, b, span));
                 for (idx, pat) in hir_patterns.iter().enumerate() {
@@ -609,14 +650,28 @@ impl<'db> ThirTranslator<'db> {
                     );
                     let idx_value =
                         b.new_expr(ThirExpr::use_place(idx_place, b, pat.span));
-                    self._destructure_pattern_init(b, pat, idx_value, span, v);
+                    self._destructure_pattern_init(
+                        b,
+                        pat,
+                        Either::Left(idx_value),
+                        span,
+                        v,
+                    );
                 }
             }
             HirPatternDesc::DestructureBinding { fields, .. } => {
-                let ty = self.canonicalize_type(b.get_expr(value).ty);
-                let fresh = b.new_synthetic_local(ty, Mutability::Const, pat.span);
-                v.push(ThirStmt::let_(fresh, value, span));
-                let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
+                let (place, ty) = match value {
+                    Either::Left(expr) => {
+                        let ty = self.canonicalize_type(b.get_expr(expr).ty);
+                        let fresh =
+                            b.new_synthetic_local(ty, Mutability::Const, pat.span);
+                        v.push(ThirStmt::let_(fresh, expr, span));
+                        let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
+                        (place, ty)
+                    }
+                    Either::Right(place) => (place, b.get_place(place).ty),
+                };
+
                 let wrapped = RefWrappedTy::from_type_ref(self.db, ty);
                 let def = wrapped.inner.as_struct_ref(self.db).unwrap_or_else(|| {
                     todo!(
@@ -686,7 +741,13 @@ impl<'db> ThirTranslator<'db> {
                     };
                     match pat_field {
                         HirStructFieldPattern::Rebind { pattern: pat, .. } => {
-                            self._destructure_pattern_init(b, pat, field_value, span, v);
+                            self._destructure_pattern_init(
+                                b,
+                                pat,
+                                Either::Left(field_value),
+                                span,
+                                v,
+                            );
                         }
                         HirStructFieldPattern::Name { id, .. } => {
                             let thir_local = b.local_map[id];
@@ -707,7 +768,7 @@ impl<'db> ThirTranslator<'db> {
         &mut self,
         b: &mut ThirBuilder,
         pat: &HirPattern,
-        value: ExprId,
+        value: Either<ExprId, PlaceId>,
         span: Span,
     ) -> Vec<ThirStmt> {
         let mut v = vec![];
