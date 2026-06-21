@@ -31,6 +31,9 @@ use crate::{
     },
 };
 
+// TODO: Track partial moves instead of moving the whole local when one of its
+// projection gets moved
+
 pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
     let init = mir.init_tracking(db);
     for (blk, infos) in &mir.blocks {
