@@ -68,6 +68,12 @@ fn reachable_mir_instances(
             continue;
         };
         for call_info in tc.call_infos(db).values() {
+            if !function_ast(db, call_info.callee.interned())
+                .inner(db)
+                .has_body()
+            {
+                continue;
+            }
             let callee_templates = get_templates_of_fun(db, call_info.callee.interned());
             if !callee_templates.is_empty() {
                 worklist.push((call_info.callee, call_info.substitution.clone()));
