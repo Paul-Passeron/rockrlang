@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    iter,
+};
 
 use itertools::Itertools;
 use salsa::Accumulator;
@@ -27,6 +30,7 @@ use crate::{
     hir::Mutability,
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::AstEnumVariantKind,
+    printer::render_diagnostics,
     ril::{
         BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
@@ -134,8 +138,8 @@ impl<'db> SanityChecker<'db> {
 
     fn get_peeled(
         &mut self,
-        expected_ty: TypeRef,
         ty: TypeRef,
+        expected_ty: TypeRef,
         span: Span,
     ) -> RefWrappedTy {
         RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
@@ -795,6 +799,7 @@ impl RefWrappedTy {
             inner = ty;
             refs.push(WrapKind::Ref(mutability));
         }
+        refs.reverse();
         Self { inner, refs }
     }
 

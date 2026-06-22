@@ -202,7 +202,7 @@ impl<'a> ThirToMIR<'a> {
             place.ty.to_string(self.db)
         );
         let RefWrappedTy { mut refs, .. } =
-            RefWrappedTy::peel_until(self.db, place.ty, target).unwrap();
+            RefWrappedTy::peel_until(self.db, target, place.ty).unwrap();
 
         let WrapKind::Ref(inital) = refs.remove(0);
         let mut res = MIRRValue {
