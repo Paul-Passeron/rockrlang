@@ -139,7 +139,11 @@ impl<'db> SanityChecker<'db> {
         span: Span,
     ) -> RefWrappedTy {
         RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
-            println!("ERROR");
+            println!(
+                "ERROR: Could not peel {} until {} :(",
+                ty.to_string(self.db),
+                expected_ty.to_string(self.db)
+            );
             self.check_types(expected_ty, ty, span);
             RefWrappedTy::from_type_ref(self.db, ty)
         })
@@ -161,7 +165,6 @@ impl<'db> SanityChecker<'db> {
                 for (sym, fpat) in fields {
                     let ty = peeled.wrap_like(self.db, actual[sym]);
                     self.check_pattern(ty, fpat);
-                    // self.check_pattern(self.reref(actual[sym], depth), fpat);
                 }
                 let bare = TypeRef::Concrete(TypeId::new(
                     self.db,
@@ -184,7 +187,13 @@ impl<'db> SanityChecker<'db> {
                 }
             }
             ThirPatternKind::IntLit(_) => {
-                // TODO: Do something here
+                if !expected_ty
+                    .as_type_id()
+                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                    .is_some()
+                {
+                    self.check_types(expected_ty, int_id(self.db).into(), pat.span);
+                }
             }
         }
     }
