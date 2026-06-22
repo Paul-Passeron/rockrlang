@@ -27,7 +27,7 @@ use crate::{
             lattice::LocalMap,
         },
         basic_block::{MIRTerminator, Stmt},
-        operand::{MIROperand, MIRPlace},
+        operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
     },
 };
 
@@ -38,10 +38,12 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
     let init = mir.init_tracking(db);
     for (blk, infos) in &mir.blocks {
         let mut state = init.init_in[&blk].clone();
-
         for stmt in &infos.stmts {
             match stmt {
                 Stmt::Assign { dest, rvalue } => {
+                    if let Some(place) = rvalue.inner_place() {
+                        place.check(db, &mut state);
+                    }
                     rvalue.for_each_operand(|op| {
                         op.check(db, &mut state);
                     });
@@ -93,6 +95,17 @@ impl MIRPlace {
                 Diag::generic_error("Use after move".to_string(), self.span)
                     .accumulate(db);
             }
+        }
+    }
+}
+
+impl MIRRValue {
+    pub fn inner_place(&self) -> Option<&MIRPlace> {
+        match &self.kind {
+            MIRRValueKind::Ref(p, _)
+            | MIRRValueKind::AddressOf(p, _)
+            | MIRRValueKind::Discriminant(p) => Some(p),
+            _ => None,
         }
     }
 }
