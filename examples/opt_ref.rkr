@@ -1,7 +1,7 @@
 @include core::opt
 
-fun some_opt(): opt<opt<&int>> {
-    return opt::Some(opt::Some(&8));
+fun some_opt(): &opt<opt<int>> {
+    return opt::Some(opt::Some(8));
 }
 
 fun foo(): &int {
