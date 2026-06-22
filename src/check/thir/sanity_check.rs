@@ -29,8 +29,7 @@ use crate::{
     compiler::{diagnostic::Diag, get_sig_of_function},
     hir::Mutability,
     name_resolve::type_expr::{enum_item, struct_item},
-    parse_tree::top_level::AstEnumVariantKind,
-    printer::render_diagnostics,
+    parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     ril::{
         BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
@@ -274,8 +273,32 @@ impl<'db> SanityChecker<'db> {
                 );
                 self.check_types(ret, infos.ty, infos.span);
             }
-            ExprKind::BinOp { .. } => {
-                Diag::todo("Check binop here".into(), infos.span).accumulate(self.db);
+            ExprKind::BinOp { op, lhs, rhs } => {
+                let lhs_ty = self.check_expr(*lhs);
+                let rhs_ty = self.check_expr(*rhs);
+                match op {
+                    BinaryOperator::Plus
+                    | BinaryOperator::Minus
+                    | BinaryOperator::Times
+                    | BinaryOperator::Div
+                    | BinaryOperator::Modulo => {
+                        self.check_types(infos.ty, lhs_ty, self.thir.exprs[*lhs].span);
+                        self.check_types(infos.ty, rhs_ty, self.thir.exprs[*rhs].span);
+                        if infos
+                            .ty
+                            .as_type_id()
+                            .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                            .is_none()
+                        {
+                            self.check_types(
+                                int_id(self.db).into(),
+                                infos.ty,
+                                infos.span,
+                            );
+                        }
+                    }
+                    _ => todo!(),
+                }
             }
             ExprKind::Neg(operand) => {
                 let operand_ty = self.check_expr(*operand);
