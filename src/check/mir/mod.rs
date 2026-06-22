@@ -15,10 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, check::mir::{loans::check_loans, use_after_move::check_use_after_move}, mir::MIR};
+use crate::{
+    Db,
+    check::mir::{loans::check_loans, use_after_move::check_use_after_move},
+    mir::MIR,
+};
 
-pub mod use_after_move;
 pub mod loans;
+pub mod use_after_move;
 
 pub fn check_mir(db: &dyn Db, mir: &MIR) {
     check_use_after_move(db, mir);
