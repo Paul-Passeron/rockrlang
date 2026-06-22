@@ -1,16 +1,16 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, iter::repeat_n};
 
 use itertools::Itertools;
 
 use crate::{
     Db,
-    check::thir::sanity_check::RefWrappedTy,
+    check::thir::sanity_check::{RefWrappedTy, WrapKind},
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
-    ril::{TypeDefId, TypeId, TypeRef, int_id},
+    ril::{TypeDefId, TypeId, TypeRef, int_id, ref_of},
     thir::{EnumRef, StructRef, ThirMatchBranch},
     thir_to_mir::{
         ThirToMIR,
@@ -88,7 +88,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let mut scrut_place = place.clone();
                     scrut_place
                         .projections
-                        .extend(std::iter::repeat_n(MIRProjection::Deref, depth));
+                        .extend(repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
                     let discr = MIRRValue {
@@ -196,6 +196,31 @@ impl<'a> ThirToMIR<'a> {
                 span,
             };
         }
-        todo!()
+        println!(
+            "Target is {} and we have {}",
+            target.to_string(self.db),
+            place.ty.to_string(self.db)
+        );
+        let RefWrappedTy { mut refs, .. } =
+            RefWrappedTy::peel_until(self.db, place.ty, target).unwrap();
+
+        let WrapKind::Ref(inital) = refs.remove(0);
+        let mut res = MIRRValue {
+            kind: MIRRValueKind::Ref(place.clone(), inital),
+            ty: ref_of(self.db, place.ty, inital.is_mut()).into(),
+            span,
+        };
+        for w in &refs {
+            let WrapKind::Ref(mutability) = w;
+            let place = self.synthetic_place(res.ty, span);
+            let new_ty = ref_of(self.db, place.ty, mutability.is_mut());
+            self.assign(place.clone(), res);
+            res = MIRRValue {
+                kind: MIRRValueKind::Ref(place, *mutability),
+                ty: new_ty.into(),
+                span,
+            };
+        }
+        res
     }
 }

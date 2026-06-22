@@ -457,8 +457,9 @@ impl<'a> ThirToMIR<'a> {
         projections.push(MIRProjection::Downcast {
             variant: variant_idx,
         });
-        let ConstructorType::Tuple(tys) = base
-            .ty
+        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
+        let ConstructorType::Tuple(tys) = peeled
+            .inner
             .as_enum_ref(self.db)
             .expect("Should we peel it ?")
             .get_cons(self.db, variant_idx)
