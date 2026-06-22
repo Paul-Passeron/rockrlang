@@ -278,3 +278,65 @@ impl MIR {
         }
     }
 }
+
+impl<L: Lattice> Lattice for Option<L> {
+    fn bottom() -> Self {
+        Self::None
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Some(a), Some(b)) => Some(a.join(b)),
+            (Some(value), None) | (None, Some(value)) => Some(value.clone()),
+            (None, None) => None,
+        }
+    }
+
+    fn join_assign(&mut self, other: &Self) -> LatticeChange {
+        match (self, other) {
+            (Some(a), Some(b)) => a.join_assign(b),
+            (this @ None, Some(value)) => {
+                *this = Some(value.clone());
+                LatticeChange::Changed
+            }
+            (_, None) => LatticeChange::Unchanged,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub enum Flat<T: Clone + PartialEq + Eq> {
+    Top,
+    Value(T),
+    Bottom,
+}
+
+impl<T: Clone + PartialEq + Eq> Lattice for Flat<T> {
+    fn bottom() -> Self {
+        Flat::Bottom
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Top, _) | (_, Self::Top) => Self::Top,
+            (Self::Value(a), Self::Value(b)) => {
+                if a == b {
+                    Self::Value(a.clone())
+                } else {
+                    Self::Top
+                }
+            }
+            (Self::Value(a), _) | (_, Self::Value(a)) => Self::Value(a.clone()),
+            _ => Self::Bottom,
+        }
+    }
+}
+
+impl<T: Clone + PartialEq + Eq> Flat<T> {
+    pub fn value(&self) -> Option<&T> {
+        match self {
+            Flat::Value(v) => Some(v),
+            _ => None,
+        }
+    }
+}
