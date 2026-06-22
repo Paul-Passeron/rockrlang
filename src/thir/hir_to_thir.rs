@@ -223,13 +223,17 @@ impl<'db> ThirTranslator<'db> {
             .locals(self.db)
             .iter()
             .for_each(|infos| b.register_hir_local(infos, self.tc));
-        let params = self
-            .hir
-            .params(self.db)
-            .iter()
-            .map(|param| b.local_map[param])
-            .collect_vec();
         let zelf = self.hir.zelf(self.db).map(|param| b.local_map[&param]);
+        let params = zelf
+            .iter()
+            .copied()
+            .chain(
+                self.hir
+                    .params(self.db)
+                    .iter()
+                    .map(|param| b.local_map[param]),
+            )
+            .collect_vec();
         let stmts = self
             .hir
             .stmts(self.db)
