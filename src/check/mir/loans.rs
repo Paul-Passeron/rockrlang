@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 use std::collections::HashSet;
 
 use salsa::Accumulator;
@@ -82,10 +82,10 @@ fn check_stmt(
 
     check_rvalue_conflicts(db, rvalue, state, loans);
 
-    if let MIRRValueKind::Ref(_, _) | MIRRValueKind::AddressOf(_, _) = &rvalue.kind {
-        if let Some(loan_id) = loans.loan_at(blk, stmt_idx) {
-            state.insert(loan_id);
-        }
+    if let Some(_) = rvalue.inner_place()
+        && let Some(loan_id) = loans.loan_at(blk, stmt_idx)
+    {
+        state.insert(loan_id);
     }
 }
 
