@@ -633,13 +633,21 @@ impl<'db> ThirTranslator<'db> {
             }
             HirPatternDesc::Tuple(hir_patterns) => {
                 // TODO: handle tuple destructuring with place.
-                let expr = self.place_or_expr_as_expr(b, value);
-                let ty = self.canonicalize_type(b.get_expr(expr).ty);
-                let the_tuple_local = b.new_synthetic_local(ty, Mutability::Const, span);
-                v.push(ThirStmt::let_(the_tuple_local, expr, span));
-                let the_tuple_place =
-                    b.new_place(ThirPlace::local(the_tuple_local, b, span));
+                let the_tuple_place = match value {
+                    Either::Left(expr) => {
+                        let ty = self.canonicalize_type(b.get_expr(expr).ty);
+                        let the_tuple_local =
+                            b.new_synthetic_local(ty, Mutability::Const, span);
+                        v.push(ThirStmt::let_(the_tuple_local, expr, span));
+                        b.new_place(ThirPlace::local(the_tuple_local, b, span))
+                    }
+                    Either::Right(place) => place,
+                };
+
                 for (idx, pat) in hir_patterns.iter().enumerate() {
+                    if matches!(&pat.data, HirPatternDesc::Any) {
+                        continue;
+                    }
                     let ty = self.canonicalize_type(
                         self.tc.pat_types(self.db)[&PatternId(pat.id)],
                     );
@@ -648,12 +656,10 @@ impl<'db> ThirTranslator<'db> {
                         Projection::TupleField(idx as u32, ty),
                         ty,
                     );
-                    let idx_value =
-                        b.new_expr(ThirExpr::use_place(idx_place, b, pat.span));
                     self._destructure_pattern_init(
                         b,
                         pat,
-                        Either::Left(idx_value),
+                        Either::Right(idx_place),
                         span,
                         v,
                     );
