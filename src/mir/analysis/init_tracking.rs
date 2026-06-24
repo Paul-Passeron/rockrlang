@@ -6,7 +6,7 @@ use crate::mir::{
     MIR,
     analysis::{
         MIRAnalysis,
-        lattice::{BlockMap, FixedPointIterRes, Lattice, LocalMap},
+        lattice::{BlockMap, FixedPointBlockRes, Lattice, LocalMap},
     },
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
@@ -39,7 +39,7 @@ impl Lattice for InitState {
     }
 }
 
-type FPRes = FixedPointIterRes<LocalMap<InitState>>;
+type FPRes = FixedPointBlockRes<LocalMap<InitState>>;
 
 #[derive(PartialEq, Eq)]
 pub struct MIRInitOut {

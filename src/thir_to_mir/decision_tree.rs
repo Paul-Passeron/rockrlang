@@ -425,7 +425,6 @@ fn is_complete(db: &dyn Db, sig: &HashSet<Constructor>, ty: TypeRef) -> bool {
         {
             true
         }
-        TypeRef::Concrete(_) => todo!(),
         _ => false,
     }
 }
@@ -461,7 +460,7 @@ impl<'a> ThirToMIR<'a> {
         let ConstructorType::Tuple(tys) = peeled
             .inner
             .as_enum_ref(self.db)
-            .expect("Should we peel it ?")
+            .expect("Bad type")
             .get_cons(self.db, variant_idx)
             .unwrap()
         else {
@@ -491,8 +490,9 @@ impl<'a> ThirToMIR<'a> {
         projections.push(MIRProjection::Downcast {
             variant: variant_idx,
         });
-        let ConstructorType::Struct(tys) = base
-            .ty
+        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
+        let ConstructorType::Struct(tys) = peeled
+            .inner
             .as_enum_ref(self.db)
             .expect("Should we peel it ?")
             .get_cons(self.db, variant_idx)
@@ -501,7 +501,9 @@ impl<'a> ThirToMIR<'a> {
             panic!("Expected tuple constructor");
         };
         let resulting_ty = tys.iter().find(|(name, _)| *name == field).unwrap().1;
-
+        for _ in &peeled.refs {
+            projections.push(MIRProjection::Deref);
+        }
         projections.push(MIRProjection::Field {
             name: field,
             resulting_ty,

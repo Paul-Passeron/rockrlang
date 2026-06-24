@@ -133,8 +133,48 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         default,
                         span,
                     });
+                } else if ty
+                    .as_type_id()
+                    .is_some_and(|ty| ty.def(self.db).is_int_like(self.db).is_some())
+                {
+                    let mut scrut_place = place.clone();
+                    scrut_place
+                        .projections
+                        .extend(repeat_n(MIRProjection::Deref, depth));
+                    let current = self.ctx.builder.current_block();
+
+                    let branches: BTreeMap<u128, MIRBlockID> = cases
+                        .iter()
+                        .map(|(ctor, next_dec_tree)| {
+                            let Constructor::IntLit(value) = ctor else {
+                                unreachable!()
+                            };
+                            let next_dec_tree_bb = self.ctx.builder.new_block(None);
+                            self.ctx.switch_to(next_dec_tree_bb);
+                            self._lower_dt(next_dec_tree, bbs, diverge);
+                            (*value as u128, next_dec_tree_bb)
+                        })
+                        .collect();
+
+                    let default = if let Some(default) = default {
+                        let default_bb = self.ctx.builder.new_block(None);
+                        self.ctx.switch_to(default_bb);
+                        self._lower_dt(default, bbs, diverge);
+                        default_bb
+                    } else {
+                        diverge
+                    };
+
+                    self.ctx.switch_to(current);
+                    let span = scrut_place.span;
+                    self.ctx.build_terminator(MIRTerminator::Switch {
+                        discriminant: scrut_place.into_move(),
+                        branches,
+                        default,
+                        span,
+                    });
                 } else {
-                    todo!()
+                    todo!("Ty is {}", ty.to_string(self.db))
                 }
             }
             DecisionTree::Fail => {
@@ -189,20 +229,19 @@ impl StructRef {
 impl<'a> ThirToMIR<'a> {
     pub fn wrap_ref_to_fit(&mut self, target: TypeRef, place: &MIRPlace) -> MIRRValue {
         let span = self.builder.locals[place.local].span;
-        if place.ty == target {
+        if place.ty == target
+            || target.as_ref(self.db).is_none()
+        {
             return MIRRValue {
                 kind: MIRRValueKind::Use(self.move_or_copy(place.clone())),
                 ty: place.ty,
                 span,
             };
         }
-        println!(
-            "Target is {} and we have {}",
-            target.to_string(self.db),
-            place.ty.to_string(self.db)
-        );
+
         let RefWrappedTy { mut refs, .. } =
-            RefWrappedTy::peel_until(self.db, target, place.ty).unwrap();
+            RefWrappedTy::peel_until(self.db, target, place.ty)
+                .unwrap_or_else(|| RefWrappedTy::from_type_ref(self.db, place.ty));
 
         let WrapKind::Ref(inital) = refs.remove(0);
         let mut res = MIRRValue {

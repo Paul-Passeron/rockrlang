@@ -28,7 +28,7 @@ use crate::{
         MIR, MIRBlockID, MIRLocalID,
         analysis::{
             MIRAnalysis,
-            lattice::{Direction, FixedPointIterRes},
+            lattice::{Direction, FixedPointBlockRes},
         },
     },
 };
@@ -41,12 +41,12 @@ pub struct MIRLivenessResult {
     pub live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
 }
 
-impl From<FixedPointIterRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
+impl From<FixedPointBlockRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
     fn from(
-        FixedPointIterRes {
+        FixedPointBlockRes {
             block_in,
             block_out,
-        }: FixedPointIterRes<HashSet<MIRLocalID>>,
+        }: FixedPointBlockRes<HashSet<MIRLocalID>>,
     ) -> Self {
         Self {
             live_in: block_in,

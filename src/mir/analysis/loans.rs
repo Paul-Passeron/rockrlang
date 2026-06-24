@@ -49,7 +49,7 @@ pub struct MIRLoanOut {
     pub loans_live_out: BlockMap<HashSet<LoanID>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MIRStmtIndex(pub MIRBlockID, pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -20,7 +20,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::mir::{MIR, MIRBlockID, MIRLocalID};
+use crate::mir::{MIR, MIRBlockID, MIRLocalID, analysis::loans::MIRStmtIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LatticeChange {
@@ -203,10 +203,17 @@ pub enum Direction {
 pub type LocalMap<T> = HashMap<MIRLocalID, T>;
 pub type BlockMap<L> = HashMap<MIRBlockID, L>;
 
-pub struct FixedPointIterRes<L: Lattice> {
-    pub block_in: BlockMap<L>,
-    pub block_out: BlockMap<L>,
+pub struct FixedPointIterRes<Key, L>
+where
+    L: Lattice,
+    Key: Hash,
+{
+    pub block_in: HashMap<Key, L>,
+    pub block_out: HashMap<Key, L>,
 }
+
+pub type FixedPointBlockRes<L> = FixedPointIterRes<MIRBlockID, L>;
+pub type FixedPointStmtRes<L> = FixedPointIterRes<MIRStmtIndex, L>;
 
 impl MIR {
     pub fn get_block_bottoms<L: Lattice>(&self) -> impl Iterator<Item = (MIRBlockID, L)> {
@@ -219,7 +226,7 @@ impl MIR {
         transfer: impl Fn(MIRBlockID, &L) -> L,
         in_seed: Option<BlockMap<L>>,
         out_seed: Option<BlockMap<L>>,
-    ) -> FixedPointIterRes<L> {
+    ) -> FixedPointBlockRes<L> {
         let mut block_in = BlockMap::from_iter(self.get_block_bottoms::<L>());
 
         let mut block_out = BlockMap::from_iter(self.get_block_bottoms::<L>());
@@ -272,9 +279,127 @@ impl MIR {
             }
         }
 
-        FixedPointIterRes {
+        FixedPointBlockRes {
             block_in,
             block_out,
+        }
+    }
+
+    pub fn stmt_index_iter(&self) -> impl Iterator<Item = MIRStmtIndex> {
+        self.blocks.keys().flat_map(|blk| {
+            (0..self.blocks[blk].stmts.len())
+                .into_iter()
+                .chain([0]) // Even empty blocks need the 0 index
+                .map(move |i| MIRStmtIndex(blk, i))
+        })
+    }
+
+    pub fn get_stmt_bottoms<L: Lattice>(
+        &self,
+    ) -> impl Iterator<Item = (MIRStmtIndex, L)> {
+        self.stmt_index_iter().map(|idx| (idx, L::bottom()))
+    }
+
+    pub fn stmt_successors(&self) -> HashMap<MIRStmtIndex, HashSet<MIRStmtIndex>> {
+        let mut res: HashMap<_, _> = self
+            .stmt_index_iter()
+            .map(|idx| (idx, HashSet::new()))
+            .collect();
+        let actual = self.successors();
+        for (blk, succs) in actual {
+            let stmts = &self.blocks[*blk].stmts;
+            for (i, _) in stmts.iter().enumerate() {
+                if i < stmts.len() - 1 {
+                    res.get_mut(&MIRStmtIndex(*blk, i))
+                        .unwrap()
+                        .insert(MIRStmtIndex(*blk, i + 1));
+                }
+            }
+            res.get_mut(&MIRStmtIndex(*blk, stmts.len()))
+                .unwrap()
+                .extend(succs.into_iter().map(|succ| MIRStmtIndex(*succ, 0)));
+        }
+        res
+    }
+
+    pub fn stmt_predecessors(
+        &self,
+        successors: &HashMap<MIRStmtIndex, HashSet<MIRStmtIndex>>,
+    ) -> HashMap<MIRStmtIndex, HashSet<MIRStmtIndex>> {
+        let mut res: HashMap<_, _> = self
+            .stmt_index_iter()
+            .map(|idx| (idx, HashSet::new()))
+            .collect();
+        for (idx, succs) in successors {
+            for succ in succs {
+                res.get_mut(succ).unwrap().insert(*idx);
+            }
+        }
+        res
+    }
+
+    pub fn fixed_point_iter_stmt<L: Lattice>(
+        &self,
+        direction: Direction,
+        transfer: impl Fn(MIRStmtIndex, &L) -> L,
+        in_seed: Option<HashMap<MIRStmtIndex, L>>,
+        out_seed: Option<HashMap<MIRStmtIndex, L>>,
+    ) -> FixedPointStmtRes<L> {
+        let mut stmt_in: HashMap<_, _> = HashMap::from_iter(self.get_stmt_bottoms::<L>());
+        let mut stmt_out: HashMap<_, _> =
+            HashMap::from_iter(self.get_stmt_bottoms::<L>());
+
+        let succs = self.stmt_successors();
+        let preds = self.stmt_predecessors(&succs);
+
+        let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.stmt_index_iter());
+
+        while let Some(blk) = worklist.pop_last() {
+            let (new_in, new_out) = match direction {
+                Direction::Forward => {
+                    let from_preds = preds
+                        .get(&blk)
+                        .into_iter()
+                        .flatten()
+                        .fold(L::bottom(), |l, p| l.join(&stmt_out[p]));
+                    let new_in = match in_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_preds.join(seed),
+                        None => from_preds,
+                    };
+                    let new_out = transfer(blk, &new_in);
+                    (new_in, new_out)
+                }
+                Direction::Backward => {
+                    let from_succs = succs
+                        .get(&blk)
+                        .into_iter()
+                        .flatten()
+                        .fold(L::bottom(), |l, p| l.join(&stmt_in[p]));
+                    let new_out = match out_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_succs.join(seed),
+                        None => from_succs,
+                    };
+                    let new_in = transfer(blk, &new_out);
+                    (new_in, new_out)
+                }
+            };
+
+            let changed = stmt_in[&blk] != new_in || stmt_out[&blk] != new_out;
+
+            stmt_in.insert(blk, new_in);
+            stmt_out.insert(blk, new_out);
+
+            if changed {
+                match direction {
+                    Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
+                    Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
+                }
+            }
+        }
+
+        FixedPointStmtRes {
+            block_in: stmt_in,
+            block_out: stmt_out,
         }
     }
 }
