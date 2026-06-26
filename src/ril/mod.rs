@@ -27,6 +27,7 @@ pub use plumbing::*;
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
+    hir::function_ast,
     name_resolve::{
         module_items,
         type_expr::{struct_item, templates_of_enum, templates_of_struct},
@@ -211,12 +212,40 @@ pub struct ModuleId(salsa::Id);
 pub struct FunctionId(salsa::Id);
 
 impl FunctionId {
-    pub fn sig_to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().function_id_to_string(db, *self)
+    pub fn sig_to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().function_id_to_string(db, self)
     }
 
-    pub fn called_to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().called_function_to_string(db, *self)
+    pub fn called_to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().called_function_to_string(db, self)
+    }
+
+    pub fn is_var_args(self, db: &dyn Db) -> bool {
+        self.interned().is_var_args(db)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> InternedFunctionId<'db> {
+    pub fn has_body(self, db: &'db dyn Db) -> bool {
+        match function_ast(db, self).inner(db) {
+            crate::hir::FunctionLikeAst::ExternDef(_, _)
+            | crate::hir::FunctionLikeAst::TraitMethod(_) => false,
+            _ => true,
+        }
+    }
+
+    pub fn is_var_args(self, db: &dyn Db) -> bool {
+        match function_ast(db, self).inner(db) {
+            crate::hir::FunctionLikeAst::ExternDef(_, var_arg) => *var_arg,
+            _ => false,
+        }
+    }
+}
+
+impl FunctionId {
+    pub fn has_body(self, db: &dyn Db) -> bool {
+        self.interned().has_body(db)
     }
 }
 

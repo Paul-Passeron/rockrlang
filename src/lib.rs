@@ -31,6 +31,7 @@ pub mod driver;
 pub mod hir;
 pub mod lexer;
 pub mod mir;
+pub mod mir_to_llvm;
 pub mod name_resolve;
 pub mod parse_tree;
 pub mod parser;
@@ -53,9 +54,9 @@ pub fn run_rkr(p: &Path) -> RunStatus {
     let stdout = String::new();
     let cfg = compiler::Config::default();
 
-    let exit_code = match compiler::check_from_disk(p.to_path_buf(), cfg) {
+    let exit_code = match compiler::build_from_disk(p.to_path_buf(), cfg) {
         Ok(()) => {
-            // println!("Compilation finished :)");
+            println!("Compiled successfully");
             std::process::ExitCode::SUCCESS
         }
         Err(e) => {

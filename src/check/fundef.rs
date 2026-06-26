@@ -17,31 +17,36 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
+use inkwell::context::Context;
 use itertools::Itertools;
 
 use crate::{
     Db,
     check::{mir::check_mir, thir::validate_thir},
     hir::function_ast,
+    mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeRef},
     thir::thir_body,
-    thir_to_mir::{_mir, MIRKey},
+    thir_to_mir::{_mir, MIRKey, mir},
     typecheck::type_check_function,
 };
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
-        println!("{}", thir.display(db));
+        // println!("{}", thir.display(db));
         validate_thir(db, thir.as_ref());
     }
 
     for (fdef, subs) in reachable_mir_instances(db, fdef) {
-        process_mir_instance(db, fdef, subs);
+        process_mir_instance(db, fdef, subs.clone());
+        if fdef.has_body(db) {
+            let the_mir = mir(db, fdef, subs);
+            check_mir(db, the_mir.as_ref());
+        }
     }
 }
-
-fn reachable_mir_instances(
+pub(crate) fn reachable_mir_instances(
     db: &dyn Db,
     root: FunctionId,
 ) -> Vec<(FunctionId, Vec<TypeRef>)> {
@@ -49,11 +54,11 @@ fn reachable_mir_instances(
     let mut worklist: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
     let mut res = vec![];
 
-    if !function_ast(db, root.into()).inner(db).has_body() {
-        return res;
-    }
-
-    if get_templates_of_fun(db, root.interned()).is_empty() {
+    // Bodyless function-likes (e.g. FunctionLikeAst::ExternDef) can never
+    // be templated, so they're always a single no-substitution instance.
+    if !function_ast(db, root.into()).inner(db).has_body()
+        || get_templates_of_fun(db, root.interned()).is_empty()
+    {
         worklist.push((root, vec![]));
     }
 
@@ -64,18 +69,15 @@ fn reachable_mir_instances(
         res.push((fdef, subs.clone()));
 
         let Some(tc) = type_check_function(db, fdef) else {
-            // ensure there is a body to typecheck
             continue;
         };
         for call_info in tc.call_infos(db).values() {
-            if !function_ast(db, call_info.callee.interned())
+            let callee_has_body = function_ast(db, call_info.callee.interned())
                 .inner(db)
-                .has_body()
-            {
-                continue;
-            }
+                .has_body();
             let callee_templates = get_templates_of_fun(db, call_info.callee.interned());
-            if !callee_templates.is_empty() {
+
+            if callee_has_body && !callee_templates.is_empty() {
                 worklist.push((call_info.callee, call_info.substitution.clone()));
             } else if !seen.contains(&MIRKey::new(db, call_info.callee, vec![])) {
                 worklist.push((call_info.callee, vec![]));
@@ -93,37 +95,40 @@ fn process_mir_instance(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) {
 #[salsa::tracked]
 fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
     let fdef = key.fdef(db);
-    let subs = key.subs(db);
+    if !fdef.has_body(db) {
+        return;
+    }
 
     let the_mir = _mir(db, key);
 
     check_mir(db, the_mir.as_ref());
 
-    println!(
-        "{}: {}{}",
-        fdef.span(db).start().loc_info(db),
-        fdef.called_to_string(db),
-        if subs.is_empty() {
-            String::new()
-        } else {
-            format!(
-                " with substitutions <{}>",
-                subs.iter().map(|ty| ty.to_string(db)).join(", ")
-            )
-        }
-    );
+    // let subs = key.subs(db);
+    // println!(
+    //     "{}: {}{}",
+    //     fdef.span(db).start().loc_info(db),
+    //     fdef.called_to_string(db),
+    //     if subs.is_empty() {
+    //         String::new()
+    //     } else {
+    //         format!(
+    //             " with substitutions <{}>",
+    //             subs.iter().map(|ty| ty.to_string(db)).join(", ")
+    //         )
+    //     }
+    // );
 
-    println!("{}", the_mir.display(db),);
+    // println!("{}", the_mir.display(db),);
 
-    let liveness = the_mir.as_ref().liveness(db);
-    println!("Liveness analysis:");
-    println!("{liveness}");
+    // let liveness = the_mir.as_ref().liveness(db);
+    // println!("Liveness analysis:");
+    // println!("{liveness}");
 
-    let init = the_mir.init_tracking(db);
-    println!("init analysis:");
-    println!("{init}");
+    // let init = the_mir.init_tracking(db);
+    // println!("init analysis:");
+    // println!("{init}");
 
-    let loans = the_mir.loans(db);
-    println!("loans analysis:");
-    println!("{}", loans.display(db));
+    // let loans = the_mir.loans(db);
+    // println!("loans analysis:");
+    // println!("{}", loans.display(db));
 }

@@ -18,12 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 
 use crate::{
-    Db,
-    common::arena::Arena,
-    mir::{
+    Db, common::arena::Arena, mir::{
         BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt,
         cache::MIRCache,
-    },
+    }, thir::FunctionRef, thir_to_mir::FuncInst,
 };
 
 pub struct MIRBuilder<'a> {
@@ -116,7 +114,7 @@ impl<'a> MIRBuilder<'a> {
         Some(())
     }
 
-    pub fn finalize(mut self) -> Option<MIR> {
+    pub fn finalize(mut self, func: FuncInst) -> Option<MIR> {
         if self.finalized_blocks.len() != self.blocks.len() {
             eprintln!("Not all blocks were finalized: ");
             for (id, bl) in self.blocks.iter() {
@@ -131,6 +129,7 @@ impl<'a> MIRBuilder<'a> {
         let parameters = self.parameters.take()?;
 
         Some(MIR {
+            func,
             blocks: self.blocks,
             locals: self.locals,
             entry: self.entry,

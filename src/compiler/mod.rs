@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, RockrDb, SourceFile,
-    check::check,
+    check::{build, check},
     common::{location::LocationInfo, symbols::Symbol},
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
@@ -27,11 +27,12 @@ use crate::{
     printer::render_diagnostics,
     ril::{
         BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId,
-        TypeRef,
+        TypeRef, ptr_of, ref_of,
     },
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
 use dashmap::DashSet;
+use inkwell::context::Context;
 use itertools::Itertools;
 use salsa::Setter;
 use std::{fmt, hash::Hash, path::PathBuf, sync::Arc};
@@ -175,6 +176,14 @@ impl ZelfArg {
                     }
                 }
             }
+        }
+    }
+
+    pub fn as_type_ref_for(&self, db: &dyn Db, ty: TypeRef) -> TypeRef {
+        match self.kind {
+            ZelfKind::Zelf => ty,
+            ZelfKind::RefZelf => ref_of(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::PtrZelf => ptr_of(db, ty, self.mutability.is_mut()).into(),
         }
     }
 }
@@ -411,6 +420,35 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     });
 
     render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
+    if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
+}
+
+pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
+    let db = load_workspace_from_disk(root, config)?;
+    let ws = Workspace::get(&db);
+    check(&db, ws);
+    let (has_errors, raw_diags) = program_has_errors(&db);
+
+    let mut diags: Vec<(LocationInfo, &Diag)> = raw_diags
+        .into_iter()
+        .map(|d| (d.primary.span.start().loc_info(&db), d))
+        .collect();
+
+    diags.sort_by(|(loc_a, diag_a), (loc_b, diag_b)| {
+        diag_a.severity.cmp(&diag_b.severity).then_with(|| {
+            loc_a
+                .cmp(loc_b)
+                .then_with(|| diag_a.message.cmp(&diag_b.message))
+        })
+    });
+
+    render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
+
+    let c = Context::create();
+    let llvm = build(&db, ws, &c);
+
+    llvm.write_object_file(&PathBuf::from("./a.o")).unwrap();
+
     if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
 

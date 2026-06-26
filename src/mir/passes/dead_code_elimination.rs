@@ -429,6 +429,6 @@ impl<'a> DCECtx<'a> {
 
         let paths = self.compute_paths();
         self.compute_path_bodies(paths);
-        self.b.finalize().unwrap()
+        self.b.finalize(self.mir.func).unwrap()
     }
 }

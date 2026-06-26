@@ -15,28 +15,37 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
+use inkwell::context::Context;
 use itertools::Itertools;
 use salsa::Accumulator;
 
 use crate::{
     Db,
     check::{
-        fundef::check_fundef, implem::check_implem, interface::check_interface,
+        fundef::{check_fundef, reachable_mir_instances},
+        implem::check_implem,
+        interface::check_interface,
         types::check_typedef,
     },
     common::symbols::Symbol,
     compiler::{Workspace, diagnostic::Diag, workspace_packages},
+    mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
+    mir_to_llvm::LLVMCtx,
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},
         file_module_id,
         implems::module_impls,
     },
-    ril::{FileModule, InternedModuleId, ModuleId, Package},
+    ril::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
+    thir::FunctionRef,
+    thir_to_mir::{FuncInst, MIRKey, mir},
 };
-
 pub mod fundef;
 pub mod implem;
 pub mod interface;
@@ -110,7 +119,76 @@ pub fn check_file_module<'db>(
     check_module(db, module.interned());
 }
 
+fn collect_module_functions<'db>(
+    db: &'db dyn Db,
+    module: InternedModuleId<'db>,
+) -> Vec<FunctionId> {
+    let mut funcs = vec![];
+    for (_, def) in module_definitions(db, module) {
+        match def {
+            Definition::Function(function_id) => funcs.push(function_id),
+            Definition::Module(module_id) => {
+                funcs.extend(collect_module_functions(db, module_id.interned()));
+            }
+            Definition::Interface(_) | Definition::Type(_) => (),
+        }
+    }
+    funcs
+}
+
+#[salsa::tracked]
+pub fn reachable_frefs<'db>(db: &'db dyn Db, pkg: Package<'db>) -> Arc<Vec<FuncInst>> {
+    let module = file_module_id(db, pkg.root(db), None, pkg);
+    let roots = collect_module_functions(db, module.interned());
+
+    let mut seen: HashSet<MIRKey> = HashSet::new();
+    let mut frefs: Vec<FuncInst> = vec![];
+
+    for root in roots {
+        for (fdef, subs) in reachable_mir_instances(db, root) {
+            if !seen.insert(MIRKey::new(db, fdef, subs.clone())) {
+                continue;
+            }
+            if fdef.has_body(db) {
+                let the_mir = mir(db, fdef, subs);
+                frefs.push(the_mir.func);
+            } else {
+                frefs.push(MIRKey::new(db, fdef, subs).into());
+            }
+        }
+    }
+    Arc::new(frefs)
+}
+
+pub fn build<'a, 'db>(db: &'db dyn Db, w: Workspace, c: &'a Context) -> LLVMCtx<'a, 'db> {
+    let packages = workspace_packages(db, w);
+    let frefs = packages
+        .iter()
+        .flat_map(|pkg| {
+            reachable_frefs(db, *pkg)
+                .iter()
+                .map(|x| x.clone())
+                .collect_vec()
+        })
+        .collect_vec();
+
+    let ctx = LLVMCtx::new(db, c, frefs.as_slice());
+
+    for fref in frefs.iter() {
+        if fref.fdef(db).has_body(db) {
+            let the_mir = mir(
+                db,
+                fref.fdef(db),
+                fref.subs(db).iter().cloned().collect_vec(),
+            );
+            let dce = DeadCodeElimination.run(db, the_mir.as_ref());
+            ctx.lower_mir(&dce);
+        }
+    }
+    ctx
+}
+
 #[salsa::tracked]
 pub fn check_package<'db>(db: &'db dyn Db, pkg: Package<'db>) {
-    check_file_module(db, pkg.root(db), pkg, None)
+    check_file_module(db, pkg.root(db), pkg, None);
 }

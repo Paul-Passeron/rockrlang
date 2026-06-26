@@ -229,9 +229,7 @@ impl StructRef {
 impl<'a> ThirToMIR<'a> {
     pub fn wrap_ref_to_fit(&mut self, target: TypeRef, place: &MIRPlace) -> MIRRValue {
         let span = self.builder.locals[place.local].span;
-        if place.ty == target
-            || target.as_ref(self.db).is_none()
-        {
+        if place.ty == target || target.as_ref(self.db).is_none() {
             return MIRRValue {
                 kind: MIRRValueKind::Use(self.move_or_copy(place.clone())),
                 ty: place.ty,
@@ -242,7 +240,14 @@ impl<'a> ThirToMIR<'a> {
         let RefWrappedTy { mut refs, .. } =
             RefWrappedTy::peel_until(self.db, target, place.ty)
                 .unwrap_or_else(|| RefWrappedTy::from_type_ref(self.db, place.ty));
-
+        if refs.is_empty() {
+            // TODO: weird ???
+            return MIRRValue {
+                kind: MIRRValueKind::Use(self.move_or_copy(place.clone())),
+                ty: place.ty,
+                span,
+            };
+        }
         let WrapKind::Ref(inital) = refs.remove(0);
         let mut res = MIRRValue {
             kind: MIRRValueKind::Ref(place.clone(), inital),

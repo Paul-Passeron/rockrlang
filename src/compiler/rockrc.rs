@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use clap::Parser as _;
 use clap_derive::Parser;
 use rockr::compiler::Config;
+use rockr::compiler::build_from_disk;
 use rockr::compiler::check_from_disk;
 use std::path::PathBuf;
 
@@ -39,7 +40,7 @@ fn main() -> std::process::ExitCode {
     let root = args
         .file
         .unwrap_or_else(|| std::env::current_dir().unwrap());
-    match check_from_disk(root, cfg) {
+    match build_from_disk(root, cfg) {
         Ok(()) => {
             // println!("Compilation finished :)");
             std::process::ExitCode::SUCCESS

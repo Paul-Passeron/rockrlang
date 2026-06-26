@@ -25,18 +25,14 @@ use crate::{
         arena::{Arena, Idx},
         location::Span,
         symbols::Symbol,
-    },
-    hir::{self, Mutability},
-    mir::{
+    }, hir::{self, Mutability}, mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         cache::MIRCache,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind,
         },
-    },
-    ril::TypeRef,
-    thir,
+    }, ril::TypeRef, thir::{self, FunctionRef}, thir_to_mir::{FuncInst, MIRKey},
 };
 
 pub mod analysis;
@@ -72,6 +68,7 @@ pub struct SyntacticSource {
 }
 
 pub struct MIR {
+    pub func: FuncInst,
     pub blocks: Arena<BasicBlock>,
     pub locals: Arena<Local>,
     pub parameters: Vec<LocalID>,

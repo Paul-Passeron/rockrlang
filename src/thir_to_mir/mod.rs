@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     collections::{BTreeMap, HashMap},
+    marker::PhantomData,
     sync::Arc,
 };
 
@@ -25,6 +26,7 @@ use itertools::{Either, Itertools};
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
+    compiler::get_sig_of_function,
     hir::Mutability,
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
@@ -40,8 +42,8 @@ use crate::{
         never_id, str_def, usize_id, void_id,
     },
     thir::{
-        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        self, Dispatch, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
+        Projection, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
@@ -70,6 +72,71 @@ pub struct MIRKey {
 
     #[returns(ref)]
     pub subs: Vec<TypeRef>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FuncInst(pub salsa::Id);
+
+impl<'db> From<MIRKey<'db>> for FuncInst {
+    fn from(value: MIRKey<'db>) -> Self {
+        Self(value.0)
+    }
+}
+
+impl FuncInst {
+    pub fn interned<'db>(self) -> MIRKey<'db> {
+        MIRKey(self.0, PhantomData)
+    }
+
+    pub fn fdef(self, db: &dyn Db) -> FunctionId {
+        self.interned().fdef(db)
+    }
+
+    pub fn subs<'db>(self, db: &'db dyn Db) -> &'db [TypeRef] {
+        self.interned().subs(db)
+    }
+
+    pub fn from_funcref(db: &dyn Db, fref: FunctionRef) -> Self {
+        MIRKey::new(db, fref.id, fref.args).into()
+    }
+
+    pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
+        let sig = get_sig_of_function(db, self.fdef(db).interned());
+        sig.ret.with_substitution(db, &self.subs(db))
+    }
+
+    pub fn params(self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
+        let sig = get_sig_of_function(db, self.fdef(db).interned());
+        let fdef = self.fdef(db);
+        let zelf = fdef.parent(db).get_canonical_zelf(db);
+        let zelf = sig.zelf.map(|arg| {
+            (
+                Symbol::new(db, "self"),
+                arg.as_type_ref_for(db, zelf.unwrap()),
+            )
+        });
+        zelf.into_iter()
+            .chain(
+                sig.args
+                    .iter()
+                    .map(|(symb, ty)| (*symb, ty.with_substitution(db, self.subs(db)))),
+            )
+            .collect()
+    }
+
+    pub fn get_mangled_name(&self, db: &dyn Db) -> String {
+        let name = self.fdef(db).name(db).to_string(db);
+        if !self.fdef(db).has_body(db) {
+            return name;
+        }
+        if name == "main" {
+            return name;
+        }
+        if self.subs(db).is_empty() {
+            return self.fdef(db).called_to_string(db);
+        }
+        todo!()
+    }
 }
 
 // /// Wrapper to send MIR safely between threads as it is supposed to be
@@ -757,7 +824,7 @@ impl<'a> ThirToMIR<'a> {
         }
 
         self.builder
-            .finalize()
+            .finalize(MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into())
             .expect("Something went wrong finalizing the builder")
     }
 }
