@@ -107,14 +107,11 @@ impl<'a, 'b> MIRGen<'a, 'b> {
             MIRConstant::Bool(value) => {
                 self.cg.c.bool_type().const_int(*value as u64, false).into()
             }
-            MIRConstant::CString {
-                contents,
-                null_terminated,
-            } => {
+            MIRConstant::CString { contents, .. } => {
                 let const_str = self
                     .cg
                     .b
-                    .build_global_string_ptr(&unescaper::unescape(&contents).unwrap(), "")
+                    .build_global_string_ptr(&unescaper::unescape(contents).unwrap(), "")
                     .unwrap();
                 const_str.as_basic_value_enum()
             }
@@ -209,12 +206,9 @@ impl<'a, 'b> MIRGen<'a, 'b> {
 
                 let call_site_value =
                     self.cg.b.build_direct_call(llvm_callee, &args, "").unwrap();
-                match call_site_value.try_as_basic_value() {
-                    ValueKind::Basic(value) => {
-                        let ptr = self.local_map[dest];
-                        self.cg.b.build_store(ptr, value).unwrap();
-                    }
-                    _ => (),
+                if let ValueKind::Basic(value) = call_site_value.try_as_basic_value() {
+                    let ptr = self.local_map[dest];
+                    self.cg.b.build_store(ptr, value).unwrap();
                 }
 
                 self.cg
@@ -312,11 +306,9 @@ impl<'a, 'b> MIRGen<'a, 'b> {
 
     fn create_block_for(&self, idx: MIRBlockID) -> BasicBlock<'a> {
         let block = &self.mir.blocks[idx];
-        let llvm_block = self.cg.c.append_basic_block(
-            self.f,
-            block.name.as_ref().map(String::as_str).unwrap_or(""),
-        );
-        llvm_block
+        self.cg
+            .c
+            .append_basic_block(self.f, block.name.as_deref().unwrap_or(""))
     }
 
     fn build_bb_map(&mut self) {

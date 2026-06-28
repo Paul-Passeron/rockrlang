@@ -87,7 +87,7 @@ impl<'a, 'db> LLVMCtx<'a, 'db> {
                         },
                     )
                 });
-                (fref.clone(), f)
+                (*fref, f)
             })
             .collect();
 
@@ -108,7 +108,7 @@ impl<'a, 'db> LLVMCtx<'a, 'db> {
         ret_ty.fn_type(&arg_tys, func.fdef(self.db).is_var_args(self.db))
     }
 
-    pub fn lower_mir<'b>(&'b self, mir: &MIR) {
+    pub fn lower_mir(&self, mir: &MIR) {
         MIRGen::new(self, mir).lower();
     }
 

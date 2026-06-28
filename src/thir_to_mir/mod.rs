@@ -92,7 +92,7 @@ impl FuncInst {
         self.interned().fdef(db)
     }
 
-    pub fn subs<'db>(self, db: &'db dyn Db) -> &'db [TypeRef] {
+    pub fn subs(self, db: &dyn Db) -> &[TypeRef] {
         self.interned().subs(db)
     }
 
@@ -102,7 +102,7 @@ impl FuncInst {
 
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
-        sig.ret.with_substitution(db, &self.subs(db))
+        sig.ret.with_substitution(db, self.subs(db))
     }
 
     pub fn params(self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {

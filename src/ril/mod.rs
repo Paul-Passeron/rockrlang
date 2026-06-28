@@ -27,7 +27,7 @@ pub use plumbing::*;
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
-    hir::function_ast,
+    hir::{FunctionLikeAst, function_ast},
     name_resolve::{
         module_items,
         type_expr::{struct_item, templates_of_enum, templates_of_struct},
@@ -228,11 +228,10 @@ impl FunctionId {
 #[salsa::tracked]
 impl<'db> InternedFunctionId<'db> {
     pub fn has_body(self, db: &'db dyn Db) -> bool {
-        match function_ast(db, self).inner(db) {
-            crate::hir::FunctionLikeAst::ExternDef(_, _)
-            | crate::hir::FunctionLikeAst::TraitMethod(_) => false,
-            _ => true,
-        }
+        !matches!(
+            function_ast(db, self).inner(db),
+            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
+        )
     }
 
     pub fn is_var_args(self, db: &dyn Db) -> bool {

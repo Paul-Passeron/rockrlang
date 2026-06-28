@@ -317,7 +317,7 @@ impl MIR {
             }
             res.get_mut(&MIRStmtIndex(*blk, stmts.len()))
                 .unwrap()
-                .extend(succs.into_iter().map(|succ| MIRStmtIndex(*succ, 0)));
+                .extend(succs.iter().map(|succ| MIRStmtIndex(*succ, 0)));
         }
         res
     }

@@ -163,12 +163,7 @@ pub fn build<'a, 'db>(db: &'db dyn Db, w: Workspace, c: &'a Context) -> LLVMCtx<
     let packages = workspace_packages(db, w);
     let frefs = packages
         .iter()
-        .flat_map(|pkg| {
-            reachable_frefs(db, *pkg)
-                .iter()
-                .map(|x| x.clone())
-                .collect_vec()
-        })
+        .flat_map(|pkg| reachable_frefs(db, *pkg).iter().copied().collect_vec())
         .collect_vec();
 
     let ctx = LLVMCtx::new(db, c, frefs.as_slice());
