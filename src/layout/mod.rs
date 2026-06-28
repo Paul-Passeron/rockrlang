@@ -127,6 +127,22 @@ pub struct FieldInput {
     align: Align,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VariantOrderingKind {
+    SourceOrder,
+    // later: e.g. SizeDescending, or "niche candidate first" if that ever turns out to
+    // matter for the discriminant strategy below, but nit important right now for the
+    // MVP
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiscriminantStrategyKind {
+    AlwaysTagged, // dumb default: explicit tag if >1 variant, None if exactly 1
+    NicheFilling, /* search for spare bit patterns before falling back to tagged,
+                   * this will be implemented at a later date as I'm just trying to
+                   * get the MVP up and running */
+}
+
 fn align_up(value: u64, align: u64) -> u64 {
     let remainder = value % align;
     if remainder == 0 { value } else { value + (align - remainder) }
