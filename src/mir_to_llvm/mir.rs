@@ -145,7 +145,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
     fn lower_rvalue(&self, rvalue: &MIRRValue) -> BasicValueEnum<'a> {
         let ty = self.ty(rvalue.ty);
         match &rvalue.kind {
-            MIRRValueKind::Use(miroperand) => todo!(),
+            MIRRValueKind::Use(miroperand) => self.lower_operand(miroperand),
             MIRRValueKind::AddressOf(mirplace, _) | MIRRValueKind::Ref(mirplace, _) => {
                 self.lower_place_as_ptr(mirplace).as_basic_value_enum()
             }
@@ -242,13 +242,28 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                     self.cg.b.build_return(None).unwrap();
                 }
             }
-            MIRTerminator::Goto { next } => todo!(),
+            MIRTerminator::Goto { next } => {
+                self.cg
+                    .b
+                    .build_unconditional_branch(self.get_block(*next))
+                    .unwrap();
+            }
             MIRTerminator::Branch {
-                cond,
-                then,
-                else_,
-                span,
-            } => todo!(),
+                cond, then, else_, ..
+            } => {
+                let value = self.lower_operand(cond);
+                let then_block = self.get_block(*then);
+                let else_block = self.get_block(*else_);
+
+                self.cg
+                    .b
+                    .build_conditional_branch(
+                        value.into_int_value(),
+                        then_block,
+                        else_block,
+                    )
+                    .unwrap();
+            }
             MIRTerminator::Switch {
                 discriminant,
                 branches,

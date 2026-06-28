@@ -19,7 +19,6 @@ use clap::Parser as _;
 use clap_derive::Parser;
 use rockr::compiler::Config;
 use rockr::compiler::build_from_disk;
-use rockr::compiler::check_from_disk;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
