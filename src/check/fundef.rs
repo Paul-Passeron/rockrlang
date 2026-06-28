@@ -15,22 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
-
-use inkwell::context::Context;
-use itertools::Itertools;
-
 use crate::{
     Db,
     check::{mir::check_mir, thir::validate_thir},
     hir::function_ast,
-    mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeRef},
     thir::thir_body,
     thir_to_mir::{_mir, MIRKey, mir},
     typecheck::type_check_function,
 };
+use std::collections::HashSet;
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {

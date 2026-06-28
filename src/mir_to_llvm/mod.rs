@@ -9,13 +9,12 @@ use inkwell::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
     },
     types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
-    values::{AnyValue, FunctionValue},
+    values::FunctionValue,
 };
 use itertools::Itertools;
 
 use crate::{
-    Db, mir::MIR, mir_to_llvm::mir::MIRGen, ril::TypeRef, thir::FunctionRef,
-    thir_to_mir::FuncInst,
+    Db, mir::MIR, mir_to_llvm::mir::MIRGen, ril::TypeRef, thir_to_mir::FuncInst,
 };
 
 pub mod mir;

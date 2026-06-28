@@ -17,11 +17,6 @@ use crate::{
 impl<'db> InternedTypeId<'db> {
     pub fn as_llvm<'ctx>(self, db: &'db dyn Db, c: &'ctx Context) -> AnyTypeEnum<'ctx> {
         let tref = TypeRef::Concrete(TypeId::from(self));
-        let args = self
-            .args(db)
-            .iter()
-            .map(|ty| ty.as_type_id().unwrap().interned().as_llvm(db, c))
-            .collect_vec();
         match self.def(db) {
             TypeDefId::Builtin(builtin) => {
                 if builtin == BuiltinTypeId::void(db) {

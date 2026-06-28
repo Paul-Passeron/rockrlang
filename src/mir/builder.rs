@@ -18,10 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashSet;
 
 use crate::{
-    Db, common::arena::Arena, mir::{
+    Db,
+    common::arena::Arena,
+    mir::{
         BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt,
         cache::MIRCache,
-    }, thir::FunctionRef, thir_to_mir::FuncInst,
+    },
+    thir_to_mir::FuncInst,
 };
 
 pub struct MIRBuilder<'a> {

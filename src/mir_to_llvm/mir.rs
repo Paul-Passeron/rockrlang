@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use inkwell::{
     basic_block::BasicBlock,
-    types::{BasicMetadataTypeEnum, BasicTypeEnum, FunctionType},
+    types::BasicTypeEnum,
     values::{
         AnyValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
         PointerValue, ValueKind,
@@ -11,8 +11,6 @@ use inkwell::{
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    compiler::diagnostic::Diag,
     mir::{
         MIR, MIRBlockID, MIRLocalID,
         basic_block::{MIRTerminator, Stmt},
@@ -21,11 +19,9 @@ use crate::{
             MIRRValueKind,
         },
     },
-    mir_to_llvm::{LLVMCtx, MyFnType},
+    mir_to_llvm::LLVMCtx,
     name_resolve::type_expr::struct_item,
-    printer::render_diagnostics,
     ril::TypeRef,
-    thir::FunctionRef,
     thir_to_mir::FuncInst,
 };
 
@@ -76,7 +72,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                         .unwrap_or_else(|| new_ty.as_ref(self.cg.db).unwrap())
                         .1;
                 }
-                MIRProjection::Field { name, resulting_ty } => {
+                MIRProjection::Field { name, .. } => {
                     let pointee_ty = self.ty(current_ty).unwrap().into_struct_type();
                     let sref = current_ty.as_struct_ref(self.cg.db).unwrap();
                     let item = struct_item(self.cg.db, sref.def.into());
@@ -94,12 +90,9 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                         .build_struct_gep(pointee_ty, llvm_place, index, "")
                         .unwrap();
                 }
-                MIRProjection::TupleField {
-                    index,
-                    resulting_ty,
-                } => todo!(),
-                MIRProjection::Index { index } => todo!(),
-                MIRProjection::Downcast { variant } => todo!(),
+                MIRProjection::TupleField { .. } => todo!(),
+                MIRProjection::Index { .. } => todo!(),
+                MIRProjection::Downcast { .. } => todo!(),
             }
         }
         llvm_place
@@ -149,17 +142,12 @@ impl<'a, 'b> MIRGen<'a, 'b> {
             MIRRValueKind::AddressOf(mirplace, _) | MIRRValueKind::Ref(mirplace, _) => {
                 self.lower_place_as_ptr(mirplace).as_basic_value_enum()
             }
-            MIRRValueKind::BinOp(binary_operator, miroperand, miroperand1) => todo!(),
-            MIRRValueKind::UnaryOp(unary_operator, miroperand) => todo!(),
-            MIRRValueKind::Discriminant(mirplace) => todo!(),
-            MIRRValueKind::Metadata(miroperand) => todo!(),
-            MIRRValueKind::SizeOf(type_ref) => todo!(),
-            MIRRValueKind::Constructor {
-                enum_ref,
-                idx,
-                args,
-                span,
-            } => todo!(),
+            MIRRValueKind::BinOp(_, _, _) => todo!(),
+            MIRRValueKind::UnaryOp(_, _) => todo!(),
+            MIRRValueKind::Discriminant(_) => todo!(),
+            MIRRValueKind::Metadata(_) => todo!(),
+            MIRRValueKind::SizeOf(_) => todo!(),
+            MIRRValueKind::Constructor { .. } => todo!(),
             MIRRValueKind::StructLit {
                 struct_ref, fields, ..
             } => {
@@ -180,7 +168,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                 }
                 res.as_basic_value_enum()
             }
-            MIRRValueKind::Tuple(miroperands, span) => todo!(),
+            MIRRValueKind::Tuple(_, _) => todo!(),
         }
     }
 
@@ -264,12 +252,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                     )
                     .unwrap();
             }
-            MIRTerminator::Switch {
-                discriminant,
-                branches,
-                default,
-                span,
-            } => todo!(),
+            MIRTerminator::Switch { .. } => todo!(),
         }
     }
 

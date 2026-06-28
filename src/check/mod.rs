@@ -43,7 +43,6 @@ use crate::{
         implems::module_impls,
     },
     ril::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
-    thir::FunctionRef,
     thir_to_mir::{FuncInst, MIRKey, mir},
 };
 pub mod fundef;

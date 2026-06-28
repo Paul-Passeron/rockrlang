@@ -42,8 +42,8 @@ use crate::{
         never_id, str_def, usize_id, void_id,
     },
     thir::{
-        self, Dispatch, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
-        Projection, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
+        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
