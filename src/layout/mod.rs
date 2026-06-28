@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     marker::PhantomData,
-    ops::{Add, Sub},
+    ops::{Add, Mul, Sub},
     range::RangeInclusive,
 };
 
@@ -25,9 +25,10 @@ use itertools::Itertools;
 
 use crate::{
     Db,
+    layout::LayoutData::ScalarPair,
     name_resolve::type_expr::struct_item,
     ril::{BuiltinTypeId, EnumId, StructId, TypeDefId, TypeRef},
-    thir::{EnumRef, StructRef},
+    thir::StructRef,
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -154,7 +155,7 @@ impl Size {
     pub const ZERO: Self = Self(0);
 
     pub fn bytes(self) -> u64 {
-        self.0
+        self.0 * 8
     }
 
     pub fn align_to(self, align: Align) -> Self {
@@ -183,6 +184,14 @@ impl Add for Size {
 
     fn add(self, rhs: Self) -> Self {
         Self(self.0 + rhs.0)
+    }
+}
+
+impl Mul<u64> for Size {
+    type Output = Self;
+
+    fn mul(self, rhs: u64) -> Self {
+        Self(self.0 * rhs)
     }
 }
 
@@ -242,11 +251,11 @@ impl From<ScalarKind> for LayoutData {
 impl From<IntWidth> for Size {
     fn from(value: IntWidth) -> Self {
         match value {
-            IntWidth::I8 => Self(8),
-            IntWidth::I16 => Self(16),
-            IntWidth::I32 => Self(32),
-            IntWidth::I64 => Self(64),
-            IntWidth::I128 => Self(128),
+            IntWidth::I8 => Self(1),
+            IntWidth::I16 => Self(2),
+            IntWidth::I32 => Self(4),
+            IntWidth::I64 => Self(8),
+            IntWidth::I128 => Self(16),
         }
     }
 }
@@ -254,8 +263,8 @@ impl From<IntWidth> for Size {
 impl From<FloatWidth> for Size {
     fn from(value: FloatWidth) -> Self {
         match value {
-            FloatWidth::F32 => Self(32),
-            FloatWidth::F64 => Self(64),
+            FloatWidth::F32 => Self(4),
+            FloatWidth::F64 => Self(8),
         }
     }
 }
@@ -291,6 +300,20 @@ fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
     todo!()
 }
 
+fn finish_aggregate(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
+    if source_ordered.is_empty() {
+        return LayoutID::zst(db);
+    }
+    let align = source_ordered
+        .iter()
+        .map(|l| l.align(db))
+        .max()
+        .unwrap_or(Align::BYTE);
+    let aggregated = aggregate_layout(db, source_ordered);
+    let size = aggregated.size(db).align_to(align);
+    LayoutID::new(db, size, align, aggregated.into())
+}
+
 fn struct_layout(db: &dyn Db, struct_id: StructId, args: &[TypeRef]) -> LayoutID {
     let struct_ref = StructRef {
         def: struct_id,
@@ -312,15 +335,7 @@ fn struct_layout(db: &dyn Db, struct_id: StructId, args: &[TypeRef]) -> LayoutID
         .map(|ty| layout_of(db, *ty))
         .collect_vec();
 
-    let align = layouts
-        .iter()
-        .map(|l| l.align(db))
-        .max()
-        .unwrap_or(Align::BYTE);
-
-    let aggregated = aggregate_layout(db, layouts);
-    let size = aggregated.size(db).align_to(align);
-    LayoutID::new(db, size, align, aggregated.into())
+    finish_aggregate(db, layouts)
 }
 
 /// Seems like this is an NP-hard problem, so the algorithm will probably have
@@ -367,7 +382,21 @@ fn aggregate_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> AggregateLayo
 
 impl LayoutID {
     pub fn zst(db: &dyn Db) -> Self {
-        LayoutID::new(db, Size::ZERO, Align::BYTE, LayoutData::ZeroSized)
+        Self::new(db, Size::ZERO, Align::BYTE, LayoutData::ZeroSized)
+    }
+
+    pub fn int(db: &dyn Db, width: IntWidth) -> Self {
+        Self::new(
+            db,
+            width.into(),
+            width.into(),
+            ScalarKind::Int(width).into(),
+        )
+    }
+
+    pub fn ptr(db: &dyn Db) -> Self {
+        let width = db.target_width();
+        Self::new(db, width.into(), width.into(), ScalarKind::Ptr.into())
     }
 }
 
@@ -399,40 +428,25 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
             return LayoutID::zst(db);
         }
         let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
-        let align = layouts
-            .iter()
-            .map(|l| l.align(db))
-            .max()
-            .unwrap_or(Align::BYTE);
-        let aggregated = aggregate_layout(db, layouts);
-        let size = aggregated.size(db).align_to(align);
-        LayoutID::new(db, size, align, aggregated.into())
+        finish_aggregate(db, layouts)
     } else if builtin_id == BuiltinTypeId::bool(db)
         || builtin_id == BuiltinTypeId::char(db)
     {
-        let width = IntWidth::I8;
-        LayoutID::new(db, width.into(), Align::BYTE, ScalarKind::Int(width).into())
+        LayoutID::int(db, IntWidth::I8)
     } else if builtin_id == BuiltinTypeId::never(db)
         || builtin_id == BuiltinTypeId::void(db)
     {
         LayoutID::zst(db)
     } else if builtin_id == BuiltinTypeId::int(db) {
-        let width = IntWidth::I32;
-        LayoutID::new(db, width.into(), Align::B32, ScalarKind::Int(width).into())
+        LayoutID::int(db, IntWidth::I32)
     } else if builtin_id == BuiltinTypeId::ref_(db)
         || builtin_id == BuiltinTypeId::mut_ref(db)
         || builtin_id == BuiltinTypeId::ptr(db)
         || builtin_id == BuiltinTypeId::mut_ptr(db)
     {
-        LayoutID::new(
-            db,
-            db.target_width().into(),
-            Align::B32,
-            ScalarKind::Ptr.into(),
-        )
+        LayoutID::ptr(db)
     } else if builtin_id == BuiltinTypeId::usize(db) {
-        let width = db.target_width();
-        LayoutID::new(db, width.into(), Align::BYTE, ScalarKind::Int(width).into())
+        LayoutID::int(db, db.target_width())
     } else if builtin_id == BuiltinTypeId::slice(db) {
         // This should have a length but it does not yet.
         // Let's assume (even that it's false for the moment) that the secnd
@@ -451,17 +465,19 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
             .parse()
             .unwrap();
 
-        let stride = inner_layout.align(db);
+        let align = inner_layout.align(db);
+
+        let element_size = inner_layout.size(db).align_to(align);
 
         let data = LayoutData::Aggregate(AggregateLayout {
             fields: (0..length)
                 .into_iter()
-                .map(|i| (Offset::ZERO + Size(stride.bytes() * i as u64), inner_layout))
+                .map(|i| (Offset::ZERO + element_size * i as u64, inner_layout))
                 .collect(),
             source_to_layout: (0..length).into_iter().map(|i| i as u32).collect_vec(),
         });
 
-        LayoutID::new(db, Size(stride.bytes() * length as u64), stride, data)
+        LayoutID::new(db, element_size * length as u64, align, data)
     } else {
         unreachable!()
     }
@@ -491,12 +507,39 @@ impl dyn Db {
 }
 
 fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
-    todo!()
+    let Some((_, id)) = ty.as_ref(db) else {
+        panic!("Not a fat ptr");
+    };
+    // Only slices are fat ptrs for the moment
+    let Some(_) = id.as_slice(db) else {
+        panic!("Not a fat ptr");
+    };
+
+    let target_witdh = db.target_width();
+    let size: Size = target_witdh.into();
+    let size = size + size;
+
+    let metadata_scalar = ScalarKind::Int(target_witdh);
+    let ptr_scalar = ScalarKind::Ptr;
+
+    LayoutID::new(
+        db,
+        size,
+        target_witdh.into(),
+        ScalarPair(ptr_scalar, metadata_scalar),
+    )
 }
 
 impl TypeRef {
     pub fn is_fat_ptr(self, db: &dyn Db) -> bool {
-        todo!()
+        let Some((_, id)) = self.as_ref(db) else {
+            return false;
+        };
+        // Only slices are fat ptrs for the moment
+        let Some(_) = id.as_slice(db) else {
+            return false;
+        };
+        return true;
     }
 }
 
@@ -504,6 +547,18 @@ impl FieldOrderingKind {
     pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {
         match self {
             FieldOrderingKind::SourceOrder => (0..fields.len() as u32).collect(),
+        }
+    }
+}
+
+impl From<IntWidth> for Align {
+    fn from(value: IntWidth) -> Self {
+        match value {
+            IntWidth::I8 => Self::B8,
+            IntWidth::I16 => Self::B16,
+            IntWidth::I32 => Self::B32,
+            IntWidth::I64 => Self::B64,
+            IntWidth::I128 => Self::B128,
         }
     }
 }
