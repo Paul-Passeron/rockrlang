@@ -43,7 +43,7 @@ impl<'db> InternedTypeId<'db> {
                     return c.i64_type().as_any_type_enum();
                 }
                 if builtin == BuiltinTypeId::never(db) {
-                    return c.void_type().as_any_type_enum()
+                    return c.void_type().as_any_type_enum();
                 }
 
                 todo!("{}", tref.to_string(db))
