@@ -25,8 +25,9 @@ use itertools::Itertools;
 
 use crate::{
     Db,
+    name_resolve::type_expr::struct_item,
     ril::{BuiltinTypeId, EnumId, StructId, TypeDefId, TypeRef},
-    thir::EnumRef,
+    thir::{EnumRef, StructRef},
 };
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -114,6 +115,17 @@ pub struct LIRTy {
     pub origin: Option<TypeRef>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FieldOrderingKind {
+    SourceOrder,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FieldInput {
+    size: Size,
+    align: Align,
+}
+
 fn align_up(value: u64, align: u64) -> u64 {
     let remainder = value % align;
     if remainder == 0 { value } else { value + (align - remainder) }
@@ -124,6 +136,13 @@ impl Offset {
 
     pub fn bytes(self) -> u64 {
         self.0
+    }
+
+    pub fn bytes_from(self, other: Offset) -> u64 {
+        if self < other {
+            panic!("Cannot get bytes from a bigger offset")
+        }
+        self.0 - other.0
     }
 
     pub fn align_to(self, align: Align) -> Self {
@@ -241,18 +260,6 @@ impl From<FloatWidth> for Size {
     }
 }
 
-impl Ord for Align {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl PartialOrd for Align {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 #[salsa::interned]
 struct InternedTRef {
     inner: TypeRef,
@@ -285,11 +292,77 @@ fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
 }
 
 fn struct_layout(db: &dyn Db, struct_id: StructId, args: &[TypeRef]) -> LayoutID {
-    todo!()
+    let struct_ref = StructRef {
+        def: struct_id,
+        args: args.to_vec(),
+    };
+    let fields = struct_ref.get_fields_ty(db);
+    if fields.is_empty() {
+        return LayoutID::zst(db);
+    }
+
+    let source_ordered_fields = struct_item(db, struct_id.into())
+        .fields
+        .iter()
+        .map(|field| fields[&field.name])
+        .collect_vec();
+
+    let layouts = source_ordered_fields
+        .iter()
+        .map(|ty| layout_of(db, *ty))
+        .collect_vec();
+
+    let align = layouts
+        .iter()
+        .map(|l| l.align(db))
+        .max()
+        .unwrap_or(Align::BYTE);
+
+    let aggregated = aggregate_layout(db, layouts);
+    let size = aggregated.size(db).align_to(align);
+    LayoutID::new(db, size, align, aggregated.into())
 }
 
+/// Seems like this is an NP-hard problem, so the algorithm will probably have
+/// to be "good enough" if we want good perfomance
 fn aggregate_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> AggregateLayout {
-    todo!()
+    let fields = source_ordered
+        .iter()
+        .map(|layout| FieldInput {
+            size: layout.size(db),
+            align: layout.align(db),
+        })
+        .collect_vec();
+
+    let ordering = db.ordering_strategy().order_fields(&fields);
+
+    let mut ordered = ordering
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(src, layout_idx)| (layout_idx, src as u32))
+        .collect_vec();
+    ordered.sort_by_key(|&(layout_idx, _)| layout_idx);
+
+    let mut offset = Offset::ZERO;
+    let mut align = Align::BYTE;
+
+    let mut fields = vec![(Offset::ZERO, LayoutID::zst(db)); source_ordered.len()];
+
+    // We build the offsets by walking in layout order
+    for (layout_idx, src_idx) in ordered {
+        let field_layout = source_ordered[src_idx as usize];
+        let field_align = field_layout.align(db);
+        offset = offset.align_to(field_align);
+        fields[layout_idx as usize] = (offset, field_layout);
+        offset = offset + field_layout.size(db);
+        align = align.max(field_align);
+    }
+
+    AggregateLayout {
+        fields,
+        source_to_layout: ordering,
+    }
 }
 
 impl LayoutID {
@@ -300,7 +373,11 @@ impl LayoutID {
 
 impl AggregateLayout {
     pub fn size(&self, db: &dyn Db) -> Size {
-        todo!()
+        // We get the biggest offset and add the size of its layout
+        let Some((offset, layout)) = self.fields.iter().max_by_key(|f| f.0) else {
+            return Size::ZERO;
+        };
+        Size(offset.bytes()) + layout.size(db)
     }
 }
 
@@ -407,6 +484,10 @@ impl dyn Db {
             _ => unreachable!(),
         }
     }
+
+    pub fn ordering_strategy(&self) -> FieldOrderingKind {
+        FieldOrderingKind::SourceOrder
+    }
 }
 
 fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
@@ -416,5 +497,13 @@ fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
 impl TypeRef {
     pub fn is_fat_ptr(self, db: &dyn Db) -> bool {
         todo!()
+    }
+}
+
+impl FieldOrderingKind {
+    pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {
+        match self {
+            FieldOrderingKind::SourceOrder => (0..fields.len() as u32).collect(),
+        }
     }
 }
