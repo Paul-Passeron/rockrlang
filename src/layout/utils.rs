@@ -56,7 +56,7 @@ impl Size {
     pub const ZERO: Self = Self(0);
 
     pub fn bytes(self) -> u64 {
-        self.0 * 8
+        self.0
     }
 
     pub fn align_to(self, align: Align) -> Self {

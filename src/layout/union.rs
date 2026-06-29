@@ -15,16 +15,116 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use itertools::Itertools;
+
 use crate::{
     Db,
-    layout::LayoutID,
+    check::thir::sanity_check::ConstructorType,
+    layout::{
+        Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset,
+        ScalarKind, Size, VariantsLayout,
+    },
     ril::{EnumId, TypeRef},
-    unused,
+    thir::EnumRef,
 };
 
+use super::LayoutData;
+
+fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
+    match cons {
+        ConstructorType::Tuple(_) => todo!(),
+        ConstructorType::Struct(_) => todo!(),
+        ConstructorType::None => LayoutID::zst(db),
+    }
+}
+
 pub(super) fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
-    unused!(db);
-    unused!(enum_id);
-    unused!(args);
-    todo!()
+    let enum_ref = EnumRef {
+        def: enum_id,
+        args: args.to_vec(),
+    };
+
+    let variant_tys = enum_ref.variants(db);
+
+    if variant_tys.is_empty() {
+        // Unconstructible enum, we can just return a ZST
+        return LayoutID::zst(db);
+    }
+
+    let source_ordered = variant_tys
+        .iter()
+        .map(|cons| layout_of_cons(db, cons))
+        .collect_vec();
+
+    if source_ordered.len() == 1 {
+        // Only a single variant, no discriminant needed
+        // We'll have to check that when downcasting
+        return source_ordered[0];
+    }
+
+    match db.discriminant_strategy() {
+        DiscriminantStrategyKind::AlwaysTagged => {
+            always_tagged_layout(db, source_ordered)
+        }
+        DiscriminantStrategyKind::NicheFilling => {
+            todo!("Niche filling is not implemented")
+        }
+    }
+}
+
+fn always_tagged_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
+    let tag_width = tag_width_for(source_ordered.len() as u32);
+    let tag_align: Align = tag_width.into();
+    let tag_size: Size = tag_width.into();
+
+    let payload_align = source_ordered
+        .iter()
+        .map(|layout| layout.align(db))
+        .max()
+        .unwrap_or(Align::BYTE);
+
+    let payload_size = source_ordered
+        .iter()
+        .map(|layout| layout.size(db))
+        .max()
+        .unwrap_or(Size::ZERO)
+        .align_to(payload_align);
+
+    if payload_size == Size::ZERO {
+        // Just return the discriminant
+        return LayoutID::int(db, tag_width);
+    }
+
+    // tag-first convention
+    let payload_offset = (Offset::ZERO + tag_size).align_to(payload_align);
+
+    let global_align = tag_align.max(payload_align);
+
+    let size = (payload_offset + payload_size).align_to(global_align) - Offset::ZERO;
+
+    let discriminant = Discriminant::Tagged {
+        offset: Offset::ZERO,
+        kind: ScalarKind::Int(tag_width),
+    };
+
+    LayoutID::new(
+        db,
+        size,
+        global_align,
+        LayoutData::Union(VariantsLayout {
+            variants: source_ordered,
+            payload_offset,
+            discriminant,
+        }),
+    )
+}
+
+fn tag_width_for(n: u32) -> IntWidth {
+    if n <= 1 << 8 {
+        IntWidth::I8
+    } else if n <= 1 << 16 {
+        IntWidth::I16
+    } else {
+        IntWidth::I32
+    }
 }

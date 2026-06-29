@@ -95,8 +95,6 @@ pub struct AggregateLayout {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum LayoutData {
     Scalar(ScalarKind),
-    ScalarPair(ScalarKind, ScalarKind), /* Fat pointer, both are expected to be the
-                                         * same width */
     Aggregate(AggregateLayout),
     ZeroSized,
     Union(VariantsLayout),
@@ -128,14 +126,6 @@ pub enum FieldOrderingKind {
 pub struct FieldInput {
     size: Size,
     align: Align,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum VariantOrderingKind {
-    SourceOrder,
-    // later: e.g. SizeDescending, or "niche candidate first" if that ever turns out to
-    // matter for the discriminant strategy below, but nit important right now for the
-    // MVP
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

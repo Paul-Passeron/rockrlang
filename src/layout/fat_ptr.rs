@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    layout::{LayoutData, LayoutID, ScalarKind, Size},
+    layout::{AggregateLayout, LayoutData, LayoutID, Offset, Size},
     ril::TypeRef,
 };
 
@@ -31,17 +31,23 @@ pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
     };
 
     let target_witdh = db.target_width();
-    let size: Size = target_witdh.into();
-    let size = size + size;
+    let target_size: Size = target_witdh.into();
+    let size = target_size + target_size;
 
-    let metadata_scalar = ScalarKind::Int(target_witdh);
-    let ptr_scalar = ScalarKind::Ptr;
+    let metadata_id = LayoutID::int(db, target_witdh);
+    let ptr_id = LayoutID::ptr(db);
 
     LayoutID::new(
         db,
         size,
         target_witdh.into(),
-        LayoutData::ScalarPair(ptr_scalar, metadata_scalar),
+        LayoutData::Aggregate(AggregateLayout {
+            fields: vec![
+                (Offset::ZERO, ptr_id),
+                (Offset(target_size.bytes()), metadata_id),
+            ],
+            source_to_layout: vec![0, 1],
+        }),
     )
 }
 

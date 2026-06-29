@@ -23,9 +23,7 @@ use salsa::Setter;
 use crate::{
     SourceFile,
     compiler::{self, CompilerError, Config, Workspace},
-    layout::{
-        DiscriminantStrategyKind, FieldOrderingKind, IntWidth, VariantOrderingKind,
-    },
+    layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth},
 };
 
 #[salsa::db]
@@ -128,10 +126,6 @@ impl dyn Db {
 
     pub fn ordering_strategy(&self) -> FieldOrderingKind {
         FieldOrderingKind::SourceOrder
-    }
-
-    pub fn variant_strategy(&self) -> VariantOrderingKind {
-        VariantOrderingKind::SourceOrder
     }
 
     pub fn discriminant_strategy(&self) -> DiscriminantStrategyKind {

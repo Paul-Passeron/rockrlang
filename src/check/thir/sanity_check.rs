@@ -677,6 +677,14 @@ impl EnumRef {
         }?;
         Some(raw.with_substitution(db, &self.args))
     }
+
+    pub fn variants(&self, db: &dyn Db) -> Vec<ConstructorType> {
+        let n = enum_item(db, self.def.interned()).variants.len();
+        (0..n)
+            .into_iter()
+            .map(|i| self.get_cons(db, i).unwrap())
+            .collect()
+    }
 }
 
 pub fn sanity_check(db: &dyn Db, thir: &Thir) {
