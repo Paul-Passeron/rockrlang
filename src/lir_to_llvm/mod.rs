@@ -14,29 +14,3 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-pub use common::location::SourceFile;
-pub use db::*;
-
-pub mod check;
-pub mod common;
-pub mod compiler;
-pub mod db;
-pub mod driver;
-pub mod hir;
-pub mod layout;
-pub mod lexer;
-pub mod lir;
-pub mod lir_to_llvm;
-pub mod mir;
-pub mod mir_to_lir;
-pub mod mir_to_llvm;
-pub mod name_resolve;
-pub mod parse_tree;
-pub mod parser;
-pub mod printer;
-pub mod ril;
-pub mod tests;
-pub mod thir;
-pub mod thir_to_mir;
-pub mod typecheck;

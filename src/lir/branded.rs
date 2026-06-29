@@ -17,10 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::marker::PhantomData;
 
-use crate::{common::{
-    arena::{Arena, Idx},
-    symbols::Symbol,
-}, lir::LIRDef};
+use crate::{
+    common::{
+        arena::{Arena, Idx},
+        symbols::Symbol,
+    },
+    lir::{
+        LIRDef,
+        finalized::{BlockData, FunctionBody, InstKind, Instruction, Terminator},
+    },
+};
 
 pub type Invariant<'ir> = fn(&'ir ()) -> &'ir ();
 
@@ -94,6 +100,60 @@ impl<'ir> InProgressBody<'ir> {
             blocks: Arena::new(),
             entry: None,
             _brand: PhantomData,
+        }
+    }
+
+    pub fn finalize(self) -> FunctionBody {
+        let arena = Arena::new();
+        self.blocks.into_values().for_each(|block| {
+            arena.insert(block.finalize());
+        });
+        FunctionBody {
+            defs: self.defs,
+            blocks: arena,
+            entry: Idx::from_raw(self.entry.unwrap().idx.into_raw()),
+        }
+    }
+}
+
+impl<'ir> BrandedBlockData<'ir> {
+    pub fn finalize(self) -> BlockData {
+        BlockData {
+            name: self.name,
+            params: self.params.into_iter().map(|param| param.idx).collect(),
+            insts: self.insts.into_iter().map(|inst| inst.finalize()).collect(),
+            terminator: self.terminator.unwrap().finalize(),
+        }
+    }
+}
+
+impl<'ir> BrandedInstruction<'ir> {
+    pub fn finalize(self) -> Instruction {
+        Instruction {
+            result: self.result.idx,
+            kind: self.kind.finalize(),
+        }
+    }
+}
+
+impl<'ir> BrandedInstKind<'ir> {
+    pub fn finalize(self) -> InstKind {
+        match self {
+            BrandedInstKind::Store { ptr, value } => InstKind::Store {
+                ptr: ptr.idx,
+                value: value.idx,
+            },
+        }
+    }
+}
+
+impl<'ir> BrandedTerminator<'ir> {
+    pub fn finalize(self) -> Terminator {
+        match self {
+            BrandedTerminator::Br { target, args } => Terminator::Br {
+                target: Idx::from_raw(target.idx.raw()),
+                args: args.into_iter().map(|arg| arg.idx).collect(),
+            },
         }
     }
 }

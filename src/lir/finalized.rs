@@ -25,7 +25,7 @@ use crate::{
 
 pub struct BlockData {
     pub name: Option<Symbol>,
-    pub params: Vec<LIRDef>,
+    pub params: Vec<Idx<LIRDef>>,
     pub insts: Vec<Instruction>,
     pub terminator: Terminator,
 }

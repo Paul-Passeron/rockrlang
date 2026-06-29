@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use crate::{
     common::symbols::Symbol,
@@ -84,6 +84,12 @@ pub struct Module<S: ModulePhase> {
     fun_decls: Vec<FunctionDecl<S>>,
 }
 
+impl<S: ModulePhase> IndexMut<FunctionId> for Module<S> {
+    fn index_mut(&mut self, index: FunctionId) -> &mut Self::Output {
+        &mut self.fun_decls[index.0]
+    }
+}
+
 impl<S: ModulePhase> Index<FunctionId> for Module<S> {
     type Output = FunctionDecl<S>;
 
@@ -92,10 +98,14 @@ impl<S: ModulePhase> Index<FunctionId> for Module<S> {
     }
 }
 
-fn build_function<R>(sig: &Signature, f: impl FnOnce(&mut InProgressBody<'_>) -> R) -> R {
+fn build_function(
+    sig: &Signature,
+    f: impl FnOnce(&Signature, &mut InProgressBody<'_>),
+) -> FunctionBody {
     generativity::make_guard!(guard);
     let mut body = InProgressBody::new(guard);
-    f(&mut body)
+    f(sig, &mut body);
+    body.finalize()
 }
 
 impl Module<Declaring> {
@@ -149,3 +159,25 @@ impl Module<Declaring> {
     }
 }
 
+impl Module<Building> {
+    pub fn build_function(
+        &mut self,
+        id: FunctionId,
+        f: impl FnOnce(&Signature, &mut InProgressBody<'_>),
+    ) {
+        let decl = &mut self[id];
+        let slot = match &mut decl.body {
+            Body::Defined(_, Some(_)) => {
+                panic!("Cannot build body multiple times for the same function")
+            }
+            Body::Import => panic!("cannot build body for imported function"),
+            Body::Defined(_, slot) => slot,
+        };
+        let body = build_function(&decl.signature, f);
+        *slot = Some(body);
+    }
+
+    pub fn finalize(self) -> Module<Complete> {
+        todo!()
+    }
+}
