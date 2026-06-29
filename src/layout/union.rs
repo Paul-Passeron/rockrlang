@@ -125,6 +125,19 @@ fn always_tagged_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID 
     )
 }
 
+pub fn tag_value_for_variant(
+    db: &dyn Db,
+    _enum_id: EnumId,
+    source_idx: u32,
+) -> Option<u128> {
+    match db.discriminant_strategy() {
+        DiscriminantStrategyKind::AlwaysTagged => Some(source_idx as u128),
+        DiscriminantStrategyKind::NicheFilling => {
+            todo!()
+        }
+    }
+}
+
 fn tag_width_for(n: u32) -> IntWidth {
     if n <= 1 << 8 {
         IntWidth::I8
