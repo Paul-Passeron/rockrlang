@@ -17,13 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::marker::PhantomData;
 
+use itertools::Itertools;
+
 use crate::{
     common::{
         arena::{Arena, Idx},
         symbols::Symbol,
     },
     lir::{
-        LIRDef,
+        LIRDef, LIRFunctionId,
         finalized::{BlockData, FunctionBody, InstKind, Instruction, Terminator},
     },
 };
@@ -74,8 +76,27 @@ pub enum BrandedInstKind<'ir> {
 
 pub enum BrandedTerminator<'ir> {
     Br {
+        cond: ValueId<'ir>,
+        block_if_true: BrandedBlockId<'ir>,
+        block_if_false: BrandedBlockId<'ir>,
+    },
+    Goto {
         target: BrandedBlockId<'ir>,
+    },
+    Switch {
+        on: ValueId<'ir>,
+        branches: Vec<(u128, BrandedBlockId<'ir>)>,
+        default: BrandedBlockId<'ir>,
+    },
+    Diverge,
+    Call {
+        id: LIRFunctionId,
         args: Vec<ValueId<'ir>>,
+        dest: ValueDef<'ir>,
+        next: BrandedBlockId<'ir>,
+    },
+    Return {
+        value: Option<ValueId<'ir>>,
     },
 }
 
@@ -150,10 +171,51 @@ impl<'ir> BrandedInstKind<'ir> {
 impl<'ir> BrandedTerminator<'ir> {
     pub fn finalize(self) -> Terminator {
         match self {
-            BrandedTerminator::Br { target, args } => Terminator::Br {
-                target: Idx::from_raw(target.idx.raw()),
-                args: args.into_iter().map(|arg| arg.idx).collect(),
+            BrandedTerminator::Br {
+                cond,
+                block_if_true,
+                block_if_false,
+            } => Terminator::Br {
+                cond: cond.idx,
+                block_if_true: block_if_true.finalize(),
+                block_if_false: block_if_false.finalize(),
+            },
+            BrandedTerminator::Goto { target } => Terminator::Goto {
+                target: target.finalize(),
+            },
+            BrandedTerminator::Switch {
+                on,
+                branches,
+                default,
+            } => Terminator::Switch {
+                on: on.idx,
+                branches: branches
+                    .into_iter()
+                    .map(|(n, b)| (n, b.finalize()))
+                    .collect_vec(),
+                default: default.finalize(),
+            },
+            BrandedTerminator::Diverge => Terminator::Diverge,
+            BrandedTerminator::Call {
+                id,
+                args,
+                dest,
+                next,
+            } => Terminator::Call {
+                id,
+                args: args.into_iter().map(|v| v.idx).collect_vec(),
+                dest: dest.idx,
+                next: next.finalize(),
+            },
+            BrandedTerminator::Return { value } => Terminator::Return {
+                value: value.map(|v| v.idx),
             },
         }
+    }
+}
+
+impl<'ir> BrandedBlockId<'ir> {
+    pub fn finalize(self) -> Idx<BlockData> {
+        Idx::from_raw(self.idx.raw())
     }
 }

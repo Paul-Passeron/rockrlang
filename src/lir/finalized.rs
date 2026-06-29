@@ -20,7 +20,7 @@ use crate::{
         arena::{Arena, Idx},
         symbols::Symbol,
     },
-    lir::LIRDef,
+    lir::{LIRDef, LIRFunctionId},
 };
 
 pub struct BlockData {
@@ -44,8 +44,27 @@ pub enum InstKind {
 
 pub enum Terminator {
     Br {
+        cond: Idx<LIRDef>,
+        block_if_true: Idx<BlockData>,
+        block_if_false: Idx<BlockData>,
+    },
+    Goto {
         target: Idx<BlockData>,
+    },
+    Switch {
+        on: Idx<LIRDef>,
+        branches: Vec<(u128, Idx<BlockData>)>,
+        default: Idx<BlockData>,
+    },
+    Diverge,
+    Call {
+        id: LIRFunctionId,
         args: Vec<Idx<LIRDef>>,
+        dest: Idx<LIRDef>,
+        next: Idx<BlockData>,
+    },
+    Return {
+        value: Option<Idx<LIRDef>>,
     },
 }
 

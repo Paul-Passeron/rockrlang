@@ -73,7 +73,7 @@ pub struct FunctionDecl<S: ModulePhase> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FunctionId(usize);
+pub struct LIRFunctionId(usize);
 
 pub struct Signature {
     pub params: Vec<LIRTy>,
@@ -84,16 +84,16 @@ pub struct Module<S: ModulePhase> {
     fun_decls: Vec<FunctionDecl<S>>,
 }
 
-impl<S: ModulePhase> IndexMut<FunctionId> for Module<S> {
-    fn index_mut(&mut self, index: FunctionId) -> &mut Self::Output {
+impl<S: ModulePhase> IndexMut<LIRFunctionId> for Module<S> {
+    fn index_mut(&mut self, index: LIRFunctionId) -> &mut Self::Output {
         &mut self.fun_decls[index.0]
     }
 }
 
-impl<S: ModulePhase> Index<FunctionId> for Module<S> {
+impl<S: ModulePhase> Index<LIRFunctionId> for Module<S> {
     type Output = FunctionDecl<S>;
 
-    fn index(&self, index: FunctionId) -> &Self::Output {
+    fn index(&self, index: LIRFunctionId) -> &Self::Output {
         &self.fun_decls[index.0]
     }
 }
@@ -115,8 +115,8 @@ impl Module<Declaring> {
         }
     }
 
-    pub fn declare_import(&mut self, name: String, sig: Signature) -> FunctionId {
-        let id = FunctionId(self.fun_decls.len());
+    pub fn declare_import(&mut self, name: String, sig: Signature) -> LIRFunctionId {
+        let id = LIRFunctionId(self.fun_decls.len());
         self.fun_decls.push(FunctionDecl {
             name,
             signature: sig,
@@ -130,8 +130,8 @@ impl Module<Declaring> {
         name: String,
         sig: Signature,
         linkage: DefinedLinkage,
-    ) -> FunctionId {
-        let id = FunctionId(self.fun_decls.len());
+    ) -> LIRFunctionId {
+        let id = LIRFunctionId(self.fun_decls.len());
         self.fun_decls.push(FunctionDecl {
             name,
             signature: sig,
@@ -162,7 +162,7 @@ impl Module<Declaring> {
 impl Module<Building> {
     pub fn build_function(
         &mut self,
-        id: FunctionId,
+        id: LIRFunctionId,
         f: impl FnOnce(&Signature, &mut InProgressBody<'_>),
     ) {
         let decl = &mut self[id];
