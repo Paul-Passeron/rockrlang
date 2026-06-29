@@ -135,7 +135,8 @@ impl<'db> InferenceCtx<'db> {
                 self.table.unify_var_value(*infer_var, Some(resolved))?;
                 self.listeners
                     .remove(&self.table.find(*infer_var))
-                    .into_flat_iter()
+                    .into_iter()
+                    .flatten()
                     .for_each(|l| {
                         if self.ready_set.insert(l) {
                             self.ready.push_back(l);

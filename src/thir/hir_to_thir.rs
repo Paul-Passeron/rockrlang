@@ -1158,7 +1158,10 @@ impl<'db> ThirTranslator<'db> {
                     (place.ty, place.span)
                 };
                 let mut tuple_ref = ty.as_tuple_ref(self.db).expect("TODO");
-                let idx_ty = tuple_ref.try_remove(*index as usize).expect("TODO");
+                if tuple_ref.len() <= *index as usize {
+                    todo!("Problem !")
+                }
+                let idx_ty = tuple_ref.remove(*index as usize);
                 b.with_projection(
                     base,
                     Projection::TupleField(*index, idx_ty),
@@ -1176,7 +1179,11 @@ impl<'db> ThirTranslator<'db> {
                 if builtin.is_ptr_like(self.db).is_none() {
                     todo!("error diagnostic")
                 }
-                let deref_ty = type_id.args(self.db).try_remove(0).expect("TODO");
+                let mut args = type_id.args(self.db);
+                if args.is_empty() {
+                    todo!("Problem")
+                }
+                let deref_ty = args.remove(0);
                 b.with_projection(base, Projection::Deref, deref_ty, place.span)
             }
             HirPlaceKind::Index { base, index } => {

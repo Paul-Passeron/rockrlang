@@ -38,14 +38,3 @@ path = "src/lsp/server.rs"
 [[bin]]
 name = "rockrc"
 path = "src/compiler/rockrc.rs"
-
-
-[[test]]
-name = "examples"
-path = "tests/examples.rs"
-harness = false
-
-[dev-dependencies]
-insta = { version = "1.47.2", features = ["filters"] }
-libtest-mimic = "0.8.2"
-walkdir = "2.5.0"

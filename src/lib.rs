@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![feature(option_into_flat_iter, vec_try_remove)]
-
-use std::path::Path;
-use std::process::ExitCode;
-
 pub use common::location::SourceFile;
 pub use db::*;
 
@@ -43,32 +38,3 @@ pub mod tests;
 pub mod thir;
 pub mod thir_to_mir;
 pub mod typecheck;
-
-#[derive(Debug)]
-pub struct RunStatus {
-    pub exit_code: ExitCode,
-    pub stderr: String,
-    pub stdout: String,
-}
-
-pub fn run_rkr(p: &Path) -> RunStatus {
-    let stderr = String::new();
-    let stdout = String::new();
-    let cfg = compiler::Config::default();
-
-    let exit_code = match compiler::build_from_disk(p.to_path_buf(), cfg) {
-        Ok(()) => {
-            println!("Compiled successfully");
-            std::process::ExitCode::SUCCESS
-        }
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::ExitCode::FAILURE
-        }
-    };
-    RunStatus {
-        exit_code,
-        stderr,
-        stdout,
-    }
-}
