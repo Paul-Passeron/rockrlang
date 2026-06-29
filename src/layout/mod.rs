@@ -15,21 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    marker::PhantomData,
-    ops::{Add, Mul, Sub},
-    range::RangeInclusive,
-};
+use std::range::RangeInclusive;
 
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    layout::LayoutData::ScalarPair,
-    name_resolve::type_expr::struct_item,
-    ril::{BuiltinTypeId, EnumId, StructId, TypeDefId, TypeRef},
-    thir::StructRef,
+    Db, layout::{
+        aggregate::{finish_aggregate, struct_layout}, fat_ptr::fat_ptr_layout_for, union::enum_layout,
+    }, ril::{BuiltinTypeId, TypeDefId, TypeRef},
 };
+
+pub mod aggregate;
+pub mod fat_ptr;
+pub mod utils;
+pub mod union;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Offset(u64);
@@ -143,148 +142,6 @@ pub enum DiscriminantStrategyKind {
                    * get the MVP up and running */
 }
 
-fn align_up(value: u64, align: u64) -> u64 {
-    let remainder = value % align;
-    if remainder == 0 { value } else { value + (align - remainder) }
-}
-
-impl Offset {
-    pub const ZERO: Self = Self(0);
-
-    pub fn bytes(self) -> u64 {
-        self.0
-    }
-
-    pub fn bytes_from(self, other: Offset) -> u64 {
-        if self < other {
-            panic!("Cannot get bytes from a bigger offset")
-        }
-        self.0 - other.0
-    }
-
-    pub fn align_to(self, align: Align) -> Self {
-        Self(align_up(self.bytes(), align.bytes()))
-    }
-}
-
-impl Size {
-    pub const ZERO: Self = Self(0);
-
-    pub fn bytes(self) -> u64 {
-        self.0 * 8
-    }
-
-    pub fn align_to(self, align: Align) -> Self {
-        Self(align_up(self.bytes(), align.bytes()))
-    }
-}
-
-impl Add<Size> for Offset {
-    type Output = Self;
-
-    fn add(self, rhs: Size) -> Self {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Sub for Offset {
-    type Output = Size;
-
-    fn sub(self, rhs: Self) -> Size {
-        Size(self.0 - rhs.0)
-    }
-}
-
-impl Add for Size {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self {
-        Self(self.0 + rhs.0)
-    }
-}
-
-impl Mul<u64> for Size {
-    type Output = Self;
-
-    fn mul(self, rhs: u64) -> Self {
-        Self(self.0 * rhs)
-    }
-}
-
-impl Align {
-    pub const BYTE: Self = Self(0);
-    pub const B8: Self = Self::BYTE;
-    pub const B16: Self = Self(1);
-    pub const B32: Self = Self(2);
-    pub const B64: Self = Self(3);
-    pub const B128: Self = Self(4);
-
-    pub fn bytes(self) -> u64 {
-        1 << self.0
-    }
-}
-
-impl<'a> From<Layout<'a>> for LayoutID {
-    fn from(value: Layout<'a>) -> Self {
-        Self(value.0)
-    }
-}
-
-impl<'a> From<LayoutID> for Layout<'a> {
-    fn from(value: LayoutID) -> Self {
-        Self(value.0, PhantomData)
-    }
-}
-
-impl LayoutID {
-    pub fn interned<'a>(self) -> Layout<'a> {
-        self.into()
-    }
-
-    pub fn data<'db>(self, db: &dyn Db) -> &LayoutData {
-        self.interned().inner(db)
-    }
-
-    pub fn new(db: &dyn Db, size: Size, align: Align, data: LayoutData) -> Self {
-        Layout::new(db, size, align, data).into()
-    }
-
-    pub fn size(self, db: &dyn Db) -> Size {
-        self.interned().size(db)
-    }
-
-    pub fn align(self, db: &dyn Db) -> Align {
-        self.interned().align(db)
-    }
-}
-
-impl From<ScalarKind> for LayoutData {
-    fn from(value: ScalarKind) -> Self {
-        Self::Scalar(value)
-    }
-}
-
-impl From<IntWidth> for Size {
-    fn from(value: IntWidth) -> Self {
-        match value {
-            IntWidth::I8 => Self(1),
-            IntWidth::I16 => Self(2),
-            IntWidth::I32 => Self(4),
-            IntWidth::I64 => Self(8),
-            IntWidth::I128 => Self(16),
-        }
-    }
-}
-
-impl From<FloatWidth> for Size {
-    fn from(value: FloatWidth) -> Self {
-        match value {
-            FloatWidth::F32 => Self(4),
-            FloatWidth::F64 => Self(8),
-        }
-    }
-}
-
 #[salsa::interned]
 struct InternedTRef {
     inner: TypeRef,
@@ -309,132 +166,6 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
             }
         },
         _ => panic!("Expected a concrete type"),
-    }
-}
-
-fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
-    todo!()
-}
-
-fn finish_aggregate(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
-    if source_ordered.is_empty() {
-        return LayoutID::zst(db);
-    }
-    let align = source_ordered
-        .iter()
-        .map(|l| l.align(db))
-        .max()
-        .unwrap_or(Align::BYTE);
-    let aggregated = aggregate_layout(db, source_ordered);
-    let size = aggregated.size(db).align_to(align);
-    LayoutID::new(db, size, align, aggregated.into())
-}
-
-fn struct_layout(db: &dyn Db, struct_id: StructId, args: &[TypeRef]) -> LayoutID {
-    let struct_ref = StructRef {
-        def: struct_id,
-        args: args.to_vec(),
-    };
-    let fields = struct_ref.get_fields_ty(db);
-    if fields.is_empty() {
-        return LayoutID::zst(db);
-    }
-
-    let source_ordered_fields = struct_item(db, struct_id.into())
-        .fields
-        .iter()
-        .map(|field| fields[&field.name])
-        .collect_vec();
-
-    let layouts = source_ordered_fields
-        .iter()
-        .map(|ty| layout_of(db, *ty))
-        .collect_vec();
-
-    finish_aggregate(db, layouts)
-}
-
-/// Seems like this is an NP-hard problem, so the algorithm will probably have
-/// to be "good enough" if we want good perfomance
-fn aggregate_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> AggregateLayout {
-    let fields = source_ordered
-        .iter()
-        .map(|layout| FieldInput {
-            size: layout.size(db),
-            align: layout.align(db),
-        })
-        .collect_vec();
-
-    let ordering = db.ordering_strategy().order_fields(&fields);
-
-    let mut ordered = ordering
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(src, layout_idx)| (layout_idx, src as u32))
-        .collect_vec();
-    ordered.sort_by_key(|&(layout_idx, _)| layout_idx);
-
-    let mut offset = Offset::ZERO;
-    let mut align = Align::BYTE;
-
-    let mut fields = vec![(Offset::ZERO, LayoutID::zst(db)); source_ordered.len()];
-
-    // We build the offsets by walking in layout order
-    for (layout_idx, src_idx) in ordered {
-        let field_layout = source_ordered[src_idx as usize];
-        let field_align = field_layout.align(db);
-        offset = offset.align_to(field_align);
-        fields[layout_idx as usize] = (offset, field_layout);
-        offset = offset + field_layout.size(db);
-        align = align.max(field_align);
-    }
-
-    AggregateLayout {
-        fields,
-        source_to_layout: ordering,
-    }
-}
-
-impl LayoutID {
-    pub fn zst(db: &dyn Db) -> Self {
-        Self::new(db, Size::ZERO, Align::BYTE, LayoutData::ZeroSized)
-    }
-
-    pub fn int(db: &dyn Db, width: IntWidth) -> Self {
-        Self::new(
-            db,
-            width.into(),
-            width.into(),
-            ScalarKind::Int(width).into(),
-        )
-    }
-
-    pub fn ptr(db: &dyn Db) -> Self {
-        let width = db.target_width();
-        Self::new(db, width.into(), width.into(), ScalarKind::Ptr.into())
-    }
-}
-
-impl AggregateLayout {
-    pub fn size(&self, db: &dyn Db) -> Size {
-        // We get the biggest offset and add the size of its layout
-        let Some((offset, layout)) = self.fields.iter().max_by_key(|f| f.0) else {
-            return Size::ZERO;
-        };
-        Size(offset.bytes()) + layout.size(db)
-    }
-}
-
-impl From<AggregateLayout> for LayoutData {
-    fn from(value: AggregateLayout) -> Self {
-        LayoutData::Aggregate(value)
-    }
-}
-
-impl From<VariantsLayout> for LayoutData {
-    fn from(value: VariantsLayout) -> Self {
-        LayoutData::Union(value)
     }
 }
 
@@ -501,80 +232,4 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
 
 pub fn layout_of(db: &dyn Db, ty: TypeRef) -> LayoutID {
     _layout_of(db, InternedTRef::new(db, ty)).into()
-}
-
-impl dyn Db {
-    pub fn target_width(&self) -> IntWidth {
-        // For the moment, we don't have a way of setting the target, so we just use the
-        // user's machine's width.
-        match usize::BITS {
-            8 => IntWidth::I8,
-            16 => IntWidth::I16,
-            32 => IntWidth::I32,
-            64 => IntWidth::I64,
-            128 => IntWidth::I128,
-            _ => unreachable!(),
-        }
-    }
-
-    pub fn ordering_strategy(&self) -> FieldOrderingKind {
-        FieldOrderingKind::SourceOrder
-    }
-}
-
-fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
-    let Some((_, id)) = ty.as_ref(db) else {
-        panic!("Not a fat ptr");
-    };
-    // Only slices are fat ptrs for the moment
-    let Some(_) = id.as_slice(db) else {
-        panic!("Not a fat ptr");
-    };
-
-    let target_witdh = db.target_width();
-    let size: Size = target_witdh.into();
-    let size = size + size;
-
-    let metadata_scalar = ScalarKind::Int(target_witdh);
-    let ptr_scalar = ScalarKind::Ptr;
-
-    LayoutID::new(
-        db,
-        size,
-        target_witdh.into(),
-        ScalarPair(ptr_scalar, metadata_scalar),
-    )
-}
-
-impl TypeRef {
-    pub fn is_fat_ptr(self, db: &dyn Db) -> bool {
-        let Some((_, id)) = self.as_ref(db) else {
-            return false;
-        };
-        // Only slices are fat ptrs for the moment
-        let Some(_) = id.as_slice(db) else {
-            return false;
-        };
-        return true;
-    }
-}
-
-impl FieldOrderingKind {
-    pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {
-        match self {
-            FieldOrderingKind::SourceOrder => (0..fields.len() as u32).collect(),
-        }
-    }
-}
-
-impl From<IntWidth> for Align {
-    fn from(value: IntWidth) -> Self {
-        match value {
-            IntWidth::I8 => Self::B8,
-            IntWidth::I16 => Self::B16,
-            IntWidth::I32 => Self::B32,
-            IntWidth::I64 => Self::B64,
-            IntWidth::I128 => Self::B128,
-        }
-    }
 }

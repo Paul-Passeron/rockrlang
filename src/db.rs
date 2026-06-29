@@ -21,8 +21,7 @@ use dashmap::DashMap;
 use salsa::Setter;
 
 use crate::{
-    SourceFile,
-    compiler::{self, CompilerError, Config, Workspace},
+    SourceFile, compiler::{self, CompilerError, Config, Workspace}, layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth, VariantOrderingKind},
 };
 
 #[salsa::db]
@@ -104,5 +103,35 @@ impl dyn Db {
         let files = ws.files(self).clone();
         files.remove(&file);
         ws.set_files(self).to(files);
+    }
+}
+
+
+// Layout stuff
+
+impl dyn Db {
+    pub fn target_width(&self) -> IntWidth {
+        // For the moment, we don't have a way of setting the target, so we just use the
+        // user's machine's width.
+        match usize::BITS {
+            8 => IntWidth::I8,
+            16 => IntWidth::I16,
+            32 => IntWidth::I32,
+            64 => IntWidth::I64,
+            128 => IntWidth::I128,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn ordering_strategy(&self) -> FieldOrderingKind {
+        FieldOrderingKind::SourceOrder
+    }
+
+    pub fn variant_strategy(&self) -> VariantOrderingKind {
+        VariantOrderingKind::SourceOrder
+    }
+
+    pub fn discriminant_strategy(&self) -> DiscriminantStrategyKind {
+        DiscriminantStrategyKind::AlwaysTagged
     }
 }
