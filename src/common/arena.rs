@@ -195,7 +195,7 @@ impl<'a, T> IntoIterator for &'a Arena<T> {
         Map<Enumerate<FrozenIter<'a, T>>, fn((usize, &'a T)) -> (Idx<T>, &'a T)>;
 }
 
-impl <T> Idx<T> {
+impl<T> Idx<T> {
     pub fn from_raw(raw: usize) -> Self {
         Self(raw, PhantomData)
     }

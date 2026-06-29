@@ -28,6 +28,7 @@ pub mod layout;
 pub mod lexer;
 pub mod lir;
 pub mod lir_to_llvm;
+pub mod mangle;
 pub mod mir;
 pub mod mir_to_lir;
 pub mod mir_to_llvm;
