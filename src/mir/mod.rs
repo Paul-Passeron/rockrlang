@@ -66,7 +66,7 @@ type ConstructorArgs = MIRConstructorArgs;
 pub type MIRBlockID = Idx<BasicBlock>;
 pub type MIRLocalID = Idx<Local>;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SyntacticSource {
     pub span: Span,
     pub id: hir::LocalId,
