@@ -22,7 +22,7 @@ use crate::{
     check::thir::sanity_check::ConstructorType,
     layout::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset,
-        ScalarKind, Size, VariantsLayout,
+        ScalarKind, Size, VariantsLayout, finish_aggregate, layout_of,
     },
     ril::{EnumId, TypeRef},
     thir::EnumRef,
@@ -31,11 +31,17 @@ use crate::{
 use super::LayoutData;
 
 fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
-    match cons {
-        ConstructorType::Tuple(_) => todo!(),
-        ConstructorType::Struct(_) => todo!(),
-        ConstructorType::None => LayoutID::zst(db),
-    }
+    let source_ordered = match cons {
+        ConstructorType::Tuple(tys) => {
+            tys.iter().map(|ty| layout_of(db, *ty)).collect_vec()
+        }
+        ConstructorType::Struct(named_tys) => named_tys
+            .iter()
+            .map(|(_, ty)| layout_of(db, *ty))
+            .collect_vec(),
+        ConstructorType::None => return LayoutID::zst(db),
+    };
+    finish_aggregate(db, source_ordered)
 }
 
 pub(super) fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
