@@ -20,15 +20,19 @@ use std::range::RangeInclusive;
 use itertools::Itertools;
 
 use crate::{
-    Db, layout::{
-        aggregate::{finish_aggregate, struct_layout}, fat_ptr::fat_ptr_layout_for, union::enum_layout,
-    }, ril::{BuiltinTypeId, TypeDefId, TypeRef},
+    Db,
+    layout::{
+        aggregate::{finish_aggregate, struct_layout},
+        fat_ptr::fat_ptr_layout_for,
+        union::enum_layout,
+    },
+    ril::{BuiltinTypeId, TypeDefId, TypeRef},
 };
 
 pub mod aggregate;
 pub mod fat_ptr;
-pub mod utils;
 pub mod union;
+pub mod utils;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Offset(u64);

@@ -21,7 +21,11 @@ use dashmap::DashMap;
 use salsa::Setter;
 
 use crate::{
-    SourceFile, compiler::{self, CompilerError, Config, Workspace}, layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth, VariantOrderingKind},
+    SourceFile,
+    compiler::{self, CompilerError, Config, Workspace},
+    layout::{
+        DiscriminantStrategyKind, FieldOrderingKind, IntWidth, VariantOrderingKind,
+    },
 };
 
 #[salsa::db]
@@ -105,7 +109,6 @@ impl dyn Db {
         ws.set_files(self).to(files);
     }
 }
-
 
 // Layout stuff
 
