@@ -116,6 +116,7 @@ impl<'ir> ValueDef<'ir> {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Typed<'ir, K: ValueKind> {
     id: ValueId<'ir>,
     ty: LIRTy,

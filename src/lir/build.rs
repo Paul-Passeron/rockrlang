@@ -308,6 +308,8 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         }
     }
 
+    // Addressing
+
     pub fn field_ptr(
         &mut self,
         ptr: ValueId<'ir>,
@@ -384,6 +386,47 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         ptr: TypedPtr<'ir, Union>,
     ) -> Option<Typed<'ir, Scalar<Int>>> {
         self.get_discriminant(ptr.erase(), ptr.pointee)
+    }
+
+    // Aggregates
+
+    pub fn make_aggregate(
+        &mut self,
+        ty: LIRTy,
+        fields: Vec<ValueId<'ir>>,
+    ) -> Typed<'ir, Aggregate> {
+        debug_assert!(ty.is_aggregate(self.db));
+        self.push_value(ty, ValueInstKind::MakeAggregate { ty, fields })
+            .typed(ty, self.db)
+            .unwrap()
+    }
+
+    pub fn extract_field(
+        &mut self,
+        value: ValueId<'ir>,
+        ty: LIRTy,
+        idx: u32,
+    ) -> ValueId<'ir> {
+        debug_assert!(ty.is_aggregate(self.db));
+        debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
+        debug_assert!(
+            ty.aggregate_layout(self.db).unwrap().fields.len() > idx as usize
+        );
+        let field_layout =
+            ty.aggregate_layout(self.db).unwrap().fields[idx as usize].1;
+        let field_ty = LIRTy { layout: field_layout, origin: None };
+        self.push_value(
+            field_ty,
+            ValueInstKind::ExtractField { value, ty, idx },
+        )
+    }
+
+    pub fn extract_field_typed(
+        &mut self,
+        value: Typed<'ir, Aggregate>,
+        idx: u32,
+    ) -> ValueId<'ir> {
+        self.extract_field(value.erase(), value.ty, idx)
     }
 
     // Terminators

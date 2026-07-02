@@ -110,10 +110,8 @@ fn always_tagged_layout(
     let size =
         (payload_offset + payload_size).align_to(global_align) - Offset::ZERO;
 
-    let discriminant = Discriminant::Tagged {
-        offset: Offset::ZERO,
-        kind: ScalarKind::Int(tag_width),
-    };
+    let discriminant =
+        Discriminant::Tagged { offset: Offset::ZERO, kind: tag_width };
 
     LayoutID::new(
         db,

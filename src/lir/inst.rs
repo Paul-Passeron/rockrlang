@@ -53,7 +53,7 @@ pub enum ValueInstKind<R: Refs> {
     GetDiscriminant { ptr: R::Val, ty: LIRTy },
 
     // Aggregates
-    MakeAggregate { ty: R::Val, fields: Vec<R::Val> },
+    MakeAggregate { ty: LIRTy, fields: Vec<R::Val> },
     ExtractField { value: R::Val, ty: LIRTy, idx: u32 },
     InsertField { value: R::Val, ty: LIRTy, idx: u32, field: R::Val },
 

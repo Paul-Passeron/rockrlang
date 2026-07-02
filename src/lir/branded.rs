@@ -155,7 +155,7 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
             ValueInstKind::Alloca { ty } => todo!(),
             ValueInstKind::Load { ptr, ty } => todo!(),
             ValueInstKind::FieldPtr { ptr, ty, idx } => todo!(),
-            ValueInstKind::UnionPayloadPtr { ptr, src, ty } => todo!(),
+            ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => todo!(),
             ValueInstKind::GetDiscriminant { ptr, ty } => todo!(),
             ValueInstKind::MakeAggregate { ty, fields } => todo!(),
             ValueInstKind::ExtractField { value, ty, idx } => todo!(),
