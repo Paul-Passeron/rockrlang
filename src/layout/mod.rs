@@ -58,7 +58,7 @@ pub enum FloatWidth {
     F64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScalarKind {
     Int(IntWidth),
     Ptr,
@@ -235,4 +235,16 @@ fn builtin_layout(
 
 pub fn layout_of(db: &dyn Db, ty: TypeRef) -> LayoutID {
     _layout_of(db, InternedTRef::new(db, ty)).into()
+}
+
+impl LIRTy {
+    pub fn is_zst(&self, db: &dyn Db) -> bool {
+        self.layout.is_zst(db)
+    }
+}
+
+impl LayoutID {
+    pub fn is_zst(&self, db: &dyn Db) -> bool {
+        matches!(self.data(db), LayoutData::ZeroSized)
+    }
 }

@@ -19,7 +19,7 @@ use std::marker::PhantomData;
 
 use crate::{
     common::arena::Idx,
-    layout::LIRTy,
+    layout::{LIRTy, ScalarKind},
     lir::{
         branded::{BrandedBlockId, Invariant},
         finalized::{BlockData, FunctionBody},
@@ -43,31 +43,29 @@ pub struct Scalar<S: ScalarMarker>(PhantomData<S>);
 
 #[derive(Clone, Copy)]
 pub struct Int;
-impl ScalarMarker for Int {}
-
-impl<S: ScalarMarker> ValueKind for Scalar<S> {}
-
-pub trait Pointee: Copy + 'static {}
-
-#[derive(Clone, Copy)]
-pub struct ToScalar;
-
-#[derive(Clone, Copy)]
-pub struct ToAggregate;
-
-#[derive(Clone, Copy)]
-pub struct ToUnion;
 
 #[derive(Clone, Copy)]
 pub struct Ptr<P: ValueKind>(PhantomData<P>);
 
-impl<P: ValueKind> ValueKind for Ptr<P> {}
-impl<P: ValueKind> ScalarMarker for Ptr<P> {}
+#[derive(Clone, Copy)]
+pub struct Aggregate;
 
 #[derive(Clone, Copy)]
-pub struct Pair<A: ScalarMarker, B: ScalarMarker>(PhantomData<(A, B)>);
+pub struct Union;
 
-impl<A: ScalarMarker, B: ScalarMarker> ValueKind for Pair<A, B> {}
+pub enum ValueClass {
+    Scalar(ScalarKind),
+    Aggregate,
+    Union,
+    None,
+}
+
+impl ScalarMarker for Int {}
+impl<S: ScalarMarker> ValueKind for Scalar<S> {}
+impl<P: ValueKind> ValueKind for Ptr<P> {}
+impl<P: ValueKind> ScalarMarker for Ptr<P> {}
+impl ValueKind for Aggregate {}
+impl ValueKind for Union {}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId<'ir> {
@@ -86,14 +84,6 @@ impl<'ir> ValueDef<'ir> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Aggregate;
-impl ValueKind for Aggregate {}
-
-#[derive(Clone, Copy)]
-pub struct Union;
-impl ValueKind for Union {}
-
 pub struct Typed<'ir, K: ValueKind> {
     id: ValueId<'ir>,
     _k: PhantomData<K>,
@@ -109,10 +99,13 @@ pub type ScalarValue<'ir, S> = Typed<'ir, Scalar<S>>;
 pub type IntValue<'ir> = Typed<'ir, Scalar<Int>>;
 pub type AggregateValue<'ir> = Typed<'ir, Aggregate>;
 pub type UnionValue<'ir> = Typed<'ir, Union>;
-pub type PtrValue<'ir, V> = Typed<'ir, Ptr<V>>;
-pub type ScalarPtr<'ir> = Typed<'ir, Ptr<ToScalar>>;
-pub type AggregatePtr<'ir> = Typed<'ir, Ptr<ToAggregate>>;
-pub type UnionPtr<'ir> = Typed<'ir, Ptr<ToUnion>>;
+
+#[derive(Clone, Copy)]
+pub struct TypedPtr<'ir, K: ValueKind> {
+    raw: ValueId<'ir>,
+    pointee: LIRTy,
+    _k: PhantomData<K>,
+}
 
 pub trait Refs {
     type Val: Copy; // use of value
