@@ -15,24 +15,123 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::ops::{Index, IndexMut};
+use std::marker::PhantomData;
 
 use crate::{
-    common::symbols::Symbol,
+    common::arena::Idx,
     layout::LIRTy,
-    lir::{branded::InProgressBody, finalized::FunctionBody},
+    lir::{
+        branded::{BrandedBlockId, Invariant},
+        finalized::{BlockData, FunctionBody},
+    },
 };
 
 pub mod branded;
+pub mod build;
 pub mod finalized;
-
-pub struct ValueData {
-    pub name: Symbol,
-}
+pub mod inst;
 
 pub struct LIRDef {
     pub ty: LIRTy,
-    pub data: ValueData,
+}
+
+pub trait ValueKind: Copy + 'static {}
+pub trait ScalarMarker: Copy + 'static {}
+
+#[derive(Clone, Copy)]
+pub struct Scalar<S: ScalarMarker>(PhantomData<S>);
+
+#[derive(Clone, Copy)]
+pub struct Int;
+impl ScalarMarker for Int {}
+
+impl<S: ScalarMarker> ValueKind for Scalar<S> {}
+
+pub trait Pointee: Copy + 'static {}
+
+#[derive(Clone, Copy)]
+pub struct ToScalar;
+
+#[derive(Clone, Copy)]
+pub struct ToAggregate;
+
+#[derive(Clone, Copy)]
+pub struct ToUnion;
+
+#[derive(Clone, Copy)]
+pub struct Ptr<P: ValueKind>(PhantomData<P>);
+
+impl<P: ValueKind> ValueKind for Ptr<P> {}
+impl<P: ValueKind> ScalarMarker for Ptr<P> {}
+
+#[derive(Clone, Copy)]
+pub struct Pair<A: ScalarMarker, B: ScalarMarker>(PhantomData<(A, B)>);
+
+impl<A: ScalarMarker, B: ScalarMarker> ValueKind for Pair<A, B> {}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ValueId<'ir> {
+    idx: Idx<LIRDef>,
+    _brand: PhantomData<Invariant<'ir>>,
+}
+
+pub struct ValueDef<'ir> {
+    idx: Idx<LIRDef>,
+    _brand: PhantomData<Invariant<'ir>>,
+}
+
+impl<'ir> ValueDef<'ir> {
+    pub fn id(&self) -> ValueId<'ir> {
+        ValueId { idx: self.idx, _brand: PhantomData }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct Aggregate;
+impl ValueKind for Aggregate {}
+
+#[derive(Clone, Copy)]
+pub struct Union;
+impl ValueKind for Union {}
+
+pub struct Typed<'ir, K: ValueKind> {
+    id: ValueId<'ir>,
+    _k: PhantomData<K>,
+}
+
+impl<'ir, K: ValueKind> Typed<'ir, K> {
+    pub fn erase(self) -> ValueId<'ir> {
+        self.id
+    }
+}
+
+pub type ScalarValue<'ir, S> = Typed<'ir, Scalar<S>>;
+pub type IntValue<'ir> = Typed<'ir, Scalar<Int>>;
+pub type AggregateValue<'ir> = Typed<'ir, Aggregate>;
+pub type UnionValue<'ir> = Typed<'ir, Union>;
+pub type PtrValue<'ir, V> = Typed<'ir, Ptr<V>>;
+pub type ScalarPtr<'ir> = Typed<'ir, Ptr<ToScalar>>;
+pub type AggregatePtr<'ir> = Typed<'ir, Ptr<ToAggregate>>;
+pub type UnionPtr<'ir> = Typed<'ir, Ptr<ToUnion>>;
+
+pub trait Refs {
+    type Val: Copy; // use of value
+    type Def;
+    type Block: Copy; // use of a block
+}
+
+pub struct Branded<'ir>(PhantomData<Invariant<'ir>>);
+impl<'ir> Refs for Branded<'ir> {
+    type Val = ValueId<'ir>;
+    type Def = ValueDef<'ir>;
+    type Block = BrandedBlockId<'ir>;
+}
+
+pub struct Finalized;
+impl Refs for Finalized {
+    type Val = Idx<LIRDef>;
+    type Def = Idx<LIRDef>;
+    type Block = Idx<BlockData>;
 }
 
 pub struct Declaring;
@@ -55,21 +154,43 @@ impl ModulePhase for Complete {
     type FnBody = FunctionBody;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DefinedLinkage {
     Export,
     Local,
     Weak,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ArithBinop {
+    UAdd,
+    USub,
+    UMul,
+    UDiv,
+    UMod,
+    SAdd,
+    SSub,
+    SMul,
+    SDiv,
+    SMod,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CmpBinop {
+    SLessThan,
+    ULessThan,
+    Eq,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Logic {
+    Or,
+    And,
+}
+
 pub enum Body<S: ModulePhase> {
     Import,
     Defined(DefinedLinkage, S::FnBody),
-}
-
-pub struct FunctionDecl<S: ModulePhase> {
-    pub name: String,
-    pub signature: Signature,
-    pub body: Body<S>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -80,47 +201,53 @@ pub struct Signature {
     pub ret: LIRTy,
 }
 
+pub struct FunctionSig {
+    pub name: String,
+    pub signature: Signature,
+    pub kind: SigKind,
+}
+
+pub enum SigKind {
+    Import,
+    Defined(DefinedLinkage),
+}
+
 pub struct Module<S: ModulePhase> {
-    fun_decls: Vec<FunctionDecl<S>>,
+    sigs: Vec<FunctionSig>,
+    bodies: Vec<Body<S>>,
 }
 
-impl<S: ModulePhase> IndexMut<LIRFunctionId> for Module<S> {
-    fn index_mut(&mut self, index: LIRFunctionId) -> &mut Self::Output {
-        &mut self.fun_decls[index.0]
+pub enum VerifyError {}
+
+impl<S: ModulePhase> Module<S> {
+    pub fn get_fn(&self, id: LIRFunctionId) -> (&FunctionSig, &Body<S>) {
+        (&self.sigs[id.0], &self.bodies[id.0])
     }
-}
 
-impl<S: ModulePhase> Index<LIRFunctionId> for Module<S> {
-    type Output = FunctionDecl<S>;
-
-    fn index(&self, index: LIRFunctionId) -> &Self::Output {
-        &self.fun_decls[index.0]
+    pub fn get_fn_mut(
+        &mut self,
+        id: LIRFunctionId,
+    ) -> (&FunctionSig, &mut Body<S>) {
+        (&self.sigs[id.0], &mut self.bodies[id.0])
     }
-}
-
-fn build_function(
-    sig: &Signature,
-    f: impl FnOnce(&Signature, &mut InProgressBody<'_>),
-) -> FunctionBody {
-    generativity::make_guard!(guard);
-    let mut body = InProgressBody::new(guard);
-    f(sig, &mut body);
-    body.finalize()
 }
 
 impl Module<Declaring> {
     pub fn new() -> Self {
-        Self {
-            fun_decls: Vec::new(),
-        }
+        Self { sigs: Vec::new(), bodies: Vec::new() }
     }
 
-    pub fn declare_import(&mut self, name: String, sig: Signature) -> LIRFunctionId {
-        let id = LIRFunctionId(self.fun_decls.len());
-        self.fun_decls.push(FunctionDecl {
+    pub fn declare_import(
+        &mut self,
+        name: String,
+        sig: Signature,
+    ) -> LIRFunctionId {
+        let id = LIRFunctionId(self.sigs.len());
+        self.bodies.push(Body::Import);
+        self.sigs.push(FunctionSig {
             name,
             signature: sig,
-            body: Body::Import,
+            kind: SigKind::Import,
         });
         id
     }
@@ -131,53 +258,44 @@ impl Module<Declaring> {
         sig: Signature,
         linkage: DefinedLinkage,
     ) -> LIRFunctionId {
-        let id = LIRFunctionId(self.fun_decls.len());
-        self.fun_decls.push(FunctionDecl {
+        let id = LIRFunctionId(self.sigs.len());
+        self.bodies.push(Body::Defined(linkage, ()));
+        self.sigs.push(FunctionSig {
             name,
             signature: sig,
-            body: Body::Defined(linkage, ()),
+            kind: SigKind::Defined(linkage),
         });
         id
     }
 
     pub fn finish_declarations(self) -> Module<Building> {
-        let fun_decls = self
-            .fun_decls
-            .into_iter()
-            .map(|fun_decl| FunctionDecl {
-                name: fun_decl.name,
-                signature: fun_decl.signature,
-                body: match fun_decl.body {
-                    Body::Import => Body::Import,
-                    Body::Defined(defined_linkage, _) => {
-                        Body::Defined(defined_linkage, None)
-                    }
-                },
-            })
-            .collect();
-        Module { fun_decls }
+        Module {
+            sigs: self.sigs,
+            bodies: self
+                .bodies
+                .into_iter()
+                .map(|body| body.map(|_| None))
+                .collect(),
+        }
     }
 }
 
 impl Module<Building> {
-    pub fn build_function(
-        &mut self,
-        id: LIRFunctionId,
-        f: impl FnOnce(&Signature, &mut InProgressBody<'_>),
-    ) {
-        let decl = &mut self[id];
-        let slot = match &mut decl.body {
-            Body::Defined(_, Some(_)) => {
-                panic!("Cannot build body multiple times for the same function")
-            }
-            Body::Import => panic!("cannot build body for imported function"),
-            Body::Defined(_, slot) => slot,
-        };
-        let body = build_function(&decl.signature, f);
-        *slot = Some(body);
-    }
-
     pub fn finalize(self) -> Module<Complete> {
         todo!()
+    }
+}
+
+impl<S: ModulePhase> Body<S> {
+    pub fn map<NewPhase: ModulePhase>(
+        self,
+        f: impl FnOnce(S::FnBody) -> NewPhase::FnBody,
+    ) -> Body<NewPhase> {
+        match self {
+            Body::Import => Body::Import,
+            Body::Defined(defined_linkage, val) => {
+                Body::Defined(defined_linkage, f(val))
+            }
+        }
     }
 }

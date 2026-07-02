@@ -20,120 +20,111 @@ use std::marker::PhantomData;
 use itertools::Itertools;
 
 use crate::{
+    Db,
     common::{
         arena::{Arena, Idx},
         symbols::Symbol,
     },
     lir::{
-        LIRDef, LIRFunctionId,
-        finalized::{BlockData, FunctionBody, InstKind, Instruction, Terminator},
+        Branded, Finalized, FunctionSig, LIRDef, ValueDef, VerifyError,
+        finalized::{BlockData, FunctionBody},
+        inst::ValueInstKind,
     },
 };
 
+type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
+type Terminator<'ir> = super::inst::Terminator<Branded<'ir>>;
+type FInstruction = super::inst::Instruction<Finalized>;
+type FTerminator = super::inst::Terminator<Finalized>;
 pub type Invariant<'ir> = fn(&'ir ()) -> &'ir ();
-
-// Cheap handle on an SSA value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ValueId<'ir> {
-    idx: Idx<LIRDef>,
-    _brand: PhantomData<Invariant<'ir>>,
-}
 
 // Cheap handle on a basic block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BrandedBlockId<'ir> {
-    idx: Idx<BrandedBlockData<'ir>>,
+    pub(super) idx: Idx<BrandedBlockData<'ir>>,
     _brand: PhantomData<Invariant<'ir>>,
 }
 
-// move-only: only one ValueDef exists per def and is held by its owner (Either
-// an instruction or a block parameter)
-pub struct ValueDef<'ir> {
-    idx: Idx<LIRDef>,
-    _brand: PhantomData<Invariant<'ir>>,
-}
-
-impl<'ir> ValueDef<'ir> {
-    pub fn id(&self) -> ValueId<'ir> {
-        ValueId {
-            idx: self.idx,
+impl<'ir> InProgressBody<'ir> {
+    pub fn new_block(&self, name: Option<Symbol>) -> BrandedBlockId<'ir> {
+        BrandedBlockId {
+            idx: self.blocks.insert(BrandedBlockData {
+                name,
+                params: Vec::new(),
+                insts: Vec::new(),
+                terminator: None,
+            }),
             _brand: PhantomData,
         }
     }
 }
 
-pub struct BrandedInstruction<'ir> {
-    pub result: ValueDef<'ir>,
-    pub kind: BrandedInstKind<'ir>,
-}
-
-pub enum BrandedInstKind<'ir> {
-    Store {
-        ptr: ValueId<'ir>,
-        value: ValueId<'ir>,
-    },
-}
-
-pub enum BrandedTerminator<'ir> {
-    Br {
-        cond: ValueId<'ir>,
-        block_if_true: BrandedBlockId<'ir>,
-        block_if_false: BrandedBlockId<'ir>,
-    },
-    Goto {
-        target: BrandedBlockId<'ir>,
-    },
-    Switch {
-        on: ValueId<'ir>,
-        branches: Vec<(u128, BrandedBlockId<'ir>)>,
-        default: BrandedBlockId<'ir>,
-    },
-    Diverge,
-    Call {
-        id: LIRFunctionId,
-        args: Vec<ValueId<'ir>>,
-        dest: ValueDef<'ir>,
-        next: BrandedBlockId<'ir>,
-    },
-    Return {
-        value: Option<ValueId<'ir>>,
-    },
+impl<'ir> BrandedBlockId<'ir> {
+    pub fn from_idx(idx: Idx<BrandedBlockData<'ir>>) -> Self {
+        Self { idx, _brand: PhantomData }
+    }
 }
 
 pub struct BrandedBlockData<'ir> {
     pub name: Option<Symbol>,
     pub params: Vec<ValueDef<'ir>>,
-    pub insts: Vec<BrandedInstruction<'ir>>,
-    pub terminator: Option<BrandedTerminator<'ir>>,
+    pub insts: Vec<Instruction<'ir>>,
+    pub terminator: Option<Terminator<'ir>>,
 }
 
 pub struct InProgressBody<'ir> {
-    defs: Arena<LIRDef>,
-    blocks: Arena<BrandedBlockData<'ir>>,
-    entry: Option<BrandedBlockId<'ir>>,
+    pub defs: Arena<LIRDef>,
+    pub blocks: Arena<BrandedBlockData<'ir>>,
+    pub entry: BrandedBlockId<'ir>,
     _brand: PhantomData<Invariant<'ir>>,
 }
 
 impl<'ir> InProgressBody<'ir> {
-    pub fn new(_guard: generativity::Guard<'ir>) -> Self {
+    pub fn new(
+        _guard: generativity::Guard<'ir>,
+        db: &dyn Db,
+        sig: &FunctionSig,
+    ) -> Self {
+        let defs = Arena::new();
+        let blocks = Arena::new();
+        let params = sig
+            .signature
+            .params
+            .iter()
+            .map(|ty| {
+                let idx = defs.insert(LIRDef { ty: *ty });
+                ValueDef { idx, _brand: PhantomData }
+            })
+            .collect_vec();
+        let entry = blocks.insert(BrandedBlockData {
+            name: Some(Symbol::new(db, "entry")),
+            params,
+            insts: Vec::new(),
+            terminator: None,
+        });
         Self {
-            defs: Arena::new(),
-            blocks: Arena::new(),
-            entry: None,
+            defs,
+            blocks,
+            entry: BrandedBlockId { idx: entry, _brand: PhantomData },
             _brand: PhantomData,
         }
     }
 
-    pub fn finalize(self) -> FunctionBody {
+    fn verify(&self) -> Result<(), VerifyError> {
+        todo!()
+    }
+
+    pub fn finalize(self) -> Result<FunctionBody, VerifyError> {
+        self.verify()?;
         let arena = Arena::new();
         self.blocks.into_values().for_each(|block| {
             arena.insert(block.finalize());
         });
-        FunctionBody {
+        Ok(FunctionBody {
             defs: self.defs,
             blocks: arena,
-            entry: Idx::from_raw(self.entry.unwrap().idx.into_raw()),
-        }
+            entry: Idx::from_raw(self.entry.idx.into_raw()),
+        })
     }
 }
 
@@ -148,68 +139,47 @@ impl<'ir> BrandedBlockData<'ir> {
     }
 }
 
-impl<'ir> BrandedInstruction<'ir> {
-    pub fn finalize(self) -> Instruction {
-        Instruction {
-            result: self.result.idx,
-            kind: self.kind.finalize(),
+impl<'ir> Instruction<'ir> {
+    pub fn finalize(self) -> FInstruction {
+        match self {
+            Instruction::Void(branded_void_instruction) => todo!(),
+            Instruction::Value { def, kind } => todo!(),
         }
     }
 }
 
-impl<'ir> BrandedInstKind<'ir> {
-    pub fn finalize(self) -> InstKind {
+impl<'ir> ValueInstKind<Branded<'ir>> {
+    pub fn finalize(self) -> ValueInstKind<Finalized> {
         match self {
-            BrandedInstKind::Store { ptr, value } => InstKind::Store {
-                ptr: ptr.idx,
-                value: value.idx,
-            },
+            ValueInstKind::Const(const_value) => todo!(),
+            ValueInstKind::Alloca { ty } => todo!(),
+            ValueInstKind::Load { ptr, ty } => todo!(),
+            ValueInstKind::MemCopy { src, dst, ty } => todo!(),
+            ValueInstKind::FieldPtr { ptr, ty, idx } => todo!(),
+            ValueInstKind::UnionPayloadPtr { ptr, src, ty } => todo!(),
+            ValueInstKind::GetDiscriminant { ptr, ty } => todo!(),
+            ValueInstKind::SetDiscriminant { ptr, ty, idx } => todo!(),
+            ValueInstKind::MakeAggregate { ty, fields } => todo!(),
+            ValueInstKind::ExtractField { value, ty, idx } => todo!(),
+            ValueInstKind::InsertField { value, ty, idx, field } => todo!(),
+            ValueInstKind::Arith { op, lhs, rhs } => todo!(),
+            ValueInstKind::Cmp { op, lhs, rhs } => todo!(),
+            ValueInstKind::Logic { op, lhs, rhs } => todo!(),
+            ValueInstKind::Not { value } => todo!(),
+            ValueInstKind::Case { kind, value, to } => todo!(),
         }
     }
 }
 
-impl<'ir> BrandedTerminator<'ir> {
-    pub fn finalize(self) -> Terminator {
+impl<'ir> Terminator<'ir> {
+    pub fn finalize(self) -> FTerminator {
         match self {
-            BrandedTerminator::Br {
-                cond,
-                block_if_true,
-                block_if_false,
-            } => Terminator::Br {
-                cond: cond.idx,
-                block_if_true: block_if_true.finalize(),
-                block_if_false: block_if_false.finalize(),
-            },
-            BrandedTerminator::Goto { target } => Terminator::Goto {
-                target: target.finalize(),
-            },
-            BrandedTerminator::Switch {
-                on,
-                branches,
-                default,
-            } => Terminator::Switch {
-                on: on.idx,
-                branches: branches
-                    .into_iter()
-                    .map(|(n, b)| (n, b.finalize()))
-                    .collect_vec(),
-                default: default.finalize(),
-            },
-            BrandedTerminator::Diverge => Terminator::Diverge,
-            BrandedTerminator::Call {
-                id,
-                args,
-                dest,
-                next,
-            } => Terminator::Call {
-                id,
-                args: args.into_iter().map(|v| v.idx).collect_vec(),
-                dest: dest.idx,
-                next: next.finalize(),
-            },
-            BrandedTerminator::Return { value } => Terminator::Return {
-                value: value.map(|v| v.idx),
-            },
+            Terminator::Goto(block_target) => todo!(),
+            Terminator::Br { cond, if_true, if_false } => todo!(),
+            Terminator::Switch { on, branches, default } => todo!(),
+            Terminator::Call { id, args, dest, next } => todo!(),
+            Terminator::Return(_) => todo!(),
+            Terminator::Diverge => todo!(),
         }
     }
 }
