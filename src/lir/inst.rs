@@ -49,7 +49,7 @@ pub enum ValueInstKind<R: Refs> {
 
     // Addressing
     FieldPtr { ptr: R::Val, ty: LIRTy, idx: u32 },
-    UnionPayloadPtr { ptr: R::Val, src: R::Val, ty: LIRTy },
+    UnionPayloadPtr { ptr: R::Val, ty: LIRTy, variant: u32 },
     GetDiscriminant { ptr: R::Val, ty: LIRTy },
 
     // Aggregates

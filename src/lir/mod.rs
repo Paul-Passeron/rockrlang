@@ -55,6 +55,9 @@ pub struct Aggregate;
 #[derive(Clone, Copy)]
 pub struct Union;
 
+#[derive(Clone, Copy)]
+pub struct ZST;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ValueClass {
     Scalar(ScalarKind),
@@ -90,6 +93,12 @@ impl ValueKind for Union {
     }
 }
 
+impl ValueKind for ZST {
+    fn matches(class: ValueClass) -> bool {
+        class == ValueClass::None
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId<'ir> {
     idx: Idx<LIRDef>,
@@ -109,6 +118,7 @@ impl<'ir> ValueDef<'ir> {
 
 pub struct Typed<'ir, K: ValueKind> {
     id: ValueId<'ir>,
+    ty: LIRTy,
     _k: PhantomData<K>,
 }
 

@@ -20,11 +20,14 @@ use std::marker::PhantomData;
 use crate::{
     Db,
     common::symbols::Symbol,
-    layout::{LIRTy, LayoutData, LayoutID, ScalarKind},
+    layout::{
+        AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID,
+        ScalarKind, VariantsLayout,
+    },
     lir::{
-        Body, Branded, Building, FunctionSig, Int, IntValue, LIRDef,
-        LIRFunctionId, Module, SigKind, Signature, Typed, TypedPtr, ValueClass,
-        ValueDef, ValueId, ValueKind, VerifyError,
+        Aggregate, Body, Branded, Building, FunctionSig, Int, IntValue, LIRDef,
+        LIRFunctionId, Module, Scalar, SigKind, Signature, Typed, TypedPtr,
+        Union, ValueClass, ValueDef, ValueId, ValueKind, VerifyError,
         branded::{BrandedBlockId, InProgressBody},
         inst::{BlockTarget, ConstValue, ValueInstKind, VoidInstKind},
     },
@@ -126,15 +129,28 @@ impl<'ir, K: ValueKind> TypedPtr<'ir, K> {
 }
 
 impl<'ir> ValueId<'ir> {
-    pub fn typed<V: ValueKind>(self, ty: LIRTy) -> Option<Typed<'ir, V>> {
-        todo!()
-    }
-
-    pub fn typed_ptr<V: ValueKind>(
+    fn typed<V: ValueKind>(
         self,
         ty: LIRTy,
+        db: &dyn Db,
+    ) -> Option<Typed<'ir, V>> {
+        if V::matches(ty.class(db)) {
+            Some(Typed { id: self, ty, _k: PhantomData })
+        } else {
+            None
+        }
+    }
+
+    fn typed_ptr<V: ValueKind>(
+        self,
+        pointee: LIRTy,
+        db: &dyn Db,
     ) -> Option<TypedPtr<'ir, V>> {
-        todo!()
+        if V::matches(pointee.class(db)) {
+            Some(TypedPtr { raw: self, pointee, _k: PhantomData })
+        } else {
+            None
+        }
     }
 }
 
@@ -157,7 +173,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
     // Void inst kind
 
-    fn store(&mut self, ptr: ValueId<'ir>, value: ValueId<'ir>) {
+    pub fn store(&mut self, ptr: ValueId<'ir>, value: ValueId<'ir>) {
         debug_assert_eq!(
             self.body.defs[ptr.idx].ty.class(self.db),
             ValueClass::Scalar(ScalarKind::Ptr)
@@ -165,7 +181,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_void(VoidInstKind::Store { ptr, value })
     }
 
-    fn store_typed<V: ValueKind>(
+    pub fn store_typed<V: ValueKind>(
         &mut self,
         ptr: TypedPtr<'ir, V>,
         value: Typed<'ir, V>,
@@ -173,13 +189,13 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.store(ptr.erase(), value.erase())
     }
 
-    fn memcpy(&mut self, src: ValueId<'ir>, dst: ValueId<'ir>, ty: LIRTy) {
+    pub fn memcpy(&mut self, src: ValueId<'ir>, dst: ValueId<'ir>, ty: LIRTy) {
         debug_assert!(self.body.defs[src.idx].ty.is_ptr(self.db));
         debug_assert!(self.body.defs[dst.idx].ty.is_ptr(self.db));
         self.push_void(VoidInstKind::MemCopy { src, dst, ty });
     }
 
-    fn memcpy_typed<K: ValueKind>(
+    pub fn memcpy_typed<K: ValueKind>(
         &mut self,
         src: TypedPtr<'ir, K>,
         dst: TypedPtr<'ir, K>,
@@ -195,11 +211,29 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         );
     }
 
+    pub fn set_discriminant(&mut self, ptr: ValueId<'ir>, ty: LIRTy, idx: u32) {
+        debug_assert!(self.body.defs[ptr.idx].ty.is_ptr(self.db));
+        debug_assert!(ty.is_union(self.db));
+        debug_assert!(
+            ty.union_layout(self.db)
+                .map_or(false, |vs| vs.variants.len() > idx as usize)
+        );
+        self.push_void(VoidInstKind::SetDiscriminant { ptr, ty, idx });
+    }
+
+    pub fn set_discriminant_typed(
+        &mut self,
+        ptr: TypedPtr<'ir, Union>,
+        idx: u32,
+    ) {
+        self.set_discriminant(ptr.erase(), ptr.pointee, idx);
+    }
+
     // Value inst kind
 
     // constants
 
-    fn const_int(&mut self, ty: LIRTy, v: u128) -> IntValue<'ir> {
+    pub fn const_int(&mut self, ty: LIRTy, v: u128) -> IntValue<'ir> {
         debug_assert!(matches!(
             ty.class(self.db),
             ValueClass::Scalar(ScalarKind::Int(_))
@@ -208,10 +242,10 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             ty,
             ValueInstKind::Const(ConstValue::Int { ty, value: v }),
         );
-        IntValue { id: val, _k: PhantomData }
+        IntValue { id: val, ty, _k: PhantomData }
     }
 
-    fn const_null_ptr<K: ValueKind>(
+    pub fn const_null_ptr<K: ValueKind>(
         &mut self,
         pointee: LIRTy,
     ) -> TypedPtr<'ir, K> {
@@ -228,7 +262,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         TypedPtr { raw: val, pointee, _k: PhantomData }
     }
 
-    fn zeroed(&mut self, ty: LIRTy) -> ValueId<'ir> {
+    pub fn zeroed(&mut self, ty: LIRTy) -> ValueId<'ir> {
         debug_assert!(matches!(
             ty.class(self.db),
             ValueClass::Aggregate | ValueClass::None | ValueClass::Union
@@ -237,7 +271,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_value(ty, ValueInstKind::Const(ConstValue::Zeroed { ty }))
     }
 
-    fn function_ptr(&mut self, id: LIRFunctionId) -> ValueId<'ir> {
+    pub fn function_ptr(&mut self, id: LIRFunctionId) -> ValueId<'ir> {
         self.push_value(
             LIRTy { layout: LayoutID::ptr(self.db), origin: None },
             ValueInstKind::Const(ConstValue::FunctionAddr(id)),
@@ -246,31 +280,115 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
     // Memory
 
-    fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
+    pub fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
         self.push_value(ty, ValueInstKind::Alloca { ty })
     }
 
-    fn alloca_typed<K: ValueKind>(&mut self, ty: LIRTy) -> TypedPtr<'ir, K> {
+    pub fn alloca_typed<K: ValueKind>(
+        &mut self,
+        ty: LIRTy,
+    ) -> TypedPtr<'ir, K> {
         debug_assert!(K::matches(ty.class(self.db)));
         let val = self.alloca(ty);
         TypedPtr { raw: val, pointee: ty, _k: PhantomData }
     }
 
-    fn load(&mut self, ptr: ValueId<'ir>, ty: LIRTy) -> ValueId<'ir> {
+    pub fn load(&mut self, ptr: ValueId<'ir>, ty: LIRTy) -> ValueId<'ir> {
         self.push_value(ty, ValueInstKind::Load { ptr, ty })
     }
 
-    fn load_typed<K: ValueKind>(
+    pub fn load_typed<K: ValueKind>(
         &mut self,
         ptr: TypedPtr<'ir, K>,
     ) -> Typed<'ir, K> {
-        debug_assert!(K::matches(ptr.pointee.class(self.db)));
-        Typed { id: self.load(ptr.raw, ptr.pointee), _k: PhantomData }
+        unsafe {
+            self.load(ptr.raw, ptr.pointee)
+                .typed(ptr.pointee, self.db)
+                .unwrap_unchecked()
+        }
+    }
+
+    pub fn field_ptr(
+        &mut self,
+        ptr: ValueId<'ir>,
+        ty: LIRTy,
+        idx: u32,
+    ) -> ValueId<'ir> {
+        debug_assert!(self.body.defs[ptr.idx].ty.is_ptr(self.db));
+        debug_assert!(ty.is_aggregate(self.db));
+        debug_assert!(
+            ty.aggregate_layout(self.db)
+                .map_or(false, |l| l.fields.len() > idx as usize)
+        );
+        let ptr_ty = LIRTy {
+            layout: LayoutID::ptr(self.db),
+            origin: ty.origin.map(|ty| ptr_of(self.db, ty, false).into()),
+        };
+        self.push_value(ptr_ty, ValueInstKind::FieldPtr { ptr, ty, idx })
+    }
+
+    pub fn field_ptr_typed<K: ValueKind>(
+        &mut self,
+        ptr: TypedPtr<'ir, Aggregate>,
+        idx: u32,
+    ) -> TypedPtr<'ir, K> {
+        let val = self.field_ptr(ptr.raw, ptr.pointee, idx);
+        let field_layout = ptr.layout(self.db).fields[idx as usize].1;
+        let field_ty = LIRTy { layout: field_layout, origin: None };
+        val.typed_ptr(field_ty, self.db).unwrap()
+    }
+
+    pub fn union_payload_ptr(
+        &mut self,
+        ptr: ValueId<'ir>,
+        ty: LIRTy,
+        variant: u32,
+    ) -> ValueId<'ir> {
+        self.push_value(
+            LIRTy { layout: LayoutID::ptr(self.db), origin: None },
+            ValueInstKind::UnionPayloadPtr { ptr, ty, variant },
+        )
+    }
+
+    pub fn union_payload_ptr_typed<K: ValueKind>(
+        &mut self,
+        ptr: TypedPtr<'ir, Union>,
+        variant: u32,
+    ) -> TypedPtr<'ir, K> {
+        let val = self.union_payload_ptr(ptr.raw, ptr.pointee, variant);
+        let payload_layout = ptr.layout(self.db).variants[variant as usize];
+        let payload_ty = LIRTy { layout: payload_layout, origin: None };
+        val.typed_ptr(payload_ty, self.db).unwrap()
+    }
+
+    pub fn get_discriminant(
+        &mut self,
+        ptr: ValueId<'ir>,
+        ty: LIRTy,
+    ) -> Option<Typed<'ir, Scalar<Int>>> {
+        let discr = &ty.union_layout(self.db).unwrap().discriminant;
+        let discr_layout = match discr {
+            Discriminant::None => LayoutID::zst(self.db),
+            Discriminant::Tagged { kind, .. } => LayoutID::int(self.db, *kind),
+            Discriminant::Niche { .. } => todo!(),
+        };
+        let discr_ty = LIRTy { layout: discr_layout, origin: None };
+
+        let val = self
+            .push_value(discr_ty, ValueInstKind::GetDiscriminant { ptr, ty });
+        val.typed(discr_ty, self.db)
+    }
+
+    pub fn get_discriminant_typed(
+        &mut self,
+        ptr: TypedPtr<'ir, Union>,
+    ) -> Option<Typed<'ir, Scalar<Int>>> {
+        self.get_discriminant(ptr.erase(), ptr.pointee)
     }
 
     // Terminators
 
-    fn call(
+    pub fn call(
         self,
         f: LIRFunctionId,
         args: Vec<ValueId<'ir>>,
@@ -311,7 +429,50 @@ impl LIRTy {
         }
     }
 
-    pub fn is_ptr(&self, db: &dyn Db) -> bool {
+    pub fn is_ptr(self, db: &dyn Db) -> bool {
         matches!(self.layout.data(db), LayoutData::Scalar(ScalarKind::Ptr))
+    }
+
+    pub fn is_union(self, db: &dyn Db) -> bool {
+        matches!(self.layout.data(db), LayoutData::Union(_))
+    }
+
+    pub fn union_layout(self, db: &dyn Db) -> Option<&VariantsLayout> {
+        match self.layout.data(db) {
+            LayoutData::Union(variants_layout) => Some(variants_layout),
+            _ => None,
+        }
+    }
+
+    pub fn is_aggregate(self, db: &dyn Db) -> bool {
+        matches!(self.layout.data(db), LayoutData::Aggregate(_))
+    }
+
+    pub fn aggregate_layout(self, db: &dyn Db) -> Option<&AggregateLayout> {
+        match self.layout.data(db) {
+            LayoutData::Aggregate(aggregate_layout) => Some(aggregate_layout),
+            _ => None,
+        }
+    }
+}
+
+impl<'ir> TypedPtr<'ir, Aggregate> {
+    pub fn layout(self, db: &dyn Db) -> &AggregateLayout {
+        self.pointee.aggregate_layout(db).unwrap()
+    }
+}
+
+impl<'ir> TypedPtr<'ir, Union> {
+    pub fn layout(self, db: &dyn Db) -> &VariantsLayout {
+        self.pointee.union_layout(db).unwrap()
+    }
+}
+
+impl<'ir> TypedPtr<'ir, Scalar<Int>> {
+    pub fn layout(self, db: &dyn Db) -> IntWidth {
+        match self.pointee.layout.data(db) {
+            LayoutData::Scalar(ScalarKind::Int(width)) => *width,
+            _ => unreachable!(),
+        }
     }
 }
