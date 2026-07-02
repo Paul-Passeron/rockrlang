@@ -40,10 +40,7 @@ pub fn discover_package(p: &Path) -> Option<DiscoveredModule> {
         discover_dir(p.parent()?)
     } else {
         // Standalone file — no submodules
-        Some(DiscoveredModule {
-            path: p.to_path_buf(),
-            submodules: vec![],
-        })
+        Some(DiscoveredModule { path: p.to_path_buf(), submodules: vec![] })
     }
 }
 
@@ -64,17 +61,15 @@ fn discover_dir(dir: &Path) -> Option<DiscoveredModule> {
             if let Some(m) = discover_dir(&entry_path) {
                 submodules.push(m);
             }
-        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr") {
+        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr")
+        {
             submodules.push(DiscoveredModule {
                 path: entry_path,
                 submodules: vec![],
             });
         }
     }
-    Some(DiscoveredModule {
-        path: main,
-        submodules,
-    })
+    Some(DiscoveredModule { path: main, submodules })
 }
 
 #[salsa::interned]

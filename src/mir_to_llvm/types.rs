@@ -15,7 +15,11 @@ use crate::{
 
 #[salsa::tracked]
 impl<'db> InternedTypeId<'db> {
-    pub fn as_llvm<'ctx>(self, db: &'db dyn Db, c: &'ctx Context) -> AnyTypeEnum<'ctx> {
+    pub fn as_llvm<'ctx>(
+        self,
+        db: &'db dyn Db,
+        c: &'ctx Context,
+    ) -> AnyTypeEnum<'ctx> {
         let tref = TypeRef::Concrete(TypeId::from(self));
         match self.def(db) {
             TypeDefId::Builtin(builtin) => {
@@ -27,7 +31,9 @@ impl<'db> InternedTypeId<'db> {
                     || builtin == BuiltinTypeId::mut_ptr(db)
                     || builtin == BuiltinTypeId::mut_ref(db)
                 {
-                    return c.ptr_type(AddressSpace::default()).as_any_type_enum();
+                    return c
+                        .ptr_type(AddressSpace::default())
+                        .as_any_type_enum();
                 }
                 if builtin == BuiltinTypeId::int(db) {
                     return c.i32_type().as_any_type_enum();

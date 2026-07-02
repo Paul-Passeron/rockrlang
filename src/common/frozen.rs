@@ -51,26 +51,20 @@ pub struct FrozenIntoIter<T> {
 
 impl<T> Frozen<T> {
     pub fn new() -> Self {
-        Self {
-            data: Mutex::new(vec![]),
-            next_bucket_idx: AtomicUsize::new(0),
-        }
+        Self { data: Mutex::new(vec![]), next_bucket_idx: AtomicUsize::new(0) }
     }
 
     pub fn push(&self, item: T) {
         let mut data = self.data.lock().unwrap();
-        if data.is_empty() || self.next_bucket_idx.load(Ordering::Relaxed) == BUCKET_SIZE
+        if data.is_empty()
+            || self.next_bucket_idx.load(Ordering::Relaxed) == BUCKET_SIZE
         {
             self.next_bucket_idx.store(0, Ordering::Relaxed);
             data.push(Box::new([const { MaybeUninit::uninit() }; BUCKET_SIZE]));
         }
 
         let next_id = self.next_bucket_idx.load(Ordering::Relaxed);
-        data.last_mut()
-            .unwrap()
-            .get_mut(next_id)
-            .unwrap()
-            .write(item);
+        data.last_mut().unwrap().get_mut(next_id).unwrap().write(item);
         self.next_bucket_idx.fetch_add(1, Ordering::Relaxed);
     }
 
@@ -121,25 +115,18 @@ impl<T> Frozen<T> {
     }
 
     pub fn iter<'a>(&'a self) -> FrozenIter<'a, T> {
-        FrozenIter {
-            frozen: self,
-            bucket_idx: 0,
-            item_idx: 0,
-        }
+        FrozenIter { frozen: self, bucket_idx: 0, item_idx: 0 }
     }
 
     pub fn iter_mut<'a>(&'a mut self) -> FrozenIterMut<'a, T> {
-        FrozenIterMut {
-            frozen: self,
-            bucket_idx: 0,
-            item_idx: 0,
-        }
+        FrozenIterMut { frozen: self, bucket_idx: 0, item_idx: 0 }
     }
 
     pub fn is_empty(&self) -> bool {
         let data = self.data.lock().unwrap();
         data.is_empty()
-            || (data.len() == 1 && self.next_bucket_idx.load(Ordering::Relaxed) == 0)
+            || (data.len() == 1
+                && self.next_bucket_idx.load(Ordering::Relaxed) == 0)
     }
 
     pub fn len(&self) -> usize {
@@ -147,7 +134,8 @@ impl<T> Frozen<T> {
             0
         } else {
             let data = self.data.lock().unwrap();
-            self.next_bucket_idx.load(Ordering::Relaxed) + (data.len() - 1) * BUCKET_SIZE
+            self.next_bucket_idx.load(Ordering::Relaxed)
+                + (data.len() - 1) * BUCKET_SIZE
         }
     }
 }
@@ -174,9 +162,8 @@ impl<'a, T> Iterator for FrozenIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let res = self
-            .frozen
-            .get(self.item_idx + self.bucket_idx * BUCKET_SIZE);
+        let res =
+            self.frozen.get(self.item_idx + self.bucket_idx * BUCKET_SIZE);
         self.item_idx += 1;
         if self.item_idx >= BUCKET_SIZE {
             self.item_idx = 0;
@@ -295,7 +282,11 @@ impl<T> IntoIterator for Frozen<T> {
                     }
                 }
             } else {
-                res.extend(values.into_iter().map(|item| unsafe { item.assume_init() }));
+                res.extend(
+                    values
+                        .into_iter()
+                        .map(|item| unsafe { item.assume_init() }),
+                );
             }
         }
         res.reverse();
@@ -332,9 +323,13 @@ impl<T: Clone> Clone for Frozen<T> {
                     .iter()
                     .enumerate()
                     .map(|(i, x)| {
-                        let mut arr = [const { MaybeUninit::uninit() }; BUCKET_SIZE];
-                        let max_idx =
-                            if i == last_bucket { next_bucket_idx } else { BUCKET_SIZE };
+                        let mut arr =
+                            [const { MaybeUninit::uninit() }; BUCKET_SIZE];
+                        let max_idx = if i == last_bucket {
+                            next_bucket_idx
+                        } else {
+                            BUCKET_SIZE
+                        };
                         for j in 0..max_idx {
                             unsafe {
                                 arr[j].write(x[j].assume_init_ref().clone());
@@ -378,9 +373,7 @@ impl<T> Default for Frozen<T> {
 
 impl<T> Frozen<T> {
     pub fn is_sorted_by_key<R: Ord>(&self, cmp: impl Fn(&T) -> R) -> bool {
-        self.iter()
-            .zip(self.iter().skip(1))
-            .all(|(a, b)| cmp(a) < cmp(b))
+        self.iter().zip(self.iter().skip(1)).all(|(a, b)| cmp(a) < cmp(b))
     }
 
     pub fn binary_search_by_key<R: Ord>(
@@ -437,9 +430,7 @@ impl<T: Ord> Frozen<T> {
                 right = mid;
             }
         }
-        (left < l && self.get(left) == Some(value))
-            .then_some(left)
-            .ok_or(left)
+        (left < l && self.get(left) == Some(value)).then_some(left).ok_or(left)
     }
 }
 

@@ -33,14 +33,15 @@ use crate::{
         top_level::{AstInterfaceItem, AstMethodsig},
     },
     ril::{
-        BuiltinTypeId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId, TypeDefId,
-        TypeId, TypeRef, display::Display,
+        BuiltinTypeId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
+        TypeDefId, TypeId, TypeRef, display::Display,
     },
     typecheck::{
         ExprId,
         inference::{
             InferTy, InferenceCtx, InterfaceImplem, UnificationError,
-            implems::PotentialBlockRes, implicit::ImplicitContext, var::InferVar,
+            implems::PotentialBlockRes, implicit::ImplicitContext,
+            var::InferVar,
         },
     },
 };
@@ -249,7 +250,8 @@ impl<'db> InferenceCtx<'db> {
         }
 
         for (ast_arg, call_arg) in sig.data.args.iter().zip(args) {
-            let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
+            let expected =
+                self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
             if let Err(e) = self.unify(expected, call_arg.clone()) {
                 return ConstraintSolveResult::Error(e);
             }
@@ -277,7 +279,8 @@ impl<'db> InferenceCtx<'db> {
                 if self.find(&implem.ty) != receiver {
                     continue 'outer;
                 }
-                for item in interface_items(self.db, iface_id.interned()).iter() {
+                for item in interface_items(self.db, iface_id.interned()).iter()
+                {
                     if let AstInterfaceItem::Sig(sig) = item
                         && sig.data.name.data == method
                         && sig.data.args.len() == arity
@@ -293,7 +296,9 @@ impl<'db> InferenceCtx<'db> {
 
     fn get_working_impls(
         &mut self,
-        competing_impls: impl IntoIterator<Item = (ImplSource<'db>, PotentialBlockRes)>,
+        competing_impls: impl IntoIterator<
+            Item = (ImplSource<'db>, PotentialBlockRes),
+        >,
     ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
         let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
         if competing_impls.len() > 1 {
@@ -325,7 +330,8 @@ impl<'db> InferenceCtx<'db> {
         templates: &[InferTy],
     ) -> bool {
         let ty = self.find(ty);
-        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        let templates =
+            templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if !self.implements.contains_key(&id) {
             return false;
         }
@@ -358,7 +364,8 @@ impl<'db> InferenceCtx<'db> {
         templates: &[InferTy],
     ) {
         let ty = self.find(&ty);
-        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        let templates =
+            templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if let Entry::Vacant(e) = self.implements.entry(id) {
             e.insert(HashSet::from_iter(once(InterfaceImplem {
                 interface: id,
@@ -385,14 +392,11 @@ impl<'db> InferenceCtx<'db> {
                     return;
                 }
             }
-            self.implements
-                .get_mut(&id)
-                .unwrap()
-                .insert(InterfaceImplem {
-                    interface: id,
-                    ty,
-                    templates,
-                });
+            self.implements.get_mut(&id).unwrap().insert(InterfaceImplem {
+                interface: id,
+                ty,
+                templates,
+            });
         }
     }
 
@@ -444,10 +448,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn register_listeners(&mut self, constraint: &InferenceConstraint) {
         for listener in constraint.listeners(self) {
-            self.listeners
-                .entry(listener)
-                .or_default()
-                .push(constraint.id);
+            self.listeners.entry(listener).or_default().push(constraint.id);
         }
     }
 }
@@ -556,12 +557,7 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                     b.to_string(self.db),
                 )
             }
-            InferenceConstraintKind::Binop {
-                res_ty,
-                lhs_ty,
-                rhs_ty,
-                op,
-            } => {
+            InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, op } => {
                 write!(
                     f,
                     "Binop<{op}> {{lhs: {}, rhs: {}, res_ty: {res_ty}}}",
@@ -641,9 +637,7 @@ impl InferenceConstraintKind {
                 .chain(ctx.find(index_ty).listeners())
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::Tuple {
-                elem_var, tuple_ty, ..
-            } => ctx
+            InferenceConstraintKind::Tuple { elem_var, tuple_ty, .. } => ctx
                 .find(tuple_ty)
                 .listeners()
                 .into_iter()
@@ -686,10 +680,7 @@ impl InferenceConstraintKind {
                 .chain(ctx.find(b).listeners())
                 .collect(),
             InferenceConstraintKind::Binop {
-                res_ty,
-                lhs_ty,
-                rhs_ty,
-                ..
+                res_ty, lhs_ty, rhs_ty, ..
             } => lhs_ty
                 .listeners()
                 .into_iter()

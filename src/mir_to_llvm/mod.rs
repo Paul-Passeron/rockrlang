@@ -6,9 +6,13 @@ use inkwell::{
     context::Context,
     module::{Linkage, Module},
     targets::{
-        CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
+        CodeModel, FileType, InitializationConfig, RelocMode, Target,
+        TargetMachine,
     },
-    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
+    types::{
+        AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum,
+        FunctionType,
+    },
     values::FunctionValue,
 };
 use itertools::Itertools;
@@ -63,13 +67,7 @@ impl<'a, 'db> LLVMCtx<'a, 'db> {
         let m = c.create_module("main");
         let b = c.create_builder();
 
-        let mut this = Self {
-            db,
-            c,
-            m,
-            b,
-            fun_map: HashMap::new(),
-        };
+        let mut this = Self { db, c, m, b, fun_map: HashMap::new() };
 
         let fun_map = frefs
             .iter()
@@ -133,8 +131,9 @@ impl<'a, 'db> LLVMCtx<'a, 'db> {
             .ok_or_else(|| "failed to create target machine".to_string())?;
 
         self.m.set_triple(&triple);
-        self.m
-            .set_data_layout(&target_machine.get_target_data().get_data_layout());
+        self.m.set_data_layout(
+            &target_machine.get_target_data().get_data_layout(),
+        );
 
         target_machine
             .write_to_file(&self.m, FileType::Object, path)

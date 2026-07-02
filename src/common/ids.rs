@@ -23,9 +23,7 @@ pub struct IdGen {
 
 impl IdGen {
     pub fn new() -> Self {
-        Self {
-            next: RefCell::new(0),
-        }
+        Self { next: RefCell::new(0) }
     }
 
     pub fn fresh(&self) -> usize {
@@ -48,10 +46,7 @@ pub struct IdWrapper<T: From<usize>> {
 
 impl<T: From<usize>> IdWrapper<T> {
     pub fn new() -> Self {
-        Self {
-            inner: IdGen::new(),
-            _brand: Default::default(),
-        }
+        Self { inner: IdGen::new(), _brand: Default::default() }
     }
 
     pub fn fresh(&self) -> T {

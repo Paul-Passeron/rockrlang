@@ -27,7 +27,9 @@ use crate::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
+    ril::{
+        ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package,
+    },
 };
 
 pub fn resolve_type_expr_as_interface<'db>(
@@ -40,7 +42,8 @@ pub fn resolve_type_expr_as_interface<'db>(
     match &interface.data {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty()
-                && let Some(_) = template_args.iter().position(|p| p.name == *name)
+                && let Some(_) =
+                    template_args.iter().position(|p| p.name == *name)
             {
                 return None;
             }
@@ -57,21 +60,31 @@ pub fn resolve_type_expr_as_interface<'db>(
                                 template_args,
                                 has_zelf,
                             ) {
-                                TypeResolution::Type(type_ref) => Some(type_ref),
+                                TypeResolution::Type(type_ref) => {
+                                    Some(type_ref)
+                                }
                                 _ => None,
                             }
                         })
                         .collect::<Option<Vec<_>>>();
-                    resolved_args.map(|args| InterfaceRef::new(db, interface_id, args))
+                    resolved_args
+                        .map(|args| InterfaceRef::new(db, interface_id, args))
                 } else {
                     None
                 }
             })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, *from, module)
+            if let Some(Definition::Module(module)) =
+                resolve_in_module(db, *from, module)
             {
-                resolve_type_expr_as_interface(db, to, module, template_args, has_zelf)
+                resolve_type_expr_as_interface(
+                    db,
+                    to,
+                    module,
+                    template_args,
+                    has_zelf,
+                )
             } else {
                 None
             }
@@ -146,8 +159,13 @@ pub fn module_impls<'db>(
                         res.push(src);
                     }
                     None => {
-                        let impl_id =
-                            ImplId::new(db, module.into(), implemented, None, templates);
+                        let impl_id = ImplId::new(
+                            db,
+                            module.into(),
+                            implemented,
+                            None,
+                            templates,
+                        );
                         let src = ImplSource::new(
                             db,
                             impl_id,

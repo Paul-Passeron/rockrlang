@@ -36,32 +36,22 @@ impl MIRCache {
 
 impl MIR {
     pub fn liveness(&self, db: &dyn Db) -> &MIRLivenessResult {
-        self.cache
-            .liveness
-            .get_or_init(|| MIRLivenessAnalysis.run(db, self))
+        self.cache.liveness.get_or_init(|| MIRLivenessAnalysis.run(db, self))
     }
 
     pub fn init_tracking(&self, db: &dyn Db) -> &MIRInitOut {
-        self.cache
-            .init_tracking
-            .get_or_init(|| MIRInitAnalysis.run(db, self))
+        self.cache.init_tracking.get_or_init(|| MIRInitAnalysis.run(db, self))
     }
 
     pub fn successors(&self) -> &BlockMap<HashSet<MIRBlockID>> {
-        self.cache
-            .successors
-            .get_or_init(|| self.compute_successors())
+        self.cache.successors.get_or_init(|| self.compute_successors())
     }
 
     pub fn predecessors(&self) -> &BlockMap<HashSet<MIRBlockID>> {
-        self.cache
-            .predecessors
-            .get_or_init(|| self.compute_predecessors())
+        self.cache.predecessors.get_or_init(|| self.compute_predecessors())
     }
 
     pub fn loans(&self, db: &dyn Db) -> &MIRLoanOut {
-        self.cache
-            .loans
-            .get_or_init(|| MIRLoanAnalysis.run(db, self))
+        self.cache.loans.get_or_init(|| MIRLoanAnalysis.run(db, self))
     }
 }

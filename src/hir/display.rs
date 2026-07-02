@@ -22,8 +22,9 @@ use crate::{
     common::symbols::{StrLit, Symbol},
     hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern,
-        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt,
-        HirStmtKind, HirStructFieldPattern, Mutability, PartialTypeArg, PartialTypeRef,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
+        PartialTypeArg, PartialTypeRef,
     },
     parse_tree::expr::BinaryOperator,
     ril::{TypeDefId, display::Display},
@@ -128,12 +129,7 @@ fn write_stmt(
 ) -> fmt::Result {
     write_indent(f, depth)?;
     match &stmt.kind {
-        HirStmtKind::Let {
-            pattern,
-            locals: _,
-            ty_annotation,
-            init,
-        } => {
+        HirStmtKind::Let { pattern, locals: _, ty_annotation, init } => {
             write!(f, "let ")?;
             write_pattern(f, pattern, db, depth)?;
             if ty_annotation.is_some() {
@@ -190,10 +186,7 @@ fn write_stmt(
             write_indent(f, depth)?;
             writeln!(f, "}}")
         }
-        HirStmtKind::Match {
-            scrutinee,
-            branches,
-        } => {
+        HirStmtKind::Match { scrutinee, branches } => {
             write!(f, "match ")?;
             write_expr(f, scrutinee, db)?;
             writeln!(f, " {{")?;
@@ -245,11 +238,7 @@ fn write_pattern(
             }
             write!(f, ")")
         }
-        HirPatternDesc::Constructor {
-            resolution,
-            name,
-            fields,
-        } => {
+        HirPatternDesc::Constructor { resolution, name, fields } => {
             write!(
                 f,
                 "{}::{}",
@@ -258,7 +247,9 @@ fn write_pattern(
             )?;
             match fields {
                 HirPatternConstructorArgs::None => Ok(()),
-                HirPatternConstructorArgs::StructFields(hir_struct_field_patterns) => {
+                HirPatternConstructorArgs::StructFields(
+                    hir_struct_field_patterns,
+                ) => {
                     writeln!(f, "{{")?;
                     for p in hir_struct_field_patterns.iter() {
                         write_indent(f, depth + 2)?;
@@ -268,7 +259,12 @@ fn write_pattern(
                                 write_pattern(f, pattern, db, depth + 2)?;
                             }
                             HirStructFieldPattern::Name { id, name } => {
-                                write!(f, "{}/*_{}*/", name.display(db), id.raw())?;
+                                write!(
+                                    f,
+                                    "{}/*_{}*/",
+                                    name.display(db),
+                                    id.raw()
+                                )?;
                             }
                         }
                         writeln!(f, ", ")?;
@@ -294,7 +290,11 @@ fn write_pattern(
     }
 }
 
-fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
+fn write_place(
+    f: &mut impl fmt::Write,
+    place: &HirPlace,
+    db: &dyn Db,
+) -> fmt::Result {
     match &place.kind {
         HirPlaceKind::Local(id) => write!(f, "_{}", id.raw()),
         HirPlaceKind::Field { base, field } => {
@@ -323,7 +323,11 @@ fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::R
     }
 }
 
-fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Result {
+fn write_expr(
+    f: &mut impl fmt::Write,
+    expr: &HirExpr,
+    db: &dyn Db,
+) -> fmt::Result {
     match &expr.data {
         HirExprDesc::IntLit(n) => write!(f, "{}", n),
         HirExprDesc::CharLit(c) => write!(f, "'{}'", c),
@@ -367,33 +371,30 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             }
             write!(f, ")")
         }
-        HirExprDesc::CallMethod {
-            receiver,
-            method,
-            args,
-            interface_hint,
-        } => match interface_hint {
-            Some(id) => {
-                write!(f, "{}::{}(", id.to_string(db), method.display(db))?;
-                write_expr(f, receiver, db)?;
-                for arg in args {
-                    write!(f, ", ")?;
-                    write_expr(f, arg, db)?;
-                }
-                write!(f, ")")
-            }
-            None => {
-                write_expr(f, receiver, db)?;
-                write!(f, ".{}(", method.display(db))?;
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
+        HirExprDesc::CallMethod { receiver, method, args, interface_hint } => {
+            match interface_hint {
+                Some(id) => {
+                    write!(f, "{}::{}(", id.to_string(db), method.display(db))?;
+                    write_expr(f, receiver, db)?;
+                    for arg in args {
                         write!(f, ", ")?;
+                        write_expr(f, arg, db)?;
                     }
-                    write_expr(f, arg, db)?;
+                    write!(f, ")")
                 }
-                write!(f, ")")
+                None => {
+                    write_expr(f, receiver, db)?;
+                    write!(f, ".{}(", method.display(db))?;
+                    for (i, arg) in args.iter().enumerate() {
+                        if i > 0 {
+                            write!(f, ", ")?;
+                        }
+                        write_expr(f, arg, db)?;
+                    }
+                    write!(f, ")")
+                }
             }
-        },
+        }
 
         HirExprDesc::CallStatic { ty, method, args } => {
             write_partial_type(f, ty, db)?;
@@ -461,12 +462,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             write_partial_type(f, ty, db)?;
             write!(f, ")")
         }
-        HirExprDesc::Constructor {
-            name,
-            enum_def,
-            args,
-            template_hints,
-        } => {
+        HirExprDesc::Constructor { name, enum_def, args, template_hints } => {
             write!(f, "{}", enum_def.name(db).display(db))?;
             if !template_hints.is_empty() {
                 write!(f, "<")?;
@@ -478,7 +474,9 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                         PartialTypeArg::Known(tref) => {
                             write!(f, "{}", tref.to_string(db))?
                         }
-                        PartialTypeArg::Partial(p) => write_partial_type(f, p, db)?,
+                        PartialTypeArg::Partial(p) => {
+                            write_partial_type(f, p, db)?
+                        }
                         PartialTypeArg::Infer => write!(f, "_")?,
                     }
                 }
@@ -538,7 +536,9 @@ fn write_partial_type(
                         PartialTypeArg::Known(tref) => {
                             write!(f, "{}", tref.to_string(db))?
                         }
-                        PartialTypeArg::Partial(p) => write_partial_type(f, p, db)?,
+                        PartialTypeArg::Partial(p) => {
+                            write_partial_type(f, p, db)?
+                        }
                         PartialTypeArg::Infer => write!(f, "_")?,
                     }
                 }

@@ -63,7 +63,9 @@ pub fn check<'db>(db: &'db dyn Db, ws: Workspace) {
 pub fn check_definition(db: &dyn Db, def: Definition) {
     match def {
         Definition::Function(function_id) => check_fundef(db, function_id),
-        Definition::Interface(interface_id) => check_interface(db, interface_id),
+        Definition::Interface(interface_id) => {
+            check_interface(db, interface_id)
+        }
         Definition::Module(module_id) => check_module(db, module_id.interned()),
         Definition::Type(type_def_id) => check_typedef(db, type_def_id),
     }
@@ -127,7 +129,8 @@ fn collect_module_functions<'db>(
         match def {
             Definition::Function(function_id) => funcs.push(function_id),
             Definition::Module(module_id) => {
-                funcs.extend(collect_module_functions(db, module_id.interned()));
+                funcs
+                    .extend(collect_module_functions(db, module_id.interned()));
             }
             Definition::Interface(_) | Definition::Type(_) => (),
         }
@@ -136,7 +139,10 @@ fn collect_module_functions<'db>(
 }
 
 #[salsa::tracked]
-pub fn reachable_frefs<'db>(db: &'db dyn Db, pkg: Package<'db>) -> Arc<Vec<FuncInst>> {
+pub fn reachable_frefs<'db>(
+    db: &'db dyn Db,
+    pkg: Package<'db>,
+) -> Arc<Vec<FuncInst>> {
     let module = file_module_id(db, pkg.root(db), None, pkg);
     let roots = collect_module_functions(db, module.interned());
 
@@ -159,7 +165,11 @@ pub fn reachable_frefs<'db>(db: &'db dyn Db, pkg: Package<'db>) -> Arc<Vec<FuncI
     Arc::new(frefs)
 }
 
-pub fn build<'a, 'db>(db: &'db dyn Db, w: Workspace, c: &'a Context) -> LLVMCtx<'a, 'db> {
+pub fn build<'a, 'db>(
+    db: &'db dyn Db,
+    w: Workspace,
+    c: &'a Context,
+) -> LLVMCtx<'a, 'db> {
     let packages = workspace_packages(db, w);
     let frefs = packages
         .iter()

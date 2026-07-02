@@ -20,8 +20,8 @@ use itertools::Itertools;
 use crate::{
     Db,
     layout::{
-        AggregateLayout, Align, FieldInput, FieldOrderingKind, LayoutID, Offset, Size,
-        layout_of,
+        AggregateLayout, Align, FieldInput, FieldOrderingKind, LayoutID,
+        Offset, Size, layout_of,
     },
     name_resolve::type_expr::struct_item,
     ril::{StructId, TypeRef},
@@ -31,20 +31,22 @@ use crate::{
 impl FieldOrderingKind {
     pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {
         match self {
-            FieldOrderingKind::SourceOrder => (0..fields.len() as u32).collect(),
+            FieldOrderingKind::SourceOrder => {
+                (0..fields.len() as u32).collect()
+            }
         }
     }
 }
 
-pub(super) fn finish_aggregate(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
+pub(super) fn finish_aggregate(
+    db: &dyn Db,
+    source_ordered: Vec<LayoutID>,
+) -> LayoutID {
     if source_ordered.is_empty() {
         return LayoutID::zst(db);
     }
-    let align = source_ordered
-        .iter()
-        .map(|l| l.align(db))
-        .max()
-        .unwrap_or(Align::BYTE);
+    let align =
+        source_ordered.iter().map(|l| l.align(db)).max().unwrap_or(Align::BYTE);
     let aggregated = aggregate_layout(db, source_ordered);
     let size = aggregated.size(db).align_to(align);
     LayoutID::new(db, size, align, aggregated.into())
@@ -55,10 +57,7 @@ pub(super) fn struct_layout(
     struct_id: StructId,
     args: &[TypeRef],
 ) -> LayoutID {
-    let struct_ref = StructRef {
-        def: struct_id,
-        args: args.to_vec(),
-    };
+    let struct_ref = StructRef { def: struct_id, args: args.to_vec() };
     let fields = struct_ref.get_fields_ty(db);
     if fields.is_empty() {
         return LayoutID::zst(db);
@@ -70,10 +69,8 @@ pub(super) fn struct_layout(
         .map(|field| fields[&field.name])
         .collect_vec();
 
-    let layouts = source_ordered_fields
-        .iter()
-        .map(|ty| layout_of(db, *ty))
-        .collect_vec();
+    let layouts =
+        source_ordered_fields.iter().map(|ty| layout_of(db, *ty)).collect_vec();
 
     finish_aggregate(db, layouts)
 }
@@ -105,7 +102,8 @@ pub(super) fn aggregate_layout(
     let mut offset = Offset::ZERO;
     let mut align = Align::BYTE;
 
-    let mut fields = vec![(Offset::ZERO, LayoutID::zst(db)); source_ordered.len()];
+    let mut fields =
+        vec![(Offset::ZERO, LayoutID::zst(db)); source_ordered.len()];
 
     // We build the offsets by walking in layout order
     for (layout_idx, src_idx) in ordered {
@@ -117,16 +115,14 @@ pub(super) fn aggregate_layout(
         align = align.max(field_align);
     }
 
-    AggregateLayout {
-        fields,
-        source_to_layout: ordering,
-    }
+    AggregateLayout { fields, source_to_layout: ordering }
 }
 
 impl AggregateLayout {
     pub fn size(&self, db: &dyn Db) -> Size {
         // We get the biggest offset and add the size of its layout
-        let Some((offset, layout)) = self.fields.iter().max_by_key(|f| f.0) else {
+        let Some((offset, layout)) = self.fields.iter().max_by_key(|f| f.0)
+        else {
             return Size::ZERO;
         };
         Size(offset.bytes()) + layout.size(db)

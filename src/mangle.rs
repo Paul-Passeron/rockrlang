@@ -96,30 +96,19 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
         .map(|(_, ty)| ty_mangle(db, *ty).as_ref().clone())
         .collect_vec();
     let ret = ty_mangle(db, inst.ret_ty(db)).as_ref().clone();
-    let sig = MangleSig {
-        name,
-        parameters,
-        ret,
-    };
+    let sig = MangleSig { name, parameters, ret };
     match function_ast(db, fdef.into()).inner(db) {
         FunctionLikeAst::ExternDef(_, _) => {
             Arc::new(MangleFun::Extern(fdef.name(db).to_string(db)))
         }
-        FunctionLikeAst::Fundef(_) => Arc::new(MangleFun::Function {
-            path,
-            sig,
-            templates,
-        }),
+        FunctionLikeAst::Fundef(_) => {
+            Arc::new(MangleFun::Function { path, sig, templates })
+        }
         FunctionLikeAst::Method(method) => {
             let zelf = fdef.parent(db).get_canonical_zelf(db).unwrap();
             let ty = ty_mangle(db, zelf).as_ref().clone();
             let is_static = method.data.receiver.is_static();
-            Arc::new(MangleFun::Method {
-                is_static,
-                ty,
-                sig,
-                templates,
-            })
+            Arc::new(MangleFun::Method { is_static, ty, sig, templates })
         }
         FunctionLikeAst::TraitMethod(_) => todo!(),
     }
@@ -162,11 +151,7 @@ fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
             (name, path)
         }
     };
-    MangleType::Adt {
-        path,
-        name,
-        parameters: args,
-    }
+    MangleType::Adt { path, name, parameters: args }
 }
 
 fn path_of_module(db: &dyn Db, m: ModuleId) -> Vec<String> {
@@ -258,17 +243,14 @@ impl MangleType {
             }
             MangleType::Int(k) => k.mangle().to_string(),
             MangleType::Float(k) => format!("f{}", k.mangle()),
-            MangleType::Adt {
-                path,
-                name,
-                parameters,
-            } => {
+            MangleType::Adt { path, name, parameters } => {
                 let idents: String = path
                     .iter()
                     .map(|s| mangle_ident(s))
                     .chain(std::iter::once(mangle_ident(name)))
                     .collect();
-                let params: String = parameters.iter().map(Self::mangle).collect();
+                let params: String =
+                    parameters.iter().map(Self::mangle).collect();
                 format!("N{idents}E{params}E")
             }
             MangleType::Never => "z".to_string(),
@@ -280,13 +262,9 @@ impl MangleType {
 impl MangleSig {
     // <name-ident> <param-types...> E <ret-type>
     fn mangle(&self) -> String {
-        let params: String = self.parameters.iter().map(MangleType::mangle).collect();
-        format!(
-            "{}{}E{}",
-            mangle_ident(&self.name),
-            params,
-            self.ret.mangle()
-        )
+        let params: String =
+            self.parameters.iter().map(MangleType::mangle).collect();
+        format!("{}{}E{}", mangle_ident(&self.name), params, self.ret.mangle())
     }
 }
 
@@ -294,23 +272,16 @@ impl MangleFun {
     fn mangle(&self) -> String {
         match self {
             MangleFun::Extern(name) => name.clone(),
-            MangleFun::Method {
-                is_static,
-                ty,
-                sig,
-                templates,
-            } => {
+            MangleFun::Method { is_static, ty, sig, templates } => {
                 let kind = if *is_static { 's' } else { 'm' };
-                let tpls: String = templates.iter().map(MangleType::mangle).collect();
+                let tpls: String =
+                    templates.iter().map(MangleType::mangle).collect();
                 format!("_ZM{kind}{}{}G{tpls}E", ty.mangle(), sig.mangle())
             }
-            MangleFun::Function {
-                path,
-                sig,
-                templates,
-            } => {
+            MangleFun::Function { path, sig, templates } => {
                 let p: String = path.iter().map(|s| mangle_ident(s)).collect();
-                let tpls: String = templates.iter().map(MangleType::mangle).collect();
+                let tpls: String =
+                    templates.iter().map(MangleType::mangle).collect();
                 format!("_ZF{p}E{}G{tpls}E", sig.mangle())
             }
         }

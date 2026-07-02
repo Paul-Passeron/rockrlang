@@ -38,13 +38,13 @@ use crate::{
         },
     },
     ril::{
-        BuiltinTypeId, FunctionId, TypeDefId, TypeId, TypeRef, bool_id, char_id, int_id,
-        never_id, str_def, usize_id, void_id,
+        BuiltinTypeId, FunctionId, TypeDefId, TypeId, TypeRef, bool_id,
+        char_id, int_id, never_id, str_def, usize_id, void_id,
     },
     thir::{
-        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
-        ThirMatchBranch,
+        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
+        Projection, ScopeId, StructRef, Thir, ThirConstructorArgs,
+        ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
     },
@@ -110,17 +110,12 @@ impl FuncInst {
         let fdef = self.fdef(db);
         let zelf = fdef.parent(db).get_canonical_zelf(db);
         let zelf = sig.zelf.map(|arg| {
-            (
-                Symbol::new(db, "self"),
-                arg.as_type_ref_for(db, zelf.unwrap()),
-            )
+            (Symbol::new(db, "self"), arg.as_type_ref_for(db, zelf.unwrap()))
         });
         zelf.into_iter()
-            .chain(
-                sig.args
-                    .iter()
-                    .map(|(symb, ty)| (*symb, ty.with_substitution(db, self.subs(db)))),
-            )
+            .chain(sig.args.iter().map(|(symb, ty)| {
+                (*symb, ty.with_substitution(db, self.subs(db)))
+            }))
             .collect()
     }
 
@@ -173,10 +168,9 @@ impl<'a> ThirToMIR<'a> {
 
     pub fn is_valid_ty(&self, ty: TypeRef) -> bool {
         match ty {
-            TypeRef::Concrete(type_id) => type_id
-                .args(self.db)
-                .into_iter()
-                .all(|ty| self.is_valid_ty(ty)),
+            TypeRef::Concrete(type_id) => {
+                type_id.args(self.db).into_iter().all(|ty| self.is_valid_ty(ty))
+            }
             TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
             _ => false,
@@ -225,10 +219,7 @@ impl<'a> ThirToMIR<'a> {
             let mut mir = MIRLocal::new(ty, local.mutability, local.span);
             if let Some(src) = &local.source {
                 mir = mir.with_name(src.1).with_thir_src(thir_id).with_syn_src(
-                    SyntacticSource {
-                        span: local.span,
-                        id: src.0,
-                    },
+                    SyntacticSource { span: local.span, id: src.0 },
                 )
             }
             let mir_id = self.builder.new_local(mir);
@@ -269,12 +260,7 @@ impl<'a> ThirToMIR<'a> {
 
     fn place_of_local(&self, local: MIRLocalID, span: Span) -> MIRPlace {
         let ty = self.builder.locals[local].ty;
-        MIRPlace {
-            local,
-            projections: vec![],
-            ty,
-            span,
-        }
+        MIRPlace { local, projections: vec![], ty, span }
     }
 
     fn synthetic_place(&self, ty: TypeRef, span: Span) -> MIRPlace {
@@ -282,19 +268,15 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn goto(&mut self, next: MIRBlockID) {
-        self.builder
-            .terminate(MIRTerminator::Goto { next })
-            .unwrap()
+        self.builder.terminate(MIRTerminator::Goto { next }).unwrap()
     }
 
     fn build_stmt(&mut self, stmt: &ThirStmt) {
         match &stmt.kind {
-            // For the moment, we do not have to care about destructors or anything so
-            // we just:
+            // For the moment, we do not have to care about destructors or
+            // anything so we just:
             StmtKind::Block { stmts, .. } => self.build_stmts(stmts),
-            StmtKind::If {
-                cond, then, else_, ..
-            } => {
+            StmtKind::If { cond, then, else_, .. } => {
                 self.build_if_stmt(
                     cond,
                     then,
@@ -307,8 +289,10 @@ impl<'a> ThirToMIR<'a> {
             }
             StmtKind::Let { local, init } => {
                 let mir_local = self.local_map[local];
-                let dest =
-                    self.place_of_local(mir_local, self.builder.locals[mir_local].span);
+                let dest = self.place_of_local(
+                    mir_local,
+                    self.builder.locals[mir_local].span,
+                );
                 let rvalue = self.build_rvalue(*init);
                 self.assign(dest, rvalue);
             }
@@ -330,15 +314,16 @@ impl<'a> ThirToMIR<'a> {
                 let bb = self.loop_begins[scope_id];
                 self.goto(bb);
             }
-            StmtKind::Match {
-                scrutinee,
-                branches,
-            } => self.build_match_stmt(scrutinee, branches),
+            StmtKind::Match { scrutinee, branches } => {
+                self.build_match_stmt(scrutinee, branches)
+            }
             StmtKind::Expr(idx) => {
                 let rval = self.build_rvalue(*idx);
                 self.spill_rvalue_if_needed(rval, stmt.span);
             }
-            StmtKind::Error => panic!("Can only produce MIR of error-less THIR"),
+            StmtKind::Error => {
+                panic!("Can only produce MIR of error-less THIR")
+            }
         }
     }
 
@@ -361,16 +346,11 @@ impl<'a> ThirToMIR<'a> {
             return place;
         }
         let ty = self.ty(operand.ty(self.db));
-        let as_rvalue = MIRRValue {
-            kind: MIRRValueKind::Use(operand),
-            ty,
-            span,
-        };
+        let as_rvalue =
+            MIRRValue { kind: MIRRValueKind::Use(operand), ty, span };
         let place = self.synthetic_place(ty, span);
-        self.builder.emit(Stmt::Assign {
-            dest: place.clone(),
-            rvalue: as_rvalue,
-        });
+        self.builder
+            .emit(Stmt::Assign { dest: place.clone(), rvalue: as_rvalue });
         place
     }
 
@@ -402,10 +382,7 @@ impl<'a> ThirToMIR<'a> {
             }
             Projection::TupleField(index, ty) => {
                 let resulting_ty = self.ty(ty);
-                MIRProjection::TupleField {
-                    index,
-                    resulting_ty,
-                }
+                MIRProjection::TupleField { index, resulting_ty }
             }
             Projection::Index(expr) => {
                 let index = self.build_operand(expr);
@@ -414,7 +391,10 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
-    fn build_projections(&mut self, projections: &[Projection]) -> Vec<MIRProjection> {
+    fn build_projections(
+        &mut self,
+        projections: &[Projection],
+    ) -> Vec<MIRProjection> {
         projections
             .iter()
             .map(|projection| self.build_projection(*projection))
@@ -427,16 +407,15 @@ impl<'a> ThirToMIR<'a> {
         let projections = self.build_projections(&thir_place.projections);
         let ty = self.ty(thir_place.ty);
 
-        MIRPlace {
-            local,
-            projections,
-            ty,
-            span: thir_place.span,
-        }
+        MIRPlace { local, projections, ty, span: thir_place.span }
     }
 
     fn move_or_copy(&self, place: MIRPlace) -> MIROperand {
-        if place.ty.is_copy(self.db) { place.into_copy() } else { place.into_move() }
+        if place.ty.is_copy(self.db) {
+            place.into_copy()
+        } else {
+            place.into_move()
+        }
     }
 
     fn struct_ref(&mut self, struct_ref: &StructRef) -> StructRef {
@@ -457,10 +436,7 @@ impl<'a> ThirToMIR<'a> {
         let TypeDefId::Struct(str_def) = str_def(self.db) else {
             unreachable!()
         };
-        StructRef {
-            def: str_def,
-            args: vec![],
-        }
+        StructRef { def: str_def, args: vec![] }
     }
 
     fn build_strlit(&mut self, strlit: &str, span: Span) -> MIRRValueKind {
@@ -497,28 +473,19 @@ impl<'a> ThirToMIR<'a> {
             ExprKind::StrLit(lit) => {
                 self.build_strlit(&lit.interned().contents(self.db), span)
             }
-            ExprKind::StructLit {
-                struct_def,
-                fields: thir_fields,
-            } => {
+            ExprKind::StructLit { struct_def, fields: thir_fields } => {
                 let struct_ref = self.struct_ref(struct_def);
                 let fields = self.build_fields(thir_fields);
-                MIRRValueKind::StructLit {
-                    struct_ref,
-                    fields,
+                MIRRValueKind::StructLit { struct_ref, fields, span }
+            }
+            ExprKind::Constructor { enum_def, idx, args } => {
+                MIRRValueKind::Constructor {
+                    enum_ref: self.enum_ref(enum_def),
+                    idx: *idx,
+                    args: self.build_constructor_args(args),
                     span,
                 }
             }
-            ExprKind::Constructor {
-                enum_def,
-                idx,
-                args,
-            } => MIRRValueKind::Constructor {
-                enum_ref: self.enum_ref(enum_def),
-                idx: *idx,
-                args: self.build_constructor_args(args),
-                span,
-            },
             ExprKind::Use(place) => {
                 let place = self.build_place(*place);
                 MIRRValueKind::Use(self.move_or_copy(place))
@@ -561,9 +528,14 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
             }
             ExprKind::SliceLit(_) => todo!(),
-            ExprKind::Error => panic!("Can only produce MIR of error-less THIR"),
+            ExprKind::Error => {
+                panic!("Can only produce MIR of error-less THIR")
+            }
             _ => {
-                unreachable!("Unhandled expression at {}", span.start().loc_info(self.db))
+                unreachable!(
+                    "Unhandled expression at {}",
+                    span.start().loc_info(self.db)
+                )
             }
         };
         MIRRValue { kind, ty, span }
@@ -608,10 +580,8 @@ impl<'a> ThirToMIR<'a> {
         span: Span,
     ) -> MIRLocalID {
         let callee = MIRCallee::Direct(called);
-        let args = args
-            .iter()
-            .map(|arg| self.build_operand(*arg))
-            .collect_vec();
+        let args =
+            args.iter().map(|arg| self.build_operand(*arg)).collect_vec();
         let next_bb = self.builder.new_block(None);
         let local = self.synthetic_local(ret_ty, span);
         self.build_terminator(MIRTerminator::Call {
@@ -714,18 +684,29 @@ impl<'a> ThirToMIR<'a> {
         self.switch_to(merge_bb);
     }
 
-    fn build_expr_with_setup(&mut self, expr: &ThirExprWithSetup) -> MIROperand {
+    fn build_expr_with_setup(
+        &mut self,
+        expr: &ThirExprWithSetup,
+    ) -> MIROperand {
         self.build_stmts(&expr.stmts);
         self.build_operand(expr.expr)
     }
 
-    fn build_rvalue_or_place(&mut self, expr: ExprId) -> Either<MIRRValue, MIRPlace> {
+    fn build_rvalue_or_place(
+        &mut self,
+        expr: ExprId,
+    ) -> Either<MIRRValue, MIRPlace> {
         let thir_expr = &self.thir.exprs[expr];
         match &thir_expr.kind {
             ExprKind::Use(place) => Either::Right(self.build_place(*place)),
             ExprKind::Call { called, args } => {
                 let ret_ty = self.ty(thir_expr.ty);
-                let local = self.build_call(called.clone(), args, ret_ty, thir_expr.span);
+                let local = self.build_call(
+                    called.clone(),
+                    args,
+                    ret_ty,
+                    thir_expr.span,
+                );
                 Either::Right(self.place_of_local(local, thir_expr.span))
             }
             _ => Either::Left(self.build_rvalue(expr)),
@@ -741,10 +722,7 @@ impl<'a> ThirToMIR<'a> {
         match &thir_expr.kind {
             ExprKind::IntLit(value) => {
                 let ty = self.ty(thir_expr.ty);
-                Some(MIRConstant::Integer {
-                    value: *value as i128,
-                    ty,
-                })
+                Some(MIRConstant::Integer { value: *value as i128, ty })
             }
             // TODO: Handle unicode one day
             ExprKind::Charlit(lit) => Some(MIRConstant::Integer {
@@ -824,7 +802,9 @@ impl<'a> ThirToMIR<'a> {
         }
 
         self.builder
-            .finalize(MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into())
+            .finalize(
+                MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into(),
+            )
             .expect("Something went wrong finalizing the builder")
     }
 }

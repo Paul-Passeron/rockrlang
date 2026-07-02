@@ -32,13 +32,8 @@ pub struct CliArgs {
 
 fn main() -> std::process::ExitCode {
     let args = CliArgs::parse();
-    let cfg = Config {
-        no_std: args.no_std,
-        skip_core: args.skip_core,
-    };
-    let root = args
-        .file
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    let cfg = Config { no_std: args.no_std, skip_core: args.skip_core };
+    let root = args.file.unwrap_or_else(|| std::env::current_dir().unwrap());
     match build_from_disk(root, cfg) {
         Ok(()) => {
             // println!("Compilation finished :)");

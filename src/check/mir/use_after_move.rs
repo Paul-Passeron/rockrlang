@@ -66,9 +66,9 @@ impl MIRTerminator {
                 value.iter().for_each(|op| op.check(db, state))
             }
             MIRTerminator::Branch { cond: op, .. }
-            | MIRTerminator::Switch {
-                discriminant: op, ..
-            } => op.check(db, state),
+            | MIRTerminator::Switch { discriminant: op, .. } => {
+                op.check(db, state)
+            }
         }
     }
 }
@@ -87,10 +87,11 @@ impl MIRPlace {
         let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
         match state {
             InitState::Init => (),
-            InitState::Maybe => {
-                Diag::generic_error("Use after move (maybe)".to_string(), self.span)
-                    .accumulate(db)
-            }
+            InitState::Maybe => Diag::generic_error(
+                "Use after move (maybe)".to_string(),
+                self.span,
+            )
+            .accumulate(db),
             InitState::Uninit => {
                 Diag::generic_error("Use after move".to_string(), self.span)
                     .accumulate(db);

@@ -42,25 +42,19 @@ pub struct Span {
 
 impl Span {
     pub fn start(self) -> Location {
-        Location {
-            file: self.file,
-            offset: self.start_offset,
-        }
+        Location { file: self.file, offset: self.start_offset }
     }
 
     pub fn end(self) -> Location {
-        Location {
-            file: self.file,
-            offset: self.end_offset,
-        }
+        Location { file: self.file, offset: self.end_offset }
     }
 
-    pub fn new(file: SourceFile, start_offset: usize, end_offset: usize) -> Self {
-        Self {
-            file,
-            start_offset,
-            end_offset,
-        }
+    pub fn new(
+        file: SourceFile,
+        start_offset: usize,
+        end_offset: usize,
+    ) -> Self {
+        Self { file, start_offset, end_offset }
     }
 }
 
@@ -82,11 +76,7 @@ impl Location {
         } else {
             (self.offset, other.offset)
         };
-        Span {
-            file,
-            start_offset,
-            end_offset,
-        }
+        Span { file, start_offset, end_offset }
     }
 
     pub fn loc_info(self, db: &dyn Db) -> LocationInfo {
@@ -118,12 +108,7 @@ fn _loc_info(db: &dyn Db, loc: Location) -> LocationInfo {
                 column += 1;
             }
         }
-        LocationInfo {
-            file: loc.file.path(db).clone(),
-            line,
-            column,
-            offset,
-        }
+        LocationInfo { file: loc.file.path(db).clone(), line, column, offset }
     }
     _tracked(db, Interned::new(db, loc))
 }
@@ -144,16 +129,15 @@ impl PartialOrd for LocationInfo {
 
 impl Ord for LocationInfo {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.file
-            .cmp(&other.file)
-            .then_with(|| self.offset.cmp(&other.offset))
+        self.file.cmp(&other.file).then_with(|| self.offset.cmp(&other.offset))
     }
 }
 
 impl Display for LocationInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cwd = std::env::current_dir().unwrap_or_default();
-        let path = pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
+        let path =
+            pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
         write!(f, "{}:{}:{}", path.display(), self.line, self.column)
     }
 }

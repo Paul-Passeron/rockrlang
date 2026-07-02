@@ -30,7 +30,9 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir::Mutability,
-    mir::{ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind},
+    mir::{
+        ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind,
+    },
     parse_tree::expr::BinaryOperator,
     ril::{TypeRef, bool_id, char_id, ptr_of},
     thir::{EnumRef, FunctionRef, StructRef},
@@ -47,15 +49,9 @@ pub enum MIROperand {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRConstant {
-    Integer {
-        value: i128,
-        ty: TypeRef,
-    },
+    Integer { value: i128, ty: TypeRef },
     Bool(bool),
-    CString {
-        contents: String,
-        null_terminated: bool,
-    },
+    CString { contents: String, null_terminated: bool },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -129,7 +125,9 @@ impl Constant {
         match self {
             MIRConstant::Integer { ty, .. } => *ty,
             MIRConstant::Bool(_) => bool_id(db).into(),
-            MIRConstant::CString { .. } => ptr_of(db, char_id(db).into(), false).into(),
+            MIRConstant::CString { .. } => {
+                ptr_of(db, char_id(db).into(), false).into()
+            }
         }
     }
 }
@@ -138,7 +136,9 @@ impl Operand {
     pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
             MIROperand::Constant(mirconstant, _) => mirconstant.ty(db),
-            MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
+            MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
+                mirplace.ty
+            }
         }
     }
 }
@@ -171,7 +171,9 @@ impl MIRRValue {
             MIRRValueKind::Ref(p, _)
             | MIRRValueKind::AddressOf(p, _)
             | MIRRValueKind::Discriminant(p) => p.uses(),
-            MIRRValueKind::BinOp(_, l, r) => l.uses().union(&r.uses()).copied().collect(),
+            MIRRValueKind::BinOp(_, l, r) => {
+                l.uses().union(&r.uses()).copied().collect()
+            }
             MIRRValueKind::Use(op)
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => op.uses(),
@@ -180,7 +182,9 @@ impl MIRRValue {
             MIRRValueKind::StructLit { fields, .. } => {
                 fields.values().flat_map(|op| op.uses()).collect()
             }
-            MIRRValueKind::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
+            MIRRValueKind::Tuple(ops, _) => {
+                ops.iter().flat_map(|op| op.uses()).collect()
+            }
         }
     }
 }

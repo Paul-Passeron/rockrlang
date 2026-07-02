@@ -60,16 +60,20 @@ impl<'a> InferenceCtx<'a> {
                     let mut constraints = Vec::new();
                     fields.iter().zip(other_fields).try_for_each(
                         |(infer_ty, matcher)| {
-                            constraints.extend(self.matches_ty(infer_ty, matcher, ctx)?);
+                            constraints.extend(
+                                self.matches_ty(infer_ty, matcher, ctx)?,
+                            );
                             Some(())
                         },
                     )?;
                     Some(constraints)
                 }
-                TypeRef::Param(id) => Some(vec![InferenceConstraintKind::Unify {
-                    a: ty.clone(),
-                    b: ctx.get_template(id.0)?.clone(),
-                }]),
+                TypeRef::Param(id) => {
+                    Some(vec![InferenceConstraintKind::Unify {
+                        a: ty.clone(),
+                        b: ctx.get_template(id.0)?.clone(),
+                    }])
+                }
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },
@@ -83,10 +87,8 @@ impl<'a> InferenceCtx<'a> {
         source: ImplSource<'a>,
     ) -> Option<PotentialBlockRes> {
         let templates = source.id(self.db).templates(self.db);
-        let infer_templates = templates
-            .iter()
-            .map(|_| self.fresh_var())
-            .collect::<Box<[_]>>();
+        let infer_templates =
+            templates.iter().map(|_| self.fresh_var()).collect::<Box<[_]>>();
         let mapped_templates = infer_templates
             .iter()
             .map(|var| InferTy::Var(*var))
@@ -121,10 +123,7 @@ impl<'a> InferenceCtx<'a> {
             }
         }
 
-        Some(PotentialBlockRes {
-            templates: infer_templates,
-            constraints,
-        })
+        Some(PotentialBlockRes { templates: infer_templates, constraints })
     }
 
     fn get_packages(db: &dyn Db) -> Arc<Vec<Package<'_>>> {

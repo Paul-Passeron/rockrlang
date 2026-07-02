@@ -128,14 +128,7 @@ impl Diag {
         notes: Vec<String>,
         help: Vec<String>,
     ) -> Self {
-        Self {
-            severity,
-            message,
-            primary,
-            secondary,
-            notes,
-            help,
-        }
+        Self { severity, message, primary, secondary, notes, help }
     }
 }
 

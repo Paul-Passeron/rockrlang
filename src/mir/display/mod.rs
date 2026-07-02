@@ -19,11 +19,13 @@ use crate::mir::{
     MIRLocalID,
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
-        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection,
-        MIRRValue, MIRRValueKind,
+        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
+        MIRProjection, MIRRValue, MIRRValueKind,
     },
 };
-use crate::{Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
+use crate::{
+    Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator,
+};
 use std::fmt;
 
 pub mod graphviz;
@@ -93,7 +95,11 @@ pub fn fmt_local_id<W: MIRWrite>(w: &mut W, id: MIRLocalID) -> fmt::Result {
     mwrite!(w, "_{}", id.into_raw())
 }
 
-pub fn fmt_place<W: MIRWrite>(w: &mut W, db: &dyn Db, place: &MIRPlace) -> fmt::Result {
+pub fn fmt_place<W: MIRWrite>(
+    w: &mut W,
+    db: &dyn Db,
+    place: &MIRPlace,
+) -> fmt::Result {
     fmt_local_id(w, place.local)?;
     for proj in &place.projections {
         fmt_projection(w, db, proj)?;
@@ -108,14 +114,18 @@ pub fn fmt_projection<W: MIRWrite>(
 ) -> fmt::Result {
     match proj {
         MIRProjection::Deref => w.write_str(".*"),
-        MIRProjection::Field { name, .. } => mwrite!(w, ".{}", name.to_string(db)),
+        MIRProjection::Field { name, .. } => {
+            mwrite!(w, ".{}", name.to_string(db))
+        }
         MIRProjection::TupleField { index, .. } => mwrite!(w, ".{index}"),
         MIRProjection::Index { index } => {
             w.write_str("[")?;
             fmt_operand(w, db, index)?;
             w.write_str("]")
         }
-        MIRProjection::Downcast { variant } => mwrite!(w, ".downcast#{variant}"),
+        MIRProjection::Downcast { variant } => {
+            mwrite!(w, ".downcast#{variant}")
+        }
     }
 }
 
@@ -143,12 +153,11 @@ pub fn fmt_constant<W: MIRWrite>(
     constant: &MIRConstant,
 ) -> fmt::Result {
     match constant {
-        MIRConstant::Integer { value, ty } => mwrite!(w, "{value}_{}", ty.to_string(db)),
+        MIRConstant::Integer { value, ty } => {
+            mwrite!(w, "{value}_{}", ty.to_string(db))
+        }
         MIRConstant::Bool(b) => mwrite!(w, "{b}"),
-        MIRConstant::CString {
-            contents,
-            null_terminated,
-        } => {
+        MIRConstant::CString { contents, null_terminated } => {
             if *null_terminated {
                 mwrite!(w, "c\"{contents}\"")
             } else {
@@ -170,7 +179,11 @@ pub fn fmt_rvalue<W: MIRWrite>(
             fmt_place(w, db, place)
         }
         MIRRValueKind::AddressOf(place, mutability) => {
-            w.write_str(if mutability.is_mut() { "addr_of_mut " } else { "addr_of " })?;
+            w.write_str(if mutability.is_mut() {
+                "addr_of_mut "
+            } else {
+                "addr_of "
+            })?;
             fmt_place(w, db, place)
         }
         MIRRValueKind::BinOp(op, lhs, rhs) => {
@@ -195,20 +208,15 @@ pub fn fmt_rvalue<W: MIRWrite>(
             fmt_operand(w, db, operand)?;
             w.write_str(")")
         }
-        MIRRValueKind::SizeOf(ty) => mwrite!(w, "@sizeof({})", ty.to_string(db)),
-        MIRRValueKind::Constructor {
-            enum_ref,
-            idx,
-            args,
-            ..
-        } => {
+        MIRRValueKind::SizeOf(ty) => {
+            mwrite!(w, "@sizeof({})", ty.to_string(db))
+        }
+        MIRRValueKind::Constructor { enum_ref, idx, args, .. } => {
             mwrite!(w, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
             fmt_constructor_args(w, db, args)?;
             w.write_str(")")
         }
-        MIRRValueKind::StructLit {
-            struct_ref, fields, ..
-        } => {
+        MIRRValueKind::StructLit { struct_ref, fields, .. } => {
             mwrite!(w, "{} {{", struct_ref.def.name(db).to_string(db))?;
             let mut first = true;
             for (name, op) in fields {
@@ -295,7 +303,9 @@ pub fn fmt_terminator<W: MIRWrite>(
 ) -> fmt::Result {
     match terminator {
         MIRTerminator::Diverge => w.write_str("diverge"),
-        MIRTerminator::Goto { next, .. } => mwrite!(w, "goto bb{}", next.into_raw()),
+        MIRTerminator::Goto { next, .. } => {
+            mwrite!(w, "goto bb{}", next.into_raw())
+        }
         MIRTerminator::Return { value, .. } => match value {
             Some(operand) => {
                 w.write_str("return ")?;
@@ -303,19 +313,12 @@ pub fn fmt_terminator<W: MIRWrite>(
             }
             None => w.write_str("return"),
         },
-        MIRTerminator::Branch {
-            cond, then, else_, ..
-        } => {
+        MIRTerminator::Branch { cond, then, else_, .. } => {
             w.write_str("branch ")?;
             fmt_operand(w, db, cond)?;
             mwrite!(w, " ? bb{} : bb{}", then.into_raw(), else_.into_raw())
         }
-        MIRTerminator::Switch {
-            discriminant,
-            branches,
-            default,
-            ..
-        } => {
+        MIRTerminator::Switch { discriminant, branches, default, .. } => {
             w.write_str("switch ")?;
             fmt_operand(w, db, discriminant)?;
             w.write_str(" {")?;
@@ -324,13 +327,7 @@ pub fn fmt_terminator<W: MIRWrite>(
             }
             mwrite!(w, " _ => bb{} }}", default.into_raw())
         }
-        MIRTerminator::Call {
-            callee,
-            arguments,
-            dest,
-            next,
-            ..
-        } => {
+        MIRTerminator::Call { callee, arguments, dest, next, .. } => {
             fmt_local_id(w, *dest)?;
             w.write_str(" = call ")?;
             fmt_callee(w, db, callee)?;
@@ -346,7 +343,11 @@ pub fn fmt_terminator<W: MIRWrite>(
     }
 }
 
-pub fn fmt_stmt<W: MIRWrite>(w: &mut W, db: &dyn Db, stmt: &Stmt) -> fmt::Result {
+pub fn fmt_stmt<W: MIRWrite>(
+    w: &mut W,
+    db: &dyn Db,
+    stmt: &Stmt,
+) -> fmt::Result {
     match stmt {
         Stmt::Assign { dest, rvalue } => {
             fmt_place(w, db, dest)?;

@@ -83,9 +83,7 @@ impl<T> Copy for Idx<T> {}
 
 impl<T> Arena<T> {
     pub fn new() -> Self {
-        Self {
-            inner: Frozen::new(),
-        }
+        Self { inner: Frozen::new() }
     }
 
     pub fn insert(&self, elem: T) -> Idx<T> {
@@ -178,7 +176,8 @@ impl<T> IntoIterator for Arena<T> {
 
     type Item = (Idx<T>, T);
 
-    type IntoIter = Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
+    type IntoIter =
+        Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
 }
 
 impl<'a, T> IntoIterator for &'a Arena<T> {
@@ -191,8 +190,10 @@ impl<'a, T> IntoIterator for &'a Arena<T> {
 
     type Item = (Idx<T>, &'a T);
 
-    type IntoIter =
-        Map<Enumerate<FrozenIter<'a, T>>, fn((usize, &'a T)) -> (Idx<T>, &'a T)>;
+    type IntoIter = Map<
+        Enumerate<FrozenIter<'a, T>>,
+        fn((usize, &'a T)) -> (Idx<T>, &'a T),
+    >;
 }
 
 impl<T> Idx<T> {

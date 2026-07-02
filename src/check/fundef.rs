@@ -70,11 +70,14 @@ pub(crate) fn reachable_mir_instances(
             let callee_has_body = function_ast(db, call_info.callee.interned())
                 .inner(db)
                 .has_body();
-            let callee_templates = get_templates_of_fun(db, call_info.callee.interned());
+            let callee_templates =
+                get_templates_of_fun(db, call_info.callee.interned());
 
             if callee_has_body && !callee_templates.is_empty() {
-                worklist.push((call_info.callee, call_info.substitution.clone()));
-            } else if !seen.contains(&MIRKey::new(db, call_info.callee, vec![])) {
+                worklist
+                    .push((call_info.callee, call_info.substitution.clone()));
+            } else if !seen.contains(&MIRKey::new(db, call_info.callee, vec![]))
+            {
                 worklist.push((call_info.callee, vec![]));
             }
         }

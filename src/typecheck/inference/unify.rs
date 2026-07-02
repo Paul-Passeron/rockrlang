@@ -26,7 +26,9 @@ impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
         match self {
             InferTy::Var(this_var) => *this_var == var,
-            InferTy::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
+            InferTy::Adt { fields, .. } => {
+                fields.iter().any(|field| field.occurs(var))
+            }
             InferTy::Param(_) => false,
         }
     }
@@ -38,20 +40,17 @@ impl InferTy {
             flag: bool,
         ) -> Result<InferTy, UnificationError> {
             match (a, b) {
-                (InferTy::Var(var_a), InferTy::Var(_)) => Ok(InferTy::Var(*var_a)),
+                (InferTy::Var(var_a), InferTy::Var(_)) => {
+                    Ok(InferTy::Var(*var_a))
+                }
                 (
-                    InferTy::Adt {
-                        def: def_a,
-                        fields: fields_a,
-                    },
-                    InferTy::Adt {
-                        def: def_b,
-                        fields: fields_b,
-                    },
+                    InferTy::Adt { def: def_a, fields: fields_a },
+                    InferTy::Adt { def: def_b, fields: fields_b },
                 ) => {
                     if def_a != def_b {
                         Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
-                    } else if let (len_a, len_b) = (fields_a.len(), fields_b.len())
+                    } else if let (len_a, len_b) =
+                        (fields_a.len(), fields_b.len())
                         && len_a != len_b
                     {
                         Err(UnificationError::FieldCountMismatch(len_a, len_b))
@@ -61,24 +60,20 @@ impl InferTy {
                             .zip(fields_b)
                             .map(|(field_a, field_b)| field_a.unify(field_b))
                             .collect::<Result<_, _>>()?;
-                        Ok(InferTy::Adt {
-                            def: *def_a,
-                            fields,
-                        })
+                        Ok(InferTy::Adt { def: *def_a, fields })
                     }
                 }
                 (InferTy::Adt { def, fields }, InferTy::Var(infer_var)) => {
                     if fields.iter().any(|field| field.occurs(*infer_var)) {
                         Err(UnificationError::RecursiveDefinition(*infer_var))
                     } else {
-                        Ok(InferTy::Adt {
-                            def: *def,
-                            fields: fields.clone(),
-                        })
+                        Ok(InferTy::Adt { def: *def, fields: fields.clone() })
                     }
                 }
                 (InferTy::Param(p), InferTy::Var(_))
-                | (InferTy::Var(_), InferTy::Param(p)) => Ok(InferTy::Param(*p)),
+                | (InferTy::Var(_), InferTy::Param(p)) => {
+                    Ok(InferTy::Param(*p))
+                }
                 (InferTy::Param(pa), InferTy::Param(pb)) => {
                     if pa == pb {
                         Ok(InferTy::Param(*pa))
@@ -111,15 +106,15 @@ impl<'db> InferenceCtx<'db> {
     fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
         let root = self.table.find(a);
         let other = if root == a { b } else { a };
-        let flattened = self
-            .listeners
-            .remove(&other)
-            .into_iter()
-            .flatten()
-            .collect_vec();
+        let flattened =
+            self.listeners.remove(&other).into_iter().flatten().collect_vec();
         self.listeners.entry(root).or_default().extend(flattened);
     }
-    fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
+    fn try_unify(
+        &mut self,
+        a: &InferTy,
+        b: &InferTy,
+    ) -> Result<(), UnificationError> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
@@ -127,10 +122,13 @@ impl<'db> InferenceCtx<'db> {
                 .table
                 .unify_var_var(*a, *b)
                 .inspect(|_| self.merge_listeners(*a, *b)),
-            (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
+            (InferTy::Var(infer_var), value)
+            | (value, InferTy::Var(infer_var)) => {
                 let resolved = self.find(value);
                 if resolved.occurs(*infer_var) {
-                    return Err(UnificationError::RecursiveDefinition(*infer_var));
+                    return Err(UnificationError::RecursiveDefinition(
+                        *infer_var,
+                    ));
                 }
                 self.table.unify_var_value(*infer_var, Some(resolved))?;
                 self.listeners
@@ -145,14 +143,8 @@ impl<'db> InferenceCtx<'db> {
                 Ok(())
             }
             (
-                InferTy::Adt {
-                    def: def_a,
-                    fields: fields_a,
-                },
-                InferTy::Adt {
-                    def: def_b,
-                    fields: fields_b,
-                },
+                InferTy::Adt { def: def_a, fields: fields_a },
+                InferTy::Adt { def: def_b, fields: fields_b },
             ) => {
                 if def_a != def_b {
                     Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
@@ -161,12 +153,11 @@ impl<'db> InferenceCtx<'db> {
                 {
                     Err(UnificationError::FieldCountMismatch(len_a, len_b))
                 } else {
-                    fields_a
-                        .iter()
-                        .zip(fields_b)
-                        .try_for_each(|(field_a, field_b)| {
+                    fields_a.iter().zip(fields_b).try_for_each(
+                        |(field_a, field_b)| {
                             self.unify(field_a.clone(), field_b.clone())
-                        })
+                        },
+                    )
                 }
             }
             (InferTy::Param(pa), InferTy::Param(pb)) => {
@@ -178,7 +169,11 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn unify(&mut self, a: InferTy, b: InferTy) -> Result<(), UnificationError> {
+    pub fn unify(
+        &mut self,
+        a: InferTy,
+        b: InferTy,
+    ) -> Result<(), UnificationError> {
         self.snapshot(|this| this.try_unify(&a, &b))
     }
 
@@ -213,9 +208,9 @@ impl<'db> InferenceCtx<'db> {
                 InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
             }
         }
-        // For the moment, ena does not let us find the value without the table being
-        // mutable for path-compression reason I believe. We might want to find an
-        // alternative.
+        // For the moment, ena does not let us find the value without the table
+        // being mutable for path-compression reason I believe. We might
+        // want to find an alternative.
         let mut tbl = self.table.clone();
         _find(ty, &mut tbl)
     }

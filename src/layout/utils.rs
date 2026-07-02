@@ -23,8 +23,8 @@ use std::{
 use crate::{
     Db,
     layout::{
-        AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData, LayoutID,
-        Offset, ScalarKind, Size, VariantsLayout,
+        AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData,
+        LayoutID, Offset, ScalarKind, Size, VariantsLayout,
     },
 };
 
@@ -130,7 +130,12 @@ impl LayoutID {
         self.interned().inner(db)
     }
 
-    pub fn new(db: &dyn Db, size: Size, align: Align, data: LayoutData) -> Self {
+    pub fn new(
+        db: &dyn Db,
+        size: Size,
+        align: Align,
+        data: LayoutData,
+    ) -> Self {
         Layout::new(db, size, align, data).into()
     }
 
@@ -188,12 +193,7 @@ impl LayoutID {
     }
 
     pub fn int(db: &dyn Db, width: IntWidth) -> Self {
-        Self::new(
-            db,
-            width.into(),
-            width.into(),
-            ScalarKind::Int(width).into(),
-        )
+        Self::new(db, width.into(), width.into(), ScalarKind::Int(width).into())
     }
 
     pub fn ptr(db: &dyn Db) -> Self {

@@ -28,14 +28,14 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     ril::{
-        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
-        void_id,
+        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id,
+        char_id, const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id,
+        tuple_of, usize_id, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
-        ThirPattern, ThirPatternKind,
+        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::AstImplicitContext,
@@ -55,11 +55,7 @@ pub struct SanityChecker<'db> {
 
 impl<'db> SanityChecker<'db> {
     pub fn new(db: &'db dyn Db, thir: &'db Thir) -> Self {
-        Self {
-            db,
-            thir,
-            errs: Vec::new(),
-        }
+        Self { db, thir, errs: Vec::new() }
     }
 
     pub fn check(mut self) -> Vec<SanityError> {
@@ -78,9 +74,7 @@ impl<'db> SanityChecker<'db> {
     fn check_stmt(&mut self, stmt: &ThirStmt) {
         match &stmt.kind {
             StmtKind::Block { stmts, .. } => self.check_stmts(stmts),
-            StmtKind::If {
-                cond, then, else_, ..
-            } => {
+            StmtKind::If { cond, then, else_, .. } => {
                 let bool_ty = TypeRef::Concrete(bool_id(self.db));
                 let ThirExprWithSetup { stmts, expr } = cond;
                 self.check_stmts(stmts);
@@ -113,10 +107,7 @@ impl<'db> SanityChecker<'db> {
             StmtKind::Return(expr) => {
                 self.check_return(*expr, stmt.span);
             }
-            StmtKind::Match {
-                scrutinee,
-                branches,
-            } => {
+            StmtKind::Match { scrutinee, branches } => {
                 let ThirExprWithSetup { stmts, expr } = scrutinee;
                 self.check_stmts(stmts);
                 self.check_expr(*expr);
@@ -138,15 +129,17 @@ impl<'db> SanityChecker<'db> {
         expected_ty: TypeRef,
         span: Span,
     ) -> RefWrappedTy {
-        RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
-            println!(
-                "ERROR: Could not peel {} until {} :(",
-                ty.to_string(self.db),
-                expected_ty.to_string(self.db)
-            );
-            self.check_types(expected_ty, ty, span);
-            RefWrappedTy::from_type_ref(self.db, ty)
-        })
+        RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(
+            || {
+                println!(
+                    "ERROR: Could not peel {} until {} :(",
+                    ty.to_string(self.db),
+                    expected_ty.to_string(self.db)
+                );
+                self.check_types(expected_ty, ty, span);
+                RefWrappedTy::from_type_ref(self.db, ty)
+            },
+        )
     }
 
     fn check_pattern(&mut self, expected_ty: TypeRef, pat: &ThirPattern) {
@@ -192,7 +185,11 @@ impl<'db> SanityChecker<'db> {
                     .and_then(|ty| ty.def(self.db).is_int_like(self.db))
                     .is_some()
                 {
-                    self.check_types(expected_ty, int_id(self.db).into(), pat.span);
+                    self.check_types(
+                        expected_ty,
+                        int_id(self.db).into(),
+                        pat.span,
+                    );
                 }
             }
         }
@@ -221,9 +218,11 @@ impl<'db> SanityChecker<'db> {
                 infos.ty,
                 infos.span,
             ),
-            ExprKind::StrLit(_) => {
-                self.check_types(TypeRef::Concrete(str_id(self.db)), infos.ty, infos.span)
-            }
+            ExprKind::StrLit(_) => self.check_types(
+                TypeRef::Concrete(str_id(self.db)),
+                infos.ty,
+                infos.span,
+            ),
             ExprKind::CStrLit(_) => self.check_types(
                 TypeRef::Concrete(const_ptr_of(
                     self.db,
@@ -245,15 +244,21 @@ impl<'db> SanityChecker<'db> {
             ExprKind::AddressOf { place, mutability } => {
                 self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
-                let expected_ty =
-                    TypeRef::Concrete(ptr_of(self.db, place_ty, mutability.is_mut()));
+                let expected_ty = TypeRef::Concrete(ptr_of(
+                    self.db,
+                    place_ty,
+                    mutability.is_mut(),
+                ));
                 self.check_types(expected_ty, infos.ty, infos.span);
             }
             ExprKind::Ref { place, mutability } => {
                 self.check_place(*place);
                 let place_ty = self.thir.places[*place].ty;
-                let ref_ty =
-                    TypeRef::Concrete(ref_of(self.db, place_ty, mutability.is_mut()));
+                let ref_ty = TypeRef::Concrete(ref_of(
+                    self.db,
+                    place_ty,
+                    mutability.is_mut(),
+                ));
                 self.check_types(infos.ty, ref_ty, infos.span);
             }
             ExprKind::Call { called, args } => {
@@ -265,7 +270,11 @@ impl<'db> SanityChecker<'db> {
                 let params = called.params(self.db);
                 params.into_iter().zip(args_ty).for_each(
                     |((_, param), (arg_ty, arg))| {
-                        self.check_types(param, arg_ty, self.thir.exprs[arg].span)
+                        self.check_types(
+                            param,
+                            arg_ty,
+                            self.thir.exprs[arg].span,
+                        )
                     },
                 );
                 self.check_types(ret, infos.ty, infos.span);
@@ -279,8 +288,16 @@ impl<'db> SanityChecker<'db> {
                     | BinaryOperator::Times
                     | BinaryOperator::Div
                     | BinaryOperator::Modulo => {
-                        self.check_types(infos.ty, lhs_ty, self.thir.exprs[*lhs].span);
-                        self.check_types(infos.ty, rhs_ty, self.thir.exprs[*rhs].span);
+                        self.check_types(
+                            infos.ty,
+                            lhs_ty,
+                            self.thir.exprs[*lhs].span,
+                        );
+                        self.check_types(
+                            infos.ty,
+                            rhs_ty,
+                            self.thir.exprs[*rhs].span,
+                        );
                         if infos
                             .ty
                             .as_type_id()
@@ -330,11 +347,19 @@ impl<'db> SanityChecker<'db> {
                     match infos.ty {
                         TypeRef::Concrete(type_id)
                             if type_id.def(self.db)
-                                == TypeDefId::Builtin(BuiltinTypeId::slice(self.db)) => {}
+                                == TypeDefId::Builtin(
+                                    BuiltinTypeId::slice(self.db),
+                                ) => {}
                         _ => {
-                            let mock_expected =
-                                TypeRef::Concrete(slice_of(self.db, TypeRef::Unknown));
-                            self.check_types(mock_expected, infos.ty, infos.span);
+                            let mock_expected = TypeRef::Concrete(slice_of(
+                                self.db,
+                                TypeRef::Unknown,
+                            ));
+                            self.check_types(
+                                mock_expected,
+                                infos.ty,
+                                infos.span,
+                            );
                         }
                     }
                 } else {
@@ -355,15 +380,12 @@ impl<'db> SanityChecker<'db> {
                         })
                         .copied()
                         .unwrap_or(TypeRef::Error);
-                    let expected = TypeRef::Concrete(slice_of(self.db, witness_type));
+                    let expected =
+                        TypeRef::Concrete(slice_of(self.db, witness_type));
                     self.check_types(expected, infos.ty, infos.span);
                 }
             }
-            ExprKind::Constructor {
-                enum_def,
-                idx,
-                args,
-            } => {
+            ExprKind::Constructor { enum_def, idx, args } => {
                 let ty = TypeRef::Concrete(TypeId::new(
                     self.db,
                     TypeDefId::Enum(enum_def.def),
@@ -418,11 +440,7 @@ impl<'db> SanityChecker<'db> {
         let expected = self.normalize_type(expected);
         let got = self.normalize_type(got);
         if expected != got {
-            self.errs.push(SanityError {
-                expected,
-                got,
-                span,
-            });
+            self.errs.push(SanityError { expected, got, span });
         }
     }
 
@@ -433,7 +451,9 @@ impl<'db> SanityChecker<'db> {
         expected: TypeRef,
         span: Span,
     ) {
-        if let Some(ty) = self.compute_type_after_projection(before, projection, span) {
+        if let Some(ty) =
+            self.compute_type_after_projection(before, projection, span)
+        {
             self.check_types(expected, ty, span);
         } else {
             todo!()
@@ -445,21 +465,23 @@ impl<'db> SanityChecker<'db> {
         let base_ty = match info.base {
             PlaceBase::Local(idx) => self.thir.locals[idx].ty,
         };
-        let end_ty = info.projections.iter().fold(base_ty, |before, projection| {
-            let expected = match projection {
-                Projection::Field(_, type_ref) | Projection::TupleField(_, type_ref) => {
-                    Some(*type_ref)
-                }
-                _ => None,
-            };
-            let expected = expected
-                .or_else(|| {
-                    self.compute_type_after_projection(before, projection, info.span)
-                })
-                .unwrap_or(TypeRef::Error);
-            self.check_projection(before, projection, expected, info.span);
-            expected
-        });
+        let end_ty =
+            info.projections.iter().fold(base_ty, |before, projection| {
+                let expected = match projection {
+                    Projection::Field(_, type_ref)
+                    | Projection::TupleField(_, type_ref) => Some(*type_ref),
+                    _ => None,
+                };
+                let expected = expected
+                    .or_else(|| {
+                        self.compute_type_after_projection(
+                            before, projection, info.span,
+                        )
+                    })
+                    .unwrap_or(TypeRef::Error);
+                self.check_projection(before, projection, expected, info.span);
+                expected
+            });
         self.check_types(end_ty, info.ty, info.span);
     }
 
@@ -477,7 +499,11 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    pub fn check_expr_with_expected_type(&mut self, expr: ExprId, expected: TypeRef) {
+    pub fn check_expr_with_expected_type(
+        &mut self,
+        expr: ExprId,
+        expected: TypeRef,
+    ) {
         self.check_expr(expr);
         let (got, span) = {
             let expr = &self.thir.exprs[expr];
@@ -523,7 +549,11 @@ impl<'db> SanityChecker<'db> {
                     .is_none()
                 {
                     let idx_span = self.thir.exprs[*idx_expr].span;
-                    self.check_types(ty, TypeRef::Concrete(int_id(self.db)), idx_span);
+                    self.check_types(
+                        ty,
+                        TypeRef::Concrete(int_id(self.db)),
+                        idx_span,
+                    );
                     return None;
                 }
                 before.element_of_indexed(self.db)
@@ -545,7 +575,8 @@ impl<'db> SanityChecker<'db> {
             ) => {
                 assert_eq!(field_tys.len(), pat_tys.len());
                 for field in field_tys {
-                    let field_expr = pat_tys.iter().find(|p| p.0 == field.0).unwrap().1;
+                    let field_expr =
+                        pat_tys.iter().find(|p| p.0 == field.0).unwrap().1;
                     let field_ty = self.check_expr(field_expr);
                     let span = self.thir.exprs[field_expr].span;
                     self.check_types(field.1, field_ty, span);
@@ -554,7 +585,8 @@ impl<'db> SanityChecker<'db> {
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 let _ = tys;
                 let _ = pats;
-                Diag::todo("Check tuple pat here".into(), span).accumulate(self.db);
+                Diag::todo("Check tuple pat here".into(), span)
+                    .accumulate(self.db);
             }
             _ => todo!(),
         }
@@ -568,7 +600,10 @@ impl<'db> SanityChecker<'db> {
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
-            (ConstructorType::Struct(tys), ThirConstructorArgs::Struct(pats)) => {
+            (
+                ConstructorType::Struct(tys),
+                ThirConstructorArgs::Struct(pats),
+            ) => {
                 assert_eq!(tys.len(), pats.len());
                 for (sym, fty) in tys {
                     let fpat = &pats.iter().find(|p| p.0 == *sym).unwrap().1;
@@ -654,7 +689,8 @@ impl EnumRef {
                         .map(|field| {
                             (
                                 field.name,
-                                ctx.resolve(db, &field.ty.data).unwrap_or(TypeRef::Error),
+                                ctx.resolve(db, &field.ty.data)
+                                    .unwrap_or(TypeRef::Error),
                             )
                         })
                         .collect(),
@@ -670,7 +706,9 @@ impl EnumRef {
                 Some(ConstructorType::Tuple(
                     spanneds
                         .iter()
-                        .map(|ast| ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error))
+                        .map(|ast| {
+                            ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error)
+                        })
                         .collect(),
                 ))
             }
@@ -680,10 +718,7 @@ impl EnumRef {
 
     pub fn variants(&self, db: &dyn Db) -> Vec<ConstructorType> {
         let n = enum_item(db, self.def.interned()).variants.len();
-        (0..n)
-            .into_iter()
-            .map(|i| self.get_cons(db, i).unwrap())
-            .collect()
+        (0..n).into_iter().map(|i| self.get_cons(db, i).unwrap()).collect()
     }
 }
 
@@ -755,7 +790,9 @@ impl TypeRef {
             Some(inner)
         } else if let Some(inner) = self.as_slice(db) {
             Some(inner)
-        } else if let Some(inner) = self.as_ref(db).and_then(|t| t.1.as_slice(db)) {
+        } else if let Some(inner) =
+            self.as_ref(db).and_then(|t| t.1.as_slice(db))
+        {
             Some(inner)
         } else {
             println!(
@@ -771,11 +808,7 @@ impl TypeRef {
     }
 
     pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
-        if self
-            .as_ref(db)
-            .and_then(|(_, ty)| ty.as_slice(db))
-            .is_some()
-        {
+        if self.as_ref(db).and_then(|(_, ty)| ty.as_slice(db)).is_some() {
             Some(Self::Concrete(usize_id(db)))
         } else {
             None
@@ -796,16 +829,18 @@ pub struct RefWrappedTy {
 
 impl RefWrappedTy {
     pub fn wrap_like(&self, db: &dyn Db, to_wrap: TypeRef) -> TypeRef {
-        self.refs
-            .iter()
-            .fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty))
+        self.refs.iter().fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty))
     }
 
     pub fn as_type_ref(&self, db: &dyn Db) -> TypeRef {
         self.wrap_like(db, self.inner)
     }
 
-    pub fn peel_until(db: &dyn Db, to_peel: TypeRef, target: TypeRef) -> Option<Self> {
+    pub fn peel_until(
+        db: &dyn Db,
+        to_peel: TypeRef,
+        target: TypeRef,
+    ) -> Option<Self> {
         let mut refs = vec![];
         let mut inner = to_peel;
         while inner != target

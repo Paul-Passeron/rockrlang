@@ -112,8 +112,8 @@ impl dyn Db {
 
 impl dyn Db {
     pub fn target_width(&self) -> IntWidth {
-        // For the moment, we don't have a way of setting the target, so we just use the
-        // user's machine's width.
+        // For the moment, we don't have a way of setting the target, so we just
+        // use the user's machine's width.
         match usize::BITS {
             8 => IntWidth::I8,
             16 => IntWidth::I16,

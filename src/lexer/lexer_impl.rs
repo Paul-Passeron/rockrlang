@@ -37,10 +37,8 @@ pub struct LexError {
     pub offset: usize,
 }
 
-pub type TokenPattern<'db, T> = (
-    Regex,
-    fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>,
-);
+pub type TokenPattern<'db, T> =
+    (Regex, fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>);
 
 pub struct Lexer<'db, T> {
     pub db: &'db dyn crate::Db,
@@ -110,13 +108,7 @@ impl<'db, T> Lexer<'db, T> {
         skip_patterns: Vec<Regex>,
     ) -> Lexer<'db, T> {
         let contents = source.content(db);
-        Self {
-            db,
-            offset: 0,
-            file: source,
-            token_patterns,
-            skip_patterns,
-        }
+        Self { db, offset: 0, file: source, token_patterns, skip_patterns }
     }
 
     pub fn loc(&self) -> Location {

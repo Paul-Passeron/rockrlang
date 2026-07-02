@@ -50,7 +50,9 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, Assoc)> {
             (9, Assoc::Left)
         }
         TokenKind::Plus | TokenKind::Minus => (10, Assoc::Left),
-        TokenKind::Mult | TokenKind::Div | TokenKind::Modulo => (11, Assoc::Left),
+        TokenKind::Mult | TokenKind::Div | TokenKind::Modulo => {
+            (11, Assoc::Left)
+        }
         _ => return None,
     };
     let (lbp, rbp) = match assoc {
@@ -225,7 +227,8 @@ impl<'db> Parser<'db> {
 
                 Some(TokenKind::Dot) => {
                     self.consume();
-                    if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind)
+                    if let Some(TokenKind::IntLit(index)) =
+                        self.peek_n(0).map(|t| t.kind)
                     {
                         self.consume();
                         let end = self.get_end();
@@ -241,7 +244,9 @@ impl<'db> Parser<'db> {
                         continue;
                     }
                     let field = self.parse_symbol()?;
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::OpenPar) {
+                    if self.peek_n(0).map(|t| &t.kind)
+                        == Some(&TokenKind::OpenPar)
+                    {
                         self.consume();
                         let args = self.parse_expr_args()?;
                         self.expect(TokenKind::ClosePar)?;
@@ -296,29 +301,30 @@ impl<'db> Parser<'db> {
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
-                        AstExprDesc::Call {
-                            callee: Box::new(expr),
-                            args,
-                        },
+                        AstExprDesc::Call { callee: Box::new(expr), args },
                         vec![],
                         span,
                     );
                 }
 
                 Some(TokenKind::Lt) => {
-                    // Try to parse as `expr<T>::method(...)` or `expr<T>::Variant`.
-                    // This handles qualified paths like `a::b::c<T>::Variant { ... }`
-                    // where `a::b::c` has already been built up as a NameResolved expr.
+                    // Try to parse as `expr<T>::method(...)` or
+                    // `expr<T>::Variant`. This handles
+                    // qualified paths like `a::b::c<T>::Variant { ... }`
+                    // where `a::b::c` has already been built up as a
+                    // NameResolved expr.
                     let start = expr.span.start();
-                    if let Some(static_call) = self.try_parse_static_call(&expr, start) {
+                    if let Some(static_call) =
+                        self.try_parse_static_call(&expr, start)
+                    {
                         expr = static_call;
                     } else if let Some(qualified_cons) =
                         self.try_parse_qualified_cons(&expr, start)
                     {
                         expr = qualified_cons;
                     } else {
-                        // Not a static call or qualified cons — `<` is a comparison
-                        // operator.
+                        // Not a static call or qualified cons — `<` is a
+                        // comparison operator.
                         break;
                     }
                 }
@@ -326,8 +332,9 @@ impl<'db> Parser<'db> {
                 Some(TokenKind::OpenBra) => {
                     // Only parse as struct literal if the expression can be
                     // reinterpreted as a type (e.g. a name or qualified path)
-                    // AND the brace content starts with '.' (struct field syntax).
-                    // This avoids conflicts with `match expr { ... }` and other
+                    // AND the brace content starts with '.' (struct field
+                    // syntax). This avoids conflicts with
+                    // `match expr { ... }` and other
                     // brace-delimited constructs.
                     let is_type_like = matches!(
                         &expr.data,
@@ -335,8 +342,8 @@ impl<'db> Parser<'db> {
                             | AstExprDesc::NameResolved { .. }
                             | AstExprDesc::QualifiedPath { .. }
                     );
-                    let has_field_syntax =
-                        self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Dot);
+                    let has_field_syntax = self.peek_n(1).map(|t| &t.kind)
+                        == Some(&TokenKind::Dot);
 
                     if is_type_like && has_field_syntax {
                         self.consume();
@@ -348,12 +355,15 @@ impl<'db> Parser<'db> {
                         let span = expr.span.start().span(end);
 
                         let (ty, variant) = match expr.data.clone() {
-                            AstExprDesc::QualifiedPath { ty, name } => (ty, Some(name)),
+                            AstExprDesc::QualifiedPath { ty, name } => {
+                                (ty, Some(name))
+                            }
 
                             AstExprDesc::NameResolved { from, ref to }
                                 if matches!(to.data, AstExprDesc::Name(_)) =>
                             {
-                                let AstExprDesc::Name(variant_name) = to.data else {
+                                let AstExprDesc::Name(variant_name) = to.data
+                                else {
                                     unreachable!()
                                 };
                                 let base_expr = AstExpr::new(
@@ -371,11 +381,7 @@ impl<'db> Parser<'db> {
                         };
 
                         expr = AstExpr::new(
-                            AstExprDesc::StructLit {
-                                ty,
-                                variant,
-                                fields,
-                            },
+                            AstExprDesc::StructLit { ty, variant, fields },
                             vec![],
                             span,
                         );
@@ -390,24 +396,19 @@ impl<'db> Parser<'db> {
         Ok(expr)
     }
 
-    fn reinterpret_expr_as_ty(&mut self, e: AstExpr) -> Result<AstTypeExpr, ParseError> {
-        let Spanned {
-            data,
-            annotations,
-            span,
-        } = e;
+    fn reinterpret_expr_as_ty(
+        &mut self,
+        e: AstExpr,
+    ) -> Result<AstTypeExpr, ParseError> {
+        let Spanned { data, annotations, span } = e;
 
         let data = match data {
-            AstExprDesc::Name(symbol) => AstTypeExprDesc::Named {
-                name: symbol,
-                args: vec![],
-            },
+            AstExprDesc::Name(symbol) => {
+                AstTypeExprDesc::Named { name: symbol, args: vec![] }
+            }
             AstExprDesc::NameResolved { from, to } => {
                 let to = self.reinterpret_expr_as_ty(*to)?;
-                AstTypeExprDesc::NameResolved {
-                    from,
-                    to: Box::new(to),
-                }
+                AstTypeExprDesc::NameResolved { from, to: Box::new(to) }
             }
             _ => unreachable!(),
         };
@@ -415,7 +416,9 @@ impl<'db> Parser<'db> {
         Ok(Spanned::new(data, annotations, span))
     }
 
-    pub(super) fn parse_int_lit(&mut self) -> Result<Spanned<usize>, ParseError> {
+    pub(super) fn parse_int_lit(
+        &mut self,
+    ) -> Result<Spanned<usize>, ParseError> {
         let tok = self.current_token()?.clone();
         match tok.kind {
             TokenKind::IntLit(v) => {
@@ -470,7 +473,9 @@ impl<'db> Parser<'db> {
                     && !matches!(t.kind, TokenKind::CloseBra)
                 {
                     exprs.push(self.parse_expr()?);
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
+                    if self.peek_n(0).map(|t| &t.kind)
+                        == Some(&TokenKind::Comma)
+                    {
                         self.consume();
                     } else {
                         break;
@@ -491,7 +496,9 @@ impl<'db> Parser<'db> {
                     && !matches!(t.kind, TokenKind::ClosePar)
                 {
                     exprs.push(self.parse_expr()?);
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
+                    if self.peek_n(0).map(|t| &t.kind)
+                        == Some(&TokenKind::Comma)
+                    {
                         self.consume();
                     } else {
                         break;
@@ -506,7 +513,9 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
-            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
+            TokenKind::Directive(dir)
+                if dir == Symbol::new(self.db, "sizeof") =>
+            {
                 self.consume();
 
                 self.expect(TokenKind::OpenPar)?;
@@ -526,7 +535,9 @@ impl<'db> Parser<'db> {
                 ))
             }
 
-            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "metadata") => {
+            TokenKind::Directive(dir)
+                if dir == Symbol::new(self.db, "metadata") =>
+            {
                 self.consume();
 
                 self.expect(TokenKind::OpenPar)?;
@@ -565,7 +576,8 @@ impl<'db> Parser<'db> {
                     }
 
                     Some(TokenKind::OpenBra)
-                        if self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Dot) =>
+                        if self.peek_n(1).map(|t| &t.kind)
+                            == Some(&TokenKind::Dot) =>
                     {
                         self.consume();
                         let fields = self.parse_struct_fields()?;
@@ -590,8 +602,9 @@ impl<'db> Parser<'db> {
                     }
 
                     // `<` is not handled here — just return the Name and let
-                    // parse_postfix handle it for static calls / qualified paths.
-                    // This way `a::b::c<T>::Variant` works correctly: `a::b::c`
+                    // parse_postfix handle it for static calls / qualified
+                    // paths. This way `a::b::c<T>::Variant`
+                    // works correctly: `a::b::c`
                     // is built up as NameResolved through the Access arm, then
                     // postfix sees `<` and tries static_call / qualified_cons
                     // with the full expression (not just the last identifier).
@@ -655,11 +668,7 @@ impl<'db> Parser<'db> {
 
         let end = self.get_end();
         Ok(Spanned::new(
-            AstExprDesc::StaticCall {
-                ty,
-                method: method_sym.data,
-                args,
-            },
+            AstExprDesc::StaticCall { ty, method: method_sym.data, args },
             vec![],
             start.span(end),
         ))
@@ -718,9 +727,7 @@ impl<'db> Parser<'db> {
         let ty_span = start.span(self.get_end());
         let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
 
-        if self
-            .peek_n(0)
-            .is_some_and(|t| matches!(t.kind, TokenKind::OpenBra))
+        if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::OpenBra))
         {
             self.consume();
             let fields = self.parse_struct_fields()?;
@@ -746,21 +753,14 @@ impl<'db> Parser<'db> {
             self.consume();
             let end = self.get_end();
             Ok(Spanned::new(
-                AstExprDesc::StaticCall {
-                    ty,
-                    method: variant_sym.data,
-                    args,
-                },
+                AstExprDesc::StaticCall { ty, method: variant_sym.data, args },
                 vec![],
                 start.span(end),
             ))
         } else {
             let end = self.get_end();
             Ok(Spanned::new(
-                AstExprDesc::QualifiedPath {
-                    ty,
-                    name: variant_sym.data,
-                },
+                AstExprDesc::QualifiedPath { ty, name: variant_sym.data },
                 vec![],
                 start.span(end),
             ))
@@ -795,14 +795,15 @@ impl<'db> Parser<'db> {
                 vec![],
                 span,
             )),
-            _ => {
-                Err(self
-                    .parse_error(ParseErrorKind::ExpectedSymbol("type name".to_string())))
-            }
+            _ => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
+                "type name".to_string(),
+            ))),
         }
     }
 
-    fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {
+    fn parse_struct_fields(
+        &mut self,
+    ) -> Result<Vec<AstStructField>, ParseError> {
         let mut fields = vec![];
         loop {
             match self.peek_n(0).map(|t| t.kind) {
@@ -813,10 +814,7 @@ impl<'db> Parser<'db> {
                     self.expect(TokenKind::Colon)?;
                     self.consume(); // consume ':'
                     let value = self.parse_expr()?;
-                    fields.push(AstStructField {
-                        name: name.data,
-                        value,
-                    });
+                    fields.push(AstStructField { name: name.data, value });
                     match self.peek_n(0).map(|t| t.kind) {
                         Some(TokenKind::Comma) => {
                             self.consume();

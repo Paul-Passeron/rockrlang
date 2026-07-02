@@ -17,7 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     lexer::TokenKind,
-    parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
+    parse_tree::stmt::{
+        AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp,
+    },
     parser::{ParseError, Parser},
 };
 
@@ -40,15 +42,13 @@ impl<'db> Parser<'db> {
         Ok(res)
     }
 
-    pub(super) fn parse_block_as_stmt(&mut self) -> Result<AstStmt, ParseError> {
+    pub(super) fn parse_block_as_stmt(
+        &mut self,
+    ) -> Result<AstStmt, ParseError> {
         let start = self.get_end();
         let stmts = self.parse_block()?;
         let end = self.get_end();
-        Ok(AstStmt::new(
-            AstStmtDesc::Block { stmts },
-            vec![],
-            start.span(end),
-        ))
+        Ok(AstStmt::new(AstStmtDesc::Block { stmts }, vec![], start.span(end)))
     }
 
     fn parse_let_decl(&mut self) -> Result<AstStmt, ParseError> {
@@ -71,11 +71,7 @@ impl<'db> Parser<'db> {
         self.consume();
         let end = self.get_end();
         Ok(AstStmt::new(
-            AstStmtDesc::LetDecl {
-                pat,
-                type_constraint,
-                value,
-            },
+            AstStmtDesc::LetDecl { pat, type_constraint, value },
             vec![],
             start.span(end),
         ))
@@ -92,11 +88,7 @@ impl<'db> Parser<'db> {
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
         Ok(AstStmt::new(
-            AstStmtDesc::For {
-                element,
-                iterator,
-                body: Box::new(body),
-            },
+            AstStmtDesc::For { element, iterator, body: Box::new(body) },
             vec![],
             start.span(end),
         ))
@@ -117,11 +109,7 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::Semicolon)?;
         self.consume();
         let end = self.get_end();
-        Ok(AstStmt::new(
-            AstStmtDesc::Return { value },
-            vec![],
-            start.span(end),
-        ))
+        Ok(AstStmt::new(AstStmtDesc::Return { value }, vec![], start.span(end)))
     }
 
     fn parse_while_stmt(&mut self) -> Result<AstStmt, ParseError> {
@@ -132,10 +120,7 @@ impl<'db> Parser<'db> {
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
         Ok(AstStmt::new(
-            AstStmtDesc::While {
-                cond,
-                body: Box::new(body),
-            },
+            AstStmtDesc::While { cond, body: Box::new(body) },
             vec![],
             start.span(end),
         ))
@@ -145,7 +130,8 @@ impl<'db> Parser<'db> {
         let saved_pos = self.position;
         let start = self.get_start();
 
-        // Parse the LHS as an expression — postfix/field/index chains are valid LHS
+        // Parse the LHS as an expression — postfix/field/index chains are valid
+        // LHS
         let lhs = match self.parse_expr() {
             Ok(e) => e,
             Err(_) => {
@@ -155,16 +141,18 @@ impl<'db> Parser<'db> {
         };
 
         // Match directly on the dedicated compound-assign tokens or plain `=`
-        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind) {
-            Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
-            Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
-            Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
-            Some(TokenKind::DivEq) => Some(CompoundAssignOp::Div),
-            Some(TokenKind::ModuloEq) => Some(CompoundAssignOp::Modulo),
-            _ => None,
-        };
+        let compound_op: Option<CompoundAssignOp> =
+            match self.peek_n(0).map(|t| t.kind) {
+                Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
+                Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
+                Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
+                Some(TokenKind::DivEq) => Some(CompoundAssignOp::Div),
+                Some(TokenKind::ModuloEq) => Some(CompoundAssignOp::Modulo),
+                _ => None,
+            };
 
-        let is_plain_assign = self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
+        let is_plain_assign =
+            self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
 
         if compound_op.is_none() && !is_plain_assign {
             self.position = saved_pos;
@@ -221,20 +209,13 @@ impl<'db> Parser<'db> {
             self.expect(TokenKind::BigArrow)?;
             self.consume();
             let body = self.parse_block_as_stmt()?;
-            branches.push(AstMatchBranch {
-                pat,
-                guard,
-                body: Box::new(body),
-            });
+            branches.push(AstMatchBranch { pat, guard, body: Box::new(body) });
         }
         self.expect(TokenKind::CloseBra)?;
         self.consume();
 
         Ok(AstStmt::new(
-            AstStmtDesc::Match {
-                scrutinee,
-                branches,
-            },
+            AstStmtDesc::Match { scrutinee, branches },
             vec![],
             start.span(self.get_end()),
         ))

@@ -25,8 +25,8 @@ use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::{
     Db,
     hir::{
-        HirBody, HirExpr, HirId, HirPattern, HirStmt, HirStmtKind, LocalId, LocalInfo,
-        hir_body,
+        HirBody, HirExpr, HirId, HirPattern, HirStmt, HirStmtKind, LocalId,
+        LocalInfo, hir_body,
     },
     name_resolve::type_expr::get_templates_of_fun,
     parse_tree::top_level::AstTemplateArg,
@@ -117,17 +117,11 @@ impl<'db> TyCtx<'db> {
         zelf: Option<LocalId>,
     ) -> Self {
         let templates = get_templates_of_fun(db, function.interned());
-        let local_ids = locals.iter().map(|local| local.id).collect::<Box<[_]>>();
+        let local_ids =
+            locals.iter().map(|local| local.id).collect::<Box<[_]>>();
         let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params);
 
-        Self {
-            db,
-            function,
-            locals,
-            params,
-            templates,
-            inf_ctx,
-        }
+        Self { db, function, locals, params, templates, inf_ctx }
     }
 
     fn concretize_infos(&mut self, infos: InferCallInfos) -> CallInfos {
@@ -221,7 +215,10 @@ impl<'db> TyCtx<'db> {
         )
     }
 
-    fn type_check_expr(&mut self, expr: &HirExpr) -> (TyRef, Option<UnificationError>) {
+    fn type_check_expr(
+        &mut self,
+        expr: &HirExpr,
+    ) -> (TyRef, Option<UnificationError>) {
         let (ty, err) = match self.inf_ctx.infer_expr(expr) {
             Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
             Err(err) => (TyRef::Error, Some(err)),
@@ -231,11 +228,14 @@ impl<'db> TyCtx<'db> {
 
     fn get_ret_ty(&mut self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
-        self.inf_ctx
-            .allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
+        self.inf_ctx.allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
     }
 
-    fn type_check_match(&mut self, scrutinee: &HirExpr, branches: &[HirMatchBranch]) {
+    fn type_check_match(
+        &mut self,
+        scrutinee: &HirExpr,
+        branches: &[HirMatchBranch],
+    ) {
         let (typeof_scrut, err) = self.type_check_expr(scrutinee);
         if let Some(err) = err {
             dbg!("TODO: err here !", err);
@@ -259,8 +259,7 @@ impl<'db> TyCtx<'db> {
                     InferTy::Var(self.inf_ctx.fresh_var())
                 }
             };
-            self.inf_ctx
-                .emit_is_inner_constraint(pat_ty, typeof_scrut.clone());
+            self.inf_ctx.emit_is_inner_constraint(pat_ty, typeof_scrut.clone());
 
             if let Some(guard) = &branch.guard {
                 let inferred = self.inf_ctx.infer_expr(guard);
@@ -271,9 +270,11 @@ impl<'db> TyCtx<'db> {
                         InferTy::Var(self.inf_ctx.fresh_var())
                     }
                 };
-                if let Err(err) = self.inf_ctx.unify(guard_ty, self.inf_ctx.bool_ty()) {
-                    // This is safe to do because this can fail only if the one above
-                    // didn't.
+                if let Err(err) =
+                    self.inf_ctx.unify(guard_ty, self.inf_ctx.bool_ty())
+                {
+                    // This is safe to do because this can fail only if the one
+                    // above didn't.
                     error.1 = Some(err);
                 }
             }
@@ -306,8 +307,10 @@ impl<'db> TyCtx<'db> {
                 match &pattern.data {
                     HirPatternDesc::Tuple(_)
                     | HirPatternDesc::DestructureBinding { .. } => {
-                        self.inf_ctx
-                            .emit_is_inner_constraint(pattern_ty, init_ty.clone());
+                        self.inf_ctx.emit_is_inner_constraint(
+                            pattern_ty,
+                            init_ty.clone(),
+                        );
                     }
                     HirPatternDesc::Constructor { .. } => {
                         todo!("Not allowed here")
@@ -320,10 +323,11 @@ impl<'db> TyCtx<'db> {
                 }
                 if let Some(annotation) = ty_annotation
                     && let Some(annotation) = annotation.as_known()
-                    && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
-                        &annotation.data,
-                        self.inf_ctx.implicit_ctx().as_ref(),
-                    )
+                    && let Some(annotated) =
+                        self.inf_ctx.allocate_ast_type_expr(
+                            &annotation.data,
+                            self.inf_ctx.implicit_ctx().as_ref(),
+                        )
                     && let Err(_err) =
                         self.inf_ctx.unify(init_ty.clone(), annotated.clone())
                 {
@@ -346,18 +350,10 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_stmt(&mut self, stmt: &HirStmt) {
         match &stmt.kind {
-            HirStmtKind::Let {
-                pattern,
-                ty_annotation,
-                init,
-                ..
-            } => {
+            HirStmtKind::Let { pattern, ty_annotation, init, .. } => {
                 self.type_check_let(pattern, ty_annotation.as_ref(), init);
             }
-            HirStmtKind::Match {
-                scrutinee,
-                branches,
-            } => {
+            HirStmtKind::Match { scrutinee, branches } => {
                 self.type_check_match(scrutinee, branches);
             }
             HirStmtKind::Assign { lhs, rhs } => {
@@ -368,11 +364,18 @@ impl<'db> TyCtx<'db> {
                 match self.inf_ctx.infer_place(lhs) {
                     Ok(lhs_ty) => match rhs_ty {
                         TyRef::Inf(rhs_ty) => {
-                            if let Err(err) =
-                                self.inf_ctx.unify(lhs_ty.clone(), rhs_ty.clone())
+                            if let Err(err) = self
+                                .inf_ctx
+                                .unify(lhs_ty.clone(), rhs_ty.clone())
                             {
-                                let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
-                                let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
+                                let lstr = self
+                                    .inf_ctx
+                                    .find(&lhs_ty)
+                                    .to_string(self.db);
+                                let rstr = self
+                                    .inf_ctx
+                                    .find(&rhs_ty)
+                                    .to_string(self.db);
                                 dbg!("TODO: err here !", err, lstr, rstr);
                             }
                         }
@@ -387,7 +390,10 @@ impl<'db> TyCtx<'db> {
                 let (_, err) = self.type_check_expr(hir_expr);
                 if let Some(err) = err {
                     Diag::generic_error(
-                        format!("unification error: `{}`", err.display(self.db)),
+                        format!(
+                            "unification error: `{}`",
+                            err.display(self.db)
+                        ),
                         hir_expr.span,
                     )
                     .accumulate(self.db);
@@ -403,13 +409,18 @@ impl<'db> TyCtx<'db> {
 
                     match ty {
                         TyRef::Inf(infer_ty) => {
-                            if let Err(err) =
-                                self.inf_ctx.unify(ret_ty.clone(), infer_ty.clone())
+                            if let Err(err) = self
+                                .inf_ctx
+                                .unify(ret_ty.clone(), infer_ty.clone())
                             {
                                 let fmt = format!(
                                     "Cannot return {} form a function expected to return {}",
-                                    self.inf_ctx.find(&infer_ty).to_string(self.db),
-                                    self.inf_ctx.find(&ret_ty).to_string(self.db)
+                                    self.inf_ctx
+                                        .find(&infer_ty)
+                                        .to_string(self.db),
+                                    self.inf_ctx
+                                        .find(&ret_ty)
+                                        .to_string(self.db)
                                 );
                                 dbg!("TODO: err here !", err, fmt);
                             }
@@ -435,12 +446,14 @@ impl<'db> TyCtx<'db> {
             }
             HirStmtKind::If { cond, then, else_ } => {
                 match self.inf_ctx.infer_expr(cond) {
-                    Ok(ty) => match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
-                        Ok(()) => (),
-                        Err(err) => {
-                            dbg!("TODO: err here !", err);
+                    Ok(ty) => {
+                        match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                            Ok(()) => (),
+                            Err(err) => {
+                                dbg!("TODO: err here !", err);
+                            }
                         }
-                    },
+                    }
                     Err(err) => {
                         dbg!("TODO: err here !", err);
                     }
@@ -448,19 +461,23 @@ impl<'db> TyCtx<'db> {
                 self.type_check_stmt(then);
                 else_.as_ref().inspect(|else_| self.type_check_stmt(else_));
             }
-            HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
-                Ok(ty) => {
-                    if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
-                        dbg!("TODO: err here !", err);
+            HirStmtKind::While { cond, body } => {
+                match self.inf_ctx.infer_expr(cond) {
+                    Ok(ty) => {
+                        if let Err(err) =
+                            self.inf_ctx.unify(ty, self.inf_ctx.bool_ty())
+                        {
+                            dbg!("TODO: err here !", err);
 
-                        return;
+                            return;
+                        }
+                        self.type_check_stmt(body);
                     }
-                    self.type_check_stmt(body);
+                    Err(err) => {
+                        dbg!("TODO: err here !", err);
+                    }
                 }
-                Err(err) => {
-                    dbg!("TODO: err here !", err);
-                }
-            },
+            }
             HirStmtKind::Block(stmts) => {
                 stmts.iter().for_each(|stmt| self.type_check_stmt(stmt))
             }
@@ -496,15 +513,12 @@ pub struct TypeCheckResults<'db> {
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
 
-fn type_check_hir<'db>(db: &'db dyn Db, hir: HirBody<'db>) -> TypeCheckResults<'db> {
-    TyCtx::new(
-        db,
-        hir.owner(db),
-        hir.locals(db),
-        hir.params(db),
-        hir.zelf(db),
-    )
-    .type_check(hir.stmts(db))
+fn type_check_hir<'db>(
+    db: &'db dyn Db,
+    hir: HirBody<'db>,
+) -> TypeCheckResults<'db> {
+    TyCtx::new(db, hir.owner(db), hir.locals(db), hir.params(db), hir.zelf(db))
+        .type_check(hir.stmts(db))
 }
 
 #[salsa::tracked]

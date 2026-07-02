@@ -32,16 +32,16 @@ struct LspBackend {
 
 impl LspBackend {
     pub fn new(client: Client) -> Self {
-        Self {
-            client,
-            db: Arc::new(Mutex::new(RockrDb::new())),
-        }
+        Self { client, db: Arc::new(Mutex::new(RockrDb::new())) }
     }
 }
 
 #[tower_lsp::async_trait]
 impl LanguageServer for LspBackend {
-    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(
+        &self,
+        _: InitializeParams,
+    ) -> Result<InitializeResult> {
         Ok(InitializeResult {
             server_info: None,
             capabilities: ServerCapabilities {
@@ -116,9 +116,7 @@ impl LanguageServer for LspBackend {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        self.client
-            .log_message(MessageType::INFO, "rock-lsp ready")
-            .await;
+        self.client.log_message(MessageType::INFO, "rock-lsp ready").await;
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {

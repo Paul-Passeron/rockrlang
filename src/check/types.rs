@@ -144,10 +144,8 @@ fn check_variant(
             }
         }
         AstEnumVariantKind::TupleLike(tys) => {
-            for (i, (ast, ty)) in tys
-                .iter()
-                .map(|ty| (ty, ctx.resolve(db, &ty.data)))
-                .enumerate()
+            for (i, (ast, ty)) in
+                tys.iter().map(|ty| (ty, ctx.resolve(db, &ty.data))).enumerate()
             {
                 match ty {
                     Some(_) => (),

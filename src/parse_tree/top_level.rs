@@ -193,7 +193,12 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                 Ok(())
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                write!(f, "{}::{}", from.display(self.db), to.data.display(self.db))
+                write!(
+                    f,
+                    "{}::{}",
+                    from.display(self.db),
+                    to.data.display(self.db)
+                )
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
                 write!(
@@ -216,7 +221,11 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     f,
                     "[{}{}]",
                     ty.data.display(self.db),
-                    if let Some(len) = len { format!("; {len}") } else { String::new() }
+                    if let Some(len) = len {
+                        format!("; {len}")
+                    } else {
+                        String::new()
+                    }
                 )
             }
             AstTypeExprDesc::Tuple(spanneds) => {
@@ -268,11 +277,7 @@ pub struct AstImplBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
-    Type {
-        name: Symbol,
-        name_span: Span,
-        ty: AstTypeExpr,
-    },
+    Type { name: Symbol, name_span: Span, ty: AstTypeExpr },
     Fundef(Box<AstMethodDef>),
 }
 
@@ -289,10 +294,7 @@ pub type AstIncludePath = Spanned<AstIncludePathDesc>;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstIncludePathDesc {
     Symbol(Symbol),
-    NameResolved {
-        from: Symbol,
-        to: Box<AstIncludePath>,
-    },
+    NameResolved { from: Symbol, to: Box<AstIncludePath> },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -335,14 +337,16 @@ pub struct AstStructDefField {
 impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
-        let Spanned {
-            data: symbol, span, ..
-        } = symbols.pop().unwrap();
+        let Spanned { data: symbol, span, .. } = symbols.pop().unwrap();
         let start_loc = span.start();
         symbols.reverse();
 
         symbols.into_iter().fold(
-            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
+            AstIncludePath::new(
+                AstIncludePathDesc::Symbol(symbol),
+                vec![],
+                span,
+            ),
             |acc, symb| {
                 let total_span = start_loc.span(symb.span.end());
                 AstIncludePath::new(

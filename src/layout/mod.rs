@@ -130,9 +130,11 @@ pub struct FieldInput {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiscriminantStrategyKind {
-    AlwaysTagged, // dumb default: explicit tag if >1 variant, None if exactly 1
-    NicheFilling, /* search for spare bit patterns before falling back to tagged,
-                   * this will be implemented at a later date as I'm just trying to
+    AlwaysTagged, /* dumb default: explicit tag if >1 variant, None if
+                   * exactly 1 */
+    NicheFilling, /* search for spare bit patterns before falling back to
+                   * tagged, this will be implemented at
+                   * a later date as I'm just trying to
                    * get the MVP up and running */
 }
 
@@ -163,7 +165,11 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
     }
 }
 
-fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> LayoutID {
+fn builtin_layout(
+    db: &dyn Db,
+    builtin_id: BuiltinTypeId,
+    args: &[TypeRef],
+) -> LayoutID {
     if builtin_id == BuiltinTypeId::tuple(db) {
         if args.is_empty() {
             return LayoutID::zst(db);
@@ -215,7 +221,10 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
                 .into_iter()
                 .map(|i| (Offset::ZERO + element_size * i as u64, inner_layout))
                 .collect(),
-            source_to_layout: (0..length).into_iter().map(|i| i as u32).collect_vec(),
+            source_to_layout: (0..length)
+                .into_iter()
+                .map(|i| i as u32)
+                .collect_vec(),
         });
 
         LayoutID::new(db, element_size * length as u64, align, data)

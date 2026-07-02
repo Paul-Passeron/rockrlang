@@ -96,14 +96,7 @@ pub struct MIRLocal {
 
 impl MIRLocal {
     pub fn new(ty: TypeRef, mutability: Mutability, span: Span) -> Self {
-        Self {
-            ty,
-            mutability,
-            span,
-            name: None,
-            thir_src: None,
-            syn_src: None,
-        }
+        Self { ty, mutability, span, name: None, thir_src: None, syn_src: None }
     }
 
     pub fn with_thir_src(self, src: thir::LocalId) -> Self {
@@ -140,9 +133,7 @@ impl MIR {
                 self._compute_reachable(s, *then);
                 self._compute_reachable(s, *else_);
             }
-            MIRTerminator::Switch {
-                branches, default, ..
-            } => {
+            MIRTerminator::Switch { branches, default, .. } => {
                 branches
                     .iter()
                     .map(|b| b.1)
@@ -166,15 +157,18 @@ impl MIR {
                     MIRTerminator::Return { .. } | MIRTerminator::Diverge => {
                         HashSet::new()
                     }
-                    MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
+                    MIRTerminator::Goto { next }
+                    | MIRTerminator::Call { next, .. } => {
                         HashSet::from([*next])
                     }
                     MIRTerminator::Branch { then, else_, .. } => {
                         HashSet::from([*then, *else_])
                     }
-                    MIRTerminator::Switch {
-                        branches, default, ..
-                    } => branches.iter().map(|b| *b.1).chain([*default]).collect(),
+                    MIRTerminator::Switch { branches, default, .. } => branches
+                        .iter()
+                        .map(|b| *b.1)
+                        .chain([*default])
+                        .collect(),
                 };
                 (blk, succs)
             })

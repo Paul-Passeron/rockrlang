@@ -26,10 +26,7 @@ pub struct AstAnnotation {
 pub enum AstAnnotationItem {
     Flag(Symbol),
 
-    Call {
-        name: Symbol,
-        args: Vec<AstAnnotationArg>,
-    },
+    Call { name: Symbol, args: Vec<AstAnnotationArg> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

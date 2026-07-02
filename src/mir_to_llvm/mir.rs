@@ -4,8 +4,8 @@ use inkwell::{
     basic_block::BasicBlock,
     types::BasicTypeEnum,
     values::{
-        AnyValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
-        PointerValue, ValueKind,
+        AnyValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum,
+        FunctionValue, PointerValue, ValueKind,
     },
 };
 use itertools::Itertools;
@@ -15,8 +15,8 @@ use crate::{
         MIR, MIRBlockID, MIRLocalID,
         basic_block::{MIRTerminator, Stmt},
         operand::{
-            MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-            MIRRValueKind,
+            MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection,
+            MIRRValue, MIRRValueKind,
         },
     },
     mir_to_llvm::LLVMCtx,
@@ -37,13 +37,7 @@ pub(super) struct MIRGen<'a, 'b> {
 impl<'a, 'b> MIRGen<'a, 'b> {
     pub fn new(cg: &'b LLVMCtx<'a, 'b>, mir: &'b MIR) -> Self {
         let f = cg.fun_map[&mir.func];
-        Self {
-            cg,
-            mir,
-            f,
-            bb_map: HashMap::new(),
-            local_map: HashMap::new(),
-        }
+        Self { cg, mir, f, bb_map: HashMap::new(), local_map: HashMap::new() }
     }
 
     fn get_block(&self, idx: MIRBlockID) -> BasicBlock<'a> {
@@ -73,17 +67,22 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                         .1;
                 }
                 MIRProjection::Field { name, .. } => {
-                    let pointee_ty = self.ty(current_ty).unwrap().into_struct_type();
+                    let pointee_ty =
+                        self.ty(current_ty).unwrap().into_struct_type();
                     let sref = current_ty.as_struct_ref(self.cg.db).unwrap();
                     let item = struct_item(self.cg.db, sref.def.into());
-                    let index =
-                        item.fields
-                            .iter()
-                            .enumerate()
-                            .find_map(|(i, field)| {
-                                if field.name == *name { Some(i as u32) } else { None }
-                            })
-                            .unwrap();
+                    let index = item
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .find_map(|(i, field)| {
+                            if field.name == *name {
+                                Some(i as u32)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap();
                     llvm_place = self
                         .cg
                         .b
@@ -111,7 +110,10 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                 let const_str = self
                     .cg
                     .b
-                    .build_global_string_ptr(&unescaper::unescape(contents).unwrap(), "")
+                    .build_global_string_ptr(
+                        &unescaper::unescape(contents).unwrap(),
+                        "",
+                    )
                     .unwrap();
                 const_str.as_basic_value_enum()
             }
@@ -120,7 +122,9 @@ impl<'a, 'b> MIRGen<'a, 'b> {
 
     fn lower_operand(&self, operand: &MIROperand) -> BasicValueEnum<'a> {
         match operand {
-            MIROperand::Constant(mirconstant, _) => self.lower_constant(mirconstant),
+            MIROperand::Constant(mirconstant, _) => {
+                self.lower_constant(mirconstant)
+            }
             MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
                 if let Some(ty) = self.ty(mirplace.ty) {
                     let ptr = self.lower_place_as_ptr(mirplace);
@@ -136,7 +140,8 @@ impl<'a, 'b> MIRGen<'a, 'b> {
         let ty = self.ty(rvalue.ty);
         match &rvalue.kind {
             MIRRValueKind::Use(miroperand) => self.lower_operand(miroperand),
-            MIRRValueKind::AddressOf(mirplace, _) | MIRRValueKind::Ref(mirplace, _) => {
+            MIRRValueKind::AddressOf(mirplace, _)
+            | MIRRValueKind::Ref(mirplace, _) => {
                 self.lower_place_as_ptr(mirplace).as_basic_value_enum()
             }
             MIRRValueKind::BinOp(_, _, _) => todo!(),
@@ -145,9 +150,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
             MIRRValueKind::Metadata(_) => todo!(),
             MIRRValueKind::SizeOf(_) => todo!(),
             MIRRValueKind::Constructor { .. } => todo!(),
-            MIRRValueKind::StructLit {
-                struct_ref, fields, ..
-            } => {
+            MIRRValueKind::StructLit { struct_ref, fields, .. } => {
                 let ty = ty.unwrap().into_struct_type();
                 let values = struct_item(self.cg.db, struct_ref.def.into())
                     .fields
@@ -184,13 +187,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
             MIRTerminator::Diverge => {
                 self.cg.b.build_unreachable().unwrap();
             }
-            MIRTerminator::Call {
-                callee,
-                arguments,
-                dest,
-                next,
-                ..
-            } => {
+            MIRTerminator::Call { callee, arguments, dest, next, .. } => {
                 let args = arguments
                     .iter()
                     .map(|arg| self.lower_operand(arg))
@@ -199,14 +196,21 @@ impl<'a, 'b> MIRGen<'a, 'b> {
 
                 let llvm_callee = match callee {
                     MIRCallee::Direct(function_ref) => {
-                        self.cg.fun_map
-                            [&FuncInst::from_funcref(self.cg.db, function_ref.clone())]
+                        self.cg.fun_map[&FuncInst::from_funcref(
+                            self.cg.db,
+                            function_ref.clone(),
+                        )]
                     }
                 };
 
-                let call_site_value =
-                    self.cg.b.build_direct_call(llvm_callee, &args, "").unwrap();
-                if let ValueKind::Basic(value) = call_site_value.try_as_basic_value() {
+                let call_site_value = self
+                    .cg
+                    .b
+                    .build_direct_call(llvm_callee, &args, "")
+                    .unwrap();
+                if let ValueKind::Basic(value) =
+                    call_site_value.try_as_basic_value()
+                {
                     let ptr = self.local_map[dest];
                     self.cg.b.build_store(ptr, value).unwrap();
                 }
@@ -218,7 +222,8 @@ impl<'a, 'b> MIRGen<'a, 'b> {
             }
             MIRTerminator::Return { value, .. } => {
                 if let Some(operand) = value {
-                    let lowered: &dyn BasicValue<'a> = &self.lower_operand(operand);
+                    let lowered: &dyn BasicValue<'a> =
+                        &self.lower_operand(operand);
                     self.cg.b.build_return(Some(lowered)).unwrap();
                 } else {
                     self.cg.b.build_return(None).unwrap();
@@ -230,9 +235,7 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                     .build_unconditional_branch(self.get_block(*next))
                     .unwrap();
             }
-            MIRTerminator::Branch {
-                cond, then, else_, ..
-            } => {
+            MIRTerminator::Branch { cond, then, else_, .. } => {
                 let value = self.lower_operand(cond);
                 let then_block = self.get_block(*then);
                 let else_block = self.get_block(*else_);
@@ -298,7 +301,8 @@ impl<'a, 'b> MIRGen<'a, 'b> {
                 let name = local
                     .name
                     .map_or("".into(), |symbol| symbol.to_string(self.cg.db));
-                let llvm_local = self.cg.b.build_alloca(ty, name.as_str()).unwrap();
+                let llvm_local =
+                    self.cg.b.build_alloca(ty, name.as_str()).unwrap();
                 self.local_map.insert(idx, llvm_local);
             }
         }

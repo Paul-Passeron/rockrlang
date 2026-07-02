@@ -25,11 +25,7 @@ pub type AstPattern = Spanned<AstPatternDesc>;
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum StructFieldPattern {
-    Rebind {
-        name: Symbol,
-        name_span: Span,
-        pattern: AstPattern,
-    },
+    Rebind { name: Symbol, name_span: Span, pattern: AstPattern },
     Name(Symbol, Span),
 }
 
@@ -42,21 +38,11 @@ pub enum AstConstructFields {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstNamedPattern {
-    Mut {
-        name: Symbol,
-    },
+    Mut { name: Symbol },
     Bare(Symbol),
-    Constructor {
-        name: Symbol,
-        args: AstConstructFields,
-    },
-    NameResolved {
-        from: Symbol,
-        to: Box<AstNamedPattern>,
-    },
-    Tuple {
-        fields: Vec<AstPattern>,
-    },
+    Constructor { name: Symbol, args: AstConstructFields },
+    NameResolved { from: Symbol, to: Box<AstNamedPattern> },
+    Tuple { fields: Vec<AstPattern> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

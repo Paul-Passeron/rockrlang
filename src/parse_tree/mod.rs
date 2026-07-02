@@ -48,11 +48,7 @@ impl<T: Hash> Hash for Spanned<T> {
 
 impl<T> Spanned<T> {
     pub fn new(data: T, annotations: Vec<AstAnnotation>, span: Span) -> Self {
-        Self {
-            data,
-            annotations,
-            span,
-        }
+        Self { data, annotations, span }
     }
 }
 

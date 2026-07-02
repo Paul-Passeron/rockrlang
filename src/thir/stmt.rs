@@ -17,7 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
+    thir::{
+        ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch,
+    },
 };
 
 pub struct ThirStmt {
@@ -63,17 +65,11 @@ pub enum StmtKind {
 
 impl ThirStmt {
     pub fn brk(id: ScopeId, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Break(id),
-            span,
-        }
+        Self { kind: StmtKind::Break(id), span }
     }
 
     pub fn error(span: Span) -> Self {
-        Self {
-            kind: StmtKind::Error,
-            span,
-        }
+        Self { kind: StmtKind::Error, span }
     }
 
     pub fn ifte(
@@ -85,22 +81,13 @@ impl ThirStmt {
         span: Span,
     ) -> Self {
         Self {
-            kind: StmtKind::If {
-                cond,
-                then,
-                then_scope,
-                else_,
-                else_scope,
-            },
+            kind: StmtKind::If { cond, then, then_scope, else_, else_scope },
             span,
         }
     }
 
     pub fn expr(expr: ExprId, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Expr(expr),
-            span,
-        }
+        Self { kind: StmtKind::Expr(expr), span }
     }
 
     pub fn whl(
@@ -109,17 +96,11 @@ impl ThirStmt {
         body: Vec<Self>,
         span: Span,
     ) -> Self {
-        Self {
-            kind: StmtKind::While { scope, cond, body },
-            span,
-        }
+        Self { kind: StmtKind::While { scope, cond, body }, span }
     }
 
     pub fn ret(expr: Option<ExprId>, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Return(expr),
-            span,
-        }
+        Self { kind: StmtKind::Return(expr), span }
     }
 
     pub fn mtch(
@@ -127,33 +108,18 @@ impl ThirStmt {
         branches: Vec<ThirMatchBranch>,
         span: Span,
     ) -> Self {
-        Self {
-            kind: StmtKind::Match {
-                scrutinee: scrut,
-                branches,
-            },
-            span,
-        }
+        Self { kind: StmtKind::Match { scrutinee: scrut, branches }, span }
     }
 
     pub fn block(scope: ScopeId, stmts: Vec<Self>, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Block { scope, stmts },
-            span,
-        }
+        Self { kind: StmtKind::Block { scope, stmts }, span }
     }
 
     pub fn assign(place: PlaceId, expr: ExprId, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Assign { place, rhs: expr },
-            span,
-        }
+        Self { kind: StmtKind::Assign { place, rhs: expr }, span }
     }
 
     pub fn let_(local: LocalId, value: ExprId, span: Span) -> Self {
-        Self {
-            kind: StmtKind::Let { local, init: value },
-            span,
-        }
+        Self { kind: StmtKind::Let { local, init: value }, span }
     }
 }

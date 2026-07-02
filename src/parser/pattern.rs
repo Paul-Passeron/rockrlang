@@ -42,7 +42,9 @@ impl<'db> Parser<'db> {
                     start.span(self.get_end()),
                 ))
             }
-            TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
+            TokenKind::Identifier(name)
+                if name == Symbol::new(self.db, "_") =>
+            {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(end)))
@@ -131,7 +133,9 @@ impl<'db> Parser<'db> {
                             pattern: associated,
                         })
                     } else {
-                        fields.push(StructFieldPattern::Name(name.data, name.span));
+                        fields.push(StructFieldPattern::Name(
+                            name.data, name.span,
+                        ));
                     }
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Comma)

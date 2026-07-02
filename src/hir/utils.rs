@@ -18,44 +18,28 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     common::{location::Span, symbols::Symbol},
     hir::{
-        HirExpr, HirExprDesc, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
-        HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, LocalId,
-        lower_fundef::LowerFundef,
+        HirExpr, HirExprDesc, HirMatchBranch, HirPattern,
+        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, LocalId, lower_fundef::LowerFundef,
     },
     name_resolve::interfaces::core_opt_enum,
 };
 
 impl LowerFundef<'_> {
     pub fn new_expr(&self, desc: HirExprDesc, span: Span) -> HirExpr {
-        HirExpr {
-            id: self.alloc.fresh(),
-            data: desc,
-            span,
-        }
+        HirExpr { id: self.alloc.fresh(), data: desc, span }
     }
 
     pub fn new_place(&self, kind: HirPlaceKind, span: Span) -> HirPlace {
-        HirPlace {
-            id: self.alloc.fresh(),
-            kind,
-            span,
-        }
+        HirPlace { id: self.alloc.fresh(), kind, span }
     }
 
     pub fn new_pattern(&self, desc: HirPatternDesc, span: Span) -> HirPattern {
-        HirPattern {
-            id: self.alloc.fresh(),
-            data: desc,
-            span,
-        }
+        HirPattern { id: self.alloc.fresh(), data: desc, span }
     }
 
     pub fn new_stmt(&self, kind: HirStmtKind, span: Span) -> HirStmt {
-        HirStmt {
-            id: self.alloc.fresh(),
-            kind,
-            span,
-        }
+        HirStmt { id: self.alloc.fresh(), kind, span }
     }
 
     /// Returns the pattern Some(<pat>)
@@ -106,10 +90,13 @@ impl LowerFundef<'_> {
                         body: stmt.boxed(),
                     },
                     HirMatchBranch {
-                        pattern: self.new_pattern(HirPatternDesc::Any, pat_span),
+                        pattern: self
+                            .new_pattern(HirPatternDesc::Any, pat_span),
                         locals: vec![],
                         guard: None,
-                        body: self.new_stmt(HirStmtKind::Break, pat_span).boxed(),
+                        body: self
+                            .new_stmt(HirStmtKind::Break, pat_span)
+                            .boxed(),
                     },
                 ],
             },

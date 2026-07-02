@@ -22,12 +22,14 @@ use crate::{
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
-    name_resolve::type_expr::{get_templates_of_fun_only, get_templates_of_owner},
+    name_resolve::type_expr::{
+        get_templates_of_fun_only, get_templates_of_owner,
+    },
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     printer::render_diagnostics,
     ril::{
-        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId,
-        TypeRef, ptr_of, ref_of,
+        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
+        TypeDefId, TypeRef, ptr_of, ref_of,
     },
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
@@ -123,7 +125,11 @@ impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CompilerError::NoCompilationUnitFound(path_buf) => {
-                write!(f, "No compilation unit found at `{}`", path_buf.display())
+                write!(
+                    f,
+                    "No compilation unit found at `{}`",
+                    path_buf.display()
+                )
             }
             CompilerError::STDLibNotFound => {
                 write!(f, "Standard library (`std`) package not found.")
@@ -182,8 +188,12 @@ impl ZelfArg {
     pub fn as_type_ref_for(&self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         match self.kind {
             ZelfKind::Zelf => ty,
-            ZelfKind::RefZelf => ref_of(db, ty, self.mutability.is_mut()).into(),
-            ZelfKind::PtrZelf => ptr_of(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::RefZelf => {
+                ref_of(db, ty, self.mutability.is_mut()).into()
+            }
+            ZelfKind::PtrZelf => {
+                ptr_of(db, ty, self.mutability.is_mut()).into()
+            }
         }
     }
 }
@@ -199,9 +209,11 @@ pub enum ZelfKind {
 pub struct FunctionSignature {
     pub name: Symbol,
     pub zelf: Option<ZelfArg>,
-    pub implicit_templates: Vec<Vec<InterfaceRef>>, /* Templates inherited from
+    pub implicit_templates: Vec<Vec<InterfaceRef>>, /* Templates inherited
+                                                     * from
                                                      * environment */
-    pub added_templates: Vec<Vec<InterfaceRef>>, // Templates for this function only
+    pub added_templates: Vec<Vec<InterfaceRef>>, /* Templates for this
+                                                  * function only */
     pub args: Vec<(Symbol, TypeRef)>,
     pub ret: TypeRef,
 }
@@ -222,8 +234,12 @@ impl AstReceiver {
                 return None;
             }
             AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
-            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
-            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
+            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => {
+                ZelfKind::RefZelf
+            }
+            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => {
+                ZelfKind::PtrZelf
+            }
         };
         Some(ZelfArg { mutability, kind })
     }
@@ -249,15 +265,20 @@ pub fn get_sig_of_function(
 ) -> Arc<FunctionSignature> {
     let function_templates: Arc<[AstTemplateArg]> =
         get_templates_of_fun_only(db, function_id).into();
-    let ctx =
-        AstImplicitContext::new(db, function_id.parent(db), function_templates.clone())
-            .unwrap();
+    let ctx = AstImplicitContext::new(
+        db,
+        function_id.parent(db),
+        function_templates.clone(),
+    )
+    .unwrap();
     let added_templates: Vec<Vec<InterfaceRef>> = function_templates
         .iter()
         .map(|t| {
             t.constraints
                 .iter()
-                .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                .flat_map(|constraint| {
+                    ctx.resolve_interface(db, &constraint.data)
+                })
                 .collect()
         })
         .collect();
@@ -268,7 +289,9 @@ pub fn get_sig_of_function(
             .map(|t| {
                 t.constraints
                     .iter()
-                    .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                    .flat_map(|constraint| {
+                        ctx.resolve_interface(db, &constraint.data)
+                    })
                     .collect_vec()
             })
             .collect_vec();
@@ -300,14 +323,13 @@ fn add_package_root_from_disk(
     db: &mut dyn Db,
     root: PathBuf,
 ) -> Result<(), CompilerError> {
-    let root = root
-        .canonicalize()
-        .map_err(|_| CompilerError::NoFileFoundAt(root))?;
+    let root =
+        root.canonicalize().map_err(|_| CompilerError::NoFileFoundAt(root))?;
     let path_to_file =
         if root.is_dir() { root.join(ANCHOR_FILE_NAME) } else { root.clone() };
     let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
-    let root_file =
-        read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
+    let root_file = read_source_file(db, &path_to_file)
+        .ok_or(CompilerError::NoFileFoundAt(root))?;
     let root = PackageRoot::new(db, package_name, root_file);
     Workspace::get(db).add_package_root(db, root);
     Ok(())
@@ -322,16 +344,19 @@ fn std_path() -> Result<PathBuf, CompilerError> {
 }
 
 fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
-    std::env::var(env)
-        .map_err(|_| CompilerError::CoreLibNotFound)
-        .and_then(|path| {
+    std::env::var(env).map_err(|_| CompilerError::CoreLibNotFound).and_then(
+        |path| {
             PathBuf::from(path)
                 .canonicalize()
                 .map_err(|_| CompilerError::CoreLibNotFound)
-        })
+        },
+    )
 }
 
-fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
+fn compute_package_roots(
+    db: &mut dyn Db,
+    root: PathBuf,
+) -> Result<(), CompilerError> {
     add_package_root_from_disk(db, root)?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {
@@ -371,7 +396,8 @@ fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
         walk(
             db,
             if path.is_file()
-                && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME
+                && path.file_name().unwrap().to_str().unwrap()
+                    == ANCHOR_FILE_NAME
             {
                 path.parent().unwrap().to_path_buf()
             } else {
@@ -400,7 +426,10 @@ fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
     (has_errors, raw_diags)
 }
 
-pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
+pub fn check_from_disk(
+    root: PathBuf,
+    config: Config,
+) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -413,9 +442,7 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
 
     diags.sort_by(|(loc_a, diag_a), (loc_b, diag_b)| {
         diag_a.severity.cmp(&diag_b.severity).then_with(|| {
-            loc_a
-                .cmp(loc_b)
-                .then_with(|| diag_a.message.cmp(&diag_b.message))
+            loc_a.cmp(loc_b).then_with(|| diag_a.message.cmp(&diag_b.message))
         })
     });
 
@@ -423,7 +450,10 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
 
-pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
+pub fn build_from_disk(
+    root: PathBuf,
+    config: Config,
+) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -436,9 +466,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
 
     diags.sort_by(|(loc_a, diag_a), (loc_b, diag_b)| {
         diag_a.severity.cmp(&diag_b.severity).then_with(|| {
-            loc_a
-                .cmp(loc_b)
-                .then_with(|| diag_a.message.cmp(&diag_b.message))
+            loc_a.cmp(loc_b).then_with(|| diag_a.message.cmp(&diag_b.message))
         })
     });
 
@@ -502,17 +530,20 @@ pub fn submodules_of_file<'db>(
 }
 
 #[salsa::tracked]
-pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> {
+pub fn package_of_root<'db>(
+    db: &'db dyn Db,
+    root: PackageRoot,
+) -> Package<'db> {
     let file = root.file(db);
     Package::new(db, FileModule::new(db, file, submodules_of_file(db, file)))
 }
 
 #[salsa::tracked]
-pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Arc<Vec<Package<'db>>> {
+pub fn workspace_packages<'db>(
+    db: &'db dyn Db,
+    ws: Workspace,
+) -> Arc<Vec<Package<'db>>> {
     Arc::new(
-        ws.roots(db)
-            .iter()
-            .map(|root| package_of_root(db, *root))
-            .collect(),
+        ws.roots(db).iter().map(|root| package_of_root(db, *root)).collect(),
     )
 }

@@ -75,11 +75,7 @@ impl<'a> Matrix<'a> {
         let Some(fst) = self.rows.first() else {
             return DecisionTree::Fail;
         };
-        if fst
-            .pats
-            .iter()
-            .all(|p| p.is_none_or(|pat| pat.is_wildcard_like()))
-        {
+        if fst.pats.iter().all(|p| p.is_none_or(|pat| pat.is_wildcard_like())) {
             return DecisionTree::Leaf {
                 branch_idx: fst.branch_idx,
                 bindings: self.collect_bindings(fst, ctx),
@@ -100,7 +96,9 @@ impl<'a> Matrix<'a> {
         let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
         let ty = wrapped.inner;
 
-        if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct_ref(ctx.db).is_some() {
+        if ty.as_tuple_ref(ctx.db).is_some()
+            || ty.as_struct_ref(ctx.db).is_some()
+        {
             return self.expand_irrefutable(col, ctx).compile(ctx);
         }
 
@@ -110,11 +108,7 @@ impl<'a> Matrix<'a> {
             Some(Box::new(self.default(col, ctx).compile(ctx)))
         };
 
-        DecisionTree::Switch {
-            place,
-            cases,
-            default,
-        }
+        DecisionTree::Switch { place, cases, default }
     }
 
     fn expand_irrefutable(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
@@ -122,37 +116,38 @@ impl<'a> Matrix<'a> {
         let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
         let ty = wrapped.inner;
 
-        let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
-            tuple_ref
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| {
-                    let mut pl = place.clone();
-                    pl.ty = *ty;
-                    pl.projections.push(MIRProjection::TupleField {
-                        index: i as u32,
-                        resulting_ty: *ty,
-                    });
-                    pl
-                })
-                .collect()
-        } else if let Some(struct_ref) = ty.as_struct_ref(ctx.db) {
-            struct_ref
-                .get_fields_ty(ctx.db)
-                .iter()
-                .map(|(name, ty)| {
-                    let mut pl = place.clone();
-                    pl.ty = *ty;
-                    pl.projections.push(MIRProjection::Field {
-                        name: *name,
-                        resulting_ty: *ty,
-                    });
-                    pl
-                })
-                .collect_vec()
-        } else {
-            todo!()
-        };
+        let new_places: Vec<MIRPlace> =
+            if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
+                tuple_ref
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ty)| {
+                        let mut pl = place.clone();
+                        pl.ty = *ty;
+                        pl.projections.push(MIRProjection::TupleField {
+                            index: i as u32,
+                            resulting_ty: *ty,
+                        });
+                        pl
+                    })
+                    .collect()
+            } else if let Some(struct_ref) = ty.as_struct_ref(ctx.db) {
+                struct_ref
+                    .get_fields_ty(ctx.db)
+                    .iter()
+                    .map(|(name, ty)| {
+                        let mut pl = place.clone();
+                        pl.ty = *ty;
+                        pl.projections.push(MIRProjection::Field {
+                            name: *name,
+                            resulting_ty: *ty,
+                        });
+                        pl
+                    })
+                    .collect_vec()
+            } else {
+                todo!()
+            };
 
         let arity = new_places.len();
 
@@ -184,10 +179,7 @@ impl<'a> Matrix<'a> {
             })
             .collect_vec();
 
-        Self {
-            cols: new_cols,
-            rows: new_rows,
-        }
+        Self { cols: new_cols, rows: new_rows }
     }
 
     fn default(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
@@ -205,7 +197,8 @@ impl<'a> Matrix<'a> {
                 if let Some(pat) = pat
                     && let ThirPatternKind::Bind { local, .. } = &pat.kind
                 {
-                    bindings.push((ctx.local_map[local], self.cols[col].clone()));
+                    bindings
+                        .push((ctx.local_map[local], self.cols[col].clone()));
                 }
                 rows.push(Row {
                     pats: new_pats,
@@ -217,7 +210,12 @@ impl<'a> Matrix<'a> {
         Self { cols, rows }
     }
 
-    fn specialize(&self, col: usize, ctor: Constructor, ctx: &mut ThirToMIR) -> Self {
+    fn specialize(
+        &self,
+        col: usize,
+        ctor: Constructor,
+        ctx: &mut ThirToMIR,
+    ) -> Self {
         let arity = self.arity_of(col, ctor, ctx);
         let new_places = self.subplaces_for(col, ctor, &arity, ctx);
         let mut cols = self.cols.clone();
@@ -249,7 +247,8 @@ impl<'a> Matrix<'a> {
                     ..
                 }) = pat
                 {
-                    bindings.push((ctx.local_map[local], self.cols[col].clone()));
+                    bindings
+                        .push((ctx.local_map[local], self.cols[col].clone()));
                 }
                 rows.push(Row {
                     pats: new_pats,
@@ -278,7 +277,9 @@ impl<'a> Matrix<'a> {
                     panic!("Only variant constructors are supported here")
                 };
                 (0..*n)
-                    .map(|i| ctx.project_downcast_tuple_field(base, variant_idx, i))
+                    .map(|i| {
+                        ctx.project_downcast_tuple_field(base, variant_idx, i)
+                    })
                     .collect()
             }
             VariantArity::Struct(symbols) => {
@@ -287,7 +288,9 @@ impl<'a> Matrix<'a> {
                 };
                 symbols
                     .iter()
-                    .map(|field| ctx.project_downcast_field(base, variant_idx, *field))
+                    .map(|field| {
+                        ctx.project_downcast_field(base, variant_idx, *field)
+                    })
                     .collect()
             }
         }
@@ -303,17 +306,28 @@ impl<'a> Matrix<'a> {
         let ty = wrapped.inner;
         match ctor {
             Constructor::Variant(idx) => {
-                let id = ty.as_enum_ref(ctx.db).expect("This should be an enum").def;
+                let id =
+                    ty.as_enum_ref(ctx.db).expect("This should be an enum").def;
                 let kind = &enum_item(ctx.db, id.interned()).variants[idx].kind;
                 match kind {
                     AstEnumVariantKind::Unit => VariantArity::None,
-                    AstEnumVariantKind::StructLike(fields) => VariantArity::Struct(
-                        fields.iter().map(|field| field.name).unique().collect(),
-                    ),
-                    AstEnumVariantKind::TupleLike(tys) => VariantArity::Tuple(tys.len()),
+                    AstEnumVariantKind::StructLike(fields) => {
+                        VariantArity::Struct(
+                            fields
+                                .iter()
+                                .map(|field| field.name)
+                                .unique()
+                                .collect(),
+                        )
+                    }
+                    AstEnumVariantKind::TupleLike(tys) => {
+                        VariantArity::Tuple(tys.len())
+                    }
                 }
             }
-            Constructor::BoolLit(_) | Constructor::IntLit(_) => VariantArity::None,
+            Constructor::BoolLit(_) | Constructor::IntLit(_) => {
+                VariantArity::None
+            }
         }
     }
 
@@ -356,10 +370,7 @@ impl<'a> Matrix<'a> {
                 }) => {
                     bindings.push((ctx.local_map[local], place.clone()));
                 }
-                Some(ThirPattern {
-                    kind: ThirPatternKind::Any,
-                    ..
-                }) => (),
+                Some(ThirPattern { kind: ThirPatternKind::Any, .. }) => (),
                 Some(_) => unreachable!(),
                 None => (), // synthetic wildcard
             }
@@ -378,31 +389,44 @@ impl ThirPattern {
 
     fn constructor(&self) -> Option<Constructor> {
         match &self.kind {
-            ThirPatternKind::Constructor { idx, .. } => Some(Constructor::Variant(*idx)),
-            ThirPatternKind::IntLit(val) => Some(Constructor::IntLit(*val as i128)),
+            ThirPatternKind::Constructor { idx, .. } => {
+                Some(Constructor::Variant(*idx))
+            }
+            ThirPatternKind::IntLit(val) => {
+                Some(Constructor::IntLit(*val as i128))
+            }
             _ => None,
         }
     }
 
-    fn sub_patterns_for(&self, arity: &VariantArity) -> Vec<Option<&ThirPattern>> {
+    fn sub_patterns_for(
+        &self,
+        arity: &VariantArity,
+    ) -> Vec<Option<&ThirPattern>> {
         match &self.kind {
             ThirPatternKind::Constructor { args, .. } => match (args, arity) {
                 (ThirConstructorArgs::Tuple(items), VariantArity::Tuple(n)) => {
                     assert_eq!(items.len(), *n);
                     items.iter().map(Some).collect()
                 }
-                (ThirConstructorArgs::Struct(items), VariantArity::Struct(symbs)) => {
-                    symbs
-                        .iter()
-                        .map(|symb| {
-                            items.iter().find(|(name, _)| symb == name).map(|f| &f.1)
-                        })
-                        .collect()
-                }
+                (
+                    ThirConstructorArgs::Struct(items),
+                    VariantArity::Struct(symbs),
+                ) => symbs
+                    .iter()
+                    .map(|symb| {
+                        items
+                            .iter()
+                            .find(|(name, _)| symb == name)
+                            .map(|f| &f.1)
+                    })
+                    .collect(),
                 (ThirConstructorArgs::None, VariantArity::None) => vec![],
                 _ => unreachable!(),
             },
-            ThirPatternKind::Tuple(_) | ThirPatternKind::Struct { .. } => unreachable!(),
+            ThirPatternKind::Tuple(_) | ThirPatternKind::Struct { .. } => {
+                unreachable!()
+            }
             _ => std::iter::repeat_n(None, arity.len()).collect_vec(),
         }
     }
@@ -421,7 +445,8 @@ fn is_complete(db: &dyn Db, sig: &HashSet<Constructor>, ty: TypeRef) -> bool {
                 && sig.contains(&Constructor::BoolLit(false))
         }
         TypeRef::Concrete(_)
-            if ty.as_tuple_ref(db).is_some() || ty.as_struct_ref(db).is_some() =>
+            if ty.as_tuple_ref(db).is_some()
+                || ty.as_struct_ref(db).is_some() =>
         {
             true
         }
@@ -453,9 +478,7 @@ impl<'a> ThirToMIR<'a> {
         tuple_idx: usize,
     ) -> MIRPlace {
         let mut projections = base.projections.clone();
-        projections.push(MIRProjection::Downcast {
-            variant: variant_idx,
-        });
+        projections.push(MIRProjection::Downcast { variant: variant_idx });
         let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
         let ConstructorType::Tuple(tys) = peeled
             .inner
@@ -487,9 +510,7 @@ impl<'a> ThirToMIR<'a> {
         field: Symbol,
     ) -> MIRPlace {
         let mut projections = base.projections.clone();
-        projections.push(MIRProjection::Downcast {
-            variant: variant_idx,
-        });
+        projections.push(MIRProjection::Downcast { variant: variant_idx });
         let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
         let ConstructorType::Struct(tys) = peeled
             .inner
@@ -500,14 +521,12 @@ impl<'a> ThirToMIR<'a> {
         else {
             panic!("Expected tuple constructor");
         };
-        let resulting_ty = tys.iter().find(|(name, _)| *name == field).unwrap().1;
+        let resulting_ty =
+            tys.iter().find(|(name, _)| *name == field).unwrap().1;
         for _ in &peeled.refs {
             projections.push(MIRProjection::Deref);
         }
-        projections.push(MIRProjection::Field {
-            name: field,
-            resulting_ty,
-        });
+        projections.push(MIRProjection::Field { name: field, resulting_ty });
         MIRPlace {
             local: base.local,
             projections,

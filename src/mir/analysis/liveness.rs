@@ -43,15 +43,11 @@ pub struct MIRLivenessResult {
 
 impl From<FixedPointBlockRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
     fn from(
-        FixedPointBlockRes {
-            block_in,
-            block_out,
-        }: FixedPointBlockRes<HashSet<MIRLocalID>>,
+        FixedPointBlockRes { block_in, block_out }: FixedPointBlockRes<
+            HashSet<MIRLocalID>,
+        >,
     ) -> Self {
-        Self {
-            live_in: block_in,
-            live_out: block_out,
-        }
+        Self { live_in: block_in, live_out: block_out }
     }
 }
 
@@ -84,9 +80,7 @@ impl fmt::Display for MIRLivenessResult {
                 f,
                 "    bb{}: {{{}}}",
                 bb.raw(),
-                live.iter()
-                    .map(|local| format!("_{}", local.raw()))
-                    .join(", ")
+                live.iter().map(|local| format!("_{}", local.raw())).join(", ")
             )?;
         }
         writeln!(f, "live-out:")?;
@@ -95,9 +89,7 @@ impl fmt::Display for MIRLivenessResult {
                 f,
                 "    bb{}: {{{}}}",
                 bb.raw(),
-                live.iter()
-                    .map(|local| format!("_{}", local.raw()))
-                    .join(", ")
+                live.iter().map(|local| format!("_{}", local.raw())).join(", ")
             )?;
         }
         Ok(())

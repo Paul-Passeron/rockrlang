@@ -25,7 +25,9 @@ use crate::{
         MIR, MIRBlockID, MIRLocalID,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
-        operand::{MIRConstructorArgs, MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
+        operand::{
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRRValue, MIRRValueKind,
+        },
         passes::MIRPass,
     },
 };
@@ -76,7 +78,10 @@ impl<'a> DCECtx<'a> {
         self.reachable = reachable.into_iter().collect();
     }
 
-    fn add_and_get_local_to_mapping(&mut self, original: MIRLocalID) -> MIRLocalID {
+    fn add_and_get_local_to_mapping(
+        &mut self,
+        original: MIRLocalID,
+    ) -> MIRLocalID {
         if let Some(res) = self.local_map.get(&original) {
             return *res;
         }
@@ -168,7 +173,8 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_paths(&mut self) -> Vec<Vec<OldBlockID>> {
-        let mut paths = self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
+        let mut paths =
+            self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
         while let Some(PathCompressionRes { i, j, reversed }) =
             self.find_next_path_compression(&paths)
         {
@@ -215,54 +221,51 @@ impl<'a> DCECtx<'a> {
     fn copy_rvalue(&mut self, rvalue: &MIRRValue) -> MIRRValue {
         let kind = match &rvalue.kind {
             MIRRValueKind::Use(op) => MIRRValueKind::Use(self.copy_operand(op)),
-            MIRRValueKind::Ref(p, m) => MIRRValueKind::Ref(self.copy_place(p), *m),
+            MIRRValueKind::Ref(p, m) => {
+                MIRRValueKind::Ref(self.copy_place(p), *m)
+            }
             MIRRValueKind::AddressOf(p, m) => {
                 MIRRValueKind::AddressOf(self.copy_place(p), *m)
             }
-            MIRRValueKind::BinOp(bop, l, r) => {
-                MIRRValueKind::BinOp(*bop, self.copy_operand(l), self.copy_operand(r))
-            }
+            MIRRValueKind::BinOp(bop, l, r) => MIRRValueKind::BinOp(
+                *bop,
+                self.copy_operand(l),
+                self.copy_operand(r),
+            ),
             MIRRValueKind::UnaryOp(uop, op) => {
                 MIRRValueKind::UnaryOp(*uop, self.copy_operand(op))
             }
             MIRRValueKind::Discriminant(p) => {
                 MIRRValueKind::Discriminant(self.copy_place(p))
             }
-            MIRRValueKind::Metadata(op) => MIRRValueKind::Metadata(self.copy_operand(op)),
+            MIRRValueKind::Metadata(op) => {
+                MIRRValueKind::Metadata(self.copy_operand(op))
+            }
             MIRRValueKind::SizeOf(t) => MIRRValueKind::SizeOf(*t),
-            MIRRValueKind::Constructor {
-                enum_ref,
-                idx,
-                args,
-                span,
-            } => MIRRValueKind::Constructor {
-                enum_ref: enum_ref.clone(),
-                idx: *idx,
-                args: self.copy_cons_args(args),
-                span: *span,
-            },
-            MIRRValueKind::StructLit {
-                struct_ref,
-                fields,
-                span,
-            } => MIRRValueKind::StructLit {
-                struct_ref: struct_ref.clone(),
-                fields: fields
-                    .iter()
-                    .map(|f| (*f.0, self.copy_operand(f.1)))
-                    .collect(),
-                span: *span,
-            },
+            MIRRValueKind::Constructor { enum_ref, idx, args, span } => {
+                MIRRValueKind::Constructor {
+                    enum_ref: enum_ref.clone(),
+                    idx: *idx,
+                    args: self.copy_cons_args(args),
+                    span: *span,
+                }
+            }
+            MIRRValueKind::StructLit { struct_ref, fields, span } => {
+                MIRRValueKind::StructLit {
+                    struct_ref: struct_ref.clone(),
+                    fields: fields
+                        .iter()
+                        .map(|f| (*f.0, self.copy_operand(f.1)))
+                        .collect(),
+                    span: *span,
+                }
+            }
             MIRRValueKind::Tuple(ops, span) => MIRRValueKind::Tuple(
                 ops.iter().map(|op| self.copy_operand(op)).collect(),
                 *span,
             ),
         };
-        MIRRValue {
-            kind,
-            ty: rvalue.ty,
-            span: rvalue.span,
-        }
+        MIRRValue { kind, ty: rvalue.ty, span: rvalue.span }
     }
 
     fn copy_stmt(&mut self, stmt: &Stmt) -> Stmt {
@@ -283,7 +286,10 @@ impl<'a> DCECtx<'a> {
         }
     }
 
-    fn copy_cons_args(&mut self, args: &MIRConstructorArgs) -> MIRConstructorArgs {
+    fn copy_cons_args(
+        &mut self,
+        args: &MIRConstructorArgs,
+    ) -> MIRConstructorArgs {
         match args {
             MIRConstructorArgs::None => MIRConstructorArgs::None,
             MIRConstructorArgs::Tuple(ops) => MIRConstructorArgs::Tuple(
@@ -300,7 +306,9 @@ impl<'a> DCECtx<'a> {
 
     fn copy_operand(&mut self, operand: &MIROperand) -> MIROperand {
         match operand {
-            MIROperand::Constant(cst, span) => MIROperand::Constant(cst.clone(), *span),
+            MIROperand::Constant(cst, span) => {
+                MIROperand::Constant(cst.clone(), *span)
+            }
             MIROperand::Move(p) => MIROperand::Move(self.copy_place(p)),
             MIROperand::Copy(p) => MIROperand::Copy(self.copy_place(p)),
         }
@@ -323,22 +331,18 @@ impl<'a> DCECtx<'a> {
     ) -> MIRTerminator {
         match terminator {
             MIRTerminator::Diverge => MIRTerminator::Diverge,
-            MIRTerminator::Call {
-                callee,
-                arguments,
-                dest,
-                next,
-                span,
-            } => MIRTerminator::Call {
-                callee: callee.clone(),
-                arguments: arguments
-                    .iter()
-                    .map(|operand| self.copy_operand(operand))
-                    .collect(),
-                dest: self.add_and_get_local_to_mapping(*dest),
-                next: self.get_bb(*next, bbs, path_heads),
-                span: *span,
-            },
+            MIRTerminator::Call { callee, arguments, dest, next, span } => {
+                MIRTerminator::Call {
+                    callee: callee.clone(),
+                    arguments: arguments
+                        .iter()
+                        .map(|operand| self.copy_operand(operand))
+                        .collect(),
+                    dest: self.add_and_get_local_to_mapping(*dest),
+                    next: self.get_bb(*next, bbs, path_heads),
+                    span: *span,
+                }
+            }
             MIRTerminator::Return { value, span } => MIRTerminator::Return {
                 value: value.as_ref().map(|operand| self.copy_operand(operand)),
                 span: *span,
@@ -346,31 +350,25 @@ impl<'a> DCECtx<'a> {
             MIRTerminator::Goto { next } => MIRTerminator::Goto {
                 next: self.get_bb(*next, bbs, path_heads),
             },
-            MIRTerminator::Branch {
-                cond,
-                then,
-                else_,
-                span,
-            } => MIRTerminator::Branch {
-                cond: self.copy_operand(cond),
-                then: self.get_bb(*then, bbs, path_heads),
-                else_: self.get_bb(*else_, bbs, path_heads),
-                span: *span,
-            },
-            MIRTerminator::Switch {
-                discriminant,
-                branches,
-                default,
-                span,
-            } => MIRTerminator::Switch {
-                discriminant: self.copy_operand(discriminant),
-                branches: branches
-                    .iter()
-                    .map(|br| (*br.0, self.get_bb(*br.1, bbs, path_heads)))
-                    .collect(),
-                default: self.get_bb(*default, bbs, path_heads),
-                span: *span,
-            },
+            MIRTerminator::Branch { cond, then, else_, span } => {
+                MIRTerminator::Branch {
+                    cond: self.copy_operand(cond),
+                    then: self.get_bb(*then, bbs, path_heads),
+                    else_: self.get_bb(*else_, bbs, path_heads),
+                    span: *span,
+                }
+            }
+            MIRTerminator::Switch { discriminant, branches, default, span } => {
+                MIRTerminator::Switch {
+                    discriminant: self.copy_operand(discriminant),
+                    branches: branches
+                        .iter()
+                        .map(|br| (*br.0, self.get_bb(*br.1, bbs, path_heads)))
+                        .collect(),
+                    default: self.get_bb(*default, bbs, path_heads),
+                    span: *span,
+                }
+            }
         }
     }
 
@@ -401,7 +399,8 @@ impl<'a> DCECtx<'a> {
                 self.b.emit(new_stmt);
             });
             let terminator = &self.mir.blocks[*p.last().unwrap()].terminator;
-            let new_terminator = self.copy_terminator(terminator, &bbs, &path_heads);
+            let new_terminator =
+                self.copy_terminator(terminator, &bbs, &path_heads);
             self.b.terminate(new_terminator).unwrap();
         }
     }

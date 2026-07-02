@@ -21,26 +21,11 @@ pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstTypeExprDesc {
-    Named {
-        name: Symbol,
-        args: Vec<AstAnyTypeExpr>,
-    },
-    NameResolved {
-        from: Symbol,
-        to: Box<AstTypeExpr>,
-    },
-    Ref {
-        mutable: bool,
-        pointee: Box<AstTypeExpr>,
-    },
-    Pointer {
-        mutable: bool,
-        pointee: Box<AstTypeExpr>,
-    },
-    Slice {
-        ty: Box<AstTypeExpr>,
-        len: Option<usize>,
-    },
+    Named { name: Symbol, args: Vec<AstAnyTypeExpr> },
+    NameResolved { from: Symbol, to: Box<AstTypeExpr> },
+    Ref { mutable: bool, pointee: Box<AstTypeExpr> },
+    Pointer { mutable: bool, pointee: Box<AstTypeExpr> },
+    Slice { ty: Box<AstTypeExpr>, len: Option<usize> },
     Tuple(Vec<AstTypeExpr>),
 }
 
