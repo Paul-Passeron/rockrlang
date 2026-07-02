@@ -35,7 +35,9 @@ pub struct LIRDef {
     pub ty: LIRTy,
 }
 
-pub trait ValueKind: Copy + 'static {}
+pub trait ValueKind: Copy + 'static {
+    fn matches(class: ValueClass) -> bool;
+}
 pub trait ScalarMarker: Copy + 'static {}
 
 #[derive(Clone, Copy)]
@@ -53,6 +55,7 @@ pub struct Aggregate;
 #[derive(Clone, Copy)]
 pub struct Union;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ValueClass {
     Scalar(ScalarKind),
     Aggregate,
@@ -61,11 +64,31 @@ pub enum ValueClass {
 }
 
 impl ScalarMarker for Int {}
-impl<S: ScalarMarker> ValueKind for Scalar<S> {}
-impl<P: ValueKind> ValueKind for Ptr<P> {}
+impl<S: ScalarMarker> ValueKind for Scalar<S> {
+    fn matches(class: ValueClass) -> bool {
+        matches!(class, ValueClass::Scalar(ScalarKind::Int(_)))
+    }
+}
+
+impl<P: ValueKind> ValueKind for Ptr<P> {
+    fn matches(class: ValueClass) -> bool {
+        matches!(class, ValueClass::Scalar(ScalarKind::Ptr))
+    }
+}
+
 impl<P: ValueKind> ScalarMarker for Ptr<P> {}
-impl ValueKind for Aggregate {}
-impl ValueKind for Union {}
+
+impl ValueKind for Aggregate {
+    fn matches(class: ValueClass) -> bool {
+        matches!(class, ValueClass::Aggregate)
+    }
+}
+
+impl ValueKind for Union {
+    fn matches(class: ValueClass) -> bool {
+        matches!(class, ValueClass::Union)
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId<'ir> {

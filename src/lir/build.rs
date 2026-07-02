@@ -15,10 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::marker::PhantomData;
+
 use crate::{
-    Db, common::symbols::Symbol, layout::{LIRTy, LayoutData}, lir::{
-        Body, Branded, Building, FunctionSig, LIRDef, LIRFunctionId, Module, SigKind, Signature, Typed, TypedPtr, ValueClass, ValueDef, ValueId, ValueKind, VerifyError, branded::{BrandedBlockId, InProgressBody}, inst::{BlockTarget, ValueInstKind, VoidInstKind},
+    Db,
+    common::symbols::Symbol,
+    layout::{LIRTy, LayoutData, LayoutID, ScalarKind},
+    lir::{
+        Body, Branded, Building, FunctionSig, Int, IntValue, LIRDef,
+        LIRFunctionId, Module, SigKind, Signature, Typed, TypedPtr, ValueClass,
+        ValueDef, ValueId, ValueKind, VerifyError,
+        branded::{BrandedBlockId, InProgressBody},
+        inst::{BlockTarget, ConstValue, ValueInstKind, VoidInstKind},
     },
+    ril::ptr_of,
 };
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
@@ -145,28 +155,120 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.insts.push(Instruction::Void(kind));
     }
 
-    // Used for instructions where you don't have a guarantee on the instruction
-    // result
-    fn inst(&mut self, inst: Instruction<'ir>) -> Option<ValueId<'ir>> {
-        let res = match &inst {
-            Instruction::Void(_) => None,
-            Instruction::Value { def, .. } => Some(def.id()),
-        };
-        self.insts.push(inst);
-        res
+    // Void inst kind
+
+    fn store(&mut self, ptr: ValueId<'ir>, value: ValueId<'ir>) {
+        debug_assert_eq!(
+            self.body.defs[ptr.idx].ty.class(self.db),
+            ValueClass::Scalar(ScalarKind::Ptr)
+        );
+        self.push_void(VoidInstKind::Store { ptr, value })
     }
 
-    fn store<V: ValueKind>(
+    fn store_typed<V: ValueKind>(
         &mut self,
         ptr: TypedPtr<'ir, V>,
         value: Typed<'ir, V>,
     ) {
-        let inst = Instruction::Void(VoidInstKind::Store {
-            ptr: ptr.erase(),
-            value: value.erase(),
-        });
-        self.insts.push(inst);
+        self.store(ptr.erase(), value.erase())
     }
+
+    fn memcpy(&mut self, src: ValueId<'ir>, dst: ValueId<'ir>, ty: LIRTy) {
+        debug_assert!(self.body.defs[src.idx].ty.is_ptr(self.db));
+        debug_assert!(self.body.defs[dst.idx].ty.is_ptr(self.db));
+        self.push_void(VoidInstKind::MemCopy { src, dst, ty });
+    }
+
+    fn memcpy_typed<K: ValueKind>(
+        &mut self,
+        src: TypedPtr<'ir, K>,
+        dst: TypedPtr<'ir, K>,
+    ) {
+        debug_assert_eq!(src.pointee.layout, dst.pointee.layout);
+        let LIRTy { origin: src_orig, .. } = src.pointee;
+        let LIRTy { origin: dst_orig, .. } = dst.pointee;
+        let origin = src_orig.or(dst_orig);
+        self.memcpy(
+            src.erase(),
+            dst.erase(),
+            LIRTy { layout: src.pointee.layout, origin },
+        );
+    }
+
+    // Value inst kind
+
+    // constants
+
+    fn const_int(&mut self, ty: LIRTy, v: u128) -> IntValue<'ir> {
+        debug_assert!(matches!(
+            ty.class(self.db),
+            ValueClass::Scalar(ScalarKind::Int(_))
+        ));
+        let val = self.push_value(
+            ty,
+            ValueInstKind::Const(ConstValue::Int { ty, value: v }),
+        );
+        IntValue { id: val, _k: PhantomData }
+    }
+
+    fn const_null_ptr<K: ValueKind>(
+        &mut self,
+        pointee: LIRTy,
+    ) -> TypedPtr<'ir, K> {
+        debug_assert!(K::matches(pointee.class(self.db)));
+        let ptr_ty = LIRTy {
+            layout: LayoutID::ptr(self.db),
+            origin: pointee.origin.map(|ty| ptr_of(self.db, ty, false).into()),
+        };
+
+        let val = self.push_value(
+            ptr_ty,
+            ValueInstKind::Const(ConstValue::NullPtr { pointee }),
+        );
+        TypedPtr { raw: val, pointee, _k: PhantomData }
+    }
+
+    fn zeroed(&mut self, ty: LIRTy) -> ValueId<'ir> {
+        debug_assert!(matches!(
+            ty.class(self.db),
+            ValueClass::Aggregate | ValueClass::None | ValueClass::Union
+        ));
+
+        self.push_value(ty, ValueInstKind::Const(ConstValue::Zeroed { ty }))
+    }
+
+    fn function_ptr(&mut self, id: LIRFunctionId) -> ValueId<'ir> {
+        self.push_value(
+            LIRTy { layout: LayoutID::ptr(self.db), origin: None },
+            ValueInstKind::Const(ConstValue::FunctionAddr(id)),
+        )
+    }
+
+    // Memory
+
+    fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
+        self.push_value(ty, ValueInstKind::Alloca { ty })
+    }
+
+    fn alloca_typed<K: ValueKind>(&mut self, ty: LIRTy) -> TypedPtr<'ir, K> {
+        debug_assert!(K::matches(ty.class(self.db)));
+        let val = self.alloca(ty);
+        TypedPtr { raw: val, pointee: ty, _k: PhantomData }
+    }
+
+    fn load(&mut self, ptr: ValueId<'ir>, ty: LIRTy) -> ValueId<'ir> {
+        self.push_value(ty, ValueInstKind::Load { ptr, ty })
+    }
+
+    fn load_typed<K: ValueKind>(
+        &mut self,
+        ptr: TypedPtr<'ir, K>,
+    ) -> Typed<'ir, K> {
+        debug_assert!(K::matches(ptr.pointee.class(self.db)));
+        Typed { id: self.load(ptr.raw, ptr.pointee), _k: PhantomData }
+    }
+
+    // Terminators
 
     fn call(
         self,
@@ -202,10 +304,14 @@ impl<T> Terminated<T> {
 impl LIRTy {
     pub fn class(&self, db: &dyn Db) -> ValueClass {
         match self.layout.data(db) {
-            LayoutData::Scalar(scalar_kind) => ValueClass::Scalar(*scalar_kind),
+            LayoutData::Scalar(kind) => ValueClass::Scalar(*kind),
             LayoutData::Aggregate(_) => ValueClass::Aggregate,
             LayoutData::ZeroSized => ValueClass::None,
             LayoutData::Union(_) => ValueClass::Union,
         }
+    }
+
+    pub fn is_ptr(&self, db: &dyn Db) -> bool {
+        matches!(self.layout.data(db), LayoutData::Scalar(ScalarKind::Ptr))
     }
 }

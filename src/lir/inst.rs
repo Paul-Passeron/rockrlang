@@ -25,16 +25,18 @@ pub enum Instruction<R: Refs> {
     Value { def: R::Def, kind: ValueInstKind<R> },
 }
 
-pub enum VoidInstKind<R: Refs> {
-    Store { ptr: R::Val, value: R::Val },
-}
-
 pub enum ConstValue {
     Int { ty: LIRTy, value: u128 },
-    NullPtr { ty: LIRTy },
+    NullPtr { pointee: LIRTy },
     Zeroed { ty: LIRTy },
     FunctionAddr(LIRFunctionId), /* May not be used right now but will be
                                   * later on */
+}
+
+pub enum VoidInstKind<R: Refs> {
+    Store { ptr: R::Val, value: R::Val },
+    MemCopy { src: R::Val, dst: R::Val, ty: LIRTy },
+    SetDiscriminant { ptr: R::Val, ty: LIRTy, idx: u32 },
 }
 
 pub enum ValueInstKind<R: Refs> {
@@ -44,13 +46,11 @@ pub enum ValueInstKind<R: Refs> {
     // Memory
     Alloca { ty: LIRTy },
     Load { ptr: R::Val, ty: LIRTy },
-    MemCopy { src: R::Val, dst: R::Val, ty: LIRTy },
 
     // Addressing
     FieldPtr { ptr: R::Val, ty: LIRTy, idx: u32 },
     UnionPayloadPtr { ptr: R::Val, src: R::Val, ty: LIRTy },
     GetDiscriminant { ptr: R::Val, ty: LIRTy },
-    SetDiscriminant { ptr: R::Val, ty: LIRTy, idx: u32 },
 
     // Aggregates
     MakeAggregate { ty: R::Val, fields: Vec<R::Val> },
