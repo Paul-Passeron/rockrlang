@@ -22,7 +22,7 @@ use crate::{
     check::thir::sanity_check::ConstructorType,
     layout::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID,
-        Offset, ScalarKind, Size, VariantsLayout, finish_aggregate, layout_of,
+        Offset, Size, VariantsLayout, finish_aggregate, layout_of,
     },
     ril::{EnumId, TypeRef},
     thir::EnumRef,

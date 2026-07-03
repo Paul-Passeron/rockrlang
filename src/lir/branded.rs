@@ -142,8 +142,8 @@ impl<'ir> BrandedBlockData<'ir> {
 impl<'ir> Instruction<'ir> {
     pub fn finalize(self) -> FInstruction {
         match self {
-            Instruction::Void(branded_void_instruction) => todo!(),
-            Instruction::Value { def, kind } => todo!(),
+            Instruction::Void(_branded_void_instruction) => todo!(),
+            Instruction::Value { def: _, kind: _ } => todo!(),
         }
     }
 }
@@ -151,20 +151,20 @@ impl<'ir> Instruction<'ir> {
 impl<'ir> ValueInstKind<Branded<'ir>> {
     pub fn finalize(self) -> ValueInstKind<Finalized> {
         match self {
-            ValueInstKind::Const(const_value) => todo!(),
-            ValueInstKind::Alloca { ty } => todo!(),
-            ValueInstKind::Load { ptr, ty } => todo!(),
-            ValueInstKind::FieldPtr { ptr, ty, idx } => todo!(),
-            ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => todo!(),
-            ValueInstKind::GetDiscriminant { ptr, ty } => todo!(),
-            ValueInstKind::MakeAggregate { ty, fields } => todo!(),
-            ValueInstKind::ExtractField { value, ty, idx } => todo!(),
-            ValueInstKind::InsertField { value, ty, idx, field } => todo!(),
-            ValueInstKind::Arith { op, lhs, rhs } => todo!(),
-            ValueInstKind::Cmp { op, lhs, rhs } => todo!(),
-            ValueInstKind::Logic { op, lhs, rhs } => todo!(),
-            ValueInstKind::Not { value } => todo!(),
-            ValueInstKind::Case { kind, value, to } => todo!(),
+            ValueInstKind::Const(_const_value) => todo!(),
+            ValueInstKind::Alloca { ty: _ } => todo!(),
+            ValueInstKind::Load { ptr: _, ty: _ } => todo!(),
+            ValueInstKind::FieldPtr { ptr: _, ty: _, idx: _ } => todo!(),
+            ValueInstKind::UnionPayloadPtr { ptr: _, ty: _, variant: _ } => todo!(),
+            ValueInstKind::GetDiscriminant { ptr: _, ty: _ } => todo!(),
+            ValueInstKind::MakeAggregate { ty: _, fields: _ } => todo!(),
+            ValueInstKind::ExtractField { value: _, ty: _, idx: _ } => todo!(),
+            ValueInstKind::InsertField { value: _, ty: _, idx: _, field: _ } => todo!(),
+            ValueInstKind::Arith { op: _, lhs: _, rhs: _ } => todo!(),
+            ValueInstKind::Cmp { op: _, lhs: _, rhs: _ } => todo!(),
+            ValueInstKind::Logic { op: _, lhs: _, rhs: _ } => todo!(),
+            ValueInstKind::Not { value: _ } => todo!(),
+            ValueInstKind::Case { kind: _, value: _, to: _ } => todo!(),
         }
     }
 }
@@ -172,10 +172,10 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
 impl<'ir> Terminator<'ir> {
     pub fn finalize(self) -> FTerminator {
         match self {
-            Terminator::Goto(block_target) => todo!(),
-            Terminator::Br { cond, if_true, if_false } => todo!(),
-            Terminator::Switch { on, branches, default } => todo!(),
-            Terminator::Call { id, args, dest, next } => todo!(),
+            Terminator::Goto(_block_target) => todo!(),
+            Terminator::Br { cond: _, if_true: _, if_false: _ } => todo!(),
+            Terminator::Switch { on: _, branches: _, default: _ } => todo!(),
+            Terminator::Call { id: _, args: _, dest: _, next: _ } => todo!(),
             Terminator::Return(_) => todo!(),
             Terminator::Diverge => todo!(),
         }

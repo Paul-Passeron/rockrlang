@@ -26,8 +26,8 @@ use crate::{
     },
     lir::{
         Aggregate, Body, Branded, Building, FunctionSig, Int, IntValue, LIRDef,
-        LIRFunctionId, Module, Scalar, SigKind, Signature, Typed, TypedPtr,
-        Union, ValueClass, ValueDef, ValueId, ValueKind, VerifyError,
+        LIRFunctionId, Module, Scalar, SigKind, Typed, TypedPtr, Union,
+        ValueClass, ValueDef, ValueId, ValueKind, VerifyError,
         branded::{BrandedBlockId, InProgressBody},
         inst::{BlockTarget, ConstValue, ValueInstKind, VoidInstKind},
     },
@@ -429,6 +429,38 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.extract_field(value.erase(), value.ty, idx)
     }
 
+    pub fn insert_field(
+        &mut self,
+        value: ValueId<'ir>,
+        ty: LIRTy,
+        idx: u32,
+        field: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        debug_assert!(ty.is_aggregate(self.db));
+        debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
+        debug_assert!(
+            ty.aggregate_layout(self.db).unwrap().fields.len() > idx as usize
+        );
+        debug_assert_eq!(
+            ty.aggregate_layout(self.db).unwrap().fields[idx as usize].1,
+            self.body.defs[field.idx].ty.layout
+        );
+        self.push_value(
+            ty,
+            ValueInstKind::InsertField { value, ty, idx, field },
+        )
+    }
+
+    pub fn insert_field_typed(
+        &mut self,
+        value: Typed<'ir, Aggregate>,
+        idx: u32,
+        field: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        self.insert_field(value.erase(), value.ty, idx, field)
+    }
+
+    
     // Terminators
 
     pub fn call(
