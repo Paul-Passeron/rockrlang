@@ -29,9 +29,10 @@ use crate::{
         Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
         ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
         ValueDef, ValueId, ValueKind, VerifyError,
-        branded::{BrandedBlockId, InProgressBody},
+        branded::{BrandedBlockData, BrandedBlockId, InProgressBody},
         inst::{
-            BlockTarget, CastKind, ConstValue, ValueInstKind, VoidInstKind,
+            BlockTarget, CastKind, ConstValue, Terminator::Return,
+            ValueInstKind, VoidInstKind,
         },
     },
     ril::ptr_of,
@@ -42,7 +43,7 @@ type Terminator<'ir> = super::inst::Terminator<Branded<'ir>>;
 
 pub struct FunctionBuilder<'ir, 'm> {
     db: &'m dyn Db,
-    id: LIRFunctionId,
+    pub id: LIRFunctionId,
     sigs: &'m [FunctionSig],
     pub body: InProgressBody<'ir>,
 }
@@ -61,7 +62,7 @@ impl Module<Building> {
             db,
             id,
             sigs,
-            body: InProgressBody::new(guard, db, &sigs[id.0]),
+            body: InProgressBody::new(guard, db, id, &sigs[id.0]),
         };
         f(&mut builder);
         let body = builder.body.finalize()?;
@@ -312,25 +313,28 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         &mut self,
         ptr: ValueId<'ir>,
         ty: LIRTy,
-        idx: u32,
+        src_idx: u32,
     ) -> ValueId<'ir> {
         debug_assert!(self.body.defs[ptr.idx].ty.is_ptr(self.db));
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert!(
             ty.aggregate_layout(self.db)
-                .map_or(false, |l| l.fields.len() > idx as usize)
+                .and_then(|l| l.source_field(src_idx))
+                .is_some()
         );
         let ptr_ty = self.ptr_of(ty);
-        self.push_value(ptr_ty, ValueInstKind::FieldPtr { ptr, ty, idx })
+        self.push_value(ptr_ty, ValueInstKind::FieldPtr { ptr, ty, src_idx })
     }
 
     pub fn field_ptr_typed<K: ValueKind>(
         &mut self,
         ptr: TypedPtr<'ir, Aggregate>,
-        idx: u32,
+        src_idx: u32,
     ) -> TypedPtr<'ir, K> {
-        let val = self.field_ptr(ptr.raw, ptr.pointee, idx);
-        let field_layout = ptr.layout(self.db).fields[idx as usize].1;
+        let val = self.field_ptr(ptr.raw, ptr.pointee, src_idx);
+        let agg_layout = ptr.layout(self.db);
+
+        let field_layout = agg_layout.source_field(src_idx).unwrap().1;
         let field_ty = LIRTy { layout: field_layout, origin: None };
         val.typed_ptr(field_ty, self.db).unwrap()
     }
@@ -388,71 +392,88 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     pub fn make_aggregate(
         &mut self,
         ty: LIRTy,
-        fields: Vec<ValueId<'ir>>,
+        // fields in source order
+        fields_in_src_order: Vec<ValueId<'ir>>,
     ) -> Typed<'ir, Aggregate> {
         debug_assert!(ty.is_aggregate(self.db));
-        self.push_value(ty, ValueInstKind::MakeAggregate { ty, fields })
-            .typed(ty, self.db)
-            .unwrap()
+        // TODO: check fields
+        self.push_value(
+            ty,
+            ValueInstKind::MakeAggregate { ty, fields_in_src_order },
+        )
+        .typed(ty, self.db)
+        .unwrap()
     }
 
     pub fn extract_field(
         &mut self,
         value: ValueId<'ir>,
         ty: LIRTy,
-        idx: u32,
+        src_idx: u32,
     ) -> ValueId<'ir> {
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
         debug_assert!(
-            ty.aggregate_layout(self.db).unwrap().fields.len() > idx as usize
+            ty.aggregate_layout(self.db)
+                .and_then(|l| l.source_field(src_idx))
+                .is_some()
         );
-        let field_layout =
-            ty.aggregate_layout(self.db).unwrap().fields[idx as usize].1;
+        let field_layout = ty
+            .aggregate_layout(self.db)
+            .unwrap()
+            .source_field(src_idx)
+            .unwrap()
+            .1;
         let field_ty = LIRTy { layout: field_layout, origin: None };
         self.push_value(
             field_ty,
-            ValueInstKind::ExtractField { value, ty, idx },
+            ValueInstKind::ExtractField { value, ty, src_idx },
         )
     }
 
     pub fn extract_field_typed(
         &mut self,
         value: Typed<'ir, Aggregate>,
-        idx: u32,
+        src_idx: u32,
     ) -> ValueId<'ir> {
-        self.extract_field(value.erase(), value.ty, idx)
+        self.extract_field(value.erase(), value.ty, src_idx)
     }
 
     pub fn insert_field(
         &mut self,
         value: ValueId<'ir>,
         ty: LIRTy,
-        idx: u32,
+        src_idx: u32,
         field: ValueId<'ir>,
     ) -> ValueId<'ir> {
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
         debug_assert!(
-            ty.aggregate_layout(self.db).unwrap().fields.len() > idx as usize
+            ty.aggregate_layout(self.db)
+                .and_then(|l| l.source_field(src_idx))
+                .is_some()
         );
         debug_assert_eq!(
-            ty.aggregate_layout(self.db).unwrap().fields[idx as usize].1,
+            ty.aggregate_layout(self.db)
+                .unwrap()
+                .source_field(src_idx)
+                .unwrap()
+                .1,
             self.body.defs[field.idx].ty.layout
         );
         self.push_value(
             ty,
-            ValueInstKind::InsertField { value, ty, idx, field },
+            ValueInstKind::InsertField { value, ty, src_idx, field },
         )
     }
 
     pub fn insert_field_typed(
         &mut self,
         value: Typed<'ir, Aggregate>,
-        idx: u32,
+        src_idx: u32,
         field: ValueId<'ir>,
     ) -> ValueId<'ir> {
-        self.insert_field(value.erase(), value.ty, idx, field)
+        self.insert_field(value.erase(), value.ty, src_idx, field)
     }
 
     // Computation
@@ -567,6 +588,16 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             .unwrap()
     }
 
+    // Block utils
+
+    pub fn target(
+        &self,
+        block: BrandedBlockId<'ir>,
+        params: Vec<ValueId<'ir>>,
+    ) -> BlockTarget<Branded<'ir>> {
+        BlockTarget { params, block }
+    }
+
     // Terminators
 
     pub fn call(
@@ -575,8 +606,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         args: Vec<ValueId<'ir>>,
         next_block: BlockTarget<Branded<'ir>>,
     ) -> Terminated<Option<ValueId<'ir>>> {
-        let sig = &self.sigs[f.0];
-        let ret_ty = sig.signature.ret;
+        let ret_ty = self.get_ret_ty(f);
         let dest = if ret_ty.is_zst(self.db) {
             None
         } else {
@@ -585,11 +615,64 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             Some(def)
         };
 
+        let params = self.get_params(f);
+
+        assert_eq!(params.len(), args.len());
+
+        for (param, arg) in params.iter().zip(args.iter()) {
+            assert_eq!(param.layout, self.body.defs[arg.idx].ty.layout);
+        }
+
         let value = dest.as_ref().map(|x| x.id());
 
         let t = Terminator::Call { id: f, args, dest, next: next_block };
 
         self.terminate(t).map(|_| value)
+    }
+
+    pub fn goto(self, target: BlockTarget<Branded<'ir>>) -> Terminated<()> {
+        self.terminate(Terminator::Goto(target))
+    }
+
+    pub fn br(
+        self,
+        cond: ValueId<'ir>,
+        if_true: BlockTarget<Branded<'ir>>,
+        if_false: BlockTarget<Branded<'ir>>,
+    ) -> Terminated<()> {
+        self.terminate(Terminator::Br { cond, if_true, if_false })
+    }
+
+    pub fn switch(
+        self,
+        on: ValueId<'ir>,
+        branches: Vec<(u128, BlockTarget<Branded<'ir>>)>,
+        default: BlockTarget<Branded<'ir>>,
+    ) -> Terminated<()> {
+        self.terminate(Terminator::Switch { on, branches, default })
+    }
+
+    fn get_sig(&self, id: LIRFunctionId) -> &'b FunctionSig {
+        &self.sigs[id.0]
+    }
+
+    fn get_ret_ty(&self, id: LIRFunctionId) -> LIRTy {
+        self.get_sig(id).signature.ret
+    }
+
+    fn get_params(&self, id: LIRFunctionId) -> &'b [LIRTy] {
+        &self.get_sig(id).signature.params
+    }
+
+    pub fn ret(self, value: Option<ValueId<'ir>>) -> Terminated<()> {
+        let ret_ty = self.get_ret_ty(self.body.id);
+        match value {
+            Some(v) => {
+                assert_eq!(self.body.defs[v.idx].ty.layout, ret_ty.layout)
+            }
+            None => assert!(ret_ty.is_zst(self.db)),
+        }
+        self.terminate(Return(value))
     }
 
     // Utils:
@@ -694,5 +777,37 @@ impl<'ir> IntValue<'ir> {
             LayoutData::Scalar(ScalarKind::Int(width)) => *width,
             _ => unreachable!(),
         }
+    }
+}
+
+impl<'ir> InProgressBody<'ir> {
+    pub fn new_block_with_params(
+        &self,
+        name: Option<Symbol>,
+        params: &[LIRTy],
+    ) -> (BrandedBlockId<'ir>, Vec<ValueId<'ir>>) {
+        let defs: Vec<ValueDef<'ir>> = params
+            .iter()
+            .map(|ty| ValueDef {
+                idx: self.defs.insert(LIRDef { ty: *ty }),
+                _brand: PhantomData,
+            })
+            .collect();
+        let ids = defs.iter().map(|d| d.id()).collect();
+        let idx = self.blocks.insert(BrandedBlockData {
+            name,
+            params: defs,
+            insts: Vec::new(),
+            terminator: None,
+        });
+        let id = BrandedBlockId { idx, _brand: PhantomData };
+        (id, ids)
+    }
+}
+
+impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
+    pub fn param(&self, i: usize) -> (LIRTy, ValueId<'ir>) {
+        let def = &self.body.blocks[self.body.entry.idx].params[i];
+        (self.body.defs[def.idx].ty, def.id())
     }
 }

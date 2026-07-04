@@ -48,14 +48,14 @@ pub enum ValueInstKind<R: Refs> {
     Load { ptr: R::Val, ty: LIRTy },
 
     // Addressing
-    FieldPtr { ptr: R::Val, ty: LIRTy, idx: u32 },
+    FieldPtr { ptr: R::Val, ty: LIRTy, src_idx: u32 },
     UnionPayloadPtr { ptr: R::Val, ty: LIRTy, variant: u32 },
     GetDiscriminant { ptr: R::Val, ty: LIRTy },
 
     // Aggregates
-    MakeAggregate { ty: LIRTy, fields: Vec<R::Val> },
-    ExtractField { value: R::Val, ty: LIRTy, idx: u32 },
-    InsertField { value: R::Val, ty: LIRTy, idx: u32, field: R::Val },
+    MakeAggregate { ty: LIRTy, fields_in_src_order: Vec<R::Val> },
+    ExtractField { value: R::Val, ty: LIRTy, src_idx: u32 },
+    InsertField { value: R::Val, ty: LIRTy, src_idx: u32, field: R::Val },
 
     // Computation
     Arith { op: ArithBinop, lhs: R::Val, rhs: R::Val },

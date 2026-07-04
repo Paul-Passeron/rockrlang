@@ -239,3 +239,11 @@ impl From<VariantsLayout> for LayoutData {
         LayoutData::Union(value)
     }
 }
+
+impl AggregateLayout {
+    pub fn source_field(&self, src_idx: u32) -> Option<(Offset, LayoutID)> {
+        let idx =
+            self.source_to_layout.iter().position(|idx| src_idx == *idx)?;
+        Some(self.fields[idx])
+    }
+}

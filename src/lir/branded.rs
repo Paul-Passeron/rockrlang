@@ -20,15 +20,11 @@ use std::marker::PhantomData;
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    common::{
+    Db, common::{
         arena::{Arena, Idx},
         symbols::Symbol,
-    },
-    lir::{
-        Branded, Finalized, FunctionSig, LIRDef, ValueDef, VerifyError,
-        finalized::{BlockData, FunctionBody},
-        inst::ValueInstKind,
+    }, lir::{
+        Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef, VerifyError, finalized::{BlockData, FunctionBody}, inst::{BlockTarget, ValueInstKind},
     },
 };
 
@@ -42,7 +38,7 @@ pub type Invariant<'ir> = fn(&'ir ()) -> &'ir ();
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BrandedBlockId<'ir> {
     pub(super) idx: Idx<BrandedBlockData<'ir>>,
-    _brand: PhantomData<Invariant<'ir>>,
+    pub(super) _brand: PhantomData<Invariant<'ir>>,
 }
 
 impl<'ir> InProgressBody<'ir> {
@@ -73,6 +69,7 @@ pub struct BrandedBlockData<'ir> {
 }
 
 pub struct InProgressBody<'ir> {
+    pub id: LIRFunctionId,
     pub defs: Arena<LIRDef>,
     pub blocks: Arena<BrandedBlockData<'ir>>,
     pub entry: BrandedBlockId<'ir>,
@@ -83,6 +80,7 @@ impl<'ir> InProgressBody<'ir> {
     pub fn new(
         _guard: generativity::Guard<'ir>,
         db: &dyn Db,
+        id: LIRFunctionId,
         sig: &FunctionSig,
     ) -> Self {
         let defs = Arena::new();
@@ -103,6 +101,7 @@ impl<'ir> InProgressBody<'ir> {
             terminator: None,
         });
         Self {
+            id,
             defs,
             blocks,
             entry: BrandedBlockId { idx: entry, _brand: PhantomData },
@@ -151,20 +150,51 @@ impl<'ir> Instruction<'ir> {
 impl<'ir> ValueInstKind<Branded<'ir>> {
     pub fn finalize(self) -> ValueInstKind<Finalized> {
         match self {
-            ValueInstKind::Const(_const_value) => todo!(),
-            ValueInstKind::Alloca { ty: _ } => todo!(),
-            ValueInstKind::Load { ptr: _, ty: _ } => todo!(),
-            ValueInstKind::FieldPtr { ptr: _, ty: _, idx: _ } => todo!(),
-            ValueInstKind::UnionPayloadPtr { ptr: _, ty: _, variant: _ } => todo!(),
-            ValueInstKind::GetDiscriminant { ptr: _, ty: _ } => todo!(),
-            ValueInstKind::MakeAggregate { ty: _, fields: _ } => todo!(),
-            ValueInstKind::ExtractField { value: _, ty: _, idx: _ } => todo!(),
-            ValueInstKind::InsertField { value: _, ty: _, idx: _, field: _ } => todo!(),
-            ValueInstKind::Arith { op: _, lhs: _, rhs: _ } => todo!(),
-            ValueInstKind::Cmp { op: _, lhs: _, rhs: _ } => todo!(),
-            ValueInstKind::Logic { op: _, lhs: _, rhs: _ } => todo!(),
-            ValueInstKind::Not { value: _ } => todo!(),
-            ValueInstKind::Cast { kind: _, value: _, to: _ } => todo!(),
+            Self::Const(cst) => ValueInstKind::Const(cst),
+            Self::Alloca { ty } => ValueInstKind::Alloca { ty },
+            Self::Load { ptr, ty } => ValueInstKind::Load { ptr: ptr.idx, ty },
+            Self::FieldPtr { ptr, ty, src_idx } => {
+                ValueInstKind::FieldPtr { ptr: ptr.idx, ty, src_idx }
+            }
+            Self::UnionPayloadPtr { ptr, ty, variant } => {
+                ValueInstKind::UnionPayloadPtr { ptr: ptr.idx, ty, variant }
+            }
+            Self::GetDiscriminant { ptr, ty } => {
+                ValueInstKind::GetDiscriminant { ptr: ptr.idx, ty }
+            }
+            Self::MakeAggregate { ty, fields_in_src_order } => {
+                ValueInstKind::MakeAggregate {
+                    ty,
+                    fields_in_src_order: fields_in_src_order
+                        .into_iter()
+                        .map(|f| f.idx)
+                        .collect(),
+                }
+            }
+            Self::ExtractField { value, ty, src_idx } => {
+                ValueInstKind::ExtractField { value: value.idx, ty, src_idx }
+            }
+            Self::InsertField { value, ty, src_idx, field } => {
+                ValueInstKind::InsertField {
+                    value: value.idx,
+                    ty,
+                    src_idx,
+                    field: field.idx,
+                }
+            }
+            Self::Arith { op, lhs, rhs } => {
+                ValueInstKind::Arith { op, lhs: lhs.idx, rhs: rhs.idx }
+            }
+            Self::Cmp { op, lhs, rhs } => {
+                ValueInstKind::Cmp { op, lhs: lhs.idx, rhs: rhs.idx }
+            }
+            Self::Logic { op, lhs, rhs } => {
+                ValueInstKind::Logic { op, lhs: lhs.idx, rhs: rhs.idx }
+            }
+            Self::Not { value } => ValueInstKind::Not { value: value.idx },
+            Self::Cast { kind, value, to } => {
+                ValueInstKind::Cast { kind, value: value.idx, to }
+            }
         }
     }
 }
@@ -172,12 +202,41 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
 impl<'ir> Terminator<'ir> {
     pub fn finalize(self) -> FTerminator {
         match self {
-            Terminator::Goto(_block_target) => todo!(),
-            Terminator::Br { cond: _, if_true: _, if_false: _ } => todo!(),
-            Terminator::Switch { on: _, branches: _, default: _ } => todo!(),
-            Terminator::Call { id: _, args: _, dest: _, next: _ } => todo!(),
-            Terminator::Return(_) => todo!(),
-            Terminator::Diverge => todo!(),
+            Terminator::Goto(block_target) => {
+                FTerminator::Goto(block_target.finalize())
+            }
+            Terminator::Br { cond, if_true, if_false } => FTerminator::Br {
+                cond: cond.idx,
+                if_true: if_true.finalize(),
+                if_false: if_false.finalize(),
+            },
+            Terminator::Switch { on, branches, default } => {
+                FTerminator::Switch {
+                    on: on.idx,
+                    branches: branches
+                        .into_iter()
+                        .map(|(idx, target)| (idx, target.finalize()))
+                        .collect(),
+                    default: default.finalize(),
+                }
+            }
+            Terminator::Call { id, args, dest, next } => FTerminator::Call {
+                id,
+                args: args.into_iter().map(|arg| arg.idx).collect(),
+                dest: dest.map(|target| target.idx),
+                next: next.finalize(),
+            },
+            Terminator::Return(val) => FTerminator::Return(val.map(|v| v.idx)),
+            Terminator::Diverge => FTerminator::Diverge,
+        }
+    }
+}
+
+impl<'ir> BlockTarget<Branded<'ir>> {
+    pub fn finalize(self) -> BlockTarget<Finalized> {
+        BlockTarget {
+            params: self.params.into_iter().map(|p| p.idx).collect(),
+            block: self.block.finalize(),
         }
     }
 }
