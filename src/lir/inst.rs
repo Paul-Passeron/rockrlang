@@ -62,7 +62,7 @@ pub enum ValueInstKind<R: Refs> {
     Cmp { op: CmpBinop, lhs: R::Val, rhs: R::Val },
     Logic { op: Logic, lhs: R::Val, rhs: R::Val },
     Not { value: R::Val },
-    Case { kind: CastKind, value: R::Val, to: ScalarKind },
+    Cast { kind: CastKind, value: R::Val, to: ScalarKind },
 }
 
 pub enum CastKind {

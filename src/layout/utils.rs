@@ -187,6 +187,15 @@ impl From<IntWidth> for Align {
     }
 }
 
+impl From<FloatWidth> for Align {
+    fn from(value: FloatWidth) -> Self {
+        match value {
+            FloatWidth::F32 => Align::B32,
+            FloatWidth::F64 => Align::B64,
+        }
+    }
+}
+
 impl LayoutID {
     pub fn zst(db: &dyn Db) -> Self {
         Self::new(db, Size::ZERO, Align::BYTE, LayoutData::ZeroSized)
@@ -196,9 +205,26 @@ impl LayoutID {
         Self::new(db, width.into(), width.into(), ScalarKind::Int(width).into())
     }
 
+    pub fn float(db: &dyn Db, width: FloatWidth) -> Self {
+        Self::new(
+            db,
+            width.into(),
+            width.into(),
+            ScalarKind::Float(width).into(),
+        )
+    }
+
     pub fn ptr(db: &dyn Db) -> Self {
         let width = db.target_width();
         Self::new(db, width.into(), width.into(), ScalarKind::Ptr.into())
+    }
+
+    pub fn scalar(db: &dyn Db, kind: ScalarKind) -> Self {
+        match kind {
+            ScalarKind::Int(width) => Self::int(db, width),
+            ScalarKind::Ptr => Self::ptr(db),
+            ScalarKind::Float(width) => Self::float(db, width),
+        }
     }
 }
 

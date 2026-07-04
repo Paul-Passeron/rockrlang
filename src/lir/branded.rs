@@ -164,7 +164,7 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
             ValueInstKind::Cmp { op: _, lhs: _, rhs: _ } => todo!(),
             ValueInstKind::Logic { op: _, lhs: _, rhs: _ } => todo!(),
             ValueInstKind::Not { value: _ } => todo!(),
-            ValueInstKind::Case { kind: _, value: _, to: _ } => todo!(),
+            ValueInstKind::Cast { kind: _, value: _, to: _ } => todo!(),
         }
     }
 }

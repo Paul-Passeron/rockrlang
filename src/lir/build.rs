@@ -25,11 +25,14 @@ use crate::{
         ScalarKind, VariantsLayout,
     },
     lir::{
-        Aggregate, Body, Branded, Building, FunctionSig, Int, IntValue, LIRDef,
-        LIRFunctionId, Module, Scalar, SigKind, Typed, TypedPtr, Union,
-        ValueClass, ValueDef, ValueId, ValueKind, VerifyError,
+        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig,
+        Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
+        ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
+        ValueDef, ValueId, ValueKind, VerifyError,
         branded::{BrandedBlockId, InProgressBody},
-        inst::{BlockTarget, ConstValue, ValueInstKind, VoidInstKind},
+        inst::{
+            BlockTarget, CastKind, ConstValue, ValueInstKind, VoidInstKind,
+        },
     },
     ril::ptr_of,
 };
@@ -101,18 +104,19 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 }
 
 impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
-    pub fn build_block<'b>(
+    pub fn build_block<'b, T>(
         &'b mut self,
         id: BrandedBlockId<'ir>,
-        f: impl FnOnce(BlockBuilder<'ir, 'b>) -> Terminated<()>,
-    ) {
-        let Terminated(()) = f(BlockBuilder {
+        f: impl FnOnce(BlockBuilder<'ir, 'b>) -> Terminated<T>,
+    ) -> T {
+        let Terminated(t) = f(BlockBuilder {
             body: &mut self.body,
             id,
             insts: Vec::new(),
             sigs: self.sigs,
             db: self.db,
         });
+        t
     }
 }
 
@@ -186,6 +190,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         ptr: TypedPtr<'ir, V>,
         value: Typed<'ir, V>,
     ) {
+        debug_assert_eq!(ptr.pointee.layout, value.ty.layout);
         self.store(ptr.erase(), value.erase())
     }
 
@@ -250,11 +255,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         pointee: LIRTy,
     ) -> TypedPtr<'ir, K> {
         debug_assert!(K::matches(pointee.class(self.db)));
-        let ptr_ty = LIRTy {
-            layout: LayoutID::ptr(self.db),
-            origin: pointee.origin.map(|ty| ptr_of(self.db, ty, false).into()),
-        };
-
+        let ptr_ty = self.ptr_of(pointee);
         let val = self.push_value(
             ptr_ty,
             ValueInstKind::Const(ConstValue::NullPtr { pointee }),
@@ -281,7 +282,8 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     // Memory
 
     pub fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
-        self.push_value(ty, ValueInstKind::Alloca { ty })
+        let ptr_ty = self.ptr_of(ty);
+        self.push_value(ptr_ty, ValueInstKind::Alloca { ty })
     }
 
     pub fn alloca_typed<K: ValueKind>(
@@ -301,11 +303,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         &mut self,
         ptr: TypedPtr<'ir, K>,
     ) -> Typed<'ir, K> {
-        unsafe {
-            self.load(ptr.raw, ptr.pointee)
-                .typed(ptr.pointee, self.db)
-                .unwrap_unchecked()
-        }
+        self.load(ptr.raw, ptr.pointee).typed(ptr.pointee, self.db).unwrap()
     }
 
     // Addressing
@@ -322,10 +320,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             ty.aggregate_layout(self.db)
                 .map_or(false, |l| l.fields.len() > idx as usize)
         );
-        let ptr_ty = LIRTy {
-            layout: LayoutID::ptr(self.db),
-            origin: ty.origin.map(|ty| ptr_of(self.db, ty, false).into()),
-        };
+        let ptr_ty = self.ptr_of(ty);
         self.push_value(ptr_ty, ValueInstKind::FieldPtr { ptr, ty, idx })
     }
 
@@ -347,7 +342,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         variant: u32,
     ) -> ValueId<'ir> {
         self.push_value(
-            LIRTy { layout: LayoutID::ptr(self.db), origin: None },
+            self.opaque_ptr_ty(),
             ValueInstKind::UnionPayloadPtr { ptr, ty, variant },
         )
     }
@@ -460,7 +455,118 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.insert_field(value.erase(), value.ty, idx, field)
     }
 
-    
+    // Computation
+
+    // TODO: typed and untyped helpers for each operation
+
+    pub fn arith(
+        &mut self,
+        op: ArithBinop,
+        lhs: ValueId<'ir>,
+        rhs: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        let lhs_ty = self.body.defs[lhs.idx].ty;
+        let rhs_ty = self.body.defs[rhs.idx].ty;
+        debug_assert_eq!(lhs_ty.layout, rhs_ty.layout);
+        debug_assert!(lhs_ty.is_int(self.db));
+        let ty = self.combine(lhs_ty, rhs_ty);
+        self.push_value(ty, ValueInstKind::Arith { op, lhs, rhs })
+    }
+
+    pub fn arith_typed(
+        &mut self,
+        op: ArithBinop,
+        lhs: Typed<'ir, Scalar<Int>>,
+        rhs: Typed<'ir, Scalar<Int>>,
+    ) -> Typed<'ir, Scalar<Int>> {
+        self.arith(op, lhs.erase(), rhs.erase()).typed(lhs.ty, self.db).unwrap()
+    }
+
+    pub fn cmp(
+        &mut self,
+        op: CmpBinop,
+        lhs: ValueId<'ir>,
+        rhs: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        let lhs_ty = self.body.defs[lhs.idx].ty;
+        let rhs_ty = self.body.defs[rhs.idx].ty;
+        debug_assert_eq!(lhs_ty.layout, rhs_ty.layout);
+        debug_assert!(lhs_ty.is_scalar(self.db));
+        self.push_value(self.bool_ty(), ValueInstKind::Cmp { op, lhs, rhs })
+    }
+
+    pub fn cmp_typed(
+        &mut self,
+        op: CmpBinop,
+        lhs: Typed<'ir, Scalar<Int>>,
+        rhs: Typed<'ir, Scalar<Int>>,
+    ) -> Typed<'ir, Scalar<Int>> {
+        self.cmp(op, lhs.erase(), rhs.erase())
+            .typed(self.bool_ty(), self.db)
+            .unwrap()
+    }
+
+    pub fn logic(
+        &mut self,
+        op: Logic,
+        lhs: ValueId<'ir>,
+        rhs: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        let bool_ty = self.bool_ty();
+        debug_assert_eq!(self.body.defs[lhs.idx].ty.layout, bool_ty.layout);
+        debug_assert_eq!(self.body.defs[rhs.idx].ty.layout, bool_ty.layout);
+        self.push_value(bool_ty, ValueInstKind::Logic { op, lhs, rhs })
+    }
+
+    pub fn logic_typed(
+        &mut self,
+        op: Logic,
+        lhs: IntValue<'ir>,
+        rhs: IntValue<'ir>,
+    ) -> IntValue<'ir> {
+        debug_assert_eq!(lhs.width(self.db), IntWidth::I8);
+        debug_assert_eq!(rhs.width(self.db), IntWidth::I8);
+        self.logic(op, lhs.erase(), rhs.erase())
+            .typed(self.bool_ty(), self.db)
+            .unwrap()
+    }
+
+    pub fn not(&mut self, value: ValueId<'ir>) -> ValueId<'ir> {
+        let bool_ty = self.bool_ty();
+        debug_assert_eq!(self.body.defs[value.idx].ty.layout, bool_ty.layout);
+        self.push_value(bool_ty, ValueInstKind::Not { value })
+    }
+
+    pub fn not_typed(&mut self, value: IntValue<'ir>) -> IntValue<'ir> {
+        let bool_ty = self.bool_ty();
+        self.not(value.erase()).typed(bool_ty, self.db).unwrap()
+    }
+
+    pub fn cast(
+        &mut self,
+        kind: CastKind,
+        value: ValueId<'ir>,
+        to: ScalarKind,
+    ) -> ValueId<'ir> {
+        debug_assert!(self.body.defs[value.idx].ty.is_scalar(self.db));
+        let ty = LIRTy { layout: LayoutID::scalar(self.db, to), origin: None };
+        self.push_value(ty, ValueInstKind::Cast { kind, value, to })
+    }
+
+    pub fn cast_ptr<S: ScalarMarker, K: ValueKind>(
+        &mut self,
+        kind: CastKind,
+        value: ScalarValue<'ir, S>,
+        pointee: LIRTy,
+    ) -> TypedPtr<'ir, K>
+    where
+        Scalar<S>: ValueKind,
+    {
+        self.cast(kind, value.erase(), ScalarKind::Ptr)
+            .typed_ptr(pointee, self.db)
+            .unwrap()
+    }
+
     // Terminators
 
     pub fn call(
@@ -484,6 +590,28 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         let t = Terminator::Call { id: f, args, dest, next: next_block };
 
         self.terminate(t).map(|_| value)
+    }
+
+    // Utils:
+    fn bool_ty(&self) -> LIRTy {
+        LIRTy { layout: LayoutID::int(self.db, IntWidth::I8), origin: None }
+    }
+
+    fn ptr_of(&self, ty: LIRTy) -> LIRTy {
+        LIRTy {
+            layout: LayoutID::ptr(self.db),
+            origin: ty.origin.map(|ty| ptr_of(self.db, ty, true).into()),
+        }
+    }
+
+    fn combine(&self, a: LIRTy, b: LIRTy) -> LIRTy {
+        debug_assert_eq!(a.layout, b.layout);
+        let origin = a.origin.or(b.origin);
+        LIRTy { layout: a.layout, origin }
+    }
+
+    fn opaque_ptr_ty(&self) -> LIRTy {
+        LIRTy { layout: LayoutID::ptr(self.db), origin: None }
     }
 }
 
@@ -529,6 +657,14 @@ impl LIRTy {
             _ => None,
         }
     }
+
+    pub fn is_int(self, db: &dyn Db) -> bool {
+        matches!(self.layout.data(db), LayoutData::Scalar(ScalarKind::Int(_)))
+    }
+
+    pub fn is_scalar(self, db: &dyn Db) -> bool {
+        matches!(self.layout.data(db), LayoutData::Scalar(_))
+    }
 }
 
 impl<'ir> TypedPtr<'ir, Aggregate> {
@@ -546,6 +682,15 @@ impl<'ir> TypedPtr<'ir, Union> {
 impl<'ir> TypedPtr<'ir, Scalar<Int>> {
     pub fn layout(self, db: &dyn Db) -> IntWidth {
         match self.pointee.layout.data(db) {
+            LayoutData::Scalar(ScalarKind::Int(width)) => *width,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'ir> IntValue<'ir> {
+    pub fn width(&self, db: &dyn Db) -> IntWidth {
+        match self.ty.layout.data(db) {
             LayoutData::Scalar(ScalarKind::Int(width)) => *width,
             _ => unreachable!(),
         }

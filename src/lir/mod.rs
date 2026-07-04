@@ -47,6 +47,9 @@ pub struct Scalar<S: ScalarMarker>(PhantomData<S>);
 pub struct Int;
 
 #[derive(Clone, Copy)]
+pub struct Bool;
+
+#[derive(Clone, Copy)]
 pub struct Ptr<P: ValueKind>(PhantomData<P>);
 
 #[derive(Clone, Copy)]
@@ -67,7 +70,9 @@ pub enum ValueClass {
 }
 
 impl ScalarMarker for Int {}
-impl<S: ScalarMarker> ValueKind for Scalar<S> {
+impl ScalarMarker for Bool {}
+
+impl ValueKind for Scalar<Int> {
     fn matches(class: ValueClass) -> bool {
         matches!(class, ValueClass::Scalar(ScalarKind::Int(_)))
     }
