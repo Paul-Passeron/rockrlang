@@ -1,0 +1,13 @@
+
+struct Pair { a: i32; b: i32 }
+fun f(p: &Pair): void {
+    let Pair { a, b } = p;
+}
+
+fun g(p: &Pair): void {
+    match p { 
+        Pair { a, b }  => {
+            let x = a;
+        } 
+    } 
+}

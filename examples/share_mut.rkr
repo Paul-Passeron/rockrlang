@@ -1,0 +1,101 @@
+// struct Point {
+//     x: int;
+//     y: int;
+// }
+
+// fun disjoint_fields_ok(p: &Point): int {
+//     let rx = &p.x;
+//     let ry = &p.y;
+//     return *rx + *ry;
+// }
+
+// fun multiple_shared_ok(x: int): int {
+//     let r1 = &x;
+//     let r2 = &x;
+//     return *r1 + *r2;
+// }
+
+// fun copy_while_shared_ok(x: int): int {
+//     let r = &x;
+//     let y = x;
+//     return *r + y;
+// }
+
+// fun move_while_shared_bad(s: str): str {
+//     let r = &s;
+//     let t = s;
+//     return t;
+// }
+
+// fun move_field_while_whole_borrowed_bad(pt: Point): int {
+//     let r = &pt;
+//     let x = pt.x;
+//     return x;
+// }
+
+// fun borrow_then_move_after_last_use_ok(s: str): str {
+//     let r = &s;
+//     let x = *r;
+//     let t = s;
+//     return t;
+// }
+
+// fun move_same_field_bad(pt: Point): int {
+//     let r = &pt.x;
+//     let x = pt.x;
+//     return x;
+// }
+
+// struct Pair {
+//     a: Point;
+//     b: Point;
+// }
+
+// fun disjoint_nested_ok(pr: &Pair): int {
+//     let ra = &pr.a;
+//     let y = pr.b.y;
+//     return ra.x + y;
+// }
+
+// struct Name {
+//     first: str;
+//     last: int;
+// }
+
+// fun move_field_while_whole_borrowed_bad2(n: Name): str {
+//     let r = &n;
+//     let f = n.first;
+//     return f;
+// }
+
+// fun move_same_field_bad2(n: Name): str {
+//     let r = &n.first;
+//     let f = n.first;
+//     return f;
+// }
+
+// fun move_disjoint_field_ok2(n: Name): int {
+//     let r = &n.first;
+//     let l = n.last;
+//     return l;
+// // }
+
+// struct Baz {
+//     z: int;
+// }
+
+// fun foo(b: &mut Baz): void {
+//     let x = &b.z;
+//     let y = b;
+// }
+
+struct Foo {
+    x: int;
+}
+
+fun destructure(p: &mut Foo): void {
+    let Foo { x } = p;
+    // let px = x;
+    // let py = y;
+    // let x = *px;
+}
