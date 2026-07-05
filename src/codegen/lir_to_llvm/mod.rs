@@ -14,3 +14,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
+
+use inkwell::context::Context;
+
+use crate::codegen::{Codegen, LIRToLLVM};
+
+impl<'db> Codegen<'db, LIRToLLVM<'db>> {
+    pub(super) fn finalize(self) -> Context {
+        todo!()
+    }
+}

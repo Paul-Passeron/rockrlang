@@ -24,10 +24,8 @@ use crate::{
     mangle::fun_mangle,
     mir::MIR,
     mir_to_llvm::mir::MIRGen,
-    name_resolve::{
-        core_package, file_module_id, modules_in_package, std_package,
-    },
-    ril::{FileModule, FunctionId, ModuleId, ScopeOwnerId, TypeRef},
+    name_resolve::{core_package, file_module_id, std_package},
+    ril::{FunctionId, ScopeOwnerId, TypeRef},
     thir_to_mir::FuncInst,
 };
 
