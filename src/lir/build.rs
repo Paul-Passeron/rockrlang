@@ -574,15 +574,27 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_value(ty, ValueInstKind::Cast { kind, value, to })
     }
 
+    pub fn bitcast(
+        &mut self,
+        value: ValueId<'ir>,
+        to: ScalarKind,
+    ) -> ValueId<'ir> {
+        self.cast(CastKind::Bitcast, value, to)
+    }
+
     pub fn cast_ptr<S: ScalarMarker, K: ValueKind>(
         &mut self,
-        kind: CastKind,
         value: ScalarValue<'ir, S>,
         pointee: LIRTy,
     ) -> TypedPtr<'ir, K>
     where
         Scalar<S>: ValueKind,
     {
+        let kind = match value.kind(self.db) {
+            ScalarKind::Int(_) => CastKind::IntToPtr,
+            ScalarKind::Ptr => CastKind::Bitcast,
+            ScalarKind::Float(_) => CastKind::Bitcast,
+        };
         self.cast(kind, value.erase(), ScalarKind::Ptr)
             .typed_ptr(pointee, self.db)
             .unwrap()
@@ -752,6 +764,13 @@ impl LIRTy {
     pub fn is_scalar(self, db: &dyn Db) -> bool {
         matches!(self.layout.data(db), LayoutData::Scalar(_))
     }
+
+    pub fn scalar(self, db: &dyn Db) -> Option<ScalarKind> {
+        match self.layout.data(db) {
+            LayoutData::Scalar(kind) => Some(*kind),
+            _ => None,
+        }
+    }
 }
 
 impl<'ir> TypedPtr<'ir, Aggregate> {
@@ -813,5 +832,14 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
     pub fn param(&self, i: usize) -> (LIRTy, ValueId<'ir>) {
         let def = &self.body.blocks[self.body.entry.idx].params[i];
         (self.body.defs[def.idx].ty, def.id())
+    }
+}
+
+impl<'ir, S: ScalarMarker> Typed<'ir, Scalar<S>>
+where
+    Scalar<S>: ValueKind,
+{
+    pub fn kind(&self, db: &dyn Db) -> ScalarKind {
+        self.ty.scalar(db).unwrap()
     }
 }

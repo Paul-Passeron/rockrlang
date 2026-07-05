@@ -28,7 +28,7 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum MangleType {
+pub enum MangleType {
     Ptr(Box<Self>),
     Tuple(Vec<Self>),
     Array(Box<Self>),
@@ -45,10 +45,10 @@ enum MangleType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum FloatKind {}
+pub enum FloatKind {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum IntKind {
+pub enum IntKind {
     Bool,
     Int,
     Usize,
@@ -57,14 +57,14 @@ enum IntKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct MangleSig {
+pub struct MangleSig {
     name: String,
     parameters: Vec<MangleType>,
     ret: MangleType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum MangleFun {
+pub enum MangleFun {
     Extern(String), // An extern function should not be mangled
     Method {
         is_static: bool,
@@ -124,7 +124,10 @@ struct InternedTR {
 }
 
 #[salsa::tracked]
-fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> Arc<MangleType> {
+pub fn _ty_mangle<'db>(
+    db: &'db dyn Db,
+    ty: InternedTR<'db>,
+) -> Arc<MangleType> {
     let ty = match ty.tref(db) {
         TypeRef::Concrete(type_id) => mangle_type_id(db, type_id),
         _ => MangleType::Error,
@@ -185,8 +188,10 @@ fn mangle_builtin_id(
         MangleType::Tuple(args)
     } else if id == BuiltinTypeId::never(db) {
         MangleType::Never
+    } else if id == BuiltinTypeId::void(db) {
+        MangleType::Tuple(vec![])
     } else {
-        todo!()
+        todo!("mangle {}", id.name(db).to_string(db))
     }
 }
 
@@ -210,12 +215,12 @@ impl BuiltinTypeId {
     }
 }
 
-fn mangle_ident(s: &str) -> String {
+pub fn mangle_ident(s: &str) -> String {
     format!("{}{}", s.len(), s)
 }
 
 impl IntKind {
-    fn mangle(&self) -> &'static str {
+    pub fn mangle(&self) -> &'static str {
         match self {
             IntKind::Bool => "ib",
             IntKind::Int => "ii",
@@ -227,13 +232,13 @@ impl IntKind {
 }
 
 impl FloatKind {
-    fn mangle(&self) -> String {
+    pub fn mangle(&self) -> String {
         match *self {} // uninhabited
     }
 }
 
 impl MangleType {
-    fn mangle(&self) -> String {
+    pub fn mangle(&self) -> String {
         match self {
             MangleType::Ptr(t) => format!("P{}", t.mangle()),
             MangleType::Array(t) => format!("A{}", t.mangle()),
@@ -261,7 +266,7 @@ impl MangleType {
 
 impl MangleSig {
     // <name-ident> <param-types...> E <ret-type>
-    fn mangle(&self) -> String {
+    pub fn mangle(&self) -> String {
         let params: String =
             self.parameters.iter().map(MangleType::mangle).collect();
         format!("{}{}E{}", mangle_ident(&self.name), params, self.ret.mangle())
@@ -269,7 +274,7 @@ impl MangleSig {
 }
 
 impl MangleFun {
-    fn mangle(&self) -> String {
+    pub fn mangle(&self) -> String {
         match self {
             MangleFun::Extern(name) => name.clone(),
             MangleFun::Method { is_static, ty, sig, templates } => {
