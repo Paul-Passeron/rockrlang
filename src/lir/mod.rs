@@ -245,10 +245,11 @@ pub enum SigKind {
 }
 
 pub struct Module<S: ModulePhase> {
-    sigs: Vec<FunctionSig>,
-    bodies: Vec<Body<S>>,
+    pub sigs: Vec<FunctionSig>,
+    pub bodies: Vec<Body<S>>,
 }
 
+#[derive(Debug)]
 pub enum VerifyError {}
 
 impl<S: ModulePhase> Module<S> {
@@ -261,6 +262,10 @@ impl<S: ModulePhase> Module<S> {
         id: LIRFunctionId,
     ) -> (&FunctionSig, &mut Body<S>) {
         (&self.sigs[id.0], &mut self.bodies[id.0])
+    }
+
+    pub fn functions(&self) -> impl Iterator<Item = LIRFunctionId> {
+        self.sigs.iter().enumerate().map(|(i, _)| LIRFunctionId(i))
     }
 }
 

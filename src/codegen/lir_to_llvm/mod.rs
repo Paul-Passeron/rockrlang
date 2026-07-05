@@ -15,12 +15,48 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use inkwell::context::Context;
+use inkwell::{builder::Builder, context::Context};
 
-use crate::codegen::{Codegen, LIRToLLVM};
+use crate::{
+    Db,
+    codegen::{Codegen, IModule, LIRToLLVM},
+    lir::{self, Complete, LIRFunctionId},
+    unused,
+};
 
 impl<'db> Codegen<'db, LIRToLLVM<'db>> {
     pub(super) fn finalize(self) -> Context {
-        todo!()
+        self.ctx.ctx
+    }
+
+    pub fn run(self) -> Context {
+        let ctx = Ctx {
+            db: self.db,
+            lir: &self.lir,
+            ctx: &self.ctx.ctx,
+            m: self.ctx.ctx.create_module("main"),
+            b: self.ctx.ctx.create_builder(),
+        };
+        ctx.run();
+        self.finalize()
+    }
+}
+
+#[allow(unused)]
+struct Ctx<'db, 'lir, 'ctx> {
+    db: &'db dyn Db,
+    lir: &'lir lir::Module<Complete>,
+    ctx: &'ctx Context,
+    m: IModule<'ctx>,
+    b: Builder<'ctx>,
+}
+
+impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
+    fn run(self) {
+        self.lir.functions().for_each(|func| self.lower_lir(func));
+    }
+
+    fn lower_lir(&self, l: LIRFunctionId) {
+        unused!(l);
     }
 }

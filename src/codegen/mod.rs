@@ -21,11 +21,14 @@ use inkwell::context::Context;
 
 use crate::{
     Db,
+    codegen::mir_to_lir::{build::MTLBCtx, declare::MTLDCtx},
     lir::{Building, Complete, Declaring, Module, ModulePhase},
 };
 
 mod lir_to_llvm;
 mod mir_to_lir;
+
+pub type IModule<'a> = inkwell::module::Module<'a>;
 
 pub struct Codegen<'db, State: CGState<'db>> {
     db: &'db dyn Db,
@@ -45,9 +48,9 @@ pub struct MIRToLIRDeclare<'db>(PhantomData<&'db ()>);
 pub struct MIRToLIRBuild<'db>(PhantomData<&'db ()>);
 pub struct LIRToLLVM<'db>(PhantomData<&'db ()>);
 
-pub struct MTLDCtx {}
-pub struct MTLBCtx {}
-pub struct LTLLVMCtx {}
+pub struct LTLLVMCtx {
+    pub ctx: Context,
+}
 
 impl<'db> CGState<'db> for MIRToLIRDeclare<'db> {
     type Ctx = MTLDCtx;

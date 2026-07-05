@@ -15,10 +15,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare};
+use std::collections::HashMap;
+
+use crate::{
+    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx},
+    lir::LIRFunctionId,
+    thir_to_mir::FuncInst,
+};
+
+pub struct MTLDCtx {
+    pub mir_map: HashMap<FuncInst, LIRFunctionId>,
+}
 
 impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
     pub fn finalize(self) -> Codegen<'db, MIRToLIRBuild<'db>> {
-        todo!()
+        Codegen {
+            db: self.db,
+            lir: self.lir.finish_declarations(),
+            ctx: MTLBCtx { mir_map: self.ctx.mir_map },
+        }
     }
 }
