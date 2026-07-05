@@ -675,6 +675,10 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.terminate(Return(value))
     }
 
+    pub fn diverge(self) -> Terminated<()> {
+        self.terminate(Terminator::Diverge)
+    }
+
     // Utils:
     fn bool_ty(&self) -> LIRTy {
         LIRTy { layout: LayoutID::int(self.db, IntWidth::I8), origin: None }
