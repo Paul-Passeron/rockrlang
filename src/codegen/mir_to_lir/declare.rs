@@ -15,10 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use itertools::Itertools;
 
 use crate::{
-    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap}, lir::LIRFunctionId, thir_to_mir::FuncInst,
+    codegen::{
+        Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx,
+        mir_to_lir::build::MIRMap,
+    },
+    layout::{LIRTy, layout_of},
+    lir::{DefinedLinkage::Export, Signature},
+    mangle::fun_mangle,
+    mir::MIR,
+    ril::TypeRef,
 };
 
 pub struct MTLDCtx<'a> {
@@ -32,5 +40,48 @@ impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
             lir: self.lir.finish_declarations(),
             ctx: MTLBCtx { db: self.db, mir_map: self.ctx.mir_map },
         }
+    }
+
+    pub fn declare_import(
+        &mut self,
+        name: String,
+        params: &[TypeRef],
+        ret_ty: TypeRef,
+    ) {
+        let params = params
+            .iter()
+            .map(|ty| LIRTy {
+                layout: layout_of(self.db, *ty),
+                origin: Some(*ty),
+            })
+            .collect_vec();
+        let ret_layout = layout_of(self.db, ret_ty);
+        let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
+        let sig = Signature { params, ret };
+        self.lir().declare_import(name, sig);
+    }
+
+    pub fn declare_mir(&mut self, mir: &'db MIR) {
+        let params = mir
+            .func
+            .params(self.db)
+            .into_iter()
+            .map(|(_, ty)| LIRTy {
+                layout: layout_of(self.db, ty),
+                origin: Some(ty),
+            })
+            .collect_vec();
+        let ret_ty = mir.func.ret_ty(self.db);
+        let ret_layout = layout_of(self.db, ret_ty);
+        let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
+        let sig = Signature { params, ret };
+        let inst = mir.func;
+        let name = if inst.is_main(self.db) {
+            "main".into()
+        } else {
+            fun_mangle(self.db, inst).mangle()
+        };
+        let id = self.lir().declare_defined(name, sig, Export);
+        self.ctx.mir_map.add(mir, id);
     }
 }

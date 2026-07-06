@@ -18,14 +18,7 @@ use inkwell::{
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
-    compiler::{Workspace, workspace_packages},
-    mangle::fun_mangle,
-    mir::MIR,
-    mir_to_llvm::mir::MIRGen,
-    name_resolve::{core_package, file_module_id, std_package},
-    ril::{FunctionId, ScopeOwnerId, TypeRef},
+    Db, mangle::fun_mangle, mir::MIR, mir_to_llvm::mir::MIRGen, ril::TypeRef,
     thir_to_mir::FuncInst,
 };
 
@@ -150,41 +143,5 @@ impl<'a, 'db> LLVMCtx<'a, 'db> {
         target_machine
             .write_to_file(&self.m, FileType::Object, path)
             .map_err(|e| e.to_string())
-    }
-}
-
-#[salsa::tracked]
-impl FuncInst {
-    pub fn is_main(self, db: &dyn Db) -> bool {
-        let packages = workspace_packages(db, Workspace::get(db));
-        let mut main_pkg = None;
-        for pkg in packages.iter() {
-            if Some(*pkg) == std_package(db) {
-                continue;
-            }
-            if *pkg == core_package(db) {
-                continue;
-            }
-            if main_pkg.is_some() {
-                panic!("TODO: handle multiple packages for main")
-            }
-
-            main_pkg = Some(*pkg);
-        }
-        let main_pkg = main_pkg.unwrap();
-        let file_module = file_module_id(db, main_pkg.root(db), None, main_pkg);
-        let f_id = FunctionId::new(
-            db,
-            Symbol::new(db, "main"),
-            ScopeOwnerId::Module(file_module),
-        );
-        if self.fdef(db) != f_id {
-            return false;
-        }
-        if !self.subs(db).is_empty() {
-            panic!("Generic main function !");
-        }
-
-        true
     }
 }

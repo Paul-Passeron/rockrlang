@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{
     collections::{BTreeMap, HashMap},
     marker::PhantomData,
-    sync::Arc,
 };
 
 use itertools::{Either, Itertools};
@@ -26,7 +25,7 @@ use itertools::{Either, Itertools};
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
-    compiler::get_sig_of_function,
+    compiler::{Workspace, get_sig_of_function, workspace_packages},
     hir::Mutability,
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
@@ -37,9 +36,10 @@ use crate::{
             MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
         },
     },
+    name_resolve::{core_package, file_module_id, std_package},
     ril::{
-        BuiltinTypeId, FunctionId, TypeDefId, TypeId, TypeRef, bool_id,
-        char_id, int_id, never_id, str_def, usize_id, void_id,
+        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
+        bool_id, char_id, int_id, never_id, str_def, usize_id, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
@@ -118,19 +118,41 @@ impl FuncInst {
             }))
             .collect()
     }
+}
 
-    pub fn get_mangled_name(&self, db: &dyn Db) -> String {
-        let name = self.fdef(db).name(db).to_string(db);
-        if !self.fdef(db).has_body(db) {
-            return name;
+#[salsa::tracked]
+impl FuncInst {
+    pub fn is_main(self, db: &dyn Db) -> bool {
+        let packages = workspace_packages(db, Workspace::get(db));
+        let mut main_pkg = None;
+        for pkg in packages.iter() {
+            if Some(*pkg) == std_package(db) {
+                continue;
+            }
+            if *pkg == core_package(db) {
+                continue;
+            }
+            if main_pkg.is_some() {
+                panic!("TODO: handle multiple packages for main")
+            }
+
+            main_pkg = Some(*pkg);
         }
-        if name == "main" {
-            return name;
+        let main_pkg = main_pkg.unwrap();
+        let file_module = file_module_id(db, main_pkg.root(db), None, main_pkg);
+        let f_id = FunctionId::new(
+            db,
+            Symbol::new(db, "main"),
+            ScopeOwnerId::Module(file_module),
+        );
+        if self.fdef(db) != f_id {
+            return false;
         }
-        if self.subs(db).is_empty() {
-            return self.fdef(db).called_to_string(db);
+        if !self.subs(db).is_empty() {
+            panic!("Generic main function !");
         }
-        todo!()
+
+        true
     }
 }
 
