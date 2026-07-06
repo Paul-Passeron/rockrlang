@@ -29,6 +29,7 @@ pub enum ConstValue {
     Int { ty: LIRTy, value: u128 },
     NullPtr { pointee: LIRTy },
     Zeroed { ty: LIRTy },
+    Strlit { contents: String, null_terminated: bool },
     FunctionAddr(LIRFunctionId), /* May not be used right now but will be
                                   * later on */
 }

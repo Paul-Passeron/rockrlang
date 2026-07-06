@@ -134,21 +134,19 @@ impl FuncInst {
     }
 }
 
-// /// Wrapper to send MIR safely between threads as it is supposed to be
-// read-only #[derive(Clone, PartialEq, Eq)]
-// struct _MIRWrapper(Arc<MIR>);
-// unsafe impl Sync for _MIRWrapper {}
-// unsafe impl Send for _MIRWrapper {}
-
-#[salsa::tracked]
-pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Arc<MIR> {
+#[salsa::tracked(returns(ref))]
+pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
     let Some(thir) = thir_body(db, key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
     };
-    Arc::new(ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower())
+    ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower()
 }
 
-pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> Arc<MIR> {
+pub fn mir<'db>(
+    db: &'db dyn Db,
+    fdef: FunctionId,
+    subs: Vec<TypeRef>,
+) -> &'db MIR {
     _mir(db, MIRKey::new(db, fdef, subs))
 }
 
@@ -449,7 +447,7 @@ impl<'a> ThirToMIR<'a> {
         );
         let len = MIROperand::Constant(
             MIRConstant::Integer {
-                value: strlit.len() as i128,
+                value: strlit.len() as u128,
                 ty: usize_id(self.db).into(),
             },
             span,
@@ -722,11 +720,11 @@ impl<'a> ThirToMIR<'a> {
         match &thir_expr.kind {
             ExprKind::IntLit(value) => {
                 let ty = self.ty(thir_expr.ty);
-                Some(MIRConstant::Integer { value: *value as i128, ty })
+                Some(MIRConstant::Integer { value: *value as u128, ty })
             }
             // TODO: Handle unicode one day
             ExprKind::Charlit(lit) => Some(MIRConstant::Integer {
-                value: *lit as u8 as i128,
+                value: *lit as u8 as u128,
                 ty: char_id(self.db).into(),
             }),
             ExprKind::CStrLit(str_lit) => Some(MIRConstant::CString {

@@ -18,13 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 
 use crate::{
-    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx},
-    lir::LIRFunctionId,
-    thir_to_mir::FuncInst,
+    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap}, lir::LIRFunctionId, thir_to_mir::FuncInst,
 };
 
-pub struct MTLDCtx {
-    pub mir_map: HashMap<FuncInst, LIRFunctionId>,
+pub struct MTLDCtx<'a> {
+    pub mir_map: MIRMap<'a>,
 }
 
 impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
@@ -32,7 +30,7 @@ impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
         Codegen {
             db: self.db,
             lir: self.lir.finish_declarations(),
-            ctx: MTLBCtx { mir_map: self.ctx.mir_map },
+            ctx: MTLBCtx { db: self.db, mir_map: self.ctx.mir_map },
         }
     }
 }

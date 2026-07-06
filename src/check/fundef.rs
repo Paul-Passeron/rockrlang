@@ -37,7 +37,7 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
         process_mir_instance(db, fdef, subs.clone());
         if fdef.has_body(db) {
             let the_mir = mir(db, fdef, subs);
-            check_mir(db, the_mir.as_ref());
+            check_mir(db, the_mir);
         }
     }
 }
@@ -99,7 +99,7 @@ fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
 
     let the_mir = _mir(db, key);
 
-    check_mir(db, the_mir.as_ref());
+    check_mir(db, the_mir);
 
     // let subs = key.subs(db);
     // println!(

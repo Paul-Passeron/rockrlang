@@ -280,6 +280,21 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         )
     }
 
+    pub fn strlit(
+        &mut self,
+        contents: impl ToString,
+        null_terminated: bool,
+    ) -> ValueId<'ir> {
+        // This is a ptr to the start of the strlit
+        self.push_value(
+            LIRTy { layout: LayoutID::ptr(self.db), origin: None },
+            ValueInstKind::Const(ConstValue::Strlit {
+                contents: contents.to_string(),
+                null_terminated,
+            }),
+        )
+    }
+
     // Memory
 
     pub fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
@@ -712,12 +727,21 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     fn opaque_ptr_ty(&self) -> LIRTy {
         LIRTy { layout: LayoutID::ptr(self.db), origin: None }
     }
+
+    pub fn type_of(&self, id: ValueId<'ir>) -> LIRTy {
+        self.body.defs[id.idx].ty
+    }
 }
 
 impl<T> Terminated<T> {
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Terminated<U> {
         let Terminated(value) = self;
         Terminated(f(value))
+    }
+
+    pub fn take(self) -> (T, Terminated<()>) {
+        let Terminated(t) = self;
+        (t, Terminated(()))
     }
 }
 

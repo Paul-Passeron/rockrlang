@@ -37,7 +37,7 @@ pub type Invariant<'ir> = fn(&'ir ()) -> &'ir ();
 // Cheap handle on a basic block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BrandedBlockId<'ir> {
-    pub(super) idx: Idx<BrandedBlockData<'ir>>,
+    pub idx: Idx<BrandedBlockData<'ir>>,
     pub(super) _brand: PhantomData<Invariant<'ir>>,
 }
 

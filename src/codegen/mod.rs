@@ -53,7 +53,7 @@ pub struct LTLLVMCtx {
 }
 
 impl<'db> CGState<'db> for MIRToLIRDeclare<'db> {
-    type Ctx = MTLDCtx;
+    type Ctx = MTLDCtx<'db>;
 
     type LIRState = Declaring;
 
@@ -65,7 +65,7 @@ impl<'db> CGState<'db> for MIRToLIRDeclare<'db> {
 }
 
 impl<'db> CGState<'db> for MIRToLIRBuild<'db> {
-    type Ctx = MTLBCtx;
+    type Ctx = MTLBCtx<'db>;
 
     type LIRState = Building;
     type Out = Codegen<'db, LIRToLLVM<'db>>;

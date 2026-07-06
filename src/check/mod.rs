@@ -185,7 +185,7 @@ pub fn build<'a, 'db>(
                 fref.fdef(db),
                 fref.subs(db).iter().cloned().collect_vec(),
             );
-            let dce = DeadCodeElimination.run(db, the_mir.as_ref());
+            let dce = DeadCodeElimination.run(db, the_mir);
             ctx.lower_mir(&dce);
         }
     }

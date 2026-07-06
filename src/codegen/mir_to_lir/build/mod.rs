@@ -15,17 +15,115 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
 
 use inkwell::context::Context;
 use itertools::Itertools;
 
 use crate::{
-    codegen::{Codegen, LIRToLLVM, LTLLVMCtx, MIRToLIRBuild}, lir::{LIRFunctionId, build::FunctionBuilder}, thir_to_mir::FuncInst, unused,
+    Db,
+    codegen::{Codegen, LIRToLLVM, LTLLVMCtx, MIRToLIRBuild},
+    common::symbols::Symbol,
+    layout::{IntWidth, LIRTy, LayoutID, layout_of},
+    lir::{
+        ArithBinop, LIRFunctionId, ValueId,
+        branded::BrandedBlockId,
+        build::{BlockBuilder, FunctionBuilder, Terminated},
+    },
+    mir::{
+        MIR, MIRBlockID, MIRLocalID,
+        basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
+        operand::{
+            MIRCallee, MIRConstant, MIROperand, MIRPlace, MIRProjection,
+            MIRRValue, MIRRValueKind, UnaryOperator,
+        },
+    },
+    name_resolve::type_expr::struct_item,
+    parse_tree::expr::BinaryOperator,
+    ril::{TypeRef, bool_id},
+    thir_to_mir::FuncInst,
 };
 
-pub struct MTLBCtx {
-    pub mir_map: HashMap<FuncInst, LIRFunctionId>,
+pub struct MIRMap<'a> {
+    mir_to_lir: HashMap<FuncInst, LIRFunctionId>,
+    mirs: HashMap<FuncInst, &'a MIR>,
+    lir_to_mir: HashMap<LIRFunctionId, FuncInst>,
+}
+
+pub struct MTLBCtx<'a> {
+    pub db: &'a dyn Db,
+    pub mir_map: MIRMap<'a>,
+}
+
+pub enum LocalSlot<'ir> {
+    Ptr { ptr: ValueId<'ir>, ty: LIRTy },
+    Value(ValueId<'ir>), /* TODO: analysis that figures out which locals we
+                          * can use here */
+}
+
+struct PendingSpill<'ir> {
+    spill_block: BrandedBlockId<'ir>,
+    real_next_block: BrandedBlockId<'ir>,
+    to_spill: MIRLocalID,
+}
+
+struct LIRLower<'ir, 'db> {
+    mir: &'db MIR,
+    block_map: HashMap<MIRBlockID, BrandedBlockId<'ir>>,
+    value_map: HashMap<MIRLocalID, LocalSlot<'ir>>,
+    pending_spills: Vec<PendingSpill<'ir>>,
+    to_spill: HashMap<MIRLocalID, ValueId<'ir>>,
+}
+
+enum ProjKind<'a> {
+    Regular(&'a MIRProjection),
+    DowncastThen { variant: u32, next: &'a MIRProjection },
+}
+
+impl<'ir> LocalSlot<'ir> {
+    fn ptr(&self) -> ValueId<'ir> {
+        match self {
+            LocalSlot::Ptr { ptr, .. } => *ptr,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<'a> MIRMap<'a> {
+    pub fn new() -> Self {
+        Self {
+            mir_to_lir: HashMap::new(),
+            mirs: HashMap::new(),
+            lir_to_mir: HashMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, mir: &'a MIR, id: LIRFunctionId) {
+        let inst = mir.func;
+        self.mir_to_lir.insert(inst, id);
+        self.lir_to_mir.insert(id, inst);
+        self.mirs.insert(inst, mir);
+    }
+
+    pub fn lirs(&self) -> Vec<LIRFunctionId> {
+        self.lir_to_mir.keys().copied().collect()
+    }
+}
+
+impl<'a> Index<LIRFunctionId> for MIRMap<'a> {
+    type Output = &'a MIR;
+
+    fn index(&self, index: LIRFunctionId) -> &Self::Output {
+        &self[self.lir_to_mir[&index]]
+    }
+}
+
+impl<'a> Index<FuncInst> for MIRMap<'a> {
+    type Output = &'a MIR;
+
+    fn index(&self, index: FuncInst) -> &Self::Output {
+        &self.mirs[&index]
+    }
 }
 
 impl<'db> Codegen<'db, MIRToLIRBuild<'db>> {
@@ -40,9 +138,7 @@ impl<'db> Codegen<'db, MIRToLIRBuild<'db>> {
     pub fn run(mut self) -> Codegen<'db, LIRToLLVM<'db>> {
         self.ctx
             .mir_map
-            .values()
-            .copied()
-            .collect_vec()
+            .lirs()
             .into_iter()
             .for_each(|lir_id| self.lower(lir_id));
         self.finalize()
@@ -59,9 +155,449 @@ impl<'db> Codegen<'db, MIRToLIRBuild<'db>> {
     }
 }
 
-impl MTLBCtx {
+impl<'a> MTLBCtx<'a> {
+    fn add_block<'ir>(
+        &mut self,
+        b: &mut FunctionBuilder<'ir, '_>,
+        id: MIRBlockID,
+        data: &MIRBasicBlock,
+        lower: &mut LIRLower<'ir, '_>,
+    ) {
+        let b = b.new_block(
+            data.name.as_ref().map(|name| Symbol::new(self.db, name)),
+        );
+        lower.block_map.insert(id, b);
+    }
+
     pub fn lower<'ir>(&mut self, b: &mut FunctionBuilder<'ir, '_>) {
-        unused!(b);
-        todo!()
+        let mir = self.mir_map[b.id];
+        let mut lower = LIRLower {
+            mir,
+            block_map: HashMap::new(),
+            value_map: HashMap::new(),
+            pending_spills: Vec::new(),
+            to_spill: HashMap::new(),
+        };
+        mir.blocks
+            .iter()
+            .for_each(|(blk, data)| self.add_block(b, blk, data, &mut lower));
+        let params = b.body.blocks[b.body.entry.idx]
+            .params
+            .iter()
+            .map(|p| p.id())
+            .collect_vec();
+        b.build_block(b.body.entry, |mut bb| {
+            for (local, decl) in mir.locals.iter() {
+                let layout = layout_of(self.db, decl.ty);
+                let ty = LIRTy { layout, origin: Some(decl.ty) };
+                let ptr = bb.alloca(ty);
+                lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
+            }
+            for (i, param_local) in mir.parameters.iter().enumerate() {
+                bb.store(lower.value_map[&param_local].ptr(), params[i]);
+            }
+
+            let mir_entry_target =
+                bb.target(lower.block_map[&mir.entry], vec![]);
+            bb.goto(mir_entry_target)
+        });
+        self.collect_spills(b, mir, &mut lower);
+        mir.blocks.keys().for_each(|blk| {
+            b.build_block(lower.block_map[&blk], |bb| {
+                self.lower_block(bb, blk, &mut lower)
+            })
+        });
+        // Handle the spill-blocks
+        for pending in lower.pending_spills {
+            b.build_block(pending.spill_block, |mut bb| {
+                let ptr = lower.value_map[&pending.to_spill].ptr();
+                let value = lower.to_spill[&pending.to_spill];
+                bb.store(ptr, value);
+                let target = bb.target(pending.real_next_block, vec![]);
+                bb.goto(target)
+            })
+        }
+    }
+
+    fn collect_spills<'ir>(
+        &mut self,
+        b: &mut FunctionBuilder<'ir, '_>,
+        mir: &MIR,
+        lower: &mut LIRLower<'ir, '_>,
+    ) {
+        mir.blocks.keys().for_each(|blk| {
+            // Collect spill-blocks
+            let t = &mir.blocks[blk].terminator;
+            match t {
+                MIRTerminator::Call { dest, next, .. } => {
+                    let ty = mir.locals[*dest].ty;
+                    let layout = layout_of(self.db, ty);
+                    if !layout.is_zst(self.db) {
+                        let spill_block = b.new_block(None);
+                        lower.pending_spills.push(PendingSpill {
+                            spill_block,
+                            real_next_block: lower.block_map[next],
+                            to_spill: *dest,
+                        });
+                    }
+                }
+                _ => (),
+            }
+        });
+    }
+
+    fn lower_block<'ir>(
+        &mut self,
+        mut b: BlockBuilder<'ir, '_>,
+        blk: MIRBlockID,
+        lower: &mut LIRLower<'ir, '_>,
+    ) -> Terminated<()> {
+        let mir = lower.mir;
+        let data = &mir.blocks[blk];
+        data.stmts.iter().for_each(|stmt| self.lower_stmt(&mut b, stmt, lower));
+        self.lower_terminator(b, &data.terminator, lower)
+    }
+
+    fn lower_stmt<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        stmt: &Stmt,
+        lower: &LIRLower<'ir, '_>,
+    ) {
+        match stmt {
+            Stmt::Assign { dest, rvalue } => {
+                let ptr = self.lower_place(b, dest, lower);
+                let value = self.lower_rvalue(b, rvalue, lower);
+                b.store(ptr, value);
+            }
+        }
+    }
+
+    fn lower_terminator<'ir>(
+        &mut self,
+        mut b: BlockBuilder<'ir, '_>,
+        t: &MIRTerminator,
+        lower: &mut LIRLower<'ir, '_>,
+    ) -> Terminated<()> {
+        match t {
+            MIRTerminator::Diverge => b.diverge(),
+            MIRTerminator::Call { callee, arguments, dest, next, .. } => {
+                let next_block = lower.block_map[next];
+                let args = arguments
+                    .iter()
+                    .map(|op| self.lower_operand(&mut b, op, lower))
+                    .collect_vec();
+                let next = b.target(next_block, vec![]);
+                let f = match callee {
+                    MIRCallee::Direct(fref) => {
+                        let inst =
+                            FuncInst::from_funcref(self.db, fref.clone());
+                        self.mir_map.mir_to_lir[&inst]
+                    }
+                };
+                let (value, t) = b.call(f, args, next).take();
+                if let Some(v) = value {
+                    lower.to_spill.insert(*dest, v);
+                }
+                t
+            }
+            MIRTerminator::Return { value, .. } => {
+                let value = value
+                    .as_ref()
+                    .map(|op| self.lower_operand(&mut b, op, lower));
+                b.ret(value)
+            }
+            MIRTerminator::Goto { next } => {
+                let target = b.target(lower.block_map[next], vec![]);
+                b.goto(target)
+            }
+            MIRTerminator::Branch { cond, then, else_, .. } => {
+                let cond = self.lower_operand(&mut b, cond, lower);
+                let if_true = b.target(lower.block_map[then], vec![]);
+                let if_false = b.target(lower.block_map[else_], vec![]);
+                b.br(cond, if_true, if_false)
+            }
+            MIRTerminator::Switch {
+                discriminant, branches, default, ..
+            } => {
+                let on = self.lower_operand(&mut b, discriminant, lower);
+                let branches = branches
+                    .iter()
+                    .map(|(n, blk)| {
+                        (*n, b.target(lower.block_map[blk], vec![]))
+                    })
+                    .collect_vec();
+                let default = b.target(lower.block_map[default], vec![]);
+                b.switch(on, branches, default)
+            }
+        }
+    }
+
+    fn lower_operand<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        op: &MIROperand,
+        lower: &LIRLower<'ir, '_>,
+    ) -> ValueId<'ir> {
+        match op {
+            MIROperand::Constant(cst, ..) => match cst {
+                MIRConstant::Integer { value, ty } => {
+                    let layout = layout_of(self.db, *ty);
+                    let ty = LIRTy { layout, origin: Some(*ty) };
+                    b.const_int(ty, *value).erase()
+                }
+                MIRConstant::Bool(value) => {
+                    let layout = LayoutID::int(self.db, IntWidth::I8);
+                    let ty =
+                        LIRTy { layout, origin: Some(bool_id(self.db).into()) };
+                    b.const_int(ty, if *value { 1 } else { 0 }).erase()
+                }
+                MIRConstant::CString { contents, null_terminated } => {
+                    b.strlit(contents, *null_terminated)
+                }
+            },
+            MIROperand::Move(place) | MIROperand::Copy(place) => {
+                self.lower_place(b, place, lower)
+            }
+        }
+    }
+
+    fn apply_proj<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        ptr: ValueId<'ir>,
+        ty: TypeRef,
+        proj: ProjKind,
+        lower: &LIRLower<'ir, '_>,
+    ) -> (ValueId<'ir>, TypeRef) {
+        match proj {
+            ProjKind::Regular(MIRProjection::Deref) => {
+                let new_ty = ty.as_ptr(self.db).unwrap().1;
+                let layout = layout_of(self.db, new_ty);
+                let ty = LIRTy { layout, origin: Some(new_ty) };
+                (b.load(ptr, ty), new_ty)
+            }
+            ProjKind::Regular(MIRProjection::Field { name, resulting_ty }) => {
+                let layout = layout_of(self.db, ty);
+                let lir_ty = LIRTy { layout, origin: Some(ty) };
+                let src_idx = {
+                    let item = struct_item(
+                        self.db,
+                        ty.as_struct_ref(self.db).unwrap().def.into(),
+                    );
+                    let pos = item
+                        .fields
+                        .iter()
+                        .position(|f| f.name == *name)
+                        .unwrap();
+                    pos as u32
+                };
+                (b.field_ptr(ptr, lir_ty, src_idx), *resulting_ty)
+            }
+            ProjKind::Regular(MIRProjection::TupleField {
+                index,
+                resulting_ty,
+            }) => {
+                let layout = layout_of(self.db, ty);
+                let lir_ty = LIRTy { layout, origin: Some(ty) };
+                (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
+            }
+            ProjKind::Regular(MIRProjection::Index { index }) => todo!(),
+            ProjKind::DowncastThen { variant, next } => {
+                let enum_ref = ty.as_enum_ref(self.db);
+                match next {
+                    MIRProjection::Field { name, resulting_ty } => todo!(),
+                    MIRProjection::TupleField { index, resulting_ty } => {
+                        todo!()
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            ProjKind::Regular(MIRProjection::Downcast { .. }) => unreachable!(),
+        }
+    }
+
+    fn get_proj_kinds<'place, 'ir>(
+        &self,
+        place: &'place MIRPlace,
+    ) -> Vec<ProjKind<'place>> {
+        let mut projs = place.projections.iter().collect_vec();
+        let mut res = vec![];
+        while let Some(proj) = projs.pop() {
+            if let MIRProjection::Downcast { variant } = proj {
+                let next = projs.pop().unwrap();
+                res.push(ProjKind::DowncastThen {
+                    variant: *variant as u32,
+                    next,
+                });
+            } else {
+                res.push(ProjKind::Regular(proj));
+            }
+        }
+        res
+    }
+
+    fn lower_place_as_ptr<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        place: &MIRPlace,
+        lower: &LIRLower<'ir, '_>,
+    ) -> ValueId<'ir> {
+        self.get_proj_kinds(place)
+            .into_iter()
+            .fold(
+                (
+                    lower.value_map[&place.local].ptr(),
+                    lower.mir.locals[place.local].ty,
+                ),
+                |(ptr, ty), proj| self.apply_proj(b, ptr, ty, proj, lower),
+            )
+            .0
+    }
+
+    fn lower_place<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        place: &MIRPlace,
+        lower: &LIRLower<'ir, '_>,
+    ) -> ValueId<'ir> {
+        // Should we load the computed place ptr
+        // or eagerly load / extract ?
+        // (This should not matter for valid places)
+        let layout = layout_of(self.db, place.ty);
+        let ty = LIRTy { layout, origin: Some(place.ty) };
+        let ptr = self.lower_place_as_ptr(b, place, lower);
+        b.load(ptr, ty)
+    }
+
+    fn lower_rvalue<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        rvalue: &MIRRValue,
+        lower: &LIRLower<'ir, '_>,
+    ) -> ValueId<'ir> {
+        match &rvalue.kind {
+            MIRRValueKind::Use(op) => self.lower_operand(b, op, lower),
+            MIRRValueKind::Ref(place, _)
+            | MIRRValueKind::AddressOf(place, _) => {
+                self.lower_place_as_ptr(b, place, lower)
+            }
+            MIRRValueKind::BinOp(op, lhs, rhs) => {
+                let lhs = self.lower_operand(b, lhs, lower);
+                let rhs = self.lower_operand(b, rhs, lower);
+                let is_signed = true; // todo !!!
+                match op {
+                    BinaryOperator::Plus => b.arith(
+                        if is_signed {
+                            ArithBinop::SAdd
+                        } else {
+                            ArithBinop::UAdd
+                        },
+                        lhs,
+                        rhs,
+                    ),
+                    BinaryOperator::Minus => b.arith(
+                        if is_signed {
+                            ArithBinop::SSub
+                        } else {
+                            ArithBinop::USub
+                        },
+                        lhs,
+                        rhs,
+                    ),
+                    BinaryOperator::Times => b.arith(
+                        if is_signed {
+                            ArithBinop::SMul
+                        } else {
+                            ArithBinop::UMul
+                        },
+                        lhs,
+                        rhs,
+                    ),
+                    BinaryOperator::Div => b.arith(
+                        if is_signed {
+                            ArithBinop::SDiv
+                        } else {
+                            ArithBinop::UDiv
+                        },
+                        lhs,
+                        rhs,
+                    ),
+                    BinaryOperator::Modulo => b.arith(
+                        if is_signed {
+                            ArithBinop::SMod
+                        } else {
+                            ArithBinop::UMod
+                        },
+                        lhs,
+                        rhs,
+                    ),
+                    BinaryOperator::Eq => todo!(),
+                    BinaryOperator::Diff => todo!(),
+                    BinaryOperator::Lt => todo!(),
+                    BinaryOperator::Leq => todo!(),
+                    BinaryOperator::Gt => todo!(),
+                    BinaryOperator::Geq => todo!(),
+                    BinaryOperator::And => todo!(),
+                    BinaryOperator::Or => todo!(),
+                    BinaryOperator::BitAnd => todo!(),
+                    BinaryOperator::BitOr => todo!(),
+                    BinaryOperator::BitXor => todo!(),
+                }
+            }
+            MIRRValueKind::UnaryOp(op, operand) => {
+                let operand = self.lower_operand(b, operand, lower);
+                match op {
+                    UnaryOperator::Neg => {
+                        let ty = b.type_of(operand);
+                        let z = b.const_int(ty, 0).erase();
+                        b.arith(ArithBinop::SSub, z, operand)
+                    }
+                    UnaryOperator::LNot => b.not(operand),
+                }
+            }
+            MIRRValueKind::Discriminant(place) => {
+                let layout = layout_of(self.db, place.ty);
+                let ty = LIRTy { layout, origin: Some(place.ty) };
+                let ptr = self.lower_place_as_ptr(b, place, lower);
+                b.get_discriminant(ptr, ty).unwrap().erase()
+            }
+            MIRRValueKind::Metadata(miroperand) => todo!(),
+            MIRRValueKind::SizeOf(type_ref) => {
+                let layout = layout_of(self.db, *type_ref);
+                let s = layout.size(self.db).bytes();
+                b.const_int(
+                    LIRTy {
+                        layout: LayoutID::int(self.db, self.db.target_width()),
+                        origin: None,
+                    },
+                    s as u128,
+                )
+                .erase()
+            }
+            MIRRValueKind::Constructor { enum_ref, idx, args, span } => todo!(),
+            MIRRValueKind::StructLit { struct_ref, fields, .. } => {
+                let in_src_order = {
+                    let item = struct_item(self.db, struct_ref.def.into());
+                    item.fields
+                        .iter()
+                        .map(|f| self.lower_operand(b, &fields[&f.name], lower))
+                        .collect_vec()
+                };
+                let tref = struct_ref.clone().as_type_ref(self.db);
+                let layout = layout_of(self.db, tref);
+                let ty = LIRTy { layout, origin: Some(tref) };
+                b.make_aggregate(ty, in_src_order).erase()
+            }
+            MIRRValueKind::Tuple(ops, _) => {
+                let values = ops
+                    .iter()
+                    .map(|op| self.lower_operand(b, op, lower))
+                    .collect_vec();
+                let layout = layout_of(self.db, rvalue.ty);
+                let ty = LIRTy { layout, origin: Some(rvalue.ty) };
+                b.make_aggregate(ty, values).erase()
+            }
+        }
     }
 }

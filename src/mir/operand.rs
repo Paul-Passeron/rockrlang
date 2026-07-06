@@ -49,7 +49,7 @@ pub enum MIROperand {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRConstant {
-    Integer { value: i128, ty: TypeRef },
+    Integer { value: u128, ty: TypeRef },
     Bool(bool),
     CString { contents: String, null_terminated: bool },
 }
@@ -160,7 +160,7 @@ impl From<FunctionRef> for MIRCallee {
 }
 
 impl Constant {
-    pub fn int(value: i128, ty: TypeRef) -> Self {
+    pub fn int(value: u128, ty: TypeRef) -> Self {
         Self::Integer { value, ty }
     }
 }
