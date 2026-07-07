@@ -29,6 +29,7 @@ use crate::{
         ArithBinop, LIRFunctionId, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
+        inst::Terminator,
     },
     mir::{
         MIR, MIRBlockID, MIRLocalID,
@@ -62,6 +63,7 @@ pub enum LocalSlot<'ir> {
 }
 
 struct PendingSpill<'ir> {
+    from: MIRBlockID,
     spill_block: BrandedBlockId<'ir>,
     real_next_block: BrandedBlockId<'ir>,
     to_spill: MIRLocalID,
@@ -71,8 +73,6 @@ struct LIRLower<'ir, 'db> {
     mir: &'db MIR,
     block_map: HashMap<MIRBlockID, BrandedBlockId<'ir>>,
     value_map: HashMap<MIRLocalID, LocalSlot<'ir>>,
-    pending_spills: Vec<PendingSpill<'ir>>,
-    to_spill: HashMap<MIRLocalID, ValueId<'ir>>,
 }
 
 enum ProjKind<'a> {
@@ -175,8 +175,6 @@ impl<'a> MTLBCtx<'a> {
             mir,
             block_map: HashMap::new(),
             value_map: HashMap::new(),
-            pending_spills: Vec::new(),
-            to_spill: HashMap::new(),
         };
         mir.blocks
             .iter()
@@ -186,13 +184,13 @@ impl<'a> MTLBCtx<'a> {
             .iter()
             .map(|p| p.id())
             .collect_vec();
+        for (local, decl) in mir.locals.iter() {
+            let layout = layout_of(self.db, decl.ty);
+            let ty = LIRTy { layout, origin: Some(decl.ty) };
+            let ptr = b.stack_slot(ty);
+            lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
+        }
         b.build_block(b.body.entry, |mut bb| {
-            for (local, decl) in mir.locals.iter() {
-                let layout = layout_of(self.db, decl.ty);
-                let ty = LIRTy { layout, origin: Some(decl.ty) };
-                let ptr = bb.alloca(ty);
-                lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
-            }
             for (i, param_local) in mir.parameters.iter().enumerate() {
                 bb.store(lower.value_map[&param_local].ptr(), params[i]);
             }
@@ -201,48 +199,10 @@ impl<'a> MTLBCtx<'a> {
                 bb.target(lower.block_map[&mir.entry], vec![]);
             bb.goto(mir_entry_target)
         });
-        self.collect_spills(b, mir, &mut lower);
         mir.blocks.keys().for_each(|blk| {
             b.build_block(lower.block_map[&blk], |bb| {
                 self.lower_block(bb, blk, &mut lower)
             })
-        });
-        // Handle the spill-blocks
-        for pending in lower.pending_spills {
-            b.build_block(pending.spill_block, |mut bb| {
-                let ptr = lower.value_map[&pending.to_spill].ptr();
-                let value = lower.to_spill[&pending.to_spill];
-                bb.store(ptr, value);
-                let target = bb.target(pending.real_next_block, vec![]);
-                bb.goto(target)
-            })
-        }
-    }
-
-    fn collect_spills<'ir>(
-        &mut self,
-        b: &mut FunctionBuilder<'ir, '_>,
-        mir: &MIR,
-        lower: &mut LIRLower<'ir, '_>,
-    ) {
-        mir.blocks.keys().for_each(|blk| {
-            // Collect spill-blocks
-            let t = &mir.blocks[blk].terminator;
-            match t {
-                MIRTerminator::Call { dest, next, .. } => {
-                    let ty = mir.locals[*dest].ty;
-                    let layout = layout_of(self.db, ty);
-                    if !layout.is_zst(self.db) {
-                        let spill_block = b.new_block(None);
-                        lower.pending_spills.push(PendingSpill {
-                            spill_block,
-                            real_next_block: lower.block_map[next],
-                            to_spill: *dest,
-                        });
-                    }
-                }
-                _ => (),
-            }
         });
     }
 
@@ -266,7 +226,7 @@ impl<'a> MTLBCtx<'a> {
     ) {
         match stmt {
             Stmt::Assign { dest, rvalue } => {
-                let ptr = self.lower_place(b, dest, lower);
+                let ptr = self.lower_place_as_ptr(b, dest, lower);
                 let value = self.lower_rvalue(b, rvalue, lower);
                 b.store(ptr, value);
             }
@@ -295,11 +255,12 @@ impl<'a> MTLBCtx<'a> {
                         self.mir_map.mir_to_lir[&inst]
                     }
                 };
-                let (value, t) = b.call(f, args, next).take();
+                let value = b.call(f, args);
                 if let Some(v) = value {
-                    lower.to_spill.insert(*dest, v);
+                    let ptr = lower.value_map[dest].ptr();
+                    b.store(ptr, v);
                 }
-                t
+                b.terminate(Terminator::Goto(next))
             }
             MIRTerminator::Return { value, .. } => {
                 let value = value

@@ -19,8 +19,7 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         symbols::Symbol,
-    },
-    lir::{Finalized, LIRDef},
+    }, layout::LIRTy, lir::{Finalized, LIRDef},
 };
 
 type Terminator = super::inst::Terminator<Finalized>;
@@ -33,8 +32,14 @@ pub struct BlockData {
     pub terminator: Terminator,
 }
 
+pub struct StackSlot {
+    pub value: Idx<LIRDef>,
+    pub pointee_ty: LIRTy, // pointee
+}
+
 pub struct FunctionBody {
     pub defs: Arena<LIRDef>,
+    pub stack_slots: Vec<StackSlot>,
     pub blocks: Arena<BlockData>,
     pub entry: Idx<BlockData>,
 }

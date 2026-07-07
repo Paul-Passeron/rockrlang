@@ -29,7 +29,9 @@ use crate::{
         Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
         ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
         ValueDef, ValueId, ValueKind, VerifyError,
-        branded::{BrandedBlockData, BrandedBlockId, InProgressBody},
+        branded::{
+            BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody,
+        },
         inst::{
             BlockTarget, CastKind, ConstValue, Terminator::Return,
             ValueInstKind, VoidInstKind,
@@ -296,20 +298,6 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     }
 
     // Memory
-
-    pub fn alloca(&mut self, ty: LIRTy) -> ValueId<'ir> {
-        let ptr_ty = self.ptr_of(ty);
-        self.push_value(ptr_ty, ValueInstKind::Alloca { ty })
-    }
-
-    pub fn alloca_typed<K: ValueKind>(
-        &mut self,
-        ty: LIRTy,
-    ) -> TypedPtr<'ir, K> {
-        debug_assert!(K::matches(ty.class(self.db)));
-        let val = self.alloca(ty);
-        TypedPtr { raw: val, pointee: ty, _k: PhantomData }
-    }
 
     pub fn load(&mut self, ptr: ValueId<'ir>, ty: LIRTy) -> ValueId<'ir> {
         self.push_value(ty, ValueInstKind::Load { ptr, ty })
@@ -615,6 +603,37 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             .unwrap()
     }
 
+    // Call
+
+    pub fn call(
+        &mut self,
+        f: LIRFunctionId,
+        args: Vec<ValueId<'ir>>,
+    ) -> Option<ValueId<'ir>> {
+        let ret_ty = self.get_ret_ty(f);
+        let dest = if ret_ty.is_zst(self.db) {
+            None
+        } else {
+            let idx = self.body.defs.insert(LIRDef { ty: ret_ty });
+            let def = ValueDef { idx, _brand: std::marker::PhantomData };
+            Some(def)
+        };
+
+        let res = dest.as_ref().map(|d| d.id());
+
+        let params = self.get_params(f);
+
+        assert_eq!(params.len(), args.len());
+
+        for (param, arg) in params.iter().zip(args.iter()) {
+            assert_eq!(param.layout, self.body.defs[arg.idx].ty.layout);
+        }
+
+        self.insts.push(Instruction::Call { dest, id: f, args });
+
+        res
+    }
+
     // Block utils
 
     pub fn target(
@@ -626,36 +645,6 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     }
 
     // Terminators
-
-    pub fn call(
-        self,
-        f: LIRFunctionId,
-        args: Vec<ValueId<'ir>>,
-        next_block: BlockTarget<Branded<'ir>>,
-    ) -> Terminated<Option<ValueId<'ir>>> {
-        let ret_ty = self.get_ret_ty(f);
-        let dest = if ret_ty.is_zst(self.db) {
-            None
-        } else {
-            let idx = self.body.defs.insert(LIRDef { ty: ret_ty });
-            let def = ValueDef { idx, _brand: std::marker::PhantomData };
-            Some(def)
-        };
-
-        let params = self.get_params(f);
-
-        assert_eq!(params.len(), args.len());
-
-        for (param, arg) in params.iter().zip(args.iter()) {
-            assert_eq!(param.layout, self.body.defs[arg.idx].ty.layout);
-        }
-
-        let value = dest.as_ref().map(|x| x.id());
-
-        let t = Terminator::Call { id: f, args, dest, next: next_block };
-
-        self.terminate(t).map(|_| value)
-    }
 
     pub fn goto(self, target: BlockTarget<Branded<'ir>>) -> Terminated<()> {
         self.terminate(Terminator::Goto(target))
@@ -856,6 +845,24 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
     pub fn param(&self, i: usize) -> (LIRTy, ValueId<'ir>) {
         let def = &self.body.blocks[self.body.entry.idx].params[i];
         (self.body.defs[def.idx].ty, def.id())
+    }
+
+    pub fn stack_slot(&mut self, ty: LIRTy) -> ValueId<'ir> {
+        let idx = self.body.defs.insert(LIRDef {
+            ty: LIRTy { layout: LayoutID::ptr(self.db), origin: None },
+        });
+        let value = ValueId { idx, _brand: PhantomData };
+        let slot = BrandedStackSlot { value, ty };
+        self.body.slots.push(slot);
+        value
+    }
+
+    pub fn stack_slot_typed<K: ValueKind>(
+        &mut self,
+        ty: LIRTy,
+    ) -> TypedPtr<'ir, K> {
+        assert!(K::matches(ty.class(self.db)));
+        self.stack_slot(ty).typed_ptr(ty, self.db).unwrap()
     }
 }
 

@@ -21,6 +21,7 @@ use crate::{
 };
 
 pub enum Instruction<R: Refs> {
+    Call { dest: Option<R::Def>, id: LIRFunctionId, args: Vec<R::Val> },
     Void(VoidInstKind<R>),
     Value { def: R::Def, kind: ValueInstKind<R> },
 }
@@ -45,7 +46,6 @@ pub enum ValueInstKind<R: Refs> {
     Const(ConstValue),
 
     // Memory
-    Alloca { ty: LIRTy },
     Load { ptr: R::Val, ty: LIRTy },
 
     // Addressing
@@ -92,12 +92,7 @@ pub enum Terminator<R: Refs> {
         branches: Vec<(u128, BlockTarget<R>)>,
         default: BlockTarget<R>,
     },
-    Call {
-        id: LIRFunctionId,
-        args: Vec<R::Val>,
-        dest: Option<R::Def>,
-        next: BlockTarget<R>,
-    },
+
     Return(Option<R::Val>),
     Diverge,
 }

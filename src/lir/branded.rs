@@ -20,11 +20,17 @@ use std::marker::PhantomData;
 use itertools::Itertools;
 
 use crate::{
-    Db, common::{
+    Db,
+    common::{
         arena::{Arena, Idx},
         symbols::Symbol,
-    }, lir::{
-        Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef, VerifyError, finalized::{BlockData, FunctionBody}, inst::{BlockTarget, ValueInstKind},
+    },
+    layout::LIRTy,
+    lir::{
+        Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef,
+        ValueId, VerifyError,
+        finalized::{BlockData, FunctionBody},
+        inst::{BlockTarget, ValueInstKind},
     },
 };
 
@@ -68,9 +74,15 @@ pub struct BrandedBlockData<'ir> {
     pub terminator: Option<Terminator<'ir>>,
 }
 
+pub struct BrandedStackSlot<'ir> {
+    pub value: ValueId<'ir>,
+    pub ty: LIRTy,
+}
+
 pub struct InProgressBody<'ir> {
     pub id: LIRFunctionId,
     pub defs: Arena<LIRDef>,
+    pub slots: Vec<BrandedStackSlot<'ir>>,
     pub blocks: Arena<BrandedBlockData<'ir>>,
     pub entry: BrandedBlockId<'ir>,
     _brand: PhantomData<Invariant<'ir>>,
@@ -104,6 +116,7 @@ impl<'ir> InProgressBody<'ir> {
             id,
             defs,
             blocks,
+            slots: Vec::new(),
             entry: BrandedBlockId { idx: entry, _brand: PhantomData },
             _brand: PhantomData,
         }
@@ -122,6 +135,7 @@ impl<'ir> InProgressBody<'ir> {
         Ok(FunctionBody {
             defs: self.defs,
             blocks: arena,
+            stack_slots: Vec::new(),
             entry: Idx::from_raw(self.entry.idx.into_raw()),
         })
     }
@@ -143,6 +157,7 @@ impl<'ir> Instruction<'ir> {
         match self {
             Instruction::Void(_branded_void_instruction) => todo!(),
             Instruction::Value { def: _, kind: _ } => todo!(),
+            Instruction::Call { dest: _, id: _, args: _ } => todo!(),
         }
     }
 }
@@ -151,7 +166,6 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
     pub fn finalize(self) -> ValueInstKind<Finalized> {
         match self {
             Self::Const(cst) => ValueInstKind::Const(cst),
-            Self::Alloca { ty } => ValueInstKind::Alloca { ty },
             Self::Load { ptr, ty } => ValueInstKind::Load { ptr: ptr.idx, ty },
             Self::FieldPtr { ptr, ty, src_idx } => {
                 ValueInstKind::FieldPtr { ptr: ptr.idx, ty, src_idx }
@@ -220,12 +234,6 @@ impl<'ir> Terminator<'ir> {
                     default: default.finalize(),
                 }
             }
-            Terminator::Call { id, args, dest, next } => FTerminator::Call {
-                id,
-                args: args.into_iter().map(|arg| arg.idx).collect(),
-                dest: dest.map(|target| target.idx),
-                next: next.finalize(),
-            },
             Terminator::Return(val) => FTerminator::Return(val.map(|v| v.idx)),
             Terminator::Diverge => FTerminator::Diverge,
         }
