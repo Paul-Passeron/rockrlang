@@ -17,11 +17,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, RockrDb, SourceFile,
-    check::{build, check},
+    check::{check, reachable_frefs},
+    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     common::{location::LocationInfo, symbols::Symbol},
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
+    mir::passes::{
+        MIRPass,
+        dead_code_elimination::{DeadCodeElimination, dce},
+    },
     name_resolve::type_expr::{
         get_templates_of_fun_only, get_templates_of_owner,
     },
@@ -31,13 +36,27 @@ use crate::{
         BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
         TypeDefId, TypeRef, ptr_of, ref_of,
     },
+    thir_to_mir::mir,
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
 use dashmap::DashSet;
-use inkwell::context::Context;
+use inkwell::{
+    OptimizationLevel,
+    context::Context,
+    module::Module,
+    targets::{
+        CodeModel, FileType, InitializationConfig, RelocMode, Target,
+        TargetMachine,
+    },
+};
 use itertools::Itertools;
 use salsa::Setter;
-use std::{fmt, hash::Hash, path::PathBuf, sync::Arc};
+use std::{
+    fmt,
+    hash::Hash,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use walkdir::WalkDir;
 
 pub mod diagnostic;
@@ -450,6 +469,71 @@ pub fn check_from_disk(
     if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
 
+pub fn build<'db, 'ctx>(
+    db: &'db dyn Db,
+    w: Workspace,
+    mut c: Codegen<'db, MIRToLIRDeclare<'db, 'ctx>>,
+) -> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
+    let packages = workspace_packages(db, w);
+    let frefs = packages
+        .iter()
+        .flat_map(|pkg| reachable_frefs(db, *pkg).iter().copied().collect_vec())
+        .unique()
+        .collect_vec();
+
+    for fref in frefs {
+        if fref.fdef(db).has_body(db) {
+            c.declare_mir(dce(db, fref));
+        } else {
+            let name = fref.fdef(db).name(db).to_string(db);
+            println!(
+                "Declaring import {} as {name}",
+                fref.fdef(db).called_to_string(db)
+            );
+            c.declare_import(
+                name,
+                &fref.params(db).iter().map(|(_, ty)| *ty).collect_vec(),
+                fref.ret_ty(db),
+                fref,
+            );
+        }
+    }
+
+    c.finalize()
+}
+
+pub fn write_object_file(
+    db: &dyn Db,
+    m: Module<'_>,
+    path: &Path,
+) -> Result<(), String> {
+    m.verify().map_err(|e| e.to_string())?;
+
+    Target::initialize_native(&InitializationConfig::default())
+        .map_err(|e| e.to_string())?;
+
+    let triple = TargetMachine::get_default_triple();
+    let target = Target::from_triple(&triple).map_err(|e| e.to_string())?;
+
+    let target_machine = target
+        .create_target_machine(
+            &triple,
+            "generic",
+            "",
+            OptimizationLevel::Default,
+            RelocMode::Default,
+            CodeModel::Default,
+        )
+        .ok_or_else(|| "failed to create target machine".to_string())?;
+
+    m.set_triple(&triple);
+    m.set_data_layout(&target_machine.get_target_data().get_data_layout());
+
+    target_machine
+        .write_to_file(&m, FileType::Object, path)
+        .map_err(|e| e.to_string())
+}
+
 pub fn build_from_disk(
     root: PathBuf,
     config: Config,
@@ -472,12 +556,22 @@ pub fn build_from_disk(
 
     render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
 
-    let c = Context::create();
-    let llvm = build(&db, ws, &c);
+    if has_errors {
+        return Err(CompilerError::CompiledWithErrors);
+    }
 
-    llvm.write_object_file(&PathBuf::from("./a.o")).unwrap();
-
-    if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
+    let cg = Codegen::<MIRToLIRDeclare>::new(&db);
+    let llvm_ctx = Context::create();
+    let llvm_module = build(&db, ws, cg) // Collect MIR
+        .run() // Run MIR -> LIR
+        .finalize(&llvm_ctx); // Run LIR -> LLVM
+    write_object_file(&db, llvm_module, &PathBuf::from("./a.o")).map_err(
+        |err| {
+            eprintln!("LLVM errors:\n{err}");
+            CompilerError::CompiledWithErrors
+        },
+    )?;
+    Ok(())
 }
 
 #[salsa::tracked]

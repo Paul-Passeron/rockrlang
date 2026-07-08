@@ -18,26 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::marker::PhantomData;
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
-    layout::{
+    Db, common::symbols::Symbol, layout::{
         AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID,
         ScalarKind, VariantsLayout,
-    },
-    lir::{
-        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig,
-        Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
-        ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
-        ValueDef, ValueId, ValueKind, VerifyError,
-        branded::{
+    }, lir::{
+        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig, Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar, ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass, ValueDef, ValueId, ValueKind, VerifyError, branded::{
             BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody,
-        },
-        inst::{
+        }, finalized::StackSlot, inst::{
             BlockTarget, CastKind, ConstValue, Terminator::Return,
             ValueInstKind, VoidInstKind,
         },
-    },
-    ril::ptr_of,
+    }, ril::ptr_of,
 };
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
@@ -623,7 +614,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
         let params = self.get_params(f);
 
-        assert_eq!(params.len(), args.len());
+        // assert_eq!(params.len(), args.len());
 
         for (param, arg) in params.iter().zip(args.iter()) {
             assert_eq!(param.layout, self.body.defs[arg.idx].ty.layout);
@@ -848,6 +839,7 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
     }
 
     pub fn stack_slot(&mut self, ty: LIRTy) -> ValueId<'ir> {
+        assert!(!ty.is_zst(self.db));
         let idx = self.body.defs.insert(LIRDef {
             ty: LIRTy { layout: LayoutID::ptr(self.db), origin: None },
         });

@@ -22,11 +22,11 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    codegen::{Codegen, LIRToLLVM, LTLLVMCtx, MIRToLIRBuild},
+    codegen::{Codegen, LIRToLLVM, MIRToLIRBuild},
     common::symbols::Symbol,
     layout::{IntWidth, LIRTy, LayoutID, layout_of},
     lir::{
-        ArithBinop, LIRFunctionId, ValueId,
+        ArithBinop, Body, LIRFunctionId, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
         inst::Terminator,
@@ -57,16 +57,10 @@ pub struct MTLBCtx<'a> {
 }
 
 pub enum LocalSlot<'ir> {
+    ZST,
     Ptr { ptr: ValueId<'ir>, ty: LIRTy },
     Value(ValueId<'ir>), /* TODO: analysis that figures out which locals we
                           * can use here */
-}
-
-struct PendingSpill<'ir> {
-    from: MIRBlockID,
-    spill_block: BrandedBlockId<'ir>,
-    real_next_block: BrandedBlockId<'ir>,
-    to_spill: MIRLocalID,
 }
 
 struct LIRLower<'ir, 'db> {
@@ -84,8 +78,13 @@ impl<'ir> LocalSlot<'ir> {
     fn ptr(&self) -> ValueId<'ir> {
         match self {
             LocalSlot::Ptr { ptr, .. } => *ptr,
+            LocalSlot::ZST => panic!("ZST slots have no pointer"),
             _ => unreachable!(),
         }
+    }
+
+    fn is_zst(&self) -> bool {
+        matches!(self, Self::ZST)
     }
 }
 
@@ -108,6 +107,11 @@ impl<'a> MIRMap<'a> {
     pub fn lirs(&self) -> Vec<LIRFunctionId> {
         self.lir_to_mir.keys().copied().collect()
     }
+
+    pub fn add_import(&mut self, inst: FuncInst, id: LIRFunctionId) {
+        self.mir_to_lir.insert(inst, id);
+        self.lir_to_mir.insert(id, inst);
+    }
 }
 
 impl<'a> Index<LIRFunctionId> for MIRMap<'a> {
@@ -126,21 +130,17 @@ impl<'a> Index<FuncInst> for MIRMap<'a> {
     }
 }
 
-impl<'db> Codegen<'db, MIRToLIRBuild<'db>> {
-    pub fn finalize(self) -> Codegen<'db, LIRToLLVM<'db>> {
-        Codegen {
-            db: self.db,
-            lir: self.lir.finalize(),
-            ctx: LTLLVMCtx { ctx: Context::create() },
-        }
+impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
+    pub fn finalize(self) -> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
+        Codegen { db: self.db, lir: self.lir.finalize(), ctx: () }
     }
 
-    pub fn run(mut self) -> Codegen<'db, LIRToLLVM<'db>> {
-        self.ctx
-            .mir_map
-            .lirs()
-            .into_iter()
-            .for_each(|lir_id| self.lower(lir_id));
+    pub fn run(mut self) -> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
+        self.ctx.mir_map.lirs().into_iter().for_each(|lir_id| {
+            if let Body::Defined(_, _) = self.lir.get_fn(lir_id).1 {
+                self.lower(lir_id)
+            }
+        });
         self.finalize()
     }
 
@@ -186,13 +186,29 @@ impl<'a> MTLBCtx<'a> {
             .collect_vec();
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty);
-            let ty = LIRTy { layout, origin: Some(decl.ty) };
-            let ptr = b.stack_slot(ty);
-            lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
+            if layout.is_zst(self.db) {
+                lower.value_map.insert(local, LocalSlot::ZST);
+            } else {
+                let ty = LIRTy { layout, origin: Some(decl.ty) };
+                let ptr = b.stack_slot(ty);
+                lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
+            }
         }
         b.build_block(b.body.entry, |mut bb| {
-            for (i, param_local) in mir.parameters.iter().enumerate() {
-                bb.store(lower.value_map[&param_local].ptr(), params[i]);
+            for (i, param_local) in mir
+                .parameters
+                .iter()
+                .filter(|param| {
+                    let tref = lower.mir.locals[**param].ty;
+                    let layout = layout_of(self.db, tref);
+                    !layout.is_zst(self.db)
+                })
+                .enumerate()
+            {
+                let slot = &lower.value_map[&param_local];
+                if !slot.is_zst() {
+                    bb.store(slot.ptr(), params[i]);
+                }
             }
 
             let mir_entry_target =
@@ -252,6 +268,10 @@ impl<'a> MTLBCtx<'a> {
                     MIRCallee::Direct(fref) => {
                         let inst =
                             FuncInst::from_funcref(self.db, fref.clone());
+                        println!(
+                            "Looking for {}",
+                            inst.fdef(self.db).called_to_string(self.db)
+                        );
                         self.mir_map.mir_to_lir[&inst]
                     }
                 };
@@ -333,10 +353,13 @@ impl<'a> MTLBCtx<'a> {
     ) -> (ValueId<'ir>, TypeRef) {
         match proj {
             ProjKind::Regular(MIRProjection::Deref) => {
-                let new_ty = ty.as_ptr(self.db).unwrap().1;
-                let layout = layout_of(self.db, new_ty);
-                let ty = LIRTy { layout, origin: Some(new_ty) };
-                (b.load(ptr, ty), new_ty)
+                let new_ty = ty
+                    .as_ptr(self.db)
+                    .unwrap_or_else(|| ty.as_ref(self.db).unwrap())
+                    .1;
+                let ptr_layout = layout_of(self.db, ty); // layout of the pointer type itself
+                let lir_ty = LIRTy { layout: ptr_layout, origin: Some(ty) };
+                (b.load(ptr, lir_ty), new_ty)
             }
             ProjKind::Regular(MIRProjection::Field { name, resulting_ty }) => {
                 let layout = layout_of(self.db, ty);
@@ -344,7 +367,12 @@ impl<'a> MTLBCtx<'a> {
                 let src_idx = {
                     let item = struct_item(
                         self.db,
-                        ty.as_struct_ref(self.db).unwrap().def.into(),
+                        ty.as_struct_ref(self.db)
+                            .unwrap_or_else(|| {
+                                panic!("Type was {}", ty.to_string(self.db))
+                            })
+                            .def
+                            .into(),
                     );
                     let pos = item
                         .fields
@@ -404,6 +432,10 @@ impl<'a> MTLBCtx<'a> {
         place: &MIRPlace,
         lower: &LIRLower<'ir, '_>,
     ) -> ValueId<'ir> {
+        println!(
+            "Looking at the place defined here: {}",
+            place.span.start().loc_info(self.db)
+        );
         self.get_proj_kinds(place)
             .into_iter()
             .fold(
@@ -428,6 +460,7 @@ impl<'a> MTLBCtx<'a> {
         let layout = layout_of(self.db, place.ty);
         let ty = LIRTy { layout, origin: Some(place.ty) };
         let ptr = self.lower_place_as_ptr(b, place, lower);
+        println!("Loading {:?} from place", ptr);
         b.load(ptr, ty)
     }
 

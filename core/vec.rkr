@@ -1,49 +1,49 @@
-@include core::iter
-@include core::opt
+// @include core::iter
+// @include core::opt
 
-struct Vec<T> {
-    contents: *mut T;
-    len: usize;
-    cap: usize;
-}
+// struct Vec<T> {
+//     contents: *mut T;
+//     len: usize;
+//     cap: usize;
+// }
 
-impl<T> Vec<T> {
-    fun new(): Self {
-        return Vec {
-            .contents: 0,
-            .len: 0,
-            .cap: 0,
-        };
-    }
+// impl<T> Vec<T> {
+//     fun new(): Self {
+//         return Vec {
+//             .contents: 0,
+//             .len: 0,
+//             .cap: 0,
+//         };
+//     }
 
-    fun push(&mut self, value: T): void {
-        // todo
-    }
+//     fun push(&mut self, value: T): void {
+//         // todo
+//     }
 
-    fun unsafe_idx(&self, idx: usize): *T {
-        // todo
-        return 0;
-    }
+//     fun unsafe_idx(&self, idx: usize): *T {
+//         // todo
+//         return 0;
+//     }
 
-    fun len(&self): usize {
-        return self.len;
-    }
-}
+//     fun len(&self): usize {
+//         return self.len;
+//     }
+// }
 
-struct VecIter<T> {
-    vec: *Vec<T>;
-    idx: usize;
-}
+// struct VecIter<T> {
+//     vec: *Vec<T>;
+//     idx: usize;
+// }
 
-impl <T> Iter for VecIter<T> {
-    type Item = T;
+// impl <T> Iter for VecIter<T> {
+//     type Item = T;
 
-    fun next(&mut self): opt<T> {
-        if self.idx >= self.vec.len() {
-            return opt::None;
-        }
-        let res = self.vec.unsafe_idx(self.idx)$;
-        self.idx += 1;
-        return opt::Some(res);
-    }
-}
+//     fun next(&mut self): opt<T> {
+//         if self.idx >= self.vec.len() {
+//             return opt::None;
+//         }
+//         let res = self.vec.unsafe_idx(self.idx)$;
+//         self.idx += 1;
+//         return opt::Some(res);
+//     }
+// }

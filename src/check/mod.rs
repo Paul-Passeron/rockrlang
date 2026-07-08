@@ -165,33 +165,6 @@ pub fn reachable_frefs<'db>(
     Arc::new(frefs)
 }
 
-pub fn build<'a, 'db>(
-    db: &'db dyn Db,
-    w: Workspace,
-    c: &'a Context,
-) -> LLVMCtx<'a, 'db> {
-    let packages = workspace_packages(db, w);
-    let frefs = packages
-        .iter()
-        .flat_map(|pkg| reachable_frefs(db, *pkg).iter().copied().collect_vec())
-        .collect_vec();
-
-    let ctx = LLVMCtx::new(db, c, frefs.as_slice());
-
-    for fref in frefs.iter() {
-        if fref.fdef(db).has_body(db) {
-            let the_mir = mir(
-                db,
-                fref.fdef(db),
-                fref.subs(db).iter().cloned().collect_vec(),
-            );
-            let dce = DeadCodeElimination.run(db, the_mir);
-            ctx.lower_mir(&dce);
-        }
-    }
-    ctx
-}
-
 #[salsa::tracked]
 pub fn check_package<'db>(db: &'db dyn Db, pkg: Package<'db>) {
     check_file_module(db, pkg.root(db), pkg, None);

@@ -104,7 +104,7 @@ impl ValueKind for ZST {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ValueId<'ir> {
     idx: Idx<LIRDef>,
     _brand: PhantomData<Invariant<'ir>>,
@@ -319,7 +319,14 @@ impl Module<Declaring> {
 
 impl Module<Building> {
     pub fn finalize(self) -> Module<Complete> {
-        todo!()
+        Module {
+            sigs: self.sigs,
+            bodies: self
+                .bodies
+                .into_iter()
+                .map(|body| body.map(|body| body.unwrap()))
+                .collect(),
+        }
     }
 }
 

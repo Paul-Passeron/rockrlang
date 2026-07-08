@@ -24,11 +24,13 @@ impl str {
     }
 
     fun println(&self): void {
-        printf(c"%s\n", self.data);
+    let this = *self; 
+        printf(c"%s\n", this.data);
     }
 
     fun print(&self): void {
-        printf(c"%s", self.data);
+        let this = *self; 
+        printf(c"%s", this.data);
     }
 }
 

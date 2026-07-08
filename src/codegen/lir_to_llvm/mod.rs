@@ -15,9 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    ffi::{CStr, CString},
+};
 
 use inkwell::{
+    AddressSpace,
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
@@ -25,38 +30,41 @@ use inkwell::{
     types::{
         AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType,
     },
-    values::{BasicValueEnum, FunctionValue, PhiValue},
+    values::{
+        AnyValue, BasicValue, BasicValueEnum, FunctionValue, GlobalValue,
+        PhiValue,
+    },
 };
 use itertools::Itertools;
+use llvm_sys::core::{LLVMBuildGlobalString, LLVMBuildGlobalStringPtr};
 
 use crate::{
     Db,
     codegen::{Codegen, IModule, LIRToLLVM},
     common::arena::Idx,
-    layout::{Discriminant, IntWidth, LayoutID, Offset},
+    layout::{
+        Discriminant, IntWidth, LayoutData, LayoutID, Offset, ScalarKind,
+    },
     lir::{
-        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
-        finalized::{BlockData, FunctionBody},
-        inst::{Instruction, Terminator, ValueInstKind, VoidInstKind},
+        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId, Module,
+        finalized::{BlockData, FunctionBody, StackSlot},
+        inst::{
+            ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
+        },
     },
     unused,
 };
 
-impl<'db> Codegen<'db, LIRToLLVM<'db>> {
-    pub(super) fn finalize(self) -> Context {
-        self.ctx.ctx
-    }
-
-    pub fn run(self) -> Context {
+impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
+    pub fn finalize(self, ctx: &'ctx Context) -> IModule<'ctx> {
         let ctx = Ctx {
             db: self.db,
             lir: &self.lir,
-            ctx: &self.ctx.ctx,
-            m: self.ctx.ctx.create_module("main"),
-            b: self.ctx.ctx.create_builder(),
+            ctx,
+            m: ctx.create_module("main"),
+            b: ctx.create_builder(),
         };
-        ctx.run();
-        self.finalize()
+        ctx.run()
     }
 }
 
@@ -77,9 +85,10 @@ struct FnCtx<'ctx> {
 }
 
 impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
-    fn run(mut self) {
+    fn run(mut self) -> IModule<'ctx> {
         self.lir.functions().for_each(|func| self.declare_lir(func));
         self.lir.functions().for_each(|func| self.lower_lir(func));
+        self.m
     }
 
     fn new_function_value(&mut self, sig: &FunctionSig) -> FunctionValue<'ctx> {
@@ -122,7 +131,28 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
     }
 
     fn lower_layout(&mut self, layout: LayoutID) -> AnyTypeEnum<'ctx> {
-        todo!()
+        match layout.data(self.db) {
+            LayoutData::ZeroSized => self.ctx.void_type().into(),
+            LayoutData::Scalar(scalar_kind) => match scalar_kind {
+                ScalarKind::Int(int_width) => {
+                    self.get_int_ty(*int_width).into()
+                }
+                ScalarKind::Ptr => {
+                    self.ctx.ptr_type(AddressSpace::default()).into()
+                }
+                ScalarKind::Float(_) => todo!(),
+            },
+            LayoutData::Aggregate(aggregate_layout) => self
+                .ctx
+                .i8_type()
+                .array_type(aggregate_layout.size(self.db).bytes() as u32)
+                .into(),
+            LayoutData::Union(_) => self
+                .ctx
+                .i8_type()
+                .array_type(layout.size(self.db).bytes() as u32)
+                .into(),
+        }
     }
 
     fn get_llvm_func(&self, l: LIRFunctionId) -> FunctionValue<'ctx> {
@@ -150,7 +180,21 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     if blk == body.entry {
                         let entry_bb =
                             self.ctx.append_basic_block(fn_ctx.func, "entry");
+                        fn_ctx.blocks.insert(blk, entry_bb);
                         self.b.position_at_end(entry_bb);
+
+                        for slot in &body.stack_slots {
+                            let StackSlot { value, pointee_ty } = slot;
+                            let pointee = self.basic(pointee_ty.layout);
+                            let ptr = self.b.build_alloca(pointee, "").unwrap();
+                            println!(
+                                "Created slot _{} as {}",
+                                slot.value.into_raw(),
+                                ptr.to_string()
+                            );
+                            fn_ctx.values.insert(*value, ptr.into());
+                        }
+
                         data.params
                             .iter()
                             .filter_map(|param| {
@@ -197,6 +241,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
         ctx: &mut FnCtx<'ctx>,
     ) {
         let bb = self.ctx.append_basic_block(ctx.func, "");
+        ctx.blocks.insert(blk, bb);
+
         self.b.position_at_end(bb);
 
         let blk_data = &body.blocks[blk];
@@ -276,11 +322,79 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             Instruction::Value { def, kind } => {
                 let layout = body.defs[*def].ty.layout;
                 let value: BasicValueEnum<'ctx> = match kind {
-                    ValueInstKind::Const(const_value) => {
-                        todo!()
+                    ValueInstKind::Const(const_value) => match const_value {
+                        ConstValue::Int { ty, value } => {
+                            let int_ty = self.basic(ty.layout).into_int_type();
+                            int_ty.const_int(*value as u64, true /* FIXME: Do not hardcode signedness of the int literals */).into()
+                        }
+                        ConstValue::NullPtr { .. } => self
+                            .ctx
+                            .ptr_type(AddressSpace::default())
+                            .const_null()
+                            .into(),
+                        ConstValue::Zeroed { ty } => {
+                            self.basic(ty.layout).const_zero()
+                        }
+                        ConstValue::Strlit { contents, null_terminated } => {
+                            let array_value = self.ctx.const_string(
+                                contents.as_bytes(),
+                                *null_terminated,
+                            );
+                            let g = self.m.add_global(
+                                array_value.get_type(),
+                                None,
+                                "",
+                            );
+                            g.set_constant(true);
+                            g.set_alignment(1);
+                            g.set_linkage(Linkage::Private);
+                            g.set_initializer(&array_value);
+                            g.set_unnamed_addr(true);
+                            g.as_pointer_value().as_basic_value_enum()
+                        }
+                        ConstValue::FunctionAddr(lirfunction_id) => {
+                            let function = self.get_llvm_func(*lirfunction_id);
+                            // TODO: is this right ?
+                            function
+                                .as_any_value_enum()
+                                .into_pointer_value()
+                                .into()
+                        }
+                    },
+                    ValueInstKind::Load { ptr, ty } => {
+                        let ty = self.basic(ty.layout);
+                        println!("Generating llvm load for {ptr:?}");
+                        let ptr = ctx.values[ptr].into_pointer_value();
+                        self.b.build_load(ty, ptr, "").unwrap()
                     }
-                    ValueInstKind::Load { ptr, ty } => todo!(),
-                    ValueInstKind::FieldPtr { ptr, ty, src_idx } => todo!(),
+                    ValueInstKind::FieldPtr { ptr, ty, src_idx } => {
+                        let ptr = ctx.values[ptr].into_pointer_value();
+                        let (offset, _) = ty
+                            .aggregate_layout(self.db)
+                            .unwrap()
+                            .source_field(*src_idx)
+                            .unwrap();
+                        if offset == Offset::ZERO {
+                            ptr.as_basic_value_enum()
+                        } else {
+                            let layout = self.basic(ty.layout);
+                            // expected to be array type of i8
+                            let value = unsafe {
+                                self.b
+                                    .build_in_bounds_gep(
+                                        layout,
+                                        ptr,
+                                        &[self
+                                            .ctx
+                                            .i32_type()
+                                            .const_int(offset.bytes(), false)],
+                                        "",
+                                    )
+                                    .unwrap()
+                            };
+                            value.into()
+                        }
+                    }
                     ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => {
                         todo!()
                     }
@@ -288,7 +402,60 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     ValueInstKind::MakeAggregate {
                         ty,
                         fields_in_src_order,
-                    } => todo!(),
+                    } => {
+                        let llvm_ty = self.basic(ty.layout); // [N x i8]
+                        let align = ty.layout.align(self.db).bytes() as u32;
+
+                        // 1. Stack slot (see note about entry-block placement
+                        //    below)
+                        let slot = self.b.build_alloca(llvm_ty, "agg").unwrap();
+                        slot.as_instruction()
+                            .unwrap()
+                            .set_alignment(align)
+                            .unwrap();
+
+                        // Optional but recommended: zero the slot first so
+                        // padding
+                        // bytes are deterministic.
+                        self.b.build_store(slot, llvm_ty.const_zero()).unwrap();
+
+                        let agg = ty.aggregate_layout(self.db).unwrap();
+                        for (src_idx, field) in
+                            fields_in_src_order.iter().enumerate()
+                        {
+                            let fty = body.defs[*field].ty;
+                            if fty.is_zst(self.db) {
+                                continue;
+                            }
+                            let offset =
+                                agg.source_field(src_idx as u32).unwrap().0;
+                            let field_ptr = unsafe {
+                                self.b
+                                    .build_in_bounds_gep(
+                                        self.ctx.i8_type(),
+                                        slot,
+                                        &[self
+                                            .ctx
+                                            .i64_type()
+                                            .const_int(offset.bytes(), false)],
+                                        "",
+                                    )
+                                    .unwrap()
+                            };
+                            let store = self
+                                .b
+                                .build_store(field_ptr, ctx.values[field])
+                                .unwrap();
+                            store
+                                .set_alignment(
+                                    fty.layout.align(self.db).bytes() as u32,
+                                )
+                                .unwrap();
+                        }
+
+                        // 2. Reload the whole thing as the SSA value for `def`
+                        self.b.build_load(llvm_ty, slot, "").unwrap()
+                    }
                     ValueInstKind::ExtractField { value, ty, src_idx } => {
                         todo!()
                     }
@@ -306,7 +473,22 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 };
                 ctx.values.insert(*def, value);
             }
-            Instruction::Call { dest, id, args } => todo!(),
+            Instruction::Call { dest, id, args } => {
+                let f = self.get_llvm_func(*id);
+                let args =
+                    args.iter().map(|arg| ctx.values[arg].into()).collect_vec();
+                let callsite = self.b.build_call(f, &args, "").unwrap();
+                match dest {
+                    Some(v) => {
+                        let value = BasicValueEnum::try_from(
+                            callsite.as_any_value_enum(),
+                        )
+                        .unwrap();
+                        ctx.values.insert(*v, value);
+                    }
+                    None => (),
+                }
+            }
         }
     }
 
@@ -326,7 +508,33 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
         t: &Terminator<Finalized>,
         ctx: &mut FnCtx<'ctx>,
     ) {
-        todo!()
+        let llvm_block = ctx.blocks[&blk];
+        self.b.position_at_end(llvm_block);
+        match t {
+            Terminator::Goto(block_target) => {
+                block_target.params.iter().for_each(|arg| {
+                    let value = ctx.values[arg];
+                    let phi = ctx.block_params[arg];
+                    phi.add_incoming(&[(&value, llvm_block)]);
+                });
+                let dst = ctx.blocks[&block_target.block];
+                self.b.build_unconditional_branch(dst).unwrap();
+            }
+            Terminator::Br { cond, if_true, if_false } => todo!(),
+            Terminator::Switch { on, branches, default } => todo!(),
+            Terminator::Return(value) => match value {
+                Some(v) => {
+                    let value = ctx.values[v];
+                    self.b.build_return(Some(&value)).unwrap();
+                }
+                None => {
+                    self.b.build_return(None).unwrap();
+                }
+            },
+            Terminator::Diverge => {
+                self.b.build_unreachable().unwrap();
+            }
+        }
     }
 }
 
@@ -337,3 +545,17 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
 // This requires two passes though (Setting up all phi nodes) and then
 // terminating each block, patching the phi nodes on the target blocks
 // accordingly
+
+fn to_c_str(mut s: &str) -> Cow<'_, CStr> {
+    if s.is_empty() {
+        s = "\0";
+    }
+
+    match CStr::from_bytes_until_nul(s.as_bytes()) {
+        Ok(c) => Cow::from(c),
+        // SAFETY: No internal 0 byte since already `FromBytesUntilNulError`
+        Err(_) => unsafe {
+            Cow::from(CString::new(s.as_bytes()).unwrap_unchecked())
+        },
+    }
+}

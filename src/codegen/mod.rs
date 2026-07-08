@@ -40,66 +40,54 @@ pub trait CGState<'db>: Sized {
     type Ctx;
     type LIRState: ModulePhase;
     type Out;
-
-    fn finalize(cg: Codegen<'db, Self>) -> Self::Out;
 }
 
-pub struct MIRToLIRDeclare<'db>(PhantomData<&'db ()>);
-pub struct MIRToLIRBuild<'db>(PhantomData<&'db ()>);
-pub struct LIRToLLVM<'db>(PhantomData<&'db ()>);
+pub struct MIRToLIRDeclare<'db, 'ctx>(
+    PhantomData<&'db ()>,
+    PhantomData<&'ctx ()>,
+);
+pub struct MIRToLIRBuild<'db, 'ctx>(
+    PhantomData<&'db ()>,
+    PhantomData<&'ctx ()>,
+);
+pub struct LIRToLLVM<'db, 'ctx>(PhantomData<&'db ()>, PhantomData<&'ctx ()>);
 
-pub struct LTLLVMCtx {
-    pub ctx: Context,
-}
-
-impl<'db> CGState<'db> for MIRToLIRDeclare<'db> {
+impl<'db, 'ctx> CGState<'db> for MIRToLIRDeclare<'db, 'ctx> {
     type Ctx = MTLDCtx<'db>;
 
     type LIRState = Declaring;
 
-    type Out = Codegen<'db, MIRToLIRBuild<'db>>;
-
-    fn finalize(cg: Codegen<'db, Self>) -> Self::Out {
-        cg.finalize()
-    }
+    type Out = Codegen<'db, MIRToLIRBuild<'db, 'ctx>>;
 }
 
-impl<'db> CGState<'db> for MIRToLIRBuild<'db> {
+impl<'db, 'ctx> CGState<'db> for MIRToLIRBuild<'db, 'ctx> {
     type Ctx = MTLBCtx<'db>;
 
     type LIRState = Building;
-    type Out = Codegen<'db, LIRToLLVM<'db>>;
-
-    fn finalize(cg: Codegen<'db, Self>) -> Self::Out {
-        cg.finalize()
-    }
+    type Out = Codegen<'db, LIRToLLVM<'db, 'ctx>>;
 }
 
-impl<'db> CGState<'db> for LIRToLLVM<'db> {
-    type Ctx = LTLLVMCtx;
+impl<'db, 'ctx> CGState<'db> for LIRToLLVM<'db, 'ctx> {
+    type Ctx = ();
 
     type LIRState = Complete;
 
-    type Out = Context;
-
-    fn finalize(cg: Codegen<'db, Self>) -> Self::Out {
-        cg.finalize()
-    }
+    type Out = IModule<'ctx>;
 }
 
-impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
+impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
     pub fn lir(&mut self) -> &mut Module<Declaring> {
         &mut self.lir
     }
 }
 
-impl<'db> Codegen<'db, MIRToLIRBuild<'db>> {
+impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
     pub fn lir(&mut self) -> &mut Module<Building> {
         &mut self.lir
     }
 }
 
-impl<'db> Codegen<'db, LIRToLLVM<'db>> {
+impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
     pub fn lir(&self) -> &Module<Complete> {
         &self.lir
     }

@@ -30,6 +30,7 @@ use crate::{
         },
         passes::MIRPass,
     },
+    thir_to_mir::{_mir, FuncInst, MIRKey},
 };
 
 pub struct DeadCodeElimination;
@@ -430,4 +431,14 @@ impl<'a> DCECtx<'a> {
         self.compute_path_bodies(paths);
         self.b.finalize(self.mir.func).unwrap()
     }
+}
+
+#[salsa::tracked(returns(ref))]
+fn _dce<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
+    let mir = _mir(db, key);
+    DeadCodeElimination.run(db, mir)
+}
+
+pub fn dce<'db>(db: &'db dyn Db, f: FuncInst) -> &'db MIR {
+    _dce(db, f.interned())
 }

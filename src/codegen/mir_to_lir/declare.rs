@@ -18,23 +18,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 
 use crate::{
-    codegen::{
+    Db, codegen::{
         Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx,
         mir_to_lir::build::MIRMap,
-    },
-    layout::{LIRTy, layout_of},
-    lir::{DefinedLinkage::Export, Signature},
-    mangle::fun_mangle,
-    mir::MIR,
-    ril::TypeRef,
+    }, layout::{LIRTy, layout_of}, lir::{DefinedLinkage::Export, Module, Signature}, mangle::fun_mangle, mir::MIR, ril::TypeRef, thir_to_mir::{FuncInst, MIRKey},
 };
 
 pub struct MTLDCtx<'a> {
     pub mir_map: MIRMap<'a>,
 }
 
-impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
-    pub fn finalize(self) -> Codegen<'db, MIRToLIRBuild<'db>> {
+impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
+    pub fn new(db: &'db dyn Db) -> Self {
+        Self { db, lir: Module::new(), ctx: MTLDCtx { mir_map: MIRMap::new() } }
+    }
+    
+    pub fn finalize(self) -> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
         Codegen {
             db: self.db,
             lir: self.lir.finish_declarations(),
@@ -47,6 +46,7 @@ impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
         name: String,
         params: &[TypeRef],
         ret_ty: TypeRef,
+        inst: FuncInst
     ) {
         let params = params
             .iter()
@@ -58,7 +58,8 @@ impl<'db> Codegen<'db, MIRToLIRDeclare<'db>> {
         let ret_layout = layout_of(self.db, ret_ty);
         let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
         let sig = Signature { params, ret };
-        self.lir().declare_import(name, sig);
+        let id = self.lir().declare_import(name, sig);
+        self.ctx.mir_map.add_import(inst, id);
     }
 
     pub fn declare_mir(&mut self, mir: &'db MIR) {

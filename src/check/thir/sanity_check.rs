@@ -311,7 +311,31 @@ impl<'db> SanityChecker<'db> {
                             );
                         }
                     }
-                    _ => todo!(),
+                    BinaryOperator::Eq |
+                    BinaryOperator::Diff |
+                    BinaryOperator::Lt |
+                    BinaryOperator::Leq |
+                    BinaryOperator::Gt |
+                    BinaryOperator::Geq => {
+                        if lhs_ty
+                            .as_type_id()
+                            .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                            .is_none()
+                        {
+                            self.check_types(
+                                int_id(self.db).into(),
+                                infos.ty,
+                                infos.span,
+                            );
+                        }
+                        self.check_types(lhs_ty, rhs_ty, infos.span);
+                        self.check_types(bool_id(self.db).into(), infos.ty, infos.span);
+                    },
+                    BinaryOperator::And => todo!(),
+                    BinaryOperator::Or => todo!(),
+                    BinaryOperator::BitAnd => todo!(),
+                    BinaryOperator::BitOr => todo!(),
+                    BinaryOperator::BitXor => todo!(),
                 }
             }
             ExprKind::Neg(operand) => {

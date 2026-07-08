@@ -29,8 +29,8 @@ use crate::{
     lir::{
         Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef,
         ValueId, VerifyError,
-        finalized::{BlockData, FunctionBody},
-        inst::{BlockTarget, ValueInstKind},
+        finalized::{BlockData, FunctionBody, StackSlot},
+        inst::{BlockTarget, ValueInstKind, VoidInstKind},
     },
 };
 
@@ -123,7 +123,8 @@ impl<'ir> InProgressBody<'ir> {
     }
 
     fn verify(&self) -> Result<(), VerifyError> {
-        todo!()
+        // TODO: verify
+        Ok(())
     }
 
     pub fn finalize(self) -> Result<FunctionBody, VerifyError> {
@@ -135,7 +136,14 @@ impl<'ir> InProgressBody<'ir> {
         Ok(FunctionBody {
             defs: self.defs,
             blocks: arena,
-            stack_slots: Vec::new(),
+            stack_slots: self
+                .slots
+                .into_iter()
+                .map(|slot| StackSlot {
+                    value: slot.value.idx,
+                    pointee_ty: slot.ty,
+                })
+                .collect(),
             entry: Idx::from_raw(self.entry.idx.into_raw()),
         })
     }
@@ -155,9 +163,15 @@ impl<'ir> BrandedBlockData<'ir> {
 impl<'ir> Instruction<'ir> {
     pub fn finalize(self) -> FInstruction {
         match self {
-            Instruction::Void(_branded_void_instruction) => todo!(),
-            Instruction::Value { def: _, kind: _ } => todo!(),
-            Instruction::Call { dest: _, id: _, args: _ } => todo!(),
+            Instruction::Void(kind) => FInstruction::Void(kind.finalize()),
+            Instruction::Value { def, kind } => {
+                FInstruction::Value { def: def.idx, kind: kind.finalize() }
+            }
+            Instruction::Call { dest, id, args } => FInstruction::Call {
+                dest: dest.map(|d| d.idx),
+                id,
+                args: args.into_iter().map(|arg| arg.idx).collect_vec(),
+            },
         }
     }
 }
@@ -208,6 +222,22 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
             Self::Not { value } => ValueInstKind::Not { value: value.idx },
             Self::Cast { kind, value, to } => {
                 ValueInstKind::Cast { kind, value: value.idx, to }
+            }
+        }
+    }
+}
+
+impl<'ir> VoidInstKind<Branded<'ir>> {
+    pub fn finalize(self) -> VoidInstKind<Finalized> {
+        match self {
+            VoidInstKind::Store { ptr, value } => {
+                VoidInstKind::Store { ptr: ptr.idx, value: value.idx }
+            }
+            VoidInstKind::MemCopy { src, dst, ty } => {
+                VoidInstKind::MemCopy { src: src.idx, dst: dst.idx, ty }
+            }
+            VoidInstKind::SetDiscriminant { ptr, ty, idx } => {
+                VoidInstKind::SetDiscriminant { ptr: ptr.idx, ty, idx }
             }
         }
     }
