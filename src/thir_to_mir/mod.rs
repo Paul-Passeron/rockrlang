@@ -39,7 +39,7 @@ use crate::{
     name_resolve::{core_package, file_module_id, std_package},
     ril::{
         BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
-        bool_id, char_id, int_id, never_id, str_def, usize_id, void_id,
+        bool_id, char_id, int_id, never_id, str_def, str_id, usize_id, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
@@ -474,10 +474,16 @@ impl<'a> ThirToMIR<'a> {
             },
             span,
         );
+        let str_ty: TypeRef = str_id(self.db).into();
+        let str_ref = str_ty.as_struct_ref(self.db).expect("str is a struct");
+        let len_field_ty = str_ref
+            .typeof_field(self.db, Symbol::new(self.db, "len"))
+            .expect("str has a len field");
+
         let len = MIROperand::Constant(
             MIRConstant::Integer {
                 value: strlit.len() as u128,
-                ty: usize_id(self.db).into(),
+                ty: len_field_ty,
             },
             span,
         );
