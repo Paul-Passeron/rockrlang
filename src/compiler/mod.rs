@@ -40,6 +40,7 @@ use inkwell::{
     OptimizationLevel,
     context::Context,
     module::Module,
+    passes::PassBuilderOptions,
     targets::{
         CodeModel, FileType, InitializationConfig, RelocMode, Target,
         TargetMachine,
@@ -498,32 +499,53 @@ pub fn build<'db, 'ctx>(
     c.finalize()
 }
 
-pub fn write_object_file(m: Module<'_>, path: &Path) -> Result<(), String> {
-    m.verify().map_err(|e| e.to_string())?;
+pub fn write_object_file(
+    m: Module<'_>,
+    path: &Path,
+    machine: TargetMachine,
+) -> Result<(), String> {
+    machine.write_to_file(&m, FileType::Object, path).map_err(|e| e.to_string())
+}
+
+pub fn optimize(
+    module: &Module,
+    opt_level: OptimizationLevel,
+) -> TargetMachine {
+    module.verify().unwrap();
 
     Target::initialize_native(&InitializationConfig::default())
-        .map_err(|e| e.to_string())?;
+        .expect("failed to initialize native target");
 
     let triple = TargetMachine::get_default_triple();
-    let target = Target::from_triple(&triple).map_err(|e| e.to_string())?;
-
-    let target_machine = target
+    let target = Target::from_triple(&triple).unwrap();
+    let machine = target
         .create_target_machine(
             &triple,
-            "generic",
-            "",
-            OptimizationLevel::Default,
-            RelocMode::Default,
+            TargetMachine::get_host_cpu_name().to_str().unwrap(),
+            TargetMachine::get_host_cpu_features().to_str().unwrap(),
+            opt_level,
+            RelocMode::PIC,
             CodeModel::Default,
         )
-        .ok_or_else(|| "failed to create target machine".to_string())?;
+        .unwrap();
 
-    m.set_triple(&triple);
-    m.set_data_layout(&target_machine.get_target_data().get_data_layout());
+    // Do this BEFORE running passes: without a data layout on the module,
+    // several passes make wrong or conservative decisions.
+    module.set_triple(&triple);
+    module.set_data_layout(&machine.get_target_data().get_data_layout());
 
-    target_machine
-        .write_to_file(&m, FileType::Object, path)
-        .map_err(|e| e.to_string())
+    let passes = match opt_level {
+        OptimizationLevel::None => "default<O0>",
+        OptimizationLevel::Less => "default<O1>",
+        OptimizationLevel::Default => "default<O2>",
+        OptimizationLevel::Aggressive => "default<O3>",
+    };
+
+    module
+        .run_passes(passes, &machine, PassBuilderOptions::create())
+        .expect("optimization passes failed");
+
+    machine
 }
 
 pub fn build_from_disk(
@@ -558,13 +580,17 @@ pub fn build_from_disk(
         .run() // Run MIR -> LIR
         .finalize(&llvm_ctx); // Run LIR -> LLVM
 
+    let machine = optimize(&llvm_module, OptimizationLevel::Aggressive);
+
     llvm_module.print_to_stderr();
-    
-    write_object_file(llvm_module, &PathBuf::from("./a.o")).map_err(|err| {
-        eprintln!("LLVM errors:\n{err}");
-        CompilerError::CompiledWithErrors
-    })?;
-    
+
+    write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(
+        |err| {
+            eprintln!("LLVM errors:\n{err}");
+            CompilerError::CompiledWithErrors
+        },
+    )?;
+
     Ok(())
 }
 
