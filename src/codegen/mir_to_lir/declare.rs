@@ -18,10 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 
 use crate::{
-    Db, codegen::{
+    Db,
+    codegen::{
         Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx,
         mir_to_lir::build::MIRMap,
-    }, layout::{LIRTy, layout_of}, lir::{DefinedLinkage::Export, Module, Signature}, mangle::fun_mangle, mir::MIR, ril::TypeRef, thir_to_mir::{FuncInst, MIRKey},
+    },
+    layout::{LIRTy, layout_of},
+    lir::{DefinedLinkage::Export, Module, Signature},
+    mangle::fun_mangle,
+    mir::MIR,
+    ril::TypeRef,
+    thir_to_mir::FuncInst,
 };
 
 pub struct MTLDCtx<'a> {
@@ -32,7 +39,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
     pub fn new(db: &'db dyn Db) -> Self {
         Self { db, lir: Module::new(), ctx: MTLDCtx { mir_map: MIRMap::new() } }
     }
-    
+
     pub fn finalize(self) -> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
         Codegen {
             db: self.db,
@@ -46,7 +53,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
         name: String,
         params: &[TypeRef],
         ret_ty: TypeRef,
-        inst: FuncInst
+        inst: FuncInst,
     ) {
         let params = params
             .iter()
@@ -58,7 +65,8 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
         let ret_layout = layout_of(self.db, ret_ty);
         let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
         let sig = Signature { params, ret };
-        let id = self.lir().declare_import(name, sig);
+        let variadic = inst.is_variadic(self.db);
+        let id = self.lir().declare_import(name, sig, variadic);
         self.ctx.mir_map.add_import(inst, id);
     }
 

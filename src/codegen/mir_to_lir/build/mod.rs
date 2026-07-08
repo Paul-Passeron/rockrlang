@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, ops::Index};
 
-use inkwell::context::Context;
 use itertools::Itertools;
 
 use crate::{
@@ -56,6 +55,7 @@ pub struct MTLBCtx<'a> {
     pub mir_map: MIRMap<'a>,
 }
 
+#[allow(unused)]
 pub enum LocalSlot<'ir> {
     ZST,
     Ptr { ptr: ValueId<'ir>, ty: LIRTy },
@@ -69,6 +69,7 @@ struct LIRLower<'ir, 'db> {
     value_map: HashMap<MIRLocalID, LocalSlot<'ir>>,
 }
 
+#[allow(unused)]
 enum ProjKind<'a> {
     Regular(&'a MIRProjection),
     DowncastThen { variant: u32, next: &'a MIRProjection },
@@ -349,7 +350,7 @@ impl<'a> MTLBCtx<'a> {
         ptr: ValueId<'ir>,
         ty: TypeRef,
         proj: ProjKind,
-        lower: &LIRLower<'ir, '_>,
+        _lower: &LIRLower<'ir, '_>,
     ) -> (ValueId<'ir>, TypeRef) {
         match proj {
             ProjKind::Regular(MIRProjection::Deref) => {
@@ -391,12 +392,12 @@ impl<'a> MTLBCtx<'a> {
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
-            ProjKind::Regular(MIRProjection::Index { index }) => todo!(),
-            ProjKind::DowncastThen { variant, next } => {
-                let enum_ref = ty.as_enum_ref(self.db);
+            ProjKind::Regular(MIRProjection::Index { .. }) => todo!(),
+            ProjKind::DowncastThen { next, .. } => {
+                let _enum_ref = ty.as_enum_ref(self.db);
                 match next {
-                    MIRProjection::Field { name, resulting_ty } => todo!(),
-                    MIRProjection::TupleField { index, resulting_ty } => {
+                    MIRProjection::Field { .. } => todo!(),
+                    MIRProjection::TupleField { .. } => {
                         todo!()
                     }
                     _ => unreachable!(),
@@ -411,6 +412,7 @@ impl<'a> MTLBCtx<'a> {
         place: &'place MIRPlace,
     ) -> Vec<ProjKind<'place>> {
         let mut projs = place.projections.iter().collect_vec();
+        projs.reverse();
         let mut res = vec![];
         while let Some(proj) = projs.pop() {
             if let MIRProjection::Downcast { variant } = proj {
@@ -556,7 +558,7 @@ impl<'a> MTLBCtx<'a> {
                 let ptr = self.lower_place_as_ptr(b, place, lower);
                 b.get_discriminant(ptr, ty).unwrap().erase()
             }
-            MIRRValueKind::Metadata(miroperand) => todo!(),
+            MIRRValueKind::Metadata(_) => todo!(),
             MIRRValueKind::SizeOf(type_ref) => {
                 let layout = layout_of(self.db, *type_ref);
                 let s = layout.size(self.db).bytes();
@@ -569,7 +571,7 @@ impl<'a> MTLBCtx<'a> {
                 )
                 .erase()
             }
-            MIRRValueKind::Constructor { enum_ref, idx, args, span } => todo!(),
+            MIRRValueKind::Constructor { .. } => todo!(),
             MIRRValueKind::StructLit { struct_ref, fields, .. } => {
                 let in_src_order = {
                     let item = struct_item(self.db, struct_ref.def.into());

@@ -18,17 +18,26 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::marker::PhantomData;
 
 use crate::{
-    Db, common::symbols::Symbol, layout::{
+    Db,
+    common::symbols::Symbol,
+    layout::{
         AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID,
         ScalarKind, VariantsLayout,
-    }, lir::{
-        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig, Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar, ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass, ValueDef, ValueId, ValueKind, VerifyError, branded::{
+    },
+    lir::{
+        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig,
+        Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
+        ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
+        ValueDef, ValueId, ValueKind, VerifyError,
+        branded::{
             BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody,
-        }, finalized::StackSlot, inst::{
+        },
+        inst::{
             BlockTarget, CastKind, ConstValue, Terminator::Return,
             ValueInstKind, VoidInstKind,
         },
-    }, ril::ptr_of,
+    },
+    ril::ptr_of,
 };
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
@@ -64,7 +73,7 @@ impl Module<Building> {
                 panic!("Cannot write multiple bodies for the same function")
             }
             Body::Defined(_, slot @ None) => slot,
-            Body::Import => {
+            Body::Import { .. } => {
                 panic!("Cannot set the body of an imported function")
             }
         };

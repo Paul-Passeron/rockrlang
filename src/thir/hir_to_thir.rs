@@ -1201,7 +1201,7 @@ impl<'db> ThirTranslator<'db> {
                 }
                 let idx_ty = tuple_ref.remove(*index as usize);
                 b.with_projection(
-                    base,
+                    place,
                     Projection::TupleField(*index, idx_ty),
                     idx_ty,
                     span,

@@ -1,11 +1,11 @@
 struct str {
     data: *char;
-    len: usize;
+    len: int;
 }
 
 impl str {
     fun from_cstr(data: *char): Self {
-        let mut len: usize = 0;
+        let mut len: int = 0;
         while data[len] != 0 {
             len = len + 1;
         }
@@ -19,18 +19,17 @@ impl str {
         return self$.data;
     }
 
-    fun len(&self): usize {
+    fun len(&self): int {
         return self$.len;
     }
 
     fun println(&self): void {
-    let this = *self; 
-        printf(c"%s\n", this.data);
+        printf(c"%.*s\n", self.len, self.data);
     }
 
     fun print(&self): void {
         let this = *self; 
-        printf(c"%s", this.data);
+        printf(c"%.*s", self.len, self.data);
     }
 }
 

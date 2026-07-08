@@ -15,11 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    ffi::{CStr, CString},
-};
+use std::collections::HashMap;
 
 use inkwell::{
     AddressSpace,
@@ -30,13 +26,9 @@ use inkwell::{
     types::{
         AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType,
     },
-    values::{
-        AnyValue, BasicValue, BasicValueEnum, FunctionValue, GlobalValue,
-        PhiValue,
-    },
+    values::{AnyValue, BasicValue, BasicValueEnum, FunctionValue, PhiValue},
 };
 use itertools::Itertools;
-use llvm_sys::core::{LLVMBuildGlobalString, LLVMBuildGlobalStringPtr};
 
 use crate::{
     Db,
@@ -46,13 +38,12 @@ use crate::{
         Discriminant, IntWidth, LayoutData, LayoutID, Offset, ScalarKind,
     },
     lir::{
-        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId, Module,
+        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
         finalized::{BlockData, FunctionBody, StackSlot},
         inst::{
             ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
         },
     },
-    unused,
 };
 
 impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
@@ -92,6 +83,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
     }
 
     fn new_function_value(&mut self, sig: &FunctionSig) -> FunctionValue<'ctx> {
+        let is_variadic = match sig.kind {
+            lir::SigKind::Import { variadic } => variadic,
+            lir::SigKind::Defined(_) => false,
+        };
         let params = sig
             .signature
             .params
@@ -110,15 +105,15 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             })
             .collect_vec();
         let fn_ty = if !sig.signature.ret.is_zst(self.db) {
-            self.basic(sig.signature.ret.layout).fn_type(&params, false)
+            self.basic(sig.signature.ret.layout).fn_type(&params, is_variadic)
         } else {
-            self.ctx.void_type().fn_type(&params, false)
+            self.ctx.void_type().fn_type(&params, is_variadic)
         };
         self.m.add_function(
             &sig.name,
             fn_ty,
             match sig.kind {
-                lir::SigKind::Import => None,
+                lir::SigKind::Import { .. } => None,
                 lir::SigKind::Defined(defined_linkage) => {
                     Some(match defined_linkage {
                         lir::DefinedLinkage::Export => Linkage::External,
@@ -173,7 +168,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             values: HashMap::new(),
         };
         match body {
-            lir::Body::Import => (), // We're done
+            lir::Body::Import { .. } => (), // We're done
             lir::Body::Defined(_, body) => {
                 // Handle the entry differently
                 for (blk, data) in &body.blocks {
@@ -320,7 +315,6 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 }
             },
             Instruction::Value { def, kind } => {
-                let layout = body.defs[*def].ty.layout;
                 let value: BasicValueEnum<'ctx> = match kind {
                     ValueInstKind::Const(const_value) => match const_value {
                         ConstValue::Int { ty, value } => {
@@ -337,7 +331,9 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         }
                         ConstValue::Strlit { contents, null_terminated } => {
                             let array_value = self.ctx.const_string(
-                                contents.as_bytes(),
+                                unescaper::unescape(contents)
+                                    .unwrap()
+                                    .as_bytes(),
                                 *null_terminated,
                             );
                             let g = self.m.add_global(
@@ -377,12 +373,11 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         if offset == Offset::ZERO {
                             ptr.as_basic_value_enum()
                         } else {
-                            let layout = self.basic(ty.layout);
                             // expected to be array type of i8
                             let value = unsafe {
                                 self.b
                                     .build_in_bounds_gep(
-                                        layout,
+                                        self.ctx.i8_type(),
                                         ptr,
                                         &[self
                                             .ctx
@@ -395,10 +390,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             value.into()
                         }
                     }
-                    ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => {
+                    ValueInstKind::UnionPayloadPtr { .. } => {
                         todo!()
                     }
-                    ValueInstKind::GetDiscriminant { ptr, ty } => todo!(),
+                    ValueInstKind::GetDiscriminant { .. } => todo!(),
                     ValueInstKind::MakeAggregate {
                         ty,
                         fields_in_src_order,
@@ -456,20 +451,15 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         // 2. Reload the whole thing as the SSA value for `def`
                         self.b.build_load(llvm_ty, slot, "").unwrap()
                     }
-                    ValueInstKind::ExtractField { value, ty, src_idx } => {
+                    ValueInstKind::ExtractField { .. } => {
                         todo!()
                     }
-                    ValueInstKind::InsertField {
-                        value,
-                        ty,
-                        src_idx,
-                        field,
-                    } => todo!(),
-                    ValueInstKind::Arith { op, lhs, rhs } => todo!(),
-                    ValueInstKind::Cmp { op, lhs, rhs } => todo!(),
-                    ValueInstKind::Logic { op, lhs, rhs } => todo!(),
-                    ValueInstKind::Not { value } => todo!(),
-                    ValueInstKind::Cast { kind, value, to } => todo!(),
+                    ValueInstKind::InsertField { .. } => todo!(),
+                    ValueInstKind::Arith { .. } => todo!(),
+                    ValueInstKind::Cmp { .. } => todo!(),
+                    ValueInstKind::Logic { .. } => todo!(),
+                    ValueInstKind::Not { .. } => todo!(),
+                    ValueInstKind::Cast { .. } => todo!(),
                 };
                 ctx.values.insert(*def, value);
             }
@@ -520,8 +510,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 let dst = ctx.blocks[&block_target.block];
                 self.b.build_unconditional_branch(dst).unwrap();
             }
-            Terminator::Br { cond, if_true, if_false } => todo!(),
-            Terminator::Switch { on, branches, default } => todo!(),
+            Terminator::Br { .. } => todo!(),
+            Terminator::Switch { .. } => todo!(),
             Terminator::Return(value) => match value {
                 Some(v) => {
                     let value = ctx.values[v];
@@ -535,27 +525,5 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 self.b.build_unreachable().unwrap();
             }
         }
-    }
-}
-
-// First instructions of every block with nodes:
-// phi nodes that we'll extend at each jump to the target with the block params
-// passed We have to have a map from block to phi nodes in param order in the
-// FnCtx This scales nicely with the args (No special cases for no args, etc...)
-// This requires two passes though (Setting up all phi nodes) and then
-// terminating each block, patching the phi nodes on the target blocks
-// accordingly
-
-fn to_c_str(mut s: &str) -> Cow<'_, CStr> {
-    if s.is_empty() {
-        s = "\0";
-    }
-
-    match CStr::from_bytes_until_nul(s.as_bytes()) {
-        Ok(c) => Cow::from(c),
-        // SAFETY: No internal 0 byte since already `FromBytesUntilNulError`
-        Err(_) => unsafe {
-            Cow::from(CString::new(s.as_bytes()).unwrap_unchecked())
-        },
     }
 }

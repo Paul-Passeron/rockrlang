@@ -23,10 +23,7 @@ use crate::{
     compiler::diagnostic::{Diag, Severity},
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
-    mir::passes::{
-        MIRPass,
-        dead_code_elimination::{DeadCodeElimination, dce},
-    },
+    mir::passes::dead_code_elimination::dce,
     name_resolve::type_expr::{
         get_templates_of_fun_only, get_templates_of_owner,
     },
@@ -36,7 +33,6 @@ use crate::{
         BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
         TypeDefId, TypeRef, ptr_of, ref_of,
     },
-    thir_to_mir::mir,
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
 use dashmap::DashSet;
@@ -502,11 +498,7 @@ pub fn build<'db, 'ctx>(
     c.finalize()
 }
 
-pub fn write_object_file(
-    db: &dyn Db,
-    m: Module<'_>,
-    path: &Path,
-) -> Result<(), String> {
+pub fn write_object_file(m: Module<'_>, path: &Path) -> Result<(), String> {
     m.verify().map_err(|e| e.to_string())?;
 
     Target::initialize_native(&InitializationConfig::default())
@@ -565,12 +557,14 @@ pub fn build_from_disk(
     let llvm_module = build(&db, ws, cg) // Collect MIR
         .run() // Run MIR -> LIR
         .finalize(&llvm_ctx); // Run LIR -> LLVM
-    write_object_file(&db, llvm_module, &PathBuf::from("./a.o")).map_err(
-        |err| {
-            eprintln!("LLVM errors:\n{err}");
-            CompilerError::CompiledWithErrors
-        },
-    )?;
+
+    llvm_module.print_to_stderr();
+    
+    write_object_file(llvm_module, &PathBuf::from("./a.o")).map_err(|err| {
+        eprintln!("LLVM errors:\n{err}");
+        CompilerError::CompiledWithErrors
+    })?;
+    
     Ok(())
 }
 

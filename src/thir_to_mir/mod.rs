@@ -26,7 +26,7 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     compiler::{Workspace, get_sig_of_function, workspace_packages},
-    hir::Mutability,
+    hir::{Mutability, function_ast},
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
@@ -122,6 +122,13 @@ impl FuncInst {
 
 #[salsa::tracked]
 impl FuncInst {
+    pub fn is_variadic(self, db: &dyn Db) -> bool {
+        match function_ast(db, self.fdef(db).interned()).inner(db) {
+            crate::hir::FunctionLikeAst::ExternDef(_, variadic) => *variadic,
+            _ => false,
+        }
+    }
+
     pub fn is_main(self, db: &dyn Db) -> bool {
         let packages = workspace_packages(db, Workspace::get(db));
         let mut main_pkg = None;

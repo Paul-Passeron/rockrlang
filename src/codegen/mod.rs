@@ -17,8 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::marker::PhantomData;
 
-use inkwell::context::Context;
-
 use crate::{
     Db,
     codegen::mir_to_lir::{build::MTLBCtx, declare::MTLDCtx},

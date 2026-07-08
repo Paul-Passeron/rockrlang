@@ -221,7 +221,7 @@ pub enum Logic {
 }
 
 pub enum Body<S: ModulePhase> {
-    Import,
+    Import { variadic: bool },
     Defined(DefinedLinkage, S::FnBody),
 }
 
@@ -240,7 +240,7 @@ pub struct FunctionSig {
 }
 
 pub enum SigKind {
-    Import,
+    Import { variadic: bool },
     Defined(DefinedLinkage),
 }
 
@@ -278,13 +278,14 @@ impl Module<Declaring> {
         &mut self,
         name: String,
         sig: Signature,
+        variadic: bool,
     ) -> LIRFunctionId {
         let id = LIRFunctionId(self.sigs.len());
-        self.bodies.push(Body::Import);
+        self.bodies.push(Body::Import { variadic });
         self.sigs.push(FunctionSig {
             name,
             signature: sig,
-            kind: SigKind::Import,
+            kind: SigKind::Import { variadic },
         });
         id
     }
@@ -336,7 +337,7 @@ impl<S: ModulePhase> Body<S> {
         f: impl FnOnce(S::FnBody) -> NewPhase::FnBody,
     ) -> Body<NewPhase> {
         match self {
-            Body::Import => Body::Import,
+            Body::Import { variadic } => Body::Import { variadic },
             Body::Defined(defined_linkage, val) => {
                 Body::Defined(defined_linkage, f(val))
             }

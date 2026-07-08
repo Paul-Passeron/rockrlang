@@ -20,7 +20,6 @@ use std::{
     sync::Arc,
 };
 
-use inkwell::context::Context;
 use itertools::Itertools;
 use salsa::Accumulator;
 
@@ -34,8 +33,6 @@ use crate::{
     },
     common::symbols::Symbol,
     compiler::{Workspace, diagnostic::Diag, workspace_packages},
-    mir::passes::{MIRPass, dead_code_elimination::DeadCodeElimination},
-    mir_to_llvm::LLVMCtx,
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},
