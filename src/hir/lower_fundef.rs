@@ -390,7 +390,7 @@ impl<'db> LowerFundef<'db> {
         ty: &AstTypeExpr,
         module: ModuleId,
     ) -> PartialTypeRef {
-        self.resolve_holed_desc(&ty, module)
+        self.resolve_holed_desc(ty, module)
     }
 
     fn resolve_holed(&self, ty: &AstTypeExpr) -> PartialTypeRef {

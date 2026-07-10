@@ -532,7 +532,7 @@ impl<'db> InferenceCtx<'db> {
 
         let ret_ty = self.allocate_type_ref(
             &method_ctx
-                .resolve(self.db, &(&ast.data.return_type).data)
+                .resolve(self.db, &ast.data.return_type.data)
                 .unwrap(),
             &method_ctx,
         );
