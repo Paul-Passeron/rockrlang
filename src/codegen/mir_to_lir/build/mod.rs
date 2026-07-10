@@ -25,7 +25,7 @@ use crate::{
     common::symbols::Symbol,
     layout::{IntWidth, LIRTy, LayoutData, LayoutID, layout_of},
     lir::{
-        ArithBinop, Body, CmpBinop, LIRFunctionId, Logic, ValueId,
+        ArithBinop, Body, CmpBinop, LIRFunctionId, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
         inst::Terminator,
@@ -402,10 +402,8 @@ impl<'a> MTLBCtx<'a> {
                     layout: layout_of(self.db, elem_ty),
                     origin: Some(elem_ty),
                 };
-                let ptr_ty = LIRTy {
-                    layout: layout_of(self.db, ty),
-                    origin: Some(ty)
-                };
+                let ptr_ty =
+                    LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) };
                 let base_ptr = b.load(ptr, ptr_ty);
                 (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
             }

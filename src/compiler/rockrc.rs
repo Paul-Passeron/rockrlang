@@ -24,22 +24,22 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct CliArgs {
     file: Option<PathBuf>,
-    
+
     #[clap(long, default_value_t = false)]
     no_std: bool,
-    
+
     #[clap(long, default_value_t = false)]
     skip_core: bool,
 
     #[clap(long, default_value_t = false)]
     display_llvm: bool,
-    
+
     #[clap(long, default_value_t = false)]
     display_opt_llvm: bool,
-    
+
     #[clap(long, default_value_t = false)]
     display_mir: bool,
-    
+
     #[clap(long, default_value_t = false)]
     display_thir: bool,
 }

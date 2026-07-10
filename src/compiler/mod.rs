@@ -601,13 +601,13 @@ pub fn build_from_disk(
     if db.config().display_llvm {
         llvm_module.print_to_stderr();
     }
-    
+
     let machine = optimize(&llvm_module, OptimizationLevel::None);
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();
     }
-    
+
     write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(
         |err| {
             eprintln!("LLVM errors:\n{err}");

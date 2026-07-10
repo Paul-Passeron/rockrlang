@@ -3,11 +3,17 @@ use std::{collections::BTreeMap, iter::repeat_n};
 use itertools::Itertools;
 
 use crate::{
-    Db, check::thir::sanity_check::{RefWrappedTy, WrapKind}, layout::{IntWidth, LIRTy, layout_of}, mir::{
+    Db,
+    check::thir::sanity_check::{RefWrappedTy, WrapKind},
+    layout::{IntWidth, LIRTy, layout_of},
+    mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
-    }, ril::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of}, thir::{EnumRef, StructRef, ThirMatchBranch}, thir_to_mir::{
+    },
+    ril::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of},
+    thir::{EnumRef, StructRef, ThirMatchBranch},
+    thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },

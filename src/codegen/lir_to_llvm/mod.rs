@@ -401,7 +401,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             value.into()
                         }
                     }
-                    ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => {
+                    ValueInstKind::UnionPayloadPtr { ptr, ty, .. } => {
                         let union_layout = ty.union_layout(self.db).unwrap();
                         let offset = union_layout.payload_offset;
                         let ptr = ctx.values[ptr].into_pointer_value();

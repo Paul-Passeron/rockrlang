@@ -311,12 +311,12 @@ impl<'db> SanityChecker<'db> {
                             );
                         }
                     }
-                    BinaryOperator::Eq |
-                    BinaryOperator::Diff |
-                    BinaryOperator::Lt |
-                    BinaryOperator::Leq |
-                    BinaryOperator::Gt |
-                    BinaryOperator::Geq => {
+                    BinaryOperator::Eq
+                    | BinaryOperator::Diff
+                    | BinaryOperator::Lt
+                    | BinaryOperator::Leq
+                    | BinaryOperator::Gt
+                    | BinaryOperator::Geq => {
                         if lhs_ty
                             .as_type_id()
                             .and_then(|ty| ty.def(self.db).is_int_like(self.db))
@@ -329,8 +329,12 @@ impl<'db> SanityChecker<'db> {
                             );
                         }
                         self.check_types(lhs_ty, rhs_ty, infos.span);
-                        self.check_types(bool_id(self.db).into(), infos.ty, infos.span);
-                    },
+                        self.check_types(
+                            bool_id(self.db).into(),
+                            infos.ty,
+                            infos.span,
+                        );
+                    }
                     BinaryOperator::And => todo!(),
                     BinaryOperator::Or => todo!(),
                     BinaryOperator::BitAnd => todo!(),

@@ -19,7 +19,9 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         symbols::Symbol,
-    }, layout::LIRTy, lir::{Finalized, LIRDef},
+    },
+    layout::LIRTy,
+    lir::{Finalized, LIRDef},
 };
 
 type Terminator = super::inst::Terminator<Finalized>;

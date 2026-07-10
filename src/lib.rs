@@ -19,6 +19,7 @@ pub use common::location::SourceFile;
 pub use db::*;
 
 pub mod check;
+pub mod codegen;
 pub mod common;
 pub mod compiler;
 pub mod db;
@@ -27,7 +28,6 @@ pub mod hir;
 pub mod layout;
 pub mod lexer;
 pub mod lir;
-pub mod codegen;
 pub mod mangle;
 pub mod mir;
 pub mod name_resolve;
