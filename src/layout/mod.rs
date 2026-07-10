@@ -161,7 +161,7 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
                 enum_layout(db, enum_id, &type_id.args(db)).into()
             }
         },
-        _ => panic!("Expected a concrete type"),
+        _ => panic!("Expected a concrete type but got {}", ty.to_string(db)),
     }
 }
 
