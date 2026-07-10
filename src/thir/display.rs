@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt::format;
-
 use super::stmt::{StmtKind, ThirStmt};
 use super::{
     Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection,

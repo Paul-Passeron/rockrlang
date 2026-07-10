@@ -244,7 +244,7 @@ pub fn fmt_rvalue<W: MIRWrite>(
             fmt_operand(w, db, operand)?;
             w.write_str(" as ")?;
             w.write_str(&type_ref.to_string(db).as_str())
-        },
+        }
     }
 }
 

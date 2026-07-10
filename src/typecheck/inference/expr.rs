@@ -156,10 +156,10 @@ impl<'db> InferenceCtx<'db> {
                 let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
                 let expr_ty = self.infer_expr(expr)?;
                 self.unify(expr_ptr_ty.into(), expr_ty).unwrap();
-                
+
                 let actual_ty =
                     self.allocate_partial_type_ref(ty, &self.implicit_ctx());
-                
+
                 Ok(actual_ty)
             }
         }
