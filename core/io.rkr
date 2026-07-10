@@ -16,11 +16,11 @@ impl str {
     }
 
     fun as_ptr(&self): *char {
-        return self$.data;
+        return self.data;
     }
 
     fun len(&self): int {
-        return self$.len;
+        return self.len;
     }
 
     fun println(&self): void {
@@ -28,7 +28,6 @@ impl str {
     }
 
     fun print(&self): void {
-        let this = *self; 
         printf(c"%.*s", self.len, self.data);
     }
 }
