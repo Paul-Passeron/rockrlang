@@ -30,7 +30,6 @@ pub mod lir;
 pub mod codegen;
 pub mod mangle;
 pub mod mir;
-pub mod mir_to_lir;
 pub mod name_resolve;
 pub mod parse_tree;
 pub mod parser;
