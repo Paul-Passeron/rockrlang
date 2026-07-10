@@ -24,6 +24,7 @@ use inkwell::{
     builder::Builder,
     context::Context,
     module::Linkage,
+    targets::TargetData,
     types::{
         AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType,
     },
@@ -548,8 +549,52 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         }
                     }
                     ValueInstKind::Cmp { op, lhs, rhs } => {
-                        let lhs = ctx.values[lhs].into_int_value();
-                        let rhs = ctx.values[rhs].into_int_value();
+                        let lhs = ctx.values[lhs];
+                        let rhs = ctx.values[rhs];
+                        let (lhs, rhs) = if lhs.is_int_value()
+                            && rhs.is_int_value()
+                        {
+                            let lhs = lhs.into_int_value();
+                            let rhs = rhs.into_int_value();
+                            (lhs, rhs)
+                        } else if lhs.is_int_value() && rhs.is_pointer_value() {
+                            let lhs = lhs.into_int_value();
+                            let rhs = rhs.into_pointer_value();
+                            let rhs = self
+                                .b
+                                .build_ptr_to_int(rhs, lhs.get_type(), "")
+                                .unwrap();
+                            (lhs, rhs)
+                        } else if lhs.is_pointer_value() && rhs.is_int_value() {
+                            let rhs = rhs.into_int_value();
+                            let lhs = lhs.into_pointer_value();
+                            let lhs = self
+                                .b
+                                .build_ptr_to_int(lhs, rhs.get_type(), "")
+                                .unwrap();
+                            (lhs, rhs)
+                        } else if lhs.is_pointer_value()
+                            && rhs.is_pointer_value()
+                        {
+                            let lhs = lhs.into_pointer_value();
+                            let rhs = rhs.into_pointer_value();
+                            let ptrint = self.ctx.ptr_sized_int_type(
+                                &TargetData::create(""),
+                                None,
+                            );
+                            let lhs = self
+                                .b
+                                .build_ptr_to_int(lhs, ptrint, "")
+                                .unwrap();
+                            let rhs = self
+                                .b
+                                .build_ptr_to_int(rhs, ptrint, "")
+                                .unwrap();
+                            (lhs, rhs)
+                        } else {
+                            todo!()
+                        };
+
                         let op = match op {
                             lir::CmpBinop::SLessThan => {
                                 inkwell::IntPredicate::SLT
