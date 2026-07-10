@@ -3,16 +3,11 @@ use std::{collections::BTreeMap, iter::repeat_n};
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    mir::{
+    Db, check::thir::sanity_check::{RefWrappedTy, WrapKind}, layout::{IntWidth, LIRTy, layout_of}, mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
-    },
-    ril::{TypeDefId, TypeId, TypeRef, int_id, ref_of},
-    thir::{EnumRef, StructRef, ThirMatchBranch},
-    thir_to_mir::{
+    }, ril::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of}, thir::{EnumRef, StructRef, ThirMatchBranch}, thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },
@@ -84,7 +79,20 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         .extend(repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
-                    let discr_ty: TypeRef = int_id(self.db).into();
+
+                    let layout = layout_of(self.db, ty);
+                    let lir_ty = LIRTy { layout, origin: Some(ty) };
+                    let vlayout = lir_ty.union_layout(self.db).unwrap();
+                    let discr_width = match vlayout.discriminant {
+                        crate::layout::Discriminant::Tagged {
+                            kind, ..
+                        } => kind,
+                        _ => todo!(),
+                    };
+
+                    let discr_ty: TypeRef =
+                        int_ty_with_witdh(self.db, discr_width).into();
+
                     let discr = MIRRValue {
                         kind: MIRRValueKind::Discriminant(scrut_place),
                         ty: discr_ty,
@@ -268,5 +276,15 @@ impl<'a> ThirToMIR<'a> {
             };
         }
         res
+    }
+}
+
+pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> TypeId {
+    match width {
+        IntWidth::I8 => char_id(db),
+        IntWidth::I16 => todo!(),
+        IntWidth::I32 => int_id(db),
+        IntWidth::I64 => todo!(),
+        IntWidth::I128 => todo!(),
     }
 }
