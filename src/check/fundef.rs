@@ -41,6 +41,7 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
         }
     }
 }
+
 pub(crate) fn reachable_mir_instances(
     db: &dyn Db,
     root: FunctionId,
@@ -49,37 +50,43 @@ pub(crate) fn reachable_mir_instances(
     let mut worklist: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
     let mut res = vec![];
 
-    // Bodyless function-likes (e.g. FunctionLikeAst::ExternDef) can never
-    // be templated, so they're always a single no-substitution instance.
-    if !function_ast(db, root.into()).inner(db).has_body()
-        || get_templates_of_fun(db, root.interned()).is_empty()
-    {
-        worklist.push((root, vec![]));
-    }
+    assert!(
+        get_templates_of_fun(db, root.interned()).is_empty(),
+        "monomorphization root must not be generic"
+    );
+    worklist.push((root, vec![]));
 
     while let Some((fdef, subs)) = worklist.pop() {
+        // Invariant: `subs` is fully concrete — no Params survive here.
+        debug_assert!(
+            subs.iter().all(|ty| matches!(ty, TypeRef::Concrete(_))),
+            "instance ({}, {:?}) reached the worklist with unresolved params",
+            fdef.name(db).display(db),
+            subs.iter().map(|t| t.to_string(db)).collect::<Vec<_>>(),
+        );
+
         if !seen.insert(MIRKey::new(db, fdef, subs.clone())) {
             continue;
         }
         res.push((fdef, subs.clone()));
 
+        if !function_ast(db, fdef.interned()).inner(db).has_body() {
+            continue; // extern: no calls to walk
+        }
+
         let Some(tc) = type_check_function(db, fdef) else {
             continue;
         };
         for call_info in tc.call_infos(db).values() {
-            let callee_has_body = function_ast(db, call_info.callee.interned())
-                .inner(db)
-                .has_body();
-            let callee_templates =
-                get_templates_of_fun(db, call_info.callee.interned());
+            // Compose: the callee's substitution is written in terms of
+            // the *caller's* params; instantiate it with our own subs.
+            let callee_subs: Vec<TypeRef> = call_info
+                .substitution
+                .iter()
+                .map(|ty| ty.with_substitution(db, &subs))
+                .collect();
 
-            if callee_has_body && !callee_templates.is_empty() {
-                worklist
-                    .push((call_info.callee, call_info.substitution.clone()));
-            } else if !seen.contains(&MIRKey::new(db, call_info.callee, vec![]))
-            {
-                worklist.push((call_info.callee, vec![]));
-            }
+            worklist.push((call_info.callee, callee_subs));
         }
     }
 
