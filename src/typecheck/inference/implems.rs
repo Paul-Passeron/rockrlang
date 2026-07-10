@@ -77,7 +77,16 @@ impl<'a> InferenceCtx<'a> {
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },
-            InferTy::Param(_) => None,
+            InferTy::Param(_) => {
+                if let TypeRef::Param(id) = matcher {
+                    Some(vec![InferenceConstraintKind::Unify {
+                        a: ty.clone(),
+                        b: ctx.get_template(id.0)?.clone(),
+                    }])
+                } else {
+                    None
+                }
+            }
         }
     }
 

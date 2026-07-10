@@ -45,7 +45,7 @@ use crate::{
                 MethodConstraint,
             },
             implems::PotentialBlockRes,
-            implicit::ImplicitContext,
+            implicit::{AsAstImplCtx, ImplicitContext},
             var::InferVar,
         },
     },
@@ -197,7 +197,7 @@ impl<'db> InferenceCtx<'db> {
         } else {
             println!(
                 "Pending here ! found type to be {}",
-                found.to_string(self.db)
+                self.find(&found).to_string(self.db)
             );
             ConstraintSolveResult::Pending
         }
@@ -252,8 +252,8 @@ impl<'db> InferenceCtx<'db> {
             }
             (lhs_ty, rhs_ty) => todo!(
                 "Implement non arithmetic binops: `{} {op} {}`",
-                lhs_ty.to_string(self.db),
-                rhs_ty.to_string(self.db)
+                self.find(lhs_ty).to_string(self.db),
+                self.find(rhs_ty).to_string(self.db)
             ),
         }
     }
@@ -530,9 +530,12 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Error(err);
         }
 
-        let ast_ret_ty = &ast.data.return_type;
-        let ret_ty =
-            self.allocate_ast_type_expr(&ast_ret_ty.data, &method_ctx).unwrap();
+        let ret_ty = self.allocate_type_ref(
+            &method_ctx
+                .resolve(self.db, &(&ast.data.return_type).data)
+                .unwrap(),
+            &method_ctx,
+        );
 
         if let Err(err) = self.unify(ret_var.into(), ret_ty.clone()) {
             return ConstraintSolveResult::Error(err);

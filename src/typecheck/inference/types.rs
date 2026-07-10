@@ -247,8 +247,11 @@ impl<'db> InferenceCtx<'db> {
         type_expr: &AstTypeExprDesc,
         ctx: &ImplicitContext,
     ) -> Option<InferTy> {
-        ctx.resolve(self.db, type_expr)
-            .map(|type_ref| self.allocate_type_ref(&type_ref, ctx))
+        let resolved = ctx.resolve(self.db, type_expr)?;
+        if resolved == TypeRef::Zelf {
+            println!("We got a Zelf...");
+        }
+        Some(self.allocate_type_ref(&resolved, ctx))
     }
 
     pub fn is_struct(

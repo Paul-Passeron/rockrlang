@@ -34,7 +34,7 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef, display::Display,
+        TypeDefId, TypeId, TypeRef,
     },
     typecheck::{
         ExprId,
@@ -52,7 +52,7 @@ pub mod solve;
 const MAX_IMPL_DEPTH: usize = 1_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InferenceConstraintId(usize);
+pub struct InferenceConstraintId(pub usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InferenceConstraint {
@@ -453,20 +453,29 @@ impl<'db> InferenceCtx<'db> {
     }
 }
 
+pub struct ICKDisplay<'db, 'a, T> {
+    pub value: T,
+    pub db: &'db dyn Db,
+    pub ctx: &'a InferenceCtx<'db>,
+}
+
 impl InferenceConstraintKind {
-    pub fn display<'a, 'b>(&'a self, db: &'b dyn Db) -> Display<'b, &'a Self> {
-        Display { value: self, db }
+    pub fn display<'a, 'b, 'db>(
+        &'a self,
+        ctx: &'b InferenceCtx<'db>,
+    ) -> ICKDisplay<'db, 'b, &'a Self> {
+        ICKDisplay { value: self, db: ctx.db, ctx }
     }
 }
 
-impl fmt::Display for Display<'_, &InferenceConstraintKind> {
+impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.value {
             InferenceConstraintKind::Deref { var, target } => {
                 write!(
                     f,
                     "Deref {{var: {}, target: {}}}",
-                    InferTy::Var(*var).to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*var)).to_string(self.db),
                     target.to_string(self.db)
                 )
             }
@@ -474,9 +483,11 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "BindsLike {{ty: {}, inner: {}, like: {}}}",
-                    InferTy::Var(*ty).to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*ty)).to_string(self.db),
                     inner.to_string(self.db),
-                    InferTy::Var(*like).to_string(self.db)
+                    self.ctx
+                        .find_const(&InferTy::Var(*like))
+                        .to_string(self.db)
                 )
             }
             InferenceConstraintKind::IndexedBy {
@@ -487,9 +498,11 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "IndexedBy {{elem_var: {}, base_ty: {}, index_ty: {}}}",
-                    InferTy::Var(*elem_var).to_string(self.db),
-                    base_ty.to_string(self.db),
-                    index_ty.to_string(self.db)
+                    self.ctx
+                        .find_const(&InferTy::Var(*elem_var))
+                        .to_string(self.db),
+                    self.ctx.find_const(base_ty).to_string(self.db),
+                    self.ctx.find_const(index_ty).to_string(self.db)
                 )
             }
             InferenceConstraintKind::Tuple {
@@ -500,8 +513,10 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Tuple {{elem_var: {}, tuple_ty: {}, has_index: {has_index}}}",
-                    InferTy::Var(*elem_var).to_string(self.db),
-                    tuple_ty.to_string(self.db),
+                    self.ctx
+                        .find_const(&InferTy::Var(*elem_var))
+                        .to_string(self.db),
+                    self.ctx.find_const(tuple_ty).to_string(self.db),
                 )
             }
             InferenceConstraintKind::StructField {
@@ -512,8 +527,10 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "StructField {{elem_var: {}, struct_ty: {}, field: {}}}",
-                    InferTy::Var(*elem_var).to_string(self.db),
-                    struct_ty.to_string(self.db),
+                    self.ctx
+                        .find_const(&InferTy::Var(*elem_var))
+                        .to_string(self.db),
+                    self.ctx.find_const(struct_ty).to_string(self.db),
                     field.display(self.db)
                 )
             }
@@ -529,11 +546,15 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Method {{ret_var: {}, ty: {}, id: ExprId({:?}), method: {}, args: [{}], interface_hint: {}, is_static: {is_static}}}",
-                    InferTy::Var(*ret_var).to_string(self.db),
-                    ty.to_string(self.db),
+                    self.ctx
+                        .find_const(&InferTy::Var(*ret_var))
+                        .to_string(self.db),
+                    self.ctx.find_const(ty).to_string(self.db),
                     id.0,
                     method.display(self.db),
-                    args.iter().map(|a| a.to_string(self.db)).join(", "),
+                    args.iter()
+                        .map(|a| self.ctx.find_const(a).to_string(self.db))
+                        .join(", "),
                     match interface_hint {
                         Some(hint) => hint.to_string(self.db).to_string(),
                         None => "".to_string(),
@@ -544,25 +565,27 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Implements {{ty: {}, id: {}, args: [{}]}}",
-                    ty.to_string(self.db),
+                    self.ctx.find_const(ty).to_string(self.db),
                     id.to_string(self.db),
-                    args.iter().map(|a| a.to_string(self.db)).join(", "),
+                    args.iter()
+                        .map(|a| self.ctx.find_const(a).to_string(self.db))
+                        .join(", "),
                 )
             }
             InferenceConstraintKind::Unify { a, b } => {
                 write!(
                     f,
                     "Unify {{a: {}, b: {}}}",
-                    a.to_string(self.db),
-                    b.to_string(self.db),
+                    self.ctx.find_const(a).to_string(self.db),
+                    self.ctx.find_const(b).to_string(self.db),
                 )
             }
             InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, op } => {
                 write!(
                     f,
                     "Binop<{op}> {{lhs: {}, rhs: {}, res_ty: {res_ty}}}",
-                    lhs_ty.to_string(self.db),
-                    rhs_ty.to_string(self.db),
+                    self.ctx.find_const(lhs_ty).to_string(self.db),
+                    self.ctx.find_const(rhs_ty).to_string(self.db),
                 )
             }
             InferenceConstraintKind::IntLike { res_ty } => {
@@ -571,8 +594,8 @@ impl fmt::Display for Display<'_, &InferenceConstraintKind> {
             InferenceConstraintKind::IsInner { inner, ref_ty } => write!(
                 f,
                 "IsInner {{ inner: {}, ref_ty: {} }}",
-                inner.to_string(self.db),
-                ref_ty.to_string(self.db)
+                self.ctx.find_const(inner).to_string(self.db),
+                self.ctx.find_const(ref_ty).to_string(self.db)
             ),
             InferenceConstraintKind::FatPtr { fat_ptr_var } => {
                 write!(f, "FatPtr {{ fat_ptr_var: {} }}", fat_ptr_var)

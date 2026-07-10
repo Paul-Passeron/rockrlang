@@ -392,6 +392,7 @@ pub trait AsAstImplCtx {
     fn get_ast_templates(&self) -> Arc<[AstTemplateArg]>;
     fn get_module(&self) -> Option<ModuleId>;
     fn owning_module(&self, db: &dyn Db) -> ModuleId;
+    fn owner(&self, db: &dyn Db) -> ScopeOwnerId;
 
     fn get_associated_type_ast(
         &self,
@@ -432,7 +433,13 @@ pub trait AsAstImplCtx {
                 if *name == Symbol::new(db, "Self")
                     && module == this.owning_module(db)
                 {
-                    return Some(TypeRef::Zelf);
+                    return if let Some(zelf) =
+                        this.owner(db).get_canonical_zelf(db)
+                    {
+                        Some(zelf)
+                    } else {
+                        panic!("No zelf ???")
+                    };
                 } else if let Some(pos) = this
                     .get_ast_templates()
                     .iter()
@@ -531,6 +538,10 @@ impl AsAstImplCtx for ImplicitContext {
 
     fn owning_module(&self, db: &dyn Db) -> ModuleId {
         owning_module(db, self.owner)
+    }
+
+    fn owner(&self, _: &dyn Db) -> ScopeOwnerId {
+        self.owner
     }
 
     fn get_module(&self) -> Option<ModuleId> {

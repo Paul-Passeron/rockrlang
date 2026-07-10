@@ -17,11 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::BTreeMap, panic, sync::Arc};
 
+use itertools::Itertools;
 use salsa::Accumulator;
 
 use crate::compiler::diagnostic::Diag;
 use crate::hir::{HirMatchBranch, HirPatternDesc};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
+use crate::ril::TypeId;
 use crate::{
     Db,
     hir::{
@@ -132,15 +134,37 @@ impl<'db> TyCtx<'db> {
                 .substitution
                 .into_iter()
                 .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
+                .collect_vec()
+                .into_iter()
+                .map(|ty| self.canon_type(ty))
                 .collect(),
             call_kind: infos.call_kind,
+        }
+    }
+
+    fn canon_type(&self, ty: TypeRef) -> TypeRef {
+        let db = self.db;
+        match ty {
+            TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
+                db,
+                type_id.def(db),
+                type_id
+                    .args(db)
+                    .iter()
+                    .map(|ty| self.canon_type(*ty))
+                    .collect(),
+            )),
+            TypeRef::Zelf => {
+                self.function.parent(db).get_canonical_zelf(db).unwrap()
+            }
+            _ => ty,
         }
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
             let err = err.display(self.db).to_string();
-            let kind = cstr.kind.display(self.db).to_string();
+            let kind = cstr.kind.display(&self.inf_ctx).to_string();
             dbg!(err, kind);
         }
 
@@ -152,7 +176,10 @@ impl<'db> TyCtx<'db> {
                 self.function.span(self.db).start().loc_info(self.db)
             );
             for unsolved in unsolveds {
-                eprintln!("<UNSOLVED> {}", unsolved.kind.display(self.db));
+                eprintln!(
+                    "<UNSOLVED> {}",
+                    unsolved.kind.display(&self.inf_ctx)
+                );
             }
         }
 
@@ -431,7 +458,7 @@ impl<'db> TyCtx<'db> {
                         TyRef::Error => {
                             let fmt = format!(
                                 "Cannot return error type form a function expected to return {}",
-                                ret_ty.to_string(self.db)
+                                self.inf_ctx.find(&ret_ty).to_string(self.db)
                             );
                             dbg!("TODO: err here !", fmt);
                         }
@@ -441,7 +468,7 @@ impl<'db> TyCtx<'db> {
                     if ret_ty != void_ty {
                         let fmt = format!(
                             "Cannot have an empty return from a function expected to return {}",
-                            ret_ty.to_string(self.db)
+                            self.inf_ctx.find(&ret_ty).to_string(self.db)
                         );
                         dbg!("TODO: err here !", fmt);
                     }
@@ -491,7 +518,7 @@ impl<'db> TyCtx<'db> {
             eprintln!(
                 "Error solving constraints after type checking stmt: {}\n    {}",
                 err.1.display(self.db),
-                err.0.kind.display(self.db)
+                err.0.kind.display(&self.inf_ctx)
             );
         }
     }

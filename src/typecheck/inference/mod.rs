@@ -192,14 +192,40 @@ impl<'db> InferenceCtx<'db> {
                 .expect("First local type unification should not fail");
         }
 
-        let actual_zelf_ty = func
-            .receiver(db)
-            .as_zelf_arg()
-            .map(|arg| arg.get_zelf_type_for(db, zelf_ty.unwrap()));
+        #[cfg(debug_assertions)]
+        for (local, var) in &this.local_map {
+            if params.contains(local)
+            /* or however params are identifiable */
+            {
+                debug_assert!(
+                    this.table.probe_value(*var).is_some(),
+                    "param local {local:?} left unseeded in `{}`",
+                    func.name(db).display(db),
+                );
+            }
+        }
 
-        if let Some(ty) = actual_zelf_ty {
-            let local_ty = this.local_var(zelf.unwrap());
-            this.unify(ty, InferTy::Var(local_ty)).unwrap();
+        match (func.receiver(db).as_zelf_arg(), zelf_ty) {
+            (Some(arg), Some(zelf_ty)) => {
+                let ty = arg.get_zelf_type_for(db, zelf_ty);
+                let local_ty = this.local_var(zelf.expect(
+                    "function has a receiver but no self local was provided",
+                ));
+                this.unify(ty, InferTy::Var(local_ty))
+                    .expect("seeding self's declared type should not fail");
+            }
+            (Some(_), None) => panic!(
+                "method `{}` has a receiver but its impl has no canonical Self \
+                 (get_canonical_zelf returned None — likely a generic impl header \
+                 that failed to resolve)",
+                func.name(db).display(db),
+            ),
+            (None, _) if zelf.is_some() => panic!(
+                "HIR provided a self local for `{}` but the AST receiver is None \
+                 (as_zelf_arg fell through — check receiver variant coverage)",
+                func.name(db).display(db),
+            ),
+            (None, _) => {} // free function, nothing to seed
         }
 
         infer_templates
@@ -295,11 +321,9 @@ impl fmt::Display for Display<'_, &UnificationError> {
             UnificationError::FieldCountMismatch(x, y) => {
                 write!(f, "Field count mismatch: {} != {}", x, y)
             }
-            UnificationError::RecursiveDefinition(infer_var) => write!(
-                f,
-                "Recursive definition: {}",
-                InferTy::Var(*infer_var).to_string(self.db)
-            ),
+            UnificationError::RecursiveDefinition(infer_var) => {
+                write!(f, "Recursive definition: {}", infer_var)
+            }
             UnificationError::UnmetConstraint(
                 inference_constraint,
                 unification_error,
@@ -307,7 +331,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 write!(
                     f,
                     "Unmet constraint: {} (reason: {})",
-                    inference_constraint.kind.display(self.db),
+                    inference_constraint.id.0,
                     unification_error.display(self.db)
                 )
             }
