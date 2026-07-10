@@ -24,15 +24,36 @@ use std::path::PathBuf;
 #[derive(Debug, Parser)]
 pub struct CliArgs {
     file: Option<PathBuf>,
+    
     #[clap(long, default_value_t = false)]
     no_std: bool,
+    
     #[clap(long, default_value_t = false)]
     skip_core: bool,
+
+    #[clap(long, default_value_t = false)]
+    display_llvm: bool,
+    
+    #[clap(long, default_value_t = false)]
+    display_opt_llvm: bool,
+    
+    #[clap(long, default_value_t = false)]
+    display_mir: bool,
+    
+    #[clap(long, default_value_t = false)]
+    display_thir: bool,
 }
 
 fn main() -> std::process::ExitCode {
     let args = CliArgs::parse();
-    let cfg = Config { no_std: args.no_std, skip_core: args.skip_core };
+    let cfg = Config {
+        no_std: args.no_std,
+        skip_core: args.skip_core,
+        display_llvm: args.display_llvm,
+        display_mir: args.display_mir,
+        display_thir: args.display_thir,
+        display_opt_llvm: args.display_opt_llvm,
+    };
     let root = args.file.unwrap_or_else(|| std::env::current_dir().unwrap());
     match build_from_disk(root, cfg) {
         Ok(()) => {

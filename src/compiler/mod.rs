@@ -33,6 +33,7 @@ use crate::{
         BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
         TypeDefId, TypeRef, ptr_of, ref_of,
     },
+    thir::thir_body,
     typecheck::inference::{InferTy, implicit::AstImplicitContext},
 };
 use dashmap::DashSet;
@@ -49,6 +50,7 @@ use inkwell::{
 use itertools::Itertools;
 use salsa::Setter;
 use std::{
+    collections::HashSet,
     fmt,
     hash::Hash,
     path::{Path, PathBuf},
@@ -127,6 +129,10 @@ impl Workspace {
 pub struct Config {
     pub no_std: bool,
     pub skip_core: bool,
+    pub display_llvm: bool,
+    pub display_opt_llvm: bool,
+    pub display_mir: bool,
+    pub display_thir: bool,
 }
 
 pub enum CompilerError {
@@ -478,17 +484,29 @@ pub fn build<'db, 'ctx>(
         .unique()
         .collect_vec();
 
+    if db.config().display_thir {
+        let fids =
+            frefs.iter().map(|fref| fref.fdef(db)).collect::<HashSet<_>>();
+        let mut fids = fids.into_iter().collect_vec();
+        fids.sort_by_key(|id| id.span(db).start().loc_info(db));
+        for fid in fids {
+            if let Some(thir) = thir_body(db, fid) {
+                println!("{}", thir.display(db))
+            }
+        }
+    }
+
     for fref in frefs {
         if fref.fdef(db).has_body(db) {
-            c.declare_mir(dce(db, fref));
+            let dce = dce(db, fref);
+            if db.config().display_mir {
+                println!("{}", fref.fdef(db).called_to_string(db));
+                println!("{}\n", dce.display(db));
+            }
+            c.declare_mir(dce);
         } else {
-            let name = fref.fdef(db).name(db).to_string(db);
-            println!(
-                "Declaring import {} as {name}",
-                fref.fdef(db).called_to_string(db)
-            );
             c.declare_import(
-                name,
+                fref.fdef(db).name(db).to_string(db),
                 &fref.params(db).iter().map(|(_, ty)| *ty).collect_vec(),
                 fref.ret_ty(db),
                 fref,
@@ -580,10 +598,16 @@ pub fn build_from_disk(
         .run() // Run MIR -> LIR
         .finalize(&llvm_ctx); // Run LIR -> LLVM
 
+    if db.config().display_llvm {
+        llvm_module.print_to_stderr();
+    }
+    
     let machine = optimize(&llvm_module, OptimizationLevel::Aggressive);
 
-    llvm_module.print_to_stderr();
-
+    if db.config().display_opt_llvm {
+        llvm_module.print_to_stderr();
+    }
+    
     write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(
         |err| {
             eprintln!("LLVM errors:\n{err}");
