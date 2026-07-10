@@ -270,8 +270,16 @@ impl<'a> MTLBCtx<'a> {
                 let next = b.target(next_block, vec![]);
                 let f = match callee {
                     MIRCallee::Direct(fref) => {
-                        let inst =
-                            FuncInst::from_funcref(self.db, fref.clone());
+                        let caller_subs = lower.mir.func.subs(self.db);
+                        let mut fref = fref.clone();
+                        fref.args = fref
+                            .args
+                            .iter()
+                            .map(|ty| {
+                                ty.with_substitution(self.db, caller_subs)
+                            })
+                            .collect();
+                        let inst = FuncInst::from_funcref(self.db, fref);
                         self.mir_map.mir_to_lir[&inst]
                     }
                 };
@@ -323,9 +331,19 @@ impl<'a> MTLBCtx<'a> {
         match op {
             MIROperand::Constant(cst, ..) => match cst {
                 MIRConstant::Integer { value, ty } => {
+                    let is_ptr = ty.as_ptr(self.db);
                     let layout = layout_of(self.db, *ty);
                     let ty = LIRTy { layout, origin: Some(*ty) };
-                    b.const_int(ty, *value).erase()
+                    if let Some((_, pointee)) = is_ptr {
+                        if *value != 0 {
+                            todo!()
+                        }
+                        let layout = layout_of(self.db, pointee);
+                        let pointee = LIRTy { layout, origin: Some(pointee) };
+                        b.const_null_ptr(pointee)
+                    } else {
+                        b.const_int(ty, *value).erase()
+                    }
                 }
                 MIRConstant::Bool(value) => {
                     let layout = LayoutID::int(self.db, IntWidth::I8);
@@ -612,8 +630,11 @@ impl<'a> MTLBCtx<'a> {
                         lhs,
                         rhs,
                     ),
-                    BinaryOperator::Eq => todo!(),
-                    BinaryOperator::Diff => todo!(),
+                    BinaryOperator::Eq => b.cmp(CmpBinop::Eq, lhs, rhs),
+                    BinaryOperator::Diff => {
+                        let eq = b.cmp(CmpBinop::Eq, lhs, rhs);
+                        b.not(eq)
+                    }
                     BinaryOperator::Lt => b.cmp(
                         if is_signed {
                             CmpBinop::SLessThan
