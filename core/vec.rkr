@@ -1,49 +1,137 @@
-// @include core::iter
-// @include core::opt
+@include core::iter
+@include core::opt
+@include core::panic
 
-// struct Vec<T> {
-//     contents: *mut T;
-//     len: usize;
-//     cap: usize;
-// }
+@extern {
+    @[ffi(C, malloc)]
+    fun malloc(size: usize): *mut void;
+}
+   
+@extern {
+    @[ffi(C, realloc)]
+    fun realloc(ptr: *mut void, size: usize): *mut void;
+} 
 
-// impl<T> Vec<T> {
-//     fun new(): Self {
-//         return Vec {
-//             .contents: 0,
-//             .len: 0,
-//             .cap: 0,
-//         };
-//     }
+@extern {
+    @[ffi(C, free)]
+    fun free(ptr: *mut void): void;
+}
 
-//     fun push(&mut self, value: T): void {
-//         // todo
-//     }
+struct Vec<T> {
+    contents: *mut T;
+    len: usize;
+    cap: usize;
+}
 
-//     fun unsafe_idx(&self, idx: usize): *T {
-//         // todo
-//         return 0;
-//     }
+impl<T> Vec<T> {
+    fun new(): Self {
+        return Vec {
+            .contents: 0,
+            .len: 0,
+            .cap: 0,
+        };
+    }
 
-//     fun len(&self): usize {
-//         return self.len;
-//     }
-// }
+    fun with_capacity(cap: usize): Self {
+        if cap == 0 {
+            return Vec::new();
+        }
+        return Vec {
+            .contents: malloc(cap * @sizeof(T)) as *mut T,
+            .len: 0,
+            .cap: cap,
+        };
+    }
 
-// struct VecIter<T> {
-//     vec: *Vec<T>;
-//     idx: usize;
-// }
+    fun grow(&mut self): void {
+        let mut new_cap: usize = 0;
+        if self.cap == 0 {
+            new_cap = 4;
+        } else { 
+            new_cap = self.cap * 2;
+        }
+        let new_ptr = realloc(self.contents as *mut void, new_cap * @sizeof(T)) as *mut T;
+        if new_ptr == 0 {
+            core::panic::panic("Vec: allocation failed");
+        }
+        self.contents = new_ptr;
+        self.cap = new_cap;
+    }
 
-// impl <T> Iter for VecIter<T> {
-//     type Item = T;
+    fun push(&mut self, value: T): void {
+        if self.len == self.cap {
+            self.grow();
+        }
+        self.contents[self.len] = value;
+        self.len = self.len + 1;
+    }
 
-//     fun next(&mut self): opt<T> {
-//         if self.idx >= self.vec.len() {
-//             return opt::None;
-//         }
-//         let res = self.vec.unsafe_idx(self.idx)$;
-//         self.idx += 1;
-//         return opt::Some(res);
-//     }
-// }
+    fun pop(&mut self): opt<T> {
+        if self.len == 0 {
+            return opt::None;
+        }
+        self.len = self.len - 1;
+        return opt::Some(self.contents[self.len]);
+    }
+
+    fun unsafe_idx(&self, idx: usize): *T {
+        return self.contents[idx]@;
+    }
+
+    fun get(&self, idx: usize): opt<T> {
+        if idx >= self.len {
+            return opt::None;
+        }
+        let idx_ptr = self.unsafe_idx(idx);
+        return opt::Some(*idx_ptr);
+    }
+
+
+    fun is_empty(&self): bool {
+        return self.len == 0;
+    }
+
+    fun clear(&mut self): void {
+        // No destructors in the language yet, so truncating is just this:
+        self.len = 0;
+    }
+
+    fun deinit(&mut self): void {
+        // Manual for now; becomes Drop when you have destructors.
+        if self.cap != 0 {
+            free(self.contents as *mut void);
+            self.contents = 0;
+            self.len = 0;
+            self.cap = 0;
+        }
+    }
+}
+
+struct VecIter<T> {
+    vec: &Vec<T>;
+    idx: usize;
+}
+
+impl<T> Iter for VecIter<T> {
+    type Item = T;
+
+    fun next(&mut self): opt<T> {
+        if self.idx >= self.vec.len {
+            return opt::None;
+        }
+        let res = self.vec.unsafe_idx(self.idx)$;
+        self.idx = self.idx + 1;
+        return opt::Some(res);
+    }
+}
+
+impl<T> IntoIterator for &Vec<T> {
+    type IntoIter = VecIter<T>;
+
+    fun into_iter(self): VecIter<T> {
+        return VecIter {
+            .vec: self,
+            .idx: 0,
+        };
+    }
+}
