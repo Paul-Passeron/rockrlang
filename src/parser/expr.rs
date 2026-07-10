@@ -94,8 +94,6 @@ impl<'db> Parser<'db> {
         let mut lhs = self.parse_unary()?;
 
         while let Some(tok_kind) = self.peek_n(0).map(|t| t.kind) {
-            println!("Current is {tok_kind:?}");
-
             if tok_kind == TokenKind::DotDot {
                 let lbp: u8 = 4;
                 let rbp: u8 = 4;
