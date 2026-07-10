@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 use inkwell::{
     AddressSpace,
+    attributes::{Attribute, AttributeLoc},
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
@@ -44,6 +45,7 @@ use crate::{
             ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
         },
     },
+    ril::never_id,
 };
 
 impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
@@ -109,7 +111,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
         } else {
             self.ctx.void_type().fn_type(&params, is_variadic)
         };
-        self.m.add_function(
+
+        let f = self.m.add_function(
             &sig.name,
             fn_ty,
             match sig.kind {
@@ -122,7 +125,18 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     })
                 }
             },
-        )
+        );
+
+        if let Some(ty) = sig.signature.ret.origin
+            && let Some(tid) = ty.as_type_id()
+            && tid == never_id(self.db)
+        {
+            let kind_id = Attribute::get_named_enum_kind_id("noreturn");
+            let noreturn = self.ctx.create_enum_attribute(kind_id, 0);
+            f.add_attribute(AttributeLoc::Function, noreturn);
+        }
+
+        f
     }
 
     fn lower_layout(&mut self, layout: LayoutID) -> AnyTypeEnum<'ctx> {
@@ -181,12 +195,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         for slot in &body.stack_slots {
                             let StackSlot { value, pointee_ty } = slot;
                             let pointee = self.basic(pointee_ty.layout);
-                            let ptr = self.b.build_alloca(pointee, "").unwrap();
-                            println!(
-                                "Created slot _{} as {}",
-                                slot.value.into_raw(),
-                                ptr.to_string()
-                            );
+                            let ptr = self
+                                .b
+                                .build_alloca(pointee, "alloca_slot")
+                                .unwrap();
                             fn_ctx.values.insert(*value, ptr.into());
                         }
 
@@ -339,7 +351,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             let g = self.m.add_global(
                                 array_value.get_type(),
                                 None,
-                                "",
+                                "global_str",
                             );
                             g.set_constant(true);
                             g.set_alignment(1);
@@ -359,9 +371,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     },
                     ValueInstKind::Load { ptr, ty } => {
                         let ty = self.basic(ty.layout);
-                        println!("Generating llvm load for {ptr:?}");
                         let ptr = ctx.values[ptr].into_pointer_value();
-                        self.b.build_load(ty, ptr, "").unwrap()
+                        self.b.build_load(ty, ptr, "load_ptr").unwrap()
                     }
                     ValueInstKind::FieldPtr { ptr, ty, src_idx } => {
                         let ptr = ctx.values[ptr].into_pointer_value();
@@ -383,17 +394,55 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                             .ctx
                                             .i32_type()
                                             .const_int(offset.bytes(), false)],
-                                        "",
+                                        "offset_for_field_ptr",
                                     )
                                     .unwrap()
                             };
                             value.into()
                         }
                     }
-                    ValueInstKind::UnionPayloadPtr { .. } => {
-                        todo!()
+                    ValueInstKind::UnionPayloadPtr { ptr, ty, variant } => {
+                        let union_layout = ty.union_layout(self.db).unwrap();
+                        let offset = union_layout.payload_offset;
+                        let ptr = ctx.values[ptr].into_pointer_value();
+                        unsafe {
+                            self.b
+                                .build_gep(
+                                    self.ctx.i8_type(),
+                                    ptr,
+                                    &[self
+                                        .ctx
+                                        .i32_type()
+                                        .const_int(offset.bytes(), false)],
+                                    "payload_offset_ptr",
+                                )
+                                .unwrap()
+                        }
+                        .into()
                     }
-                    ValueInstKind::GetDiscriminant { .. } => todo!(),
+                    ValueInstKind::GetDiscriminant { ptr, ty } => {
+                        let layout = ty.union_layout(self.db).unwrap();
+                        match layout.discriminant {
+                            Discriminant::None => todo!(), /* Just return 0, */
+                            // maybe ?
+                            Discriminant::Niche { .. } => todo!(),
+                            Discriminant::Tagged { offset, kind } => {
+                                let tag_ptr = if offset == Offset::ZERO {
+                                    ptr
+                                } else {
+                                    todo!()
+                                };
+                                let int_ty = self.get_int_ty(kind);
+                                let tag_ptr =
+                                    ctx.values[tag_ptr].into_pointer_value();
+                                let discr = self
+                                    .b
+                                    .build_load(int_ty, tag_ptr, "the_discr")
+                                    .unwrap();
+                                discr.into()
+                            }
+                        }
+                    }
                     ValueInstKind::MakeAggregate {
                         ty,
                         fields_in_src_order,
@@ -433,7 +482,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                             .ctx
                                             .i64_type()
                                             .const_int(offset.bytes(), false)],
-                                        "",
+                                        "agg_field_ptr",
                                     )
                                     .unwrap()
                             };
@@ -448,17 +497,83 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                 .unwrap();
                         }
 
-                        // 2. Reload the whole thing as the SSA value for `def`
-                        self.b.build_load(llvm_ty, slot, "").unwrap()
+                        self.b
+                            .build_load(llvm_ty, slot, "loaded_aggregate")
+                            .unwrap()
                     }
                     ValueInstKind::ExtractField { .. } => {
                         todo!()
                     }
                     ValueInstKind::InsertField { .. } => todo!(),
-                    ValueInstKind::Arith { .. } => todo!(),
-                    ValueInstKind::Cmp { .. } => todo!(),
+                    ValueInstKind::Arith { op, lhs, rhs } => {
+                        let lhs = ctx.values[lhs].into_int_value();
+                        let rhs = ctx.values[rhs].into_int_value();
+                        match op {
+                            lir::ArithBinop::SAdd | lir::ArithBinop::UAdd => {
+                                self.b
+                                    .build_int_add(lhs, rhs, "int-add")
+                                    .unwrap()
+                                    .into()
+                            }
+                            lir::ArithBinop::SMul | lir::ArithBinop::UMul => {
+                                self.b
+                                    .build_int_mul(lhs, rhs, "int-mul")
+                                    .unwrap()
+                                    .into()
+                            }
+                            lir::ArithBinop::UDiv => self
+                                .b
+                                .build_int_unsigned_div(lhs, rhs, "int-udiv")
+                                .unwrap()
+                                .into(),
+                            lir::ArithBinop::SDiv => self
+                                .b
+                                .build_int_signed_div(lhs, rhs, "int-sdiv")
+                                .unwrap()
+                                .into(),
+                            lir::ArithBinop::UMod => self
+                                .b
+                                .build_int_unsigned_rem(lhs, rhs, "int-umod")
+                                .unwrap()
+                                .into(),
+                            lir::ArithBinop::SMod => self
+                                .b
+                                .build_int_signed_rem(lhs, rhs, "int-smod")
+                                .unwrap()
+                                .into(),
+                            lir::ArithBinop::SSub | lir::ArithBinop::USub => {
+                                self.b
+                                    .build_int_sub(lhs, rhs, "int-sub")
+                                    .unwrap()
+                                    .into()
+                            }
+                        }
+                    }
+                    ValueInstKind::Cmp { op, lhs, rhs } => {
+                        let lhs = ctx.values[lhs].into_int_value();
+                        let rhs = ctx.values[rhs].into_int_value();
+                        let op = match op {
+                            lir::CmpBinop::SLessThan => {
+                                inkwell::IntPredicate::SLT
+                            }
+                            lir::CmpBinop::ULessThan => {
+                                inkwell::IntPredicate::ULT
+                            }
+                            lir::CmpBinop::Eq => inkwell::IntPredicate::EQ,
+                        };
+                        self.b
+                            .build_int_compare(op, lhs, rhs, "cmp")
+                            .unwrap()
+                            .into()
+                    }
                     ValueInstKind::Logic { .. } => todo!(),
-                    ValueInstKind::Not { .. } => todo!(),
+                    ValueInstKind::Not { value } => {
+                        let value = ctx.values[value];
+                        self.b
+                            .build_not(value.into_int_value(), "logic_not")
+                            .unwrap()
+                            .into()
+                    }
                     ValueInstKind::Cast { .. } => todo!(),
                 };
                 ctx.values.insert(*def, value);
@@ -467,7 +582,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 let f = self.get_llvm_func(*id);
                 let args =
                     args.iter().map(|arg| ctx.values[arg].into()).collect_vec();
-                let callsite = self.b.build_call(f, &args, "").unwrap();
+                let callsite = self.b.build_call(f, &args, "callsite").unwrap();
                 match dest {
                     Some(v) => {
                         let value = BasicValueEnum::try_from(
@@ -510,8 +625,56 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 let dst = ctx.blocks[&block_target.block];
                 self.b.build_unconditional_branch(dst).unwrap();
             }
-            Terminator::Br { .. } => todo!(),
-            Terminator::Switch { .. } => todo!(),
+            Terminator::Br { cond, if_true, if_false } => {
+                let cond = ctx.values[cond].into_int_value();
+                let cond = self.b.build_int_compare(
+                    inkwell::IntPredicate::NE,
+                    cond,
+                    cond.get_type().const_zero(),
+                    "cond",
+                ).unwrap();
+                if_true.params.iter().for_each(|arg| {
+                    let value = ctx.values[arg];
+                    let phi = ctx.block_params[arg];
+                    phi.add_incoming(&[(&value, llvm_block)]);
+                });
+                if_false.params.iter().for_each(|arg| {
+                    let value = ctx.values[arg];
+                    let phi = ctx.block_params[arg];
+                    phi.add_incoming(&[(&value, llvm_block)]);
+                });
+                let then_block = ctx.blocks[&if_true.block];
+                let else_block = ctx.blocks[&if_false.block];
+                self.b
+                    .build_conditional_branch(
+                        cond,
+                        then_block,
+                        else_block,
+                    )
+                    .unwrap();
+            }
+            Terminator::Switch { on, branches, default } => {
+                let value = ctx.values[on].into_int_value();
+                let value_ty = value.get_type();
+                default.params.iter().for_each(|arg| {
+                    let value = ctx.values[arg];
+                    let phi = ctx.block_params[arg];
+                    phi.add_incoming(&[(&value, llvm_block)]);
+                });
+                let else_block = ctx.blocks[&default.block];
+                let mut cases = vec![];
+                for (value, block_target) in branches {
+                    block_target.params.iter().for_each(|arg| {
+                        let value = ctx.values[arg];
+                        let phi = ctx.block_params[arg];
+                        phi.add_incoming(&[(&value, llvm_block)]);
+                    });
+                    let int_value =
+                        value_ty.const_int(*value as u64, false);
+                    cases.push((int_value, ctx.blocks[&block_target.block]));
+                }
+                self.b.build_switch(value, else_block, &cases).unwrap();
+            }
             Terminator::Return(value) => match value {
                 Some(v) => {
                     let value = ctx.values[v];
