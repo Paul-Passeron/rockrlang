@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
 
@@ -949,10 +949,18 @@ impl<'db> ThirTranslator<'db> {
                     thir_args
                 };
 
+                let zelf_ty = call_infos
+                    .callee
+                    .parent(self.db)
+                    .get_canonical_zelf(self.db)
+                    .map(|ty| {
+                        ty.with_substitution(self.db, &call_infos.substitution)
+                    });
+
                 let fref = FunctionRef {
                     id: call_infos.callee,
                     args: call_infos.substitution.clone(),
-                    self_ty: None,
+                    self_ty: zelf_ty,
                     dispatch: Dispatch::Direct,
                 };
                 ExprKind::Call { called: fref, args: thir_args }
@@ -994,7 +1002,7 @@ impl<'db> ThirTranslator<'db> {
                 // ex: let x: *int = y as *_;
                 let expr = self.expr(b, expr, stmts);
                 ExprKind::Cast(expr, ty)
-            },
+            }
         };
         b.new_expr(ThirExpr { kind, ty, span: expr.span })
     }
