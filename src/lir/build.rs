@@ -253,17 +253,12 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         IntValue { id: val, ty, _k: PhantomData }
     }
 
-    pub fn const_null_ptr<K: ValueKind>(
-        &mut self,
-        pointee: LIRTy,
-    ) -> TypedPtr<'ir, K> {
-        debug_assert!(K::matches(pointee.class(self.db)));
+    pub fn const_null_ptr(&mut self, pointee: LIRTy) -> ValueId<'ir> {
         let ptr_ty = self.ptr_of(pointee);
-        let val = self.push_value(
+        self.push_value(
             ptr_ty,
             ValueInstKind::Const(ConstValue::NullPtr { pointee }),
-        );
-        TypedPtr { raw: val, pointee, _k: PhantomData }
+        )
     }
 
     pub fn zeroed(&mut self, ty: LIRTy) -> ValueId<'ir> {
