@@ -349,7 +349,7 @@ impl<'a> MTLBCtx<'a> {
         ptr: ValueId<'ir>,
         ty: TypeRef,
         proj: ProjKind,
-        _lower: &LIRLower<'ir, '_>,
+        lower: &LIRLower<'ir, '_>,
     ) -> (ValueId<'ir>, TypeRef) {
         match proj {
             ProjKind::Regular(MIRProjection::Deref) => {
@@ -391,7 +391,24 @@ impl<'a> MTLBCtx<'a> {
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
-            ProjKind::Regular(MIRProjection::Index { .. }) => todo!(),
+            ProjKind::Regular(MIRProjection::Index { index }) => {
+                let index = self.lower_operand(b, index, lower);
+                let elem_ty = ty
+                    .as_ptr(self.db)
+                    .or_else(|| ty.as_ref(self.db))
+                    .unwrap()
+                    .1;
+                let lir_elem = LIRTy {
+                    layout: layout_of(self.db, elem_ty),
+                    origin: Some(elem_ty),
+                };
+                let ptr_ty = LIRTy {
+                    layout: layout_of(self.db, ty),
+                    origin: Some(ty)
+                };
+                let base_ptr = b.load(ptr, ptr_ty);
+                (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
+            }
             ProjKind::DowncastThen { next, variant } => {
                 let _enum_ref = ty.as_enum_ref(self.db);
                 match next {

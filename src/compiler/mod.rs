@@ -602,7 +602,7 @@ pub fn build_from_disk(
         llvm_module.print_to_stderr();
     }
     
-    let machine = optimize(&llvm_module, OptimizationLevel::Aggressive);
+    let machine = optimize(&llvm_module, OptimizationLevel::None);
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();

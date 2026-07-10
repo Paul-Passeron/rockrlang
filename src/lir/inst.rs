@@ -52,6 +52,7 @@ pub enum ValueInstKind<R: Refs> {
     FieldPtr { ptr: R::Val, ty: LIRTy, src_idx: u32 },
     UnionPayloadPtr { ptr: R::Val, ty: LIRTy, variant: u32 },
     GetDiscriminant { ptr: R::Val, ty: LIRTy },
+    IndexPtr { ptr: R::Val, elem_ty: LIRTy, index: R::Val },
 
     // Aggregates
     MakeAggregate { ty: LIRTy, fields_in_src_order: Vec<R::Val> },

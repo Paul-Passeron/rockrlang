@@ -390,6 +390,18 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.get_discriminant(ptr.erase(), ptr.pointee)
     }
 
+    pub fn index_ptr(
+        &mut self,
+        ptr: ValueId<'ir>,
+        elem_ty: LIRTy,
+        index: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        self.push_value(
+            self.ptr_of(elem_ty),
+            ValueInstKind::IndexPtr { ptr, elem_ty, index },
+        )
+    }
+
     // Aggregates
 
     pub fn make_aggregate(

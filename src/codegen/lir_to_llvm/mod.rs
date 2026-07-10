@@ -575,6 +575,17 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             .into()
                     }
                     ValueInstKind::Cast { .. } => todo!(),
+                    ValueInstKind::IndexPtr { ptr, elem_ty, index } => {
+                        let ptr = ctx.values[ptr].into_pointer_value();
+                        let idx = ctx.values[index].into_int_value();
+                        let llvm_elem = self.basic(elem_ty.layout);
+                        unsafe {
+                            self.b
+                                .build_gep(llvm_elem, ptr, &[idx], "index-ptr")
+                                .unwrap()
+                                .into()
+                        }
+                    }
                 };
                 ctx.values.insert(*def, value);
             }
@@ -627,12 +638,15 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             }
             Terminator::Br { cond, if_true, if_false } => {
                 let cond = ctx.values[cond].into_int_value();
-                let cond = self.b.build_int_compare(
-                    inkwell::IntPredicate::NE,
-                    cond,
-                    cond.get_type().const_zero(),
-                    "cond",
-                ).unwrap();
+                let cond = self
+                    .b
+                    .build_int_compare(
+                        inkwell::IntPredicate::NE,
+                        cond,
+                        cond.get_type().const_zero(),
+                        "cond",
+                    )
+                    .unwrap();
                 if_true.params.iter().for_each(|arg| {
                     let value = ctx.values[arg];
                     let phi = ctx.block_params[arg];
@@ -646,11 +660,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 let then_block = ctx.blocks[&if_true.block];
                 let else_block = ctx.blocks[&if_false.block];
                 self.b
-                    .build_conditional_branch(
-                        cond,
-                        then_block,
-                        else_block,
-                    )
+                    .build_conditional_branch(cond, then_block, else_block)
                     .unwrap();
             }
             Terminator::Switch { on, branches, default } => {
@@ -669,8 +679,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         let phi = ctx.block_params[arg];
                         phi.add_incoming(&[(&value, llvm_block)]);
                     });
-                    let int_value =
-                        value_ty.const_int(*value as u64, false);
+                    let int_value = value_ty.const_int(*value as u64, false);
                     cases.push((int_value, ctx.blocks[&block_target.block]));
                 }
                 self.b.build_switch(value, else_block, &cases).unwrap();

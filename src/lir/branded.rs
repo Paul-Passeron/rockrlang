@@ -190,6 +190,11 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
             Self::GetDiscriminant { ptr, ty } => {
                 ValueInstKind::GetDiscriminant { ptr: ptr.idx, ty }
             }
+            Self::IndexPtr { ptr, elem_ty, index } => ValueInstKind::IndexPtr {
+                ptr: ptr.idx,
+                elem_ty,
+                index: index.idx,
+            },
             Self::MakeAggregate { ty, fields_in_src_order } => {
                 ValueInstKind::MakeAggregate {
                     ty,
