@@ -26,7 +26,8 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
-            MIRConstructorArgs, MIROperand, MIRPlace, MIRRValue, MIRRValueKind,
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
+            MIRRValueKind,
         },
         passes::MIRPass,
     },
@@ -278,10 +279,38 @@ impl<'a> DCECtx<'a> {
         }
     }
 
+    fn copy_projection(&mut self, proj: &MIRProjection) -> MIRProjection {
+        match proj {
+            MIRProjection::Deref => MIRProjection::Deref,
+            MIRProjection::Field { name, resulting_ty } => {
+                MIRProjection::Field {
+                    name: *name,
+                    resulting_ty: *resulting_ty,
+                }
+            }
+            MIRProjection::TupleField { index, resulting_ty } => {
+                MIRProjection::TupleField {
+                    index: *index,
+                    resulting_ty: *resulting_ty,
+                }
+            }
+            MIRProjection::Index { index } => {
+                MIRProjection::Index { index: self.copy_operand(index) }
+            }
+            MIRProjection::Downcast { variant } => {
+                MIRProjection::Downcast { variant: *variant }
+            }
+        }
+    }
+
     fn copy_place(&mut self, place: &MIRPlace) -> MIRPlace {
         MIRPlace {
             local: self.add_and_get_local_to_mapping(place.local),
-            projections: place.projections.clone(),
+            projections: place
+                .projections
+                .iter()
+                .map(|proj| self.copy_projection(proj))
+                .collect(),
             ty: place.ty,
             span: place.span,
         }
