@@ -468,6 +468,6 @@ fn _dce<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
     DeadCodeElimination.run(db, mir)
 }
 
-pub fn dce<'db>(db: &'db dyn Db, f: FuncInst) -> &'db MIR {
+pub fn dce(db: &dyn Db, f: FuncInst) -> &MIR {
     _dce(db, f.interned())
 }

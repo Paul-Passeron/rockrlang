@@ -57,7 +57,7 @@ pub struct MTLBCtx<'a> {
 
 #[allow(unused)]
 pub enum LocalSlot<'ir> {
-    ZST,
+    Zst,
     Ptr { ptr: ValueId<'ir>, ty: LIRTy },
     Value(ValueId<'ir>), /* TODO: analysis that figures out which locals we
                           * can use here */
@@ -79,13 +79,13 @@ impl<'ir> LocalSlot<'ir> {
     fn ptr(&self) -> ValueId<'ir> {
         match self {
             LocalSlot::Ptr { ptr, .. } => *ptr,
-            LocalSlot::ZST => panic!("ZST slots have no pointer"),
+            LocalSlot::Zst => panic!("ZST slots have no pointer"),
             _ => unreachable!(),
         }
     }
 
     fn is_zst(&self) -> bool {
-        matches!(self, Self::ZST)
+        matches!(self, Self::Zst)
     }
 }
 
@@ -145,7 +145,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
         self.finalize()
     }
 
-    fn lower<'a>(&'a mut self, lir_id: LIRFunctionId) {
+    fn lower(&mut self, lir_id: LIRFunctionId) {
         let db = self.db;
         let Self { lir, ctx, .. } = self;
         lir.build_function(db, lir_id, |b| Self::_lower(b, ctx)).unwrap()
@@ -188,7 +188,7 @@ impl<'a> MTLBCtx<'a> {
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty);
             if layout.is_zst(self.db) {
-                lower.value_map.insert(local, LocalSlot::ZST);
+                lower.value_map.insert(local, LocalSlot::Zst);
             } else {
                 let ty = LIRTy { layout, origin: Some(decl.ty) };
                 let ptr = b.stack_slot(ty);
@@ -206,7 +206,7 @@ impl<'a> MTLBCtx<'a> {
                 })
                 .enumerate()
             {
-                let slot = &lower.value_map[&param_local];
+                let slot = &lower.value_map[param_local];
                 if !slot.is_zst() {
                     bb.store(slot.ptr(), params[i]);
                 }
@@ -432,7 +432,7 @@ impl<'a> MTLBCtx<'a> {
         }
     }
 
-    fn get_proj_kinds<'place, 'ir>(
+    fn get_proj_kinds<'place>(
         &self,
         place: &'place MIRPlace,
     ) -> Vec<ProjKind<'place>> {

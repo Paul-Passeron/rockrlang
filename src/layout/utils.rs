@@ -126,7 +126,7 @@ impl LayoutID {
         self.into()
     }
 
-    pub fn data<'db>(self, db: &dyn Db) -> &LayoutData {
+    pub fn data(self, db: &dyn Db) -> &LayoutData {
         self.interned().inner(db)
     }
 

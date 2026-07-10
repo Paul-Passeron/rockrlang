@@ -224,7 +224,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         debug_assert!(ty.is_union(self.db));
         debug_assert!(
             ty.union_layout(self.db)
-                .map_or(false, |vs| vs.variants.len() > idx as usize)
+                .is_some_and(|vs| vs.variants.len() > idx as usize)
         );
         self.push_void(VoidInstKind::SetDiscriminant { ptr, ty, idx });
     }

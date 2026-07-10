@@ -435,11 +435,9 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                 let int_ty = self.get_int_ty(kind);
                                 let tag_ptr =
                                     ctx.values[tag_ptr].into_pointer_value();
-                                let discr = self
-                                    .b
+                                self.b
                                     .build_load(int_ty, tag_ptr, "the_discr")
-                                    .unwrap();
-                                discr.into()
+                                    .unwrap()
                             }
                         }
                     }
@@ -594,15 +592,11 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 let args =
                     args.iter().map(|arg| ctx.values[arg].into()).collect_vec();
                 let callsite = self.b.build_call(f, &args, "callsite").unwrap();
-                match dest {
-                    Some(v) => {
-                        let value = BasicValueEnum::try_from(
-                            callsite.as_any_value_enum(),
-                        )
-                        .unwrap();
-                        ctx.values.insert(*v, value);
-                    }
-                    None => (),
+                if let Some(v) = dest {
+                    let value =
+                        BasicValueEnum::try_from(callsite.as_any_value_enum())
+                            .unwrap();
+                    ctx.values.insert(*v, value);
                 }
             }
         }

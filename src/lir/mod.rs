@@ -318,6 +318,12 @@ impl Module<Declaring> {
     }
 }
 
+impl Default for Module<Declaring> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Module<Building> {
     pub fn finalize(self) -> Module<Complete> {
         Module {

@@ -60,6 +60,6 @@ impl TypeRef {
         let Some(_) = id.as_slice(db) else {
             return false;
         };
-        return true;
+        true
     }
 }

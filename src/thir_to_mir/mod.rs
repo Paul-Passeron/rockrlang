@@ -171,11 +171,7 @@ pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
     ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower()
 }
 
-pub fn mir<'db>(
-    db: &'db dyn Db,
-    fdef: FunctionId,
-    subs: Vec<TypeRef>,
-) -> &'db MIR {
+pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &MIR {
     _mir(db, MIRKey::new(db, fdef, subs))
 }
 
