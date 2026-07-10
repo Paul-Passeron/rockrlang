@@ -101,9 +101,14 @@ impl FuncInst {
     }
 
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
-        println!("{}", self.fdef(db).called_to_string(db));
         let sig = get_sig_of_function(db, self.fdef(db).interned());
-        sig.ret.with_substitution(db, self.subs(db))
+        let ret_ty = match sig.ret {
+            TypeRef::Zelf => {
+                self.fdef(db).parent(db).get_canonical_zelf(db).unwrap()
+            }
+            ret => ret,
+        };
+        ret_ty.with_substitution(db, self.subs(db))
     }
 
     pub fn params(self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
@@ -111,7 +116,11 @@ impl FuncInst {
         let fdef = self.fdef(db);
         let zelf = fdef.parent(db).get_canonical_zelf(db);
         let zelf = sig.zelf.map(|arg| {
-            (Symbol::new(db, "self"), arg.as_type_ref_for(db, zelf.unwrap()))
+            (
+                Symbol::new(db, "self"),
+                arg.as_type_ref_for(db, zelf.unwrap())
+                    .with_substitution(db, self.subs(db)),
+            )
         });
         zelf.into_iter()
             .chain(sig.args.iter().map(|(symb, ty)| {
@@ -556,7 +565,7 @@ impl<'a> ThirToMIR<'a> {
             }
             ExprKind::Cast(expr, ty) => {
                 MIRRValueKind::Cast(self.build_operand(*expr), *ty)
-            },
+            }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
             }
