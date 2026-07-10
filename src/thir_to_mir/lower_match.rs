@@ -84,12 +84,13 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         .extend(repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
+                    let discr_ty: TypeRef = int_id(self.db).into();
                     let discr = MIRRValue {
                         kind: MIRRValueKind::Discriminant(scrut_place),
-                        ty: int_id(self.db).into(),
+                        ty: discr_ty,
                         span,
                     };
-                    let discr_place = self.ctx.synthetic_place(ty, span);
+                    let discr_place = self.ctx.synthetic_place(discr_ty, span);
                     self.ctx.builder.emit(Stmt::Assign {
                         dest: discr_place.clone(),
                         rvalue: discr,
