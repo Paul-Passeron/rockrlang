@@ -202,6 +202,11 @@ pub enum HirExprDesc {
 
     Metadata(Box<HirExpr>),
 
+    As {
+        expr: Box<HirExpr>,
+        ty: PartialTypeRef,
+    },
+
     Error,
 }
 

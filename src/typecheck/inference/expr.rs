@@ -21,9 +21,11 @@ use std::{
 };
 
 use itertools::Itertools;
+use salsa::Accumulator;
 
 use crate::{
     common::{location::Span, symbols::Symbol},
+    compiler::diagnostic::Diag,
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace,
         HirPlaceKind, LocalId, PartialTypeArg, PartialTypeRef, function_ast,
@@ -36,6 +38,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDef, AstStructDefField},
     },
+    printer::render_diagnostics,
     ril::{
         EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId,
         TypeRef,
@@ -115,7 +118,7 @@ impl<'db> InferenceCtx<'db> {
                 })?;
                 Ok(self.slice_of(elem_var.into()))
             }
-            HirExprDesc::SizeOf(_) => Ok(self.int_ty()),
+            HirExprDesc::SizeOf(_) => Ok(self.usize_ty()),
             HirExprDesc::Constructor {
                 enum_def,
                 name,
@@ -126,7 +129,15 @@ impl<'db> InferenceCtx<'db> {
                 args.iter().for_each(|arg| {
                     let _ = self._infer_expr(arg);
                 });
-                println!("TODO: function not found in current scope");
+                let d = Diag::generic_error(
+                    "function not found in current scope".into(),
+                    expr.span,
+                );
+                if true {
+                    render_diagnostics(self.db, [d].iter());
+                } else {
+                    d.accumulate(self.db);
+                }
                 Ok(InferTy::Var(self.fresh_var()))
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
@@ -137,6 +148,19 @@ impl<'db> InferenceCtx<'db> {
                     self.emit_metadata_of_fat_ptr_constraint(fat_ptr_var);
                 self.unify(fat_ptr_ty, fat_ptr_var.into())?;
                 Ok(metadata_var.into())
+            }
+            HirExprDesc::As { expr, ty } => {
+                // For the moment, this only works on pointer types.
+                // This can do ref -> ptr but not ptr -> ref
+                let pointee = self.fresh_var();
+                let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
+                let expr_ty = self.infer_expr(expr)?;
+                self.unify(expr_ptr_ty.into(), expr_ty).unwrap();
+                
+                let actual_ty =
+                    self.allocate_partial_type_ref(ty, &self.implicit_ctx());
+                
+                Ok(actual_ty)
             }
         }
     }

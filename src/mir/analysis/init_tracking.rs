@@ -150,6 +150,7 @@ impl IterOperand for MIRRValue {
             MIRRValueKind::Ref(p, _)
             | MIRRValueKind::AddressOf(p, _)
             | MIRRValueKind::Discriminant(p) => p.iter_each_operand().collect(),
+            MIRRValueKind::Cast(op, _) |
             MIRRValueKind::Use(op)
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => vec![op],

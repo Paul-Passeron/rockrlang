@@ -153,6 +153,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                         "static" => TokenKind::Static,
                         "true" => TokenKind::True,
                         "false" => TokenKind::False,
+                        "as" => TokenKind::As,
                         _ => TokenKind::Identifier(Symbol::new(
                             db,
                             String::from(lexeme),

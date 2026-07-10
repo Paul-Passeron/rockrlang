@@ -718,6 +718,14 @@ impl<'a> MTLBCtx<'a> {
                 let ty = LIRTy { layout, origin: Some(rvalue.ty) };
                 b.make_aggregate(ty, values).erase()
             }
+            MIRRValueKind::Cast(op, type_ref) => {
+                if type_ref.as_ptr(self.db).is_some() {
+                    // Should not have to do anything (ptr -> ptr)
+                    self.lower_operand(b, op, lower)
+                } else {
+                    todo!()
+                }
+            }
         }
     }
 }

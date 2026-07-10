@@ -3,17 +3,11 @@ use std::{collections::BTreeMap, iter::repeat_n};
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    layout::{IntWidth, LIRTy, layout_of},
-    mir::{
+    Db, check::thir::sanity_check::{RefWrappedTy, WrapKind}, layout::{IntWidth, LIRTy, layout_of}, mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
-    },
-    ril::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of},
-    thir::{EnumRef, StructRef, ThirMatchBranch},
-    thir_to_mir::{
+    }, ril::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of, usize_id}, thir::{EnumRef, StructRef, ThirMatchBranch}, thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },
@@ -290,7 +284,7 @@ pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> TypeId {
         IntWidth::I8 => char_id(db),
         IntWidth::I16 => todo!(),
         IntWidth::I32 => int_id(db),
-        IntWidth::I64 => todo!(),
+        IntWidth::I64 => usize_id(db),
         IntWidth::I128 => todo!(),
     }
 }

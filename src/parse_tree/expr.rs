@@ -107,6 +107,11 @@ pub enum AstExprDesc {
     /// @metadata(<expr>), retrives the metadata for the fat-pointer expr
     /// <expr>.
     Metadata(Box<AstExpr>),
+
+    As {
+        expr: Box<AstExpr>,
+        ty: AstTypeExpr,
+    },
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

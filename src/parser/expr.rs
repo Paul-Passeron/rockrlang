@@ -53,6 +53,7 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, Assoc)> {
         TokenKind::Mult | TokenKind::Div | TokenKind::Modulo => {
             (11, Assoc::Left)
         }
+        TokenKind::As => (12, Assoc::Left),
         _ => return None,
     };
     let (lbp, rbp) = match assoc {
@@ -93,6 +94,8 @@ impl<'db> Parser<'db> {
         let mut lhs = self.parse_unary()?;
 
         while let Some(tok_kind) = self.peek_n(0).map(|t| t.kind) {
+            println!("Current is {tok_kind:?}");
+
             if tok_kind == TokenKind::DotDot {
                 let lbp: u8 = 4;
                 let rbp: u8 = 4;
@@ -132,6 +135,16 @@ impl<'db> Parser<'db> {
                         vec![],
                         span,
                     );
+                }
+
+                if op_kind == TokenKind::As {
+                    let ty = self.parse_type_expr()?;
+                    let span = lhs.span.start().span(self.get_end());
+                    lhs = Spanned::new(
+                        AstExprDesc::As { expr: Box::new(lhs), ty },
+                        vec![],
+                        span,
+                    )
                 }
                 continue;
             }

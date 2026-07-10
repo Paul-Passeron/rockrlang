@@ -163,6 +163,8 @@ pub enum ExprKind {
 
     Metadata(ExprId),
 
+    Cast(ExprId, TypeRef),
+
     Error, // Todo: Add metadata maybe
 }
 

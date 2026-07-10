@@ -404,7 +404,10 @@ impl<'db> TyCtx<'db> {
                 if let Some(expr) = &hir_expr {
                     let (ty, err) = self.type_check_expr(expr);
                     if let Some(err) = err {
-                        dbg!("TODO: err here !", err);
+                        eprintln!(
+                            "{}: TODO: err here ! {err:?}",
+                            stmt.span.start().loc_info(self.db)
+                        );
                     };
 
                     match ty {

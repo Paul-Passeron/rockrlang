@@ -460,6 +460,11 @@ impl<'db> SanityChecker<'db> {
                 }
             }
             ExprKind::Error => (),
+            ExprKind::Cast(expr, type_ref) => {
+                self.check_expr(*expr);
+                self.check_types(*type_ref, infos.ty, infos.span);
+                // TODO: check that infos.ty and type_ref are cast-compatible
+            }
         };
         infos.ty
     }

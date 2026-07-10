@@ -22,6 +22,7 @@ use itertools::Itertools;
 use crate::{
     common::symbols::Symbol,
     hir::{Mutability, impl_items},
+    layout::{LIRTy, ScalarKind, layout_of},
     parse_tree::{
         expr::BinaryOperator,
         top_level::{AstImplItem, AstReceiver},
@@ -31,8 +32,9 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind,
-        ScopeOwnerId, TypeDefId,
+        ScopeOwnerId, TypeDefId, TypeId,
     },
+    thir_to_mir::lower_match::int_ty_with_witdh,
     typecheck::{
         CallKind, InferCallInfos, ReceiverAdjustment,
         inference::{
@@ -277,7 +279,9 @@ impl<'db> InferenceCtx<'db> {
                 }
                 ConstraintSolveResult::Solved
             }
-            BinaryOperator::Plus => {
+            BinaryOperator::Plus
+            | BinaryOperator::Minus
+            | BinaryOperator::Times => {
                 if lid == rid {
                     let ty = InferTy::Adt {
                         def: TypeDefId::Builtin(lid),
@@ -288,6 +292,33 @@ impl<'db> InferenceCtx<'db> {
                     }
                     ConstraintSolveResult::Solved
                 } else {
+                    let llayout = layout_of(
+                        self.db,
+                        TypeId::new(self.db, TypeDefId::Builtin(lid), vec![])
+                            .into(),
+                    );
+                    let rlayout = layout_of(
+                        self.db,
+                        TypeId::new(self.db, TypeDefId::Builtin(rid), vec![])
+                            .into(),
+                    );
+                    let lty = LIRTy { layout: llayout, origin: None };
+                    let rty = LIRTy { layout: rlayout, origin: None };
+                    if let Some(ScalarKind::Int(lwidth)) = lty.scalar(self.db)
+                        && let Some(ScalarKind::Int(rwidth)) =
+                            rty.scalar(self.db)
+                    {
+                        let max_width = lwidth.max(rwidth);
+                        let ty = int_ty_with_witdh(self.db, max_width);
+                        let infer_ty = InferTy::Adt {
+                            def: ty.def(self.db),
+                            fields: Box::new([]),
+                        };
+                        if let Err(err) = self.unify(res_ty.into(), infer_ty) {
+                            return ConstraintSolveResult::Error(err);
+                        }
+                        return ConstraintSolveResult::Solved;
+                    }
                     todo!()
                 }
             }

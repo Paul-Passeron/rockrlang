@@ -44,7 +44,7 @@ use crate::{
             core_int_iter_struct, core_into_iterator_interface,
             core_iter_interface,
         },
-        type_expr::{enum_item, templates_of_enum},
+        type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
     },
     parse_tree::{
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
@@ -228,18 +228,25 @@ impl<'db> LowerFundef<'db> {
     ) -> PartialTypeArg {
         match &any_ty.data {
             AstAnyTypeExprDesc::Any => PartialTypeArg::Infer,
-            AstAnyTypeExprDesc::Known(desc) => {
-                self.resolve_holed_desc(desc, module).to_partial_arg()
-            }
+            AstAnyTypeExprDesc::Known(desc) => self
+                .resolve_holed_desc(
+                    &AstTypeExpr {
+                        annotations: Vec::new(),
+                        data: desc.clone(),
+                        span: any_ty.span,
+                    },
+                    module,
+                )
+                .to_partial_arg(),
         }
     }
 
     fn resolve_holed_desc(
         &self,
-        desc: &AstTypeExprDesc,
+        desc: &AstTypeExpr,
         module: ModuleId,
     ) -> PartialTypeRef {
-        match desc {
+        match &desc.data {
             AstTypeExprDesc::Named { name, args } => {
                 if args.is_empty() {
                     if *name == Symbol::new(self.db, "Self") {
@@ -256,8 +263,9 @@ impl<'db> LowerFundef<'db> {
                 let resolution = resolve_in_module(self.db, *name, module)
                     .unwrap_or_else(|| {
                         panic!(
-                            "Could not resolve name {} in scope",
-                            name.display(self.db)
+                            "{}: Could not resolve name {} in scope",
+                            desc.span.start().loc_info(self.db),
+                            name.display(self.db),
                         )
                     });
 
@@ -382,7 +390,7 @@ impl<'db> LowerFundef<'db> {
         ty: &AstTypeExpr,
         module: ModuleId,
     ) -> PartialTypeRef {
-        self.resolve_holed_desc(&ty.data, module)
+        self.resolve_holed_desc(&ty, module)
     }
 
     fn resolve_holed(&self, ty: &AstTypeExpr) -> PartialTypeRef {
@@ -819,6 +827,11 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::Metadata(fat_ptr) => {
                 let expr = self.lower_expr(fat_ptr, scope, self.module);
                 HirExprDesc::Metadata(expr.boxed())
+            }
+            AstExprDesc::As { expr, ty } => {
+                let expr = self.lower_expr(expr, scope, self.module);
+                let ty = self.resolve_holed(ty);
+                HirExprDesc::As { expr: expr.boxed(), ty }
             }
             _ => HirExprDesc::Use(self.expr_as_place(expr, scope, module)),
         };
@@ -1539,7 +1552,8 @@ pub(super) fn lower_fundef_body<'db>(
             interface_ref.def(db).parent(db)
         }
     };
-    let template_args = ast.data.template_args.clone();
+    let template_args =
+        get_templates_of_fun(db, function.into()).iter().cloned().collect();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
 }
@@ -1556,7 +1570,8 @@ pub(super) fn lower_method_body<'db>(
             interface_ref.def(db).parent(db)
         }
     };
-    let template_args = ast.data.template_args.clone();
+    let template_args =
+        get_templates_of_fun(db, function.into()).iter().cloned().collect();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower_method(ast)
 }

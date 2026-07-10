@@ -111,6 +111,7 @@ pub enum MIRRValueKind {
         span: Span,
     },
     Tuple(Vec<Operand>, Span),
+    Cast(Operand, TypeRef),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -174,7 +175,8 @@ impl MIRRValue {
             MIRRValueKind::BinOp(_, l, r) => {
                 l.uses().union(&r.uses()).copied().collect()
             }
-            MIRRValueKind::Use(op)
+            MIRRValueKind::Cast(op, _)
+            | MIRRValueKind::Use(op)
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => op.uses(),
             MIRRValueKind::SizeOf(_) => HashSet::new(),

@@ -514,6 +514,13 @@ fn write_expr(
             write_expr(f, hir_expr, db)?;
             write!(f, ")")
         }
+        HirExprDesc::As { expr, ty } => {
+            write!(f, "(")?;
+            write_expr(f, expr, db)?;
+            write!(f, " as ")?;
+            write_partial_type(f, ty, db)?;
+            write!(f, ")")
+        }
     }
 }
 

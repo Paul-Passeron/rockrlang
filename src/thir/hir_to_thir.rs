@@ -33,7 +33,7 @@ use crate::{
         HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
         LocalInfo, Mutability, PartialTypeRef,
     },
-    name_resolve::type_expr::{enum_item, struct_item},
+    name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     ril::{
         BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
         ref_of,
@@ -957,12 +957,44 @@ impl<'db> ThirTranslator<'db> {
                 };
                 ExprKind::Call { called: fref, args: thir_args }
             }
-            HirExprDesc::CallStatic { .. } => todo!(),
+            HirExprDesc::CallStatic { args, .. } => {
+                let Some(call_infos) = &self
+                    .tc
+                    .call_infos(self.db)
+                    .get(&typecheck::ExprId(expr.id))
+                else {
+                    return b.new_expr(ThirExpr {
+                        kind: ExprKind::Error,
+                        ty,
+                        span: expr.span,
+                    });
+                };
+
+                let thir_args = args
+                    .iter()
+                    .map(|arg| self.expr(b, arg, stmts))
+                    .collect_vec();
+
+                let fref = FunctionRef {
+                    id: call_infos.callee,
+                    args: call_infos.substitution.clone(),
+                    self_ty: None,
+                    dispatch: Dispatch::Direct,
+                };
+                ExprKind::Call { called: fref, args: thir_args }
+            }
             HirExprDesc::Error => ExprKind::Error,
             HirExprDesc::Metadata(fat_ptr) => {
                 let thir_fat_ptr = self.expr(b, fat_ptr, stmts);
                 ExprKind::Metadata(thir_fat_ptr)
             }
+            HirExprDesc::As { expr, ty: _ } => {
+                // As.ty was used to resolve the current scoped ty
+                // which is the source of truth for the cast
+                // ex: let x: *int = y as *_;
+                let expr = self.expr(b, expr, stmts);
+                ExprKind::Cast(expr, ty)
+            },
         };
         b.new_expr(ThirExpr { kind, ty, span: expr.span })
     }
@@ -1370,10 +1402,11 @@ impl StructRef {
         let ctx = AstImplicitContext::new(
             db,
             ScopeOwnerId::Module(self.def.parent(db)),
-            Arc::new([]),
+            templates_of_struct(db, self.def.into()).iter().cloned().collect(),
         )
         .unwrap();
-        Some(ctx.resolve(db, &found.ty.data)?.with_substitution(db, &self.args))
+        let resolution = ctx.resolve(db, &found.ty.data)?;
+        Some(resolution.with_substitution(db, &self.args))
     }
 }
 

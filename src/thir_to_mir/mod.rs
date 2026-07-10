@@ -101,6 +101,7 @@ impl FuncInst {
     }
 
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
+        println!("{}", self.fdef(db).called_to_string(db));
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         sig.ret.with_substitution(db, self.subs(db))
     }
@@ -553,6 +554,9 @@ impl<'a> ThirToMIR<'a> {
             ExprKind::Metadata(expr) => {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
+            ExprKind::Cast(expr, ty) => {
+                MIRRValueKind::Cast(self.build_operand(*expr), *ty)
+            },
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
             }

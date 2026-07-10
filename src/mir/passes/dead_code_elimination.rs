@@ -266,6 +266,9 @@ impl<'a> DCECtx<'a> {
                 ops.iter().map(|op| self.copy_operand(op)).collect(),
                 *span,
             ),
+            MIRRValueKind::Cast(operand, type_ref) => {
+                MIRRValueKind::Cast(self.copy_operand(operand), *type_ref)
+            }
         };
         MIRRValue { kind, ty: rvalue.ty, span: rvalue.span }
     }
