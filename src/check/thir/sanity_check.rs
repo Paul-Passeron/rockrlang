@@ -662,7 +662,7 @@ impl<'db> SanityChecker<'db> {
                 .id
                 .parent(self.db)
                 .get_canonical_zelf(self.db)
-                .unwrap_or(TypeRef::Zelf),
+                .unwrap(),
             TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
                 self.db,
                 type_id.def(self.db),
@@ -794,14 +794,29 @@ impl StructRef {
 impl FunctionRef {
     pub fn ret_ty(&self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.id.interned());
-        sig.ret.with_substitution(db, &self.args)
+        let ret_ty = match sig.ret {
+            TypeRef::Zelf => self.id.parent(db).get_canonical_zelf(db).unwrap(),
+            ret => ret,
+        };
+        ret_ty.with_substitution(db, &self.args)
     }
 
     pub fn params(&self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
         let sig = get_sig_of_function(db, self.id.interned());
-        sig.args
-            .iter()
-            .map(|(symb, ty)| (*symb, ty.with_substitution(db, &self.args)))
+        let zelf = self.self_ty;
+        let zelf_arg: Option<TypeRef> = match (zelf, sig.zelf) {
+            (None, None) => None,
+            (Some(ty), Some(r)) => Some(
+                r.as_type_ref_for(db, ty).with_substitution(db, &self.args),
+            ),
+            (None, Some(_)) | (Some(_), None) => unreachable!(),
+        };
+        zelf_arg
+            .into_iter()
+            .map(|ty| (Symbol::new(db, "self"), ty))
+            .chain(sig.args.iter().map(|(symb, ty)| {
+                (*symb, ty.with_substitution(db, &self.args))
+            }))
             .collect()
     }
 }
