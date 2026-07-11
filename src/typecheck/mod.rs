@@ -163,9 +163,15 @@ impl<'db> TyCtx<'db> {
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
-            let err = err.display(self.db).to_string();
-            let kind = cstr.kind.display(&self.inf_ctx).to_string();
-            dbg!(err, kind);
+            Diag::generic_error(
+                format!(
+                    "unification error while solving `{}`: {}",
+                    cstr.kind.display(&self.inf_ctx),
+                    err.display(self.db)
+                ),
+                self.function.span(self.db),
+            )
+            .accumulate(self.db);
         }
 
         // Temporary
@@ -265,7 +271,11 @@ impl<'db> TyCtx<'db> {
     ) {
         let (typeof_scrut, err) = self.type_check_expr(scrutinee);
         if let Some(err) = err {
-            dbg!("TODO: err here !", err);
+            Diag::generic_error(
+                format!("unification error: `{}`", err.display(self.db)),
+                scrutinee.span,
+            )
+            .accumulate(self.db);
         }
         let typeof_scrut = match typeof_scrut {
             TyRef::Inf(infer_ty) => infer_ty,
@@ -327,7 +337,14 @@ impl<'db> TyCtx<'db> {
     ) {
         let init_ty = match self.inf_ctx.infer_expr(init) {
             Ok(ty) => ty,
-            Err(err) => todo!("{}", err.display(self.db)),
+            Err(err) => {
+                Diag::generic_error(
+                    format!("unification error: `{}`", err.display(self.db)),
+                    init.span,
+                )
+                .accumulate(self.db);
+                InferTy::Var(self.inf_ctx.fresh_var())
+            }
         };
         match self.inf_ctx.infer_pattern(pattern, Some(init_ty.clone())) {
             Ok(pattern_ty) => {
@@ -370,7 +387,11 @@ impl<'db> TyCtx<'db> {
                 }
             }
             Err(err) => {
-                dbg!("TODO: err here !", err);
+                Diag::generic_error(
+                    format!("unification error: `{}`", err.display(self.db)),
+                    pattern.span,
+                )
+                .accumulate(self.db);
             }
         }
     }
@@ -386,7 +407,14 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Assign { lhs, rhs } => {
                 let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
                 if let Some(rhs_err) = rhs_err {
-                    dbg!("TODO: err here !", rhs_err);
+                    Diag::generic_error(
+                        format!(
+                            "unification error: `{}`",
+                            rhs_err.display(self.db)
+                        ),
+                        rhs.span,
+                    )
+                    .accumulate(self.db);
                 }
                 match self.inf_ctx.infer_place(lhs) {
                     Ok(lhs_ty) => match rhs_ty {
@@ -403,13 +431,27 @@ impl<'db> TyCtx<'db> {
                                     .inf_ctx
                                     .find(&rhs_ty)
                                     .to_string(self.db);
-                                dbg!("TODO: err here !", err, lstr, rstr);
+                                Diag::generic_error(
+                                    format!(
+                                        "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
+                                        err.display(self.db)
+                                    ),
+                                    stmt.span,
+                                )
+                                .accumulate(self.db);
                             }
                         }
                         TyRef::Error => (),
                     },
                     Err(err) => {
-                        dbg!("TODO: err here !", err);
+                        Diag::generic_error(
+                            format!(
+                                "unification error: `{}`",
+                                err.display(self.db)
+                            ),
+                            lhs.span,
+                        )
+                        .accumulate(self.db);
                     }
                 }
             }
@@ -431,10 +473,14 @@ impl<'db> TyCtx<'db> {
                 if let Some(expr) = &hir_expr {
                     let (ty, err) = self.type_check_expr(expr);
                     if let Some(err) = err {
-                        eprintln!(
-                            "{}: TODO: err here ! {err:?}",
-                            stmt.span.start().loc_info(self.db)
-                        );
+                        Diag::generic_error(
+                            format!(
+                                "unification error: `{}`",
+                                err.display(self.db)
+                            ),
+                            expr.span,
+                        )
+                        .accumulate(self.db);
                     };
 
                     match ty {
@@ -443,49 +489,72 @@ impl<'db> TyCtx<'db> {
                                 .inf_ctx
                                 .unify(ret_ty.clone(), infer_ty.clone())
                             {
-                                let fmt = format!(
-                                    "Cannot return {} form a function expected to return {}",
-                                    self.inf_ctx
-                                        .find(&infer_ty)
-                                        .to_string(self.db),
-                                    self.inf_ctx
-                                        .find(&ret_ty)
-                                        .to_string(self.db)
-                                );
-                                dbg!("TODO: err here !", err, fmt);
+                                let _ = err;
+                                Diag::generic_error(
+                                    format!(
+                                        "Cannot return {} form a function expected to return {}",
+                                        self.inf_ctx
+                                            .find(&infer_ty)
+                                            .to_string(self.db),
+                                        self.inf_ctx
+                                            .find(&ret_ty)
+                                            .to_string(self.db)
+                                    ),
+                                    expr.span,
+                                )
+                                .accumulate(self.db);
                             }
                         }
                         TyRef::Error => {
-                            let fmt = format!(
-                                "Cannot return error type form a function expected to return {}",
-                                self.inf_ctx.find(&ret_ty).to_string(self.db)
-                            );
-                            dbg!("TODO: err here !", fmt);
+                            Diag::generic_error(
+                                format!(
+                                    "Cannot return error type form a function expected to return {}",
+                                    self.inf_ctx.find(&ret_ty).to_string(self.db)
+                                ),
+                                expr.span,
+                            )
+                            .accumulate(self.db);
                         }
                     }
                 } else {
                     let void_ty = self.inf_ctx.void_ty();
                     if ret_ty != void_ty {
-                        let fmt = format!(
-                            "Cannot have an empty return from a function expected to return {}",
-                            self.inf_ctx.find(&ret_ty).to_string(self.db)
-                        );
-                        dbg!("TODO: err here !", fmt);
+                        Diag::generic_error(
+                            format!(
+                                "Cannot have an empty return from a function expected to return {}",
+                                self.inf_ctx.find(&ret_ty).to_string(self.db)
+                            ),
+                            stmt.span,
+                        )
+                        .accumulate(self.db);
                     }
                 }
             }
             HirStmtKind::If { cond, then, else_ } => {
                 match self.inf_ctx.infer_expr(cond) {
                     Ok(ty) => {
-                        match self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
-                            Ok(()) => (),
-                            Err(err) => {
-                                dbg!("TODO: err here !", err);
-                            }
+                        if let Err(err) =
+                            self.inf_ctx.unify(ty, self.inf_ctx.bool_ty())
+                        {
+                            Diag::generic_error(
+                                format!(
+                                    "if condition must be of type bool: {}",
+                                    err.display(self.db)
+                                ),
+                                cond.span,
+                            )
+                            .accumulate(self.db);
                         }
                     }
                     Err(err) => {
-                        dbg!("TODO: err here !", err);
+                        Diag::generic_error(
+                            format!(
+                                "unification error: `{}`",
+                                err.display(self.db)
+                            ),
+                            cond.span,
+                        )
+                        .accumulate(self.db);
                     }
                 }
                 self.type_check_stmt(then);
@@ -497,14 +566,28 @@ impl<'db> TyCtx<'db> {
                         if let Err(err) =
                             self.inf_ctx.unify(ty, self.inf_ctx.bool_ty())
                         {
-                            dbg!("TODO: err here !", err);
+                            Diag::generic_error(
+                                format!(
+                                    "while condition must be of type bool: {}",
+                                    err.display(self.db)
+                                ),
+                                cond.span,
+                            )
+                            .accumulate(self.db);
 
                             return;
                         }
                         self.type_check_stmt(body);
                     }
                     Err(err) => {
-                        dbg!("TODO: err here !", err);
+                        Diag::generic_error(
+                            format!(
+                                "unification error: `{}`",
+                                err.display(self.db)
+                            ),
+                            cond.span,
+                        )
+                        .accumulate(self.db);
                     }
                 }
             }
@@ -514,12 +597,16 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
             HirStmtKind::Break => (),
         }
-        if let Err(err) = self.inf_ctx.solve_constraints() {
-            eprintln!(
-                "Error solving constraints after type checking stmt: {}\n    {}",
-                err.1.display(self.db),
-                err.0.kind.display(&self.inf_ctx)
-            );
+        if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
+            Diag::generic_error(
+                format!(
+                    "unification error while solving `{}`: {}",
+                    cstr.kind.display(&self.inf_ctx),
+                    err.display(self.db)
+                ),
+                stmt.span,
+            )
+            .accumulate(self.db);
         }
     }
 
