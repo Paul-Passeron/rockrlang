@@ -79,8 +79,6 @@ impl AstImplicitContext {
         zelf: Option<InferTy>,
     ) -> ImplResult<ImplicitContext> {
         if self.template_asts.len() != templates.len() {
-            dbg!(&self.template_asts);
-            dbg!(&templates);
             return Err(ImplicitCtxCreationError::TemplateLenMismatch);
         }
 
