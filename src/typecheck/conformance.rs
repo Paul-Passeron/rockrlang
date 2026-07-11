@@ -23,10 +23,12 @@ use crate::{
     Db,
     common::symbols::{InternedSymbol, Symbol},
     compiler::{Workspace, workspace_packages},
+    hir::impl_items,
     name_resolve::implems::impls_in_package,
+    parse_tree::top_level::AstImplItem,
     ril::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
-        InternedTypeId, TypeId, TypeRef,
+        InternedTypeId, ScopeOwnerId, TypeId, TypeRef,
     },
 };
 
@@ -80,7 +82,11 @@ fn _type_match(
 
 fn type_match(db: &dyn Db, a: TypeId, b: TypeRef) -> Option<Vec<TypeId>> {
     let mut m = HashMap::new();
-    if _type_match(db, a, b, &mut m) { todo!() } else { None }
+    if _type_match(db, a, b, &mut m) {
+        Some((0..m.len()).into_iter().map(|arg| m[&arg]).collect())
+    } else {
+        None
+    }
 }
 
 #[salsa::tracked(returns(ref))]
@@ -161,7 +167,49 @@ fn _method_impl_for<'db>(
     is_static: bool,
     hint: Option<InterfaceId>,
 ) -> Option<(ImplId, FunctionId)> {
-    todo!()
+    let method: Symbol = method.into();
+    candidate_impls_for(db, ty.into()).iter().find_map(|candidate| {
+        let id = candidate.id;
+        if let Some(hint) = hint {
+            let Some(iref) = id.interface(db) else {
+                return None;
+            };
+            if iref.def(db) != hint {
+                return None;
+            }
+        }
+        let subs = &candidate.subs;
+        let templs = id.templates(db);
+        if subs.len() != templs.len() {
+            // This is a bug
+            return None;
+        }
+        let templ_matches = templs.iter().zip(subs).all(|(interfaces, ty)| {
+            interfaces
+                .iter()
+                .all(|interface| type_implements(db, *ty, *interface).is_some())
+        });
+        if !templ_matches {
+            return None;
+        }
+        let fid =
+            impl_items(db, id.into()).iter().find_map(|item| match item {
+                AstImplItem::Fundef(ast) => {
+                    if ast.data.name.data != method {
+                        return None;
+                    }
+                    if ast.data.receiver.is_static() != is_static {
+                        return None;
+                    }
+                    if ast.data.args.len() != arity {
+                        return None;
+                    }
+                    Some(FunctionId::new(db, method, ScopeOwnerId::Impl(id)))
+                }
+                _ => None,
+            })?;
+        Some((id, fid))
+    })
 }
 
 pub fn method_impl_for<'db>(
