@@ -1,5 +1,3 @@
-@include core::io
-
 fun main(): int {
     "Hello, World !".println();
     return 0;
