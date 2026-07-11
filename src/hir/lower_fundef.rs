@@ -44,7 +44,10 @@ use crate::{
             core_int_iter_struct, core_into_iterator_interface,
             core_iter_interface,
         },
-        type_expr::{enum_item, get_templates_of_fun, templates_of_enum},
+        type_expr::{
+            enum_item, get_template_param_count, get_templates_of_fun,
+            templates_of_enum,
+        },
     },
     parse_tree::{
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
@@ -63,7 +66,7 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, get_template_param_count,
+        TypeParamId, TypeRef,
     },
 };
 

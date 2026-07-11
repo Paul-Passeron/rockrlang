@@ -23,7 +23,7 @@ use crate::{
     },
     hir::{FunctionLikeAst, function_ast},
     name_resolve::{
-        builtin_module, core_module, core_package,
+        builtin_module, core_module, core_package, file_module_id,
         interfaces::interface_item,
         module_items, std_module,
         type_expr::{enum_item, struct_item},
@@ -34,9 +34,9 @@ use crate::{
     parser::parse_file,
     printer::type_printer::TypePrinter,
     ril::{
-        EnumId, FileModule, FunctionId, InterfaceId, InternedModuleId,
-        ModuleId, Package, ScopeOwnerId, StructId, TypeDefId, bool_id, char_id,
-        int_id, never_id, usize_id, void_id,
+        EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId,
+        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id, int_id, never_id,
+        usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -261,23 +261,6 @@ pub fn builtin_definitions<'db>(
     });
 
     res
-}
-
-#[salsa::tracked]
-pub fn file_module_id<'db>(
-    db: &'db dyn Db,
-    fm: FileModule<'db>,
-    parent: Option<ModuleId>,
-    package: Package<'db>,
-) -> ModuleId {
-    ModuleId::new(
-        db,
-        fm.name(db),
-        parent,
-        Some(fm.file(db)),
-        fm.submodules(db).clone(),
-        Some(package),
-    )
 }
 
 impl AstIncludePathDesc {

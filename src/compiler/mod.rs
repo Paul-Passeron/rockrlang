@@ -24,9 +24,7 @@ use crate::{
     driver::{ANCHOR_FILE_NAME, read_source_file},
     hir::{Mutability, function_ast},
     mir::passes::dead_code_elimination::dce,
-    name_resolve::type_expr::{
-        get_templates_of_fun_only, get_templates_of_owner,
-    },
+    name_resolve::type_expr::{get_templates_of_fun_only, templates_of_owner},
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     printer::render_diagnostics,
     ril::{
@@ -306,7 +304,7 @@ pub fn get_sig_of_function(
         .collect();
 
     let implicit_templates: Vec<Vec<InterfaceRef>> =
-        get_templates_of_owner(db, function_id.parent(db))
+        templates_of_owner(db, function_id.parent(db))
             .iter()
             .map(|t| {
                 t.constraints

@@ -596,4 +596,18 @@ impl FunctionId {
             }
         }
     }
+
+    pub fn has_body(self, db: &dyn Db) -> bool {
+        !matches!(
+            function_ast(db, self.interned()).inner(db),
+            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
+        )
+    }
+
+    pub fn is_var_args(self, db: &dyn Db) -> bool {
+        match function_ast(db, self.interned()).inner(db) {
+            FunctionLikeAst::ExternDef(_, var_arg) => *var_arg,
+            _ => false,
+        }
+    }
 }

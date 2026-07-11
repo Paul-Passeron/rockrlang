@@ -20,19 +20,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod display;
 pub mod plumbing;
 
-use std::sync::Arc;
-
 pub use plumbing::*;
 
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
-    hir::{FunctionLikeAst, function_ast},
-    name_resolve::{
-        module_items,
-        type_expr::{struct_item, templates_of_enum, templates_of_struct},
-    },
-    parse_tree::top_level::{AstImplItem, AstTemplateArg, AstTopLevelItemDesc},
+    parse_tree::top_level::{AstImplItem, AstTemplateArg},
     printer::type_printer::TypePrinter,
 };
 
@@ -221,45 +214,10 @@ impl FunctionId {
     pub fn called_to_string(self, db: &dyn Db) -> String {
         TypePrinter::new().called_function_to_string(db, self)
     }
-
-    pub fn is_var_args(self, db: &dyn Db) -> bool {
-        self.interned().is_var_args(db)
-    }
-}
-
-#[salsa::tracked]
-impl<'db> InternedFunctionId<'db> {
-    pub fn has_body(self, db: &'db dyn Db) -> bool {
-        !matches!(
-            function_ast(db, self).inner(db),
-            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
-        )
-    }
-
-    pub fn is_var_args(self, db: &dyn Db) -> bool {
-        match function_ast(db, self).inner(db) {
-            crate::hir::FunctionLikeAst::ExternDef(_, var_arg) => *var_arg,
-            _ => false,
-        }
-    }
-}
-
-impl FunctionId {
-    pub fn has_body(self, db: &dyn Db) -> bool {
-        self.interned().has_body(db)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StructId(salsa::Id);
-
-#[salsa::tracked]
-impl StructId {
-    pub fn field_names(self, db: &dyn Db) -> Arc<[Symbol]> {
-        let item = struct_item(db, self.interned());
-        item.fields.iter().map(|field| field.name).collect()
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EnumId(salsa::Id);
@@ -296,52 +254,3 @@ pub struct BuiltinTypeId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceRef(salsa::Id);
-
-pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
-    match ty {
-        TypeDefId::Builtin(builtin_type_id) => {
-            builtin_type_id.template_count(db)
-        }
-        TypeDefId::Struct(struct_id) => {
-            templates_of_struct(db, struct_id.interned()).len()
-        }
-        TypeDefId::Enum(enum_id) => {
-            templates_of_enum(db, enum_id.interned()).len()
-        }
-    }
-}
-
-impl SourceFile {
-    pub fn span(self, db: &dyn Db) -> Span {
-        Span::new(self, 0, self.content(db).len())
-    }
-}
-impl ModuleId {
-    pub fn get_span(&self, db: &dyn Db) -> Span {
-        match self.parent(db) {
-            Some(parent) => {
-                for item in
-                    module_items(db, parent.interned()).into_iter().flatten()
-                {
-                    if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
-                        && curr_mod.data.name.data == self.name(db)
-                    {
-                        return curr_mod.span;
-                    }
-                }
-                unreachable!()
-            }
-            None => {
-                // is it a file ?
-                match self.package(db) {
-                    Some(package) => {
-                        let root = package.root(db);
-                        let file = root.file(db);
-                        file.span(db)
-                    }
-                    None => unreachable!(),
-                }
-            }
-        }
-    }
-}

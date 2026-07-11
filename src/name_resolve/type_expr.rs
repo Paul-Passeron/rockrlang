@@ -36,11 +36,10 @@ use crate::{
     },
     ril::{
         InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
-        ScopeOwnerId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of, slice_of,
-        tuple_of,
+        ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        ptr_of, ref_of, slice_of, tuple_of,
     },
 };
-
 
 // TODO: See if we can't use AstImplicitCtx here instead
 
@@ -253,6 +252,28 @@ pub fn templates_of_struct<'db>(
 }
 
 #[salsa::tracked]
+impl StructId {
+    pub fn field_names(self, db: &dyn Db) -> Arc<[Symbol]> {
+        let item = struct_item(db, self.interned());
+        item.fields.iter().map(|field| field.name).collect()
+    }
+}
+
+pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
+    match ty {
+        TypeDefId::Builtin(builtin_type_id) => {
+            builtin_type_id.template_count(db)
+        }
+        TypeDefId::Struct(struct_id) => {
+            templates_of_struct(db, struct_id.interned()).len()
+        }
+        TypeDefId::Enum(enum_id) => {
+            templates_of_enum(db, enum_id.interned()).len()
+        }
+    }
+}
+
+#[salsa::tracked]
 pub fn templates_of_enum<'db>(
     db: &'db dyn Db,
     enum_id: InternedEnumId<'db>,
@@ -284,38 +305,14 @@ pub fn get_templates_of_fun_only<'db>(
     res.into()
 }
 
-pub fn get_templates_of_owner(
-    db: &dyn Db,
-    owner: ScopeOwnerId,
-) -> Box<[AstTemplateArg]> {
-    match owner {
-        ScopeOwnerId::Module(_) => Box::new([]),
-        ScopeOwnerId::Impl(impl_id) => {
-            let sources = impl_sources(db, impl_id.interned());
-            sources
-                .into_iter()
-                .next()
-                .unwrap()
-                .templates(db)
-                .clone()
-                .into_boxed_slice() // !!!
-        }
-        ScopeOwnerId::Interface(id) => {
-            interface_item(db, id.def(db).interned())
-                .template_args
-                .clone()
-                .into_boxed_slice()
-        }
-    }
-}
-
 #[salsa::tracked]
 pub fn get_templates_of_fun<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
 ) -> Arc<[AstTemplateArg]> {
-    get_templates_of_owner(db, function.parent(db))
-        .into_iter()
+    templates_of_owner(db, function.parent(db))
+        .iter()
+        .cloned()
         .chain(get_templates_of_fun_only(db, function))
         .collect()
 }
