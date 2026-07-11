@@ -1,0 +1,24 @@
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    let _1: core::io::str = message;
+    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/if.rkr:3:1
+thir fun if::main(): int {
+    if true 's0: {
+        core::io::printf(cHello from true !\n);
+    } else 's1: {
+        core::io::printf(cHow did you get there ?\n);
+    }
+    return 0;
+}
+

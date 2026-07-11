@@ -1,0 +1,70 @@
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    let _1: core::io::str = message;
+    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/loans.rkr:1:1
+thir fun loans::simple_borrow(): int {
+    let x: int = 5;
+    let r: &int = &x;
+    return (*r);
+}
+
+examples/loans.rkr:7:1
+thir fun loans::two_disjoint_borrows(): int {
+    let x: int = 1;
+    let y: int = 2;
+    let rx: &int = &x;
+    let ry: &int = &y;
+    return ((*rx) + (*ry));
+}
+
+examples/loans.rkr:15:1
+thir fun loans::borrow_dead_before_use(): int {
+    let x: int = 5;
+    let r: &int = &x;
+    let y: int = 10;
+    return y;
+}
+
+examples/loans.rkr:22:1
+thir fun loans::borrow_across_branch(cond: bool): int {
+    let x: int = 5;
+    let r: &int = &x;
+    if cond 's0: {
+        return (*r);
+    }
+    return 0;
+}
+
+examples/loans.rkr:31:1
+thir fun loans::reassigned_borrow(): int {
+    let a: int = 1;
+    let b: int = 2;
+    let mut r: &int = &a;
+    r = &b;
+    return (*r);
+}
+
+examples/loans.rkr:39:1
+thir fun loans::borrow_in_loop(n: int): int {
+    let x: int = 5;
+    let mut i: int = 0;
+    let mut acc: int = 0;
+    's0: while (i < n) {
+        let r: &int = &x;
+        acc = (acc + (*r));
+        i = (i + 1);
+    }
+    return acc;
+}
+

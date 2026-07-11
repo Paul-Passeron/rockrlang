@@ -1,0 +1,46 @@
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    let _1: core::io::str = message;
+    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/nested_opt.rkr:3:1
+thir fun nested_opt::some_opt(): core::opt::opt<core::opt::opt<int>> {
+    return core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(8));
+}
+
+examples/nested_opt.rkr:7:1
+thir fun nested_opt::foo(): int {
+    match nested_opt::some_opt() {
+        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(x)) => 's0: {
+            return x;
+        }
+        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#0) => 's1: {
+            return 69;
+        }
+        core::opt::opt::<core::opt::opt<int>>::#0 => 's2: {
+            return 0;
+        }
+    }
+}
+
+examples/nested_opt.rkr:21:1
+thir fun nested_opt::bar(): int {
+    match nested_opt::some_opt() {
+        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(x)) => 's0: {
+            return x;
+        }
+        _ => 's1: {
+            return 0;
+        }
+    }
+}
+
