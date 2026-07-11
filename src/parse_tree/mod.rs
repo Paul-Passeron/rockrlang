@@ -26,25 +26,13 @@ pub mod stmt;
 pub mod top_level;
 pub mod type_expr;
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct Spanned<T> {
     pub data: T,
     pub annotations: Vec<AstAnnotation>,
     pub span: Span,
 }
 
-impl<T: PartialEq> PartialEq for Spanned<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
-    }
-}
-impl<T> Eq for Spanned<T> where Spanned<T>: PartialEq {}
-
-impl<T: Hash> Hash for Spanned<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.data.hash(state);
-        self.span.hash(state);
-    }
-}
 
 impl<T> Spanned<T> {
     pub fn new(data: T, annotations: Vec<AstAnnotation>, span: Span) -> Self {
