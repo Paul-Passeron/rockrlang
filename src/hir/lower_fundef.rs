@@ -1272,9 +1272,11 @@ impl<'db> LowerFundef<'db> {
                 HirStmtKind::Assign { lhs: place, rhs }
             }
             AstStmtDesc::CompoundAssign { lhs, op, rhs } => {
+                // Make sure not to lower the lhs twice !
                 let place = self.expr_as_place(lhs, scope, self.module);
                 let binop = op.to_binop();
-                let lhs_expr = self.lower_expr(lhs, scope, self.module);
+                let lhs_expr =
+                    self.new_expr(HirExprDesc::Use(place.clone()), lhs.span);
                 let rhs_expr = self.lower_expr(rhs, scope, self.module);
                 let combined = self.new_expr(
                     HirExprDesc::BinOp {
