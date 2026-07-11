@@ -32,9 +32,5 @@ unescaper = "0.1.8"
 walkdir = "2.5.0"
 
 [[bin]]
-name = "rockr-lsp"
-path = "src/lsp/server.rs"
-
-[[bin]]
 name = "rockrc"
 path = "src/compiler/rockrc.rs"
