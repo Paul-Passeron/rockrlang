@@ -11,3 +11,4 @@ thir fun core::panic::panic(message: core::io::str): never {
     core::io::printf(c\'\n\nExitting with code 1...\n);
     core::sys::exit(1);
 }
+
