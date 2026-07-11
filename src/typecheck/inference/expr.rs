@@ -38,7 +38,6 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDef, AstStructDefField},
     },
-    printer::render_diagnostics,
     ril::{
         EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId,
         TypeRef,
@@ -129,15 +128,10 @@ impl<'db> InferenceCtx<'db> {
                 args.iter().for_each(|arg| {
                     let _ = self._infer_expr(arg);
                 });
-                let d = Diag::generic_error(
+                Diag::generic_error(
                     "function not found in current scope".into(),
                     expr.span,
-                );
-                if true {
-                    render_diagnostics(self.db, [d].iter());
-                } else {
-                    d.accumulate(self.db);
-                }
+                ).accumulate(self.db);
                 Ok(InferTy::Var(self.fresh_var()))
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
