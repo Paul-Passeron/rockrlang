@@ -299,10 +299,6 @@ impl<'a> InferenceCtx<'a> {
                 self.unify(adjusted.clone(), pot_ref_ty.clone()).expect("TODO");
             }
             _ => {
-                let mut p = TypePrinter::new();
-                p.options = p.options.with(
-                    crate::printer::type_printer::TypePrinterOption::DebugInferenceVars,
-                );
                 self.emit_is_inner_constraint(inner_ty, pot_ref_ty);
             }
         }
