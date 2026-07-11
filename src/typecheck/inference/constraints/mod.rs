@@ -271,13 +271,13 @@ impl<'db> InferenceCtx<'db> {
         let mut out = vec![];
         let receiver = self.find(receiver);
         let implements = self.implements.clone(); // same clone as before, fix later
-        'outer: for (iface_id, implems) in implements {
+        for (iface_id, implems) in implements {
             if hint.is_some_and(|h| h != iface_id) {
                 continue;
             }
             for implem in implems {
                 if self.find(&implem.ty) != receiver {
-                    continue 'outer;
+                    continue;
                 }
                 for item in interface_items(self.db, iface_id.interned()).iter()
                 {
