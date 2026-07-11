@@ -36,6 +36,7 @@ use crate::{
     typecheck::inference::{InferTy, InferenceCtx, UnificationError},
 };
 
+pub mod conformance;
 pub mod inference;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
