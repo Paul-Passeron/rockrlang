@@ -72,6 +72,7 @@ macro_rules! snapshot_test {
 snapshot_test!(auto_deref_field, "auto_deref_field");
 snapshot_test!(destructure, "destructure");
 snapshot_test!(empty, "empty");
+snapshot_test!(generics, "generics");
 snapshot_test!(hello, "hello");
 snapshot_test!(if_stmt, "if");
 snapshot_test!(impl_self, "impl_self");

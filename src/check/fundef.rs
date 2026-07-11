@@ -50,10 +50,10 @@ pub(crate) fn reachable_mir_instances(
     let mut worklist: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
     let mut res = vec![];
 
-    assert!(
-        get_templates_of_fun(db, root.interned()).is_empty(),
-        "monomorphization root must not be generic"
-    );
+    if !get_templates_of_fun(db, root.interned()).is_empty() {
+        // Gneric so not a monomorphization root
+        return res;
+    }
     worklist.push((root, vec![]));
 
     while let Some((fdef, subs)) = worklist.pop() {
