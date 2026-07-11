@@ -430,8 +430,10 @@ impl<'db> InferenceCtx<'db> {
     ) -> Result<T, UnificationError> {
         let old_listeners = self.listeners.clone();
         let old_ready = self.ready.clone();
+        let old_ready_set = self.ready_set.clone();
         let old_exprs = self.inferred_exprs.clone();
         let old_patterns = self.inferred_patterns.clone();
+        let old_places = self.inferred_places.clone();
         let snapshot = self.table.snapshot();
         match f(self) {
             Ok(res) => {
@@ -442,8 +444,10 @@ impl<'db> InferenceCtx<'db> {
                 self.table.rollback_to(snapshot);
                 self.listeners = old_listeners;
                 self.ready = old_ready;
+                self.ready_set = old_ready_set;
                 self.inferred_exprs = old_exprs;
                 self.inferred_patterns = old_patterns;
+                self.inferred_places = old_places;
                 Err(err)
             }
         }
