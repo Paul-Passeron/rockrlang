@@ -676,6 +676,7 @@ impl<'db> InferenceCtx<'db> {
                 expr_id: id,
                 callee: target,
                 substitution: inferred_templates.iter().cloned().collect(),
+                zelf_ty: None,
                 call_kind: CallKind::Direct,
             },
         );

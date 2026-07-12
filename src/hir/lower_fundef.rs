@@ -458,7 +458,33 @@ impl<'db> LowerFundef<'db> {
         scope: &Scope,
         module: ModuleId,
     ) -> HirExprDesc {
-        if from == Symbol::new(self.db, "Self") {
+        // TODO: compute once
+        let template_names =
+            get_templates_of_fun(self.db, self.function.into())
+                .iter()
+                .map(|ast| ast.name)
+                .collect_vec();
+        if let Some(pos) = template_names.iter().position(|temp| from == *temp)
+        {
+            let tref = TypeRef::Param(TypeParamId(pos));
+            match &to.data {
+                AstExprDesc::Call { callee, args } => {
+                    let AstExprDesc::Name(callee) = &callee.data else {
+                        todo!()
+                    };
+                    let args = args
+                        .iter()
+                        .map(|arg| self.lower_expr(arg, scope, self.module))
+                        .collect_vec();
+                    HirExprDesc::CallStatic {
+                        ty: PartialTypeRef::Resolved(tref),
+                        method: *callee,
+                        args,
+                    }
+                }
+                _ => todo!(),
+            }
+        } else if from == Symbol::new(self.db, "Self") {
             // TODO: we're losing template info here
             let zelf = self
                 .function
@@ -1557,8 +1583,7 @@ pub(super) fn lower_fundef_body<'db>(
             interface_ref.def(db).parent(db)
         }
     };
-    let template_args =
-        get_templates_of_fun(db, function.into()).to_vec();
+    let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
 }
@@ -1575,8 +1600,7 @@ pub(super) fn lower_method_body<'db>(
             interface_ref.def(db).parent(db)
         }
     };
-    let template_args =
-        get_templates_of_fun(db, function.into()).to_vec();
+    let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower_method(ast)
 }

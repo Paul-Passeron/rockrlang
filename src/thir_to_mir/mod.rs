@@ -36,7 +36,10 @@ use crate::{
             MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
         },
     },
-    name_resolve::{core_package, file_module_id, std_package},
+    name_resolve::{
+        core_package, file_module_id, std_package,
+        type_expr::get_templates_of_fun,
+    },
     ril::{
         BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
         bool_id, char_id, int_id, never_id, str_def, str_id, usize_id, void_id,
@@ -49,6 +52,7 @@ use crate::{
         thir_body,
     },
     thir_to_mir::lower_match::MatchLowerer,
+    typecheck::conformance::method_impl_for,
 };
 
 pub mod decision_tree;
@@ -97,6 +101,10 @@ impl FuncInst {
     }
 
     pub fn from_funcref(db: &dyn Db, fref: FunctionRef) -> Self {
+        assert_eq!(
+            get_templates_of_fun(db, fref.id.interned()).len(),
+            fref.args.len()
+        );
         MIRKey::new(db, fref.id, fref.args).into()
     }
 
@@ -202,10 +210,9 @@ impl<'a> ThirToMIR<'a> {
 
     pub fn is_valid_ty(&self, ty: TypeRef) -> bool {
         match ty {
-            TypeRef::Concrete(type_id) => type_id
-                .args(self.db)
-                .iter()
-                .all(|ty| self.is_valid_ty(*ty)),
+            TypeRef::Concrete(type_id) => {
+                type_id.args(self.db).iter().all(|ty| self.is_valid_ty(*ty))
+            }
             TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
             _ => false,
@@ -218,11 +225,7 @@ impl<'a> ThirToMIR<'a> {
             TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
                 self.db,
                 type_id.def(self.db),
-                type_id
-                    .args(self.db)
-                    .iter()
-                    .map(|ty| self.ty(*ty))
-                    .collect(),
+                type_id.args(self.db).iter().map(|ty| self.ty(*ty)).collect(),
             )),
             TypeRef::Param(id) => self.subs[id.0],
             TypeRef::Zelf => {
@@ -625,6 +628,11 @@ impl<'a> ThirToMIR<'a> {
         ret_ty: TypeRef,
         span: Span,
     ) -> MIRLocalID {
+        let called = called.concretize(self.db, self.subs);
+        assert!(!matches!(
+            called.id.parent(self.db),
+            ScopeOwnerId::Interface(_)
+        ));
         let callee = MIRCallee::Direct(called);
         let args =
             args.iter().map(|arg| self.build_operand(*arg)).collect_vec();
@@ -892,5 +900,47 @@ impl TypeId {
         }
 
         false
+    }
+}
+
+impl FunctionRef {
+    pub fn concretize(mut self, db: &dyn Db, subs: &[TypeRef]) -> Self {
+        if let ScopeOwnerId::Interface(i_ref) = self.id.parent(db) {
+            let zelf = self
+                .self_ty
+                .unwrap()
+                .with_substitution(db, subs)
+                .as_type_id()
+                .unwrap();
+            let is_static = self.id.receiver(db).is_static();
+            let arity = self.params(db).len() - if is_static { 0 } else { 1 };
+            let hint = Some(i_ref.def(db));
+            let method = method_impl_for(
+                db,
+                zelf,
+                self.id.name(db),
+                arity,
+                is_static,
+                hint,
+            )
+            .unwrap_or_else(|| {
+                panic!(
+                    "Could not find method {} of interface {} for type {} (arity = {})!!!",
+                    self.id.name(db).to_string(db),
+                    i_ref.def(db).to_string(db),
+                    TypeRef::Concrete(zelf).to_string(db),
+                    arity
+                )
+            });
+            let mut new_subs = method
+                .subs
+                .iter()
+                .map(|ty| TypeRef::Concrete(*ty))
+                .collect_vec();
+            new_subs.extend(self.args);
+            self.id = method.method_id;
+            self.args = new_subs;
+        }
+        self
     }
 }

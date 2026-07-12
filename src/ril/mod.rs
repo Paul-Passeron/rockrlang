@@ -162,8 +162,7 @@ impl ScopeOwnerId {
         match self {
             ScopeOwnerId::Module(_) => None,
             ScopeOwnerId::Impl(impl_id) => Some(impl_id.implemented(db)),
-            ScopeOwnerId::Interface(_) => todo!(), /* TODO: Is this what we
-                                                    * want ? */
+            ScopeOwnerId::Interface(_) => Some(TypeRef::Zelf),
         }
     }
 }

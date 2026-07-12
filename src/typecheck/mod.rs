@@ -23,6 +23,7 @@ use salsa::Accumulator;
 use crate::compiler::diagnostic::Diag;
 use crate::hir::{HirMatchBranch, HirPatternDesc};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
+use crate::printer::render_diagnostics;
 use crate::ril::TypeId;
 use crate::{
     Db,
@@ -72,6 +73,7 @@ pub(super) struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
     substitution: Vec<InferTy>,
+    zelf_ty: Option<InferTy>,
     call_kind: CallKind,
 }
 
@@ -80,6 +82,7 @@ pub struct CallInfos {
     pub expr_id: ExprId,
     pub callee: FunctionId,
     pub substitution: Vec<TypeRef>,
+    pub zelf_ty: Option<TypeRef>,
     pub call_kind: CallKind,
 }
 
@@ -146,6 +149,9 @@ impl<'db> TyCtx<'db> {
                 .into_iter()
                 .map(|ty| self.canon_type(ty))
                 .collect(),
+            zelf_ty: infos
+                .zelf_ty
+                .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error)),
             call_kind: infos.call_kind,
         }
     }
@@ -171,15 +177,15 @@ impl<'db> TyCtx<'db> {
 
     fn finalize(mut self) -> TypeCheckResults<'db> {
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
-            Diag::generic_error(
+            let d = Diag::generic_error(
                 format!(
                     "unification error while solving `{}`: {}",
                     cstr.kind.display(&self.inf_ctx),
                     err.display(self.db)
                 ),
                 self.function.span(self.db),
-            )
-            .accumulate(self.db);
+            );
+            render_diagnostics(self.db, std::iter::once(&d));
         }
 
         // Temporary

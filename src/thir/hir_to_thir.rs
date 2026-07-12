@@ -949,13 +949,17 @@ impl<'db> ThirTranslator<'db> {
                     thir_args
                 };
 
-                let zelf_ty = call_infos
-                    .callee
-                    .parent(self.db)
-                    .get_canonical_zelf(self.db)
-                    .map(|ty| {
-                        ty.with_substitution(self.db, &call_infos.substitution)
-                    });
+                let zelf_ty = call_infos.zelf_ty.clone().or_else(|| {
+                    match call_infos.callee.parent(self.db) {
+                        ScopeOwnerId::Impl(impl_id) => Some(
+                            impl_id.implemented(self.db).with_substitution(
+                                self.db,
+                                &call_infos.substitution,
+                            ),
+                        ),
+                        _ => None,
+                    }
+                });
 
                 let fref = FunctionRef {
                     id: call_infos.callee,
@@ -986,7 +990,7 @@ impl<'db> ThirTranslator<'db> {
                 let fref = FunctionRef {
                     id: call_infos.callee,
                     args: call_infos.substitution.clone(),
-                    self_ty: None,
+                    self_ty: call_infos.zelf_ty,
                     dispatch: Dispatch::Direct,
                 };
                 ExprKind::Call { called: fref, args: thir_args }
@@ -1443,24 +1447,6 @@ impl PartialTypeRef {
 }
 
 impl TypeRef {
-    // pub fn peel_aux(self, db: &dyn Db) -> (Self, usize) {
-    //     let mut cur = self;
-    //     let mut cnt = 0;
-    //     while let Some((_, inner)) = cur.as_ref(db) {
-    //         cur = inner;
-    //         cnt += 1;
-    //     }
-    //     (cur, cnt)
-    // }
-
-    // pub fn peeled(self, db: &dyn Db) -> Self {
-    //     self.peel_aux(db).0
-    // }
-
-    // pub fn ref_depth(self, db: &dyn Db) -> usize {
-    //     self.peel_aux(db).1
-    // }
-
     pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
             TypeRef::Error | TypeRef::Unknown => self,
