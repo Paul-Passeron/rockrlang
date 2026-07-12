@@ -372,7 +372,10 @@ impl<'db> Parser<'db> {
                     let has_field_syntax = self.peek_n(1).map(|t| &t.kind)
                         == Some(&TokenKind::Dot);
 
-                    if is_type_like && has_field_syntax {
+                    if is_type_like && has_field_syntax
+                        || self.peek_n(1).map(|t| &t.kind)
+                            == Some(&TokenKind::CloseBra)
+                    {
                         self.consume();
                         let fields = self.parse_struct_fields()?;
                         self.expect(TokenKind::CloseBra)?;
