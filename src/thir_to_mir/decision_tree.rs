@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use itertools::Itertools;
 
@@ -51,7 +51,7 @@ pub enum DecisionTree {
     Fail,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
 pub enum Constructor {
     Variant(usize),
     IntLit(i128),
@@ -343,8 +343,8 @@ impl<'a> Matrix<'a> {
         0
     }
 
-    fn collect_constructors(&self, col: usize) -> HashSet<Constructor> {
-        let mut res: HashSet<Constructor> = HashSet::new();
+    fn collect_constructors(&self, col: usize) -> BTreeSet<Constructor> {
+        let mut res: BTreeSet<Constructor> = BTreeSet::new();
         for row in &self.rows {
             let pat = &row.pats[col];
             if let Some(pat) = pat
@@ -432,7 +432,7 @@ impl ThirPattern {
     }
 }
 
-fn is_complete(db: &dyn Db, sig: &HashSet<Constructor>, ty: TypeRef) -> bool {
+fn is_complete(db: &dyn Db, sig: &BTreeSet<Constructor>, ty: TypeRef) -> bool {
     let sig: HashSet<Constructor> = HashSet::from_iter(sig.iter().copied());
     match ty {
         TypeRef::Concrete(_) if let Some(enum_ref) = ty.as_enum_ref(db) => {

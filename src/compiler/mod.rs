@@ -470,6 +470,12 @@ pub fn check_from_disk(
     if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct FrefSortKey {
+    info: LocationInfo,
+    subs: Vec<String>,
+}
+
 pub fn build<'db, 'ctx>(
     db: &'db dyn Db,
     w: Workspace,
@@ -492,6 +498,14 @@ pub fn build<'db, 'ctx>(
                 println!("{}", thir.display(db))
             }
         }
+    }
+
+    let mut frefs = frefs;
+    if db.config().display_mir {
+        frefs.sort_by_key(|fref| FrefSortKey {
+            info: fref.fdef(db).name_span(db).start().loc_info(db),
+            subs: fref.subs(db).iter().map(|ty| ty.to_string(db)).collect(),
+        });
     }
 
     for fref in frefs {
