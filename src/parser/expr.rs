@@ -210,10 +210,26 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_postfix(&mut self) -> Result<AstExpr, ParseError> {
+        self.parse_postfix_inner(false)
+    }
+
+    fn parse_postfix_inner(
+        &mut self,
+        path_segment: bool,
+    ) -> Result<AstExpr, ParseError> {
         let mut expr = self.parse_primary()?;
 
         loop {
             match self.peek_n(0).map(|t| t.kind) {
+                Some(TokenKind::Dot)
+                | Some(TokenKind::OpenSqr)
+                | Some(TokenKind::AddressOf)
+                | Some(TokenKind::Deref)
+                | Some(TokenKind::OpenBra)
+                    if path_segment =>
+                {
+                    break;
+                }
                 Some(TokenKind::AddressOf) => {
                     self.consume();
                     let end = self.get_end();
@@ -574,7 +590,7 @@ impl<'db> Parser<'db> {
                 match self.peek_n(0).map(|t| t.kind) {
                     Some(TokenKind::Access) => {
                         self.consume();
-                        let rhs = self.parse_postfix()?;
+                        let rhs = self.parse_postfix_inner(true)?;
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstExprDesc::NameResolved {
