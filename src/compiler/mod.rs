@@ -604,11 +604,17 @@ pub fn build_from_disk(
         return Err(CompilerError::CompiledWithErrors);
     }
 
-    let cg = Codegen::<MIRToLIRDeclare>::new(&db);
     let llvm_ctx = Context::create();
-    let llvm_module = build(&db, ws, cg) // Collect MIR
-        .run() // Run MIR -> LIR
-        .finalize(&llvm_ctx); // Run LIR -> LLVM
+    let cg = Codegen::<MIRToLIRDeclare>::new(&db);
+    
+    // Collect MIR
+    let cg = build(&db, ws, cg); 
+
+    // MIR -> LIR
+    let cg = cg.run(); 
+
+    // LIR -> LLVM
+    let llvm_module = cg.finalize(&llvm_ctx);
 
     if db.config().display_llvm {
         llvm_module.print_to_stderr();
