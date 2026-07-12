@@ -470,6 +470,20 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Error(err);
         }
 
+        let mut zelf_ty = receiver.clone();
+        // Peel ref 
+        // FIXME: Is there a better way of doing this ? Surely
+        for _ in 0..depth {
+            if let Some(adt) = zelf_ty.as_adt() {
+                zelf_ty = adt.1[0].clone();
+            } else {
+                let pointee = self.fresh_var();
+                let ptr = self.emit_deref_constraint(pointee.into());
+                self.unify(zelf_ty, ptr.into()).unwrap();
+                zelf_ty = pointee.into();
+            }
+        }
+
         let call_infos = InferCallInfos {
             expr_id,
             callee: method_id,
@@ -481,7 +495,7 @@ impl<'db> InferenceCtx<'db> {
                     adjustment: self.get_adjustments_for(method_id, depth),
                 }
             },
-            zelf_ty: Some(receiver.clone()),
+            zelf_ty: Some(zelf_ty),
         };
 
         self.call_infos.insert(expr_id, call_infos);
