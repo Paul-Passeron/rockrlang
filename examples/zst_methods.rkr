@@ -1,0 +1,19 @@
+struct Empty {}
+
+impl Empty {
+    fun hello(&self): void {
+        "Hey !".println();
+    }
+
+    fun twice(&self): void {
+        self.hello();
+        self.hello();
+    }
+}
+
+fun main(): int {
+    let empty: Empty = Empty {};
+    empty.hello();
+    empty.twice();
+    return 0;
+}
