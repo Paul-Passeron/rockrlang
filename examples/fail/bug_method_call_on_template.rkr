@@ -2,14 +2,14 @@ interface Foo {
     fun bar(&self): void;
 }
 
-struct X { }
+struct X { x: int }
 
 impl Foo for X {
     fun bar(&self): void {}
 }
 
 fun baz<T: Foo>(t: T): void {
-    t.foo();
+    t.bar();
 }
 
 fun qux(x: X): void {
