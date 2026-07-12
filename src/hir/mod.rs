@@ -330,7 +330,7 @@ pub fn impl_items<'db>(
     impl_id: InternedImplId<'db>,
 ) -> Vec<AstImplItem> {
     impl_sources(db, impl_id)
-        .into_iter()
+        .iter()
         .flat_map(|impl_| impl_.items(db).clone())
         .collect()
 }
@@ -561,7 +561,7 @@ impl FunctionId {
             db,
             type_expr,
             owning_module.interned(),
-            &templates,
+            templates,
             has_zelf,
         ) {
             crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => {

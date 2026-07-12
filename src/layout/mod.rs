@@ -152,13 +152,13 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
     match ty {
         TypeRef::Concrete(type_id) => match type_id.def(db) {
             TypeDefId::Builtin(builtin_id) => {
-                builtin_layout(db, builtin_id, &type_id.args(db)).into()
+                builtin_layout(db, builtin_id, type_id.args(db)).into()
             }
             TypeDefId::Struct(struct_id) => {
-                struct_layout(db, struct_id, &type_id.args(db)).into()
+                struct_layout(db, struct_id, type_id.args(db)).into()
             }
             TypeDefId::Enum(enum_id) => {
-                enum_layout(db, enum_id, &type_id.args(db)).into()
+                enum_layout(db, enum_id, type_id.args(db)).into()
             }
         },
         _ => panic!("Expected a concrete type but got {}", ty.to_string(db)),

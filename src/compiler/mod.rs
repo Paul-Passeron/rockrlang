@@ -617,8 +617,8 @@ pub fn build_from_disk(
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn is_file_direct_submodule_of_file<'db>(
-    db: &'db dyn Db,
+pub fn is_file_direct_submodule_of_file(
+    db: &dyn Db,
     parent: SourceFile,
     child: SourceFile,
 ) -> bool {

@@ -232,10 +232,10 @@ impl PartialEq for Thir {
     }
 }
 
-pub fn thir_body<'db>(
-    db: &'db dyn Db,
+pub fn thir_body(
+    db: &dyn Db,
     function: FunctionId,
-) -> Option<&'db Thir> {
+) -> Option<&Thir> {
     _thir_body(db, function.interned()).as_ref()
 }
 

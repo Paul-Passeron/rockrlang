@@ -71,7 +71,7 @@ pub enum CallKind {
 pub(super) struct InferCallInfos {
     expr_id: ExprId,
     callee: FunctionId,
-    substitution: Box<[InferTy]>,
+    substitution: Vec<InferTy>,
     call_kind: CallKind,
 }
 

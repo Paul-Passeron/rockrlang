@@ -33,10 +33,10 @@ use crate::{
 };
 
 #[salsa::tracked(returns(copy))]
-pub fn core_iter_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn core_iter_module(db: &dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
-        resolve_in_module(db, Symbol::new(db, "iter"), core_module.into());
+        resolve_in_module(db, Symbol::new(db, "iter"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::iter module not found"),
@@ -44,10 +44,10 @@ pub fn core_iter_module<'db>(db: &'db dyn Db) -> ModuleId {
 }
 
 #[salsa::tracked]
-pub fn core_mem_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn core_mem_module(db: &dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
-        resolve_in_module(db, Symbol::new(db, "mem"), core_module.into());
+        resolve_in_module(db, Symbol::new(db, "mem"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::mem module not found"),
@@ -55,10 +55,10 @@ pub fn core_mem_module<'db>(db: &'db dyn Db) -> ModuleId {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn core_opt_module(db: &dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
-        resolve_in_module(db, Symbol::new(db, "opt"), core_module.into());
+        resolve_in_module(db, Symbol::new(db, "opt"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::opt module not found"),
@@ -66,7 +66,7 @@ pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
+pub fn core_opt_enum(db: &dyn Db) -> EnumId {
     let opt_module = core_opt_module(db);
     let iter_module = resolve_in_module(db, Symbol::new(db, "opt"), opt_module);
     match iter_module {
@@ -76,10 +76,10 @@ pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
 }
 
 #[salsa::tracked]
-pub fn core_res_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn core_res_module(db: &dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
-        resolve_in_module(db, Symbol::new(db, "res"), core_module.into());
+        resolve_in_module(db, Symbol::new(db, "res"), core_module);
     match iter_module {
         Some(Definition::Module(id)) => id,
         _ => panic!("core::res module not found"),
@@ -87,7 +87,7 @@ pub fn core_res_module<'db>(db: &'db dyn Db) -> ModuleId {
 }
 
 #[salsa::tracked]
-pub fn core_iter_interface<'db>(db: &'db dyn Db) -> InterfaceId {
+pub fn core_iter_interface(db: &dyn Db) -> InterfaceId {
     let core_iter_module = core_iter_module(db);
     let interface =
         resolve_in_module(db, Symbol::new(db, "Iter"), core_iter_module);
@@ -98,7 +98,7 @@ pub fn core_iter_interface<'db>(db: &'db dyn Db) -> InterfaceId {
 }
 
 #[salsa::tracked]
-pub fn core_into_iterator_interface<'db>(db: &'db dyn Db) -> InterfaceId {
+pub fn core_into_iterator_interface(db: &dyn Db) -> InterfaceId {
     let core_iter_module = core_iter_module(db);
     let interface = resolve_in_module(
         db,
@@ -112,7 +112,7 @@ pub fn core_into_iterator_interface<'db>(db: &'db dyn Db) -> InterfaceId {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn core_int_iter_struct<'db>(db: &'db dyn Db) -> StructId {
+pub fn core_int_iter_struct(db: &dyn Db) -> StructId {
     let core_iter_module = core_iter_module(db);
     let int_iter =
         resolve_in_module(db, Symbol::new(db, "IntIter"), core_iter_module);
@@ -129,7 +129,7 @@ pub fn module_interfaces<'db>(
 ) -> Arc<Vec<AstInterface>> {
     Arc::new(
         module_items(db, module)
-            .into_iter()
+            .iter()
             .flatten()
             .filter_map(|item| match &item.data {
                 AstTopLevelItemDesc::Interface(ast_interface) => {

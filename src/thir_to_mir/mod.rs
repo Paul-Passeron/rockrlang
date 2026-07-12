@@ -204,7 +204,7 @@ impl<'a> ThirToMIR<'a> {
         match ty {
             TypeRef::Concrete(type_id) => type_id
                 .args(self.db)
-                .into_iter()
+                .iter()
                 .all(|ty| self.is_valid_ty(*ty)),
             TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
@@ -220,7 +220,7 @@ impl<'a> ThirToMIR<'a> {
                 type_id.def(self.db),
                 type_id
                     .args(self.db)
-                    .into_iter()
+                    .iter()
                     .map(|ty| self.ty(*ty))
                     .collect(),
             )),
@@ -512,7 +512,7 @@ impl<'a> ThirToMIR<'a> {
         let span = thir_expr.span;
         let kind = match &thir_expr.kind {
             ExprKind::StrLit(lit) => {
-                self.build_strlit(&lit.interned().contents(self.db), span)
+                self.build_strlit(lit.interned().contents(self.db), span)
             }
             ExprKind::StructLit { struct_def, fields: thir_fields } => {
                 let struct_ref = self.struct_ref(struct_def);

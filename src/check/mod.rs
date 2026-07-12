@@ -47,7 +47,7 @@ pub mod thir;
 pub mod types;
 
 #[salsa::tracked]
-pub fn check<'db>(db: &'db dyn Db, ws: Workspace) {
+pub fn check(db: &dyn Db, ws: Workspace) {
     let pkgs = workspace_packages(db, ws);
     for &pkg in pkgs.iter() {
         check_package(db, pkg)

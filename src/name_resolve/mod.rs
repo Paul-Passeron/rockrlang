@@ -42,7 +42,7 @@ pub fn module_to_file<'db>(
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn builtin_module(db: &dyn Db) -> ModuleId {
     ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![], None)
 }
 
@@ -170,7 +170,7 @@ pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn std_module<'db>(db: &'db dyn Db) -> Option<ModuleId> {
+pub fn std_module(db: &dyn Db) -> Option<ModuleId> {
     let package = std_package(db)?;
     let file_module = package.root(db);
     Some(file_module_id(db, *file_module, Some(builtin_module(db)), package))
@@ -189,7 +189,7 @@ pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn core_module<'db>(db: &'db dyn Db) -> ModuleId {
+pub fn core_module(db: &dyn Db) -> ModuleId {
     let package = core_package(db);
     let file_module = package.root(db);
     file_module_id(db, *file_module, Some(builtin_module(db)), package)
@@ -210,7 +210,7 @@ fn collect_modules_in_file_module<'db>(
     }
 
     if let Some(items) = module_items(db, module_id.interned()) {
-        collect_modules_in_items(db, &items, module_id, package, set);
+        collect_modules_in_items(db, items, module_id, package, set);
     }
 }
 

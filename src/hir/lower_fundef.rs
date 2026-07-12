@@ -1558,7 +1558,7 @@ pub(super) fn lower_fundef_body<'db>(
         }
     };
     let template_args =
-        get_templates_of_fun(db, function.into()).iter().cloned().collect();
+        get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
 }
@@ -1576,7 +1576,7 @@ pub(super) fn lower_method_body<'db>(
         }
     };
     let template_args =
-        get_templates_of_fun(db, function.into()).iter().cloned().collect();
+        get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower_method(ast)
 }

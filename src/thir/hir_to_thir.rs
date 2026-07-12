@@ -211,7 +211,7 @@ impl<'db> ThirTranslator<'db> {
                     type_id.def(db),
                     type_id
                         .args(db)
-                        .into_iter()
+                        .iter()
                         .map(|ty| _aux(db, owner, *ty))
                         .collect(),
                 )),

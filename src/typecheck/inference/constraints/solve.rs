@@ -411,17 +411,22 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    // TODO: this has too many arguments :(
+
     fn finish_method_call(
         &mut self,
         expr_id: ExprId,
         receiver: &InferTy,
-        method_id: FunctionId,
-        args: &[InferTy],
-        ret_var: InferVar,
-        is_static: bool,
-        templates: &[InferVar],
-        depth: usize,
+        method_call_infos: MethodCallInfos<'_>,
     ) -> ConstraintSolveResult {
+        let MethodCallInfos {
+            method_id,
+            args,
+            ret_var,
+            is_static,
+            templates,
+            depth,
+        } = method_call_infos;
         let FunctionLikeAst::Method(ast) =
             function_ast(self.db, method_id.interned()).inner(self.db)
         else {
@@ -436,7 +441,7 @@ impl<'db> InferenceCtx<'db> {
                 }
                 self.fresh_var().into()
             }))
-            .collect::<Box<[_]>>();
+            .collect_vec();
 
         let method_ctx = ImplicitContext::from_function(
             self.db,
@@ -517,7 +522,7 @@ impl<'db> InferenceCtx<'db> {
                     )
                 {
                     let templates = subs
-                        .into_iter()
+                        .iter()
                         .map(|tid| {
                             let infer_ty = concrete_to_infer(self.db, *tid);
                             let var = self.fresh_var();
@@ -525,9 +530,18 @@ impl<'db> InferenceCtx<'db> {
                             var
                         })
                         .collect_vec();
+
                     return self.finish_method_call(
-                        *id, receiver, *method_id, args, *ret_var, *is_static,
-                        &templates, depth,
+                        *id,
+                        receiver,
+                        MethodCallInfos {
+                            method_id: *method_id,
+                            args,
+                            ret_var: *ret_var,
+                            is_static: *is_static,
+                            templates: &templates,
+                            depth,
+                        },
                     );
                 }
                 match concrete_deref_target(self.db, ty) {
@@ -592,7 +606,7 @@ impl<'db> InferenceCtx<'db> {
         );
 
         let ast = impl_items(self.db, src.id(self.db).interned())
-            .into_iter()
+            .iter()
             .find_map(|item| match item {
                 AstImplItem::Fundef(def) if def.data.name.data == *method => {
                     Some(def)
@@ -614,8 +628,16 @@ impl<'db> InferenceCtx<'db> {
         }
 
         self.finish_method_call(
-            *id, receiver, method_id, args, *ret_var, *is_static, &templates,
-            depth,
+            *id,
+            receiver,
+            MethodCallInfos {
+                method_id,
+                args,
+                ret_var: *ret_var,
+                is_static: *is_static,
+                templates: &templates,
+                depth,
+            },
         )
     }
 
@@ -993,8 +1015,17 @@ fn concrete_to_infer(db: &dyn Db, ty: TypeId) -> InferTy {
         def: ty.def(db),
         fields: ty
             .args(db)
-            .into_iter()
+            .iter()
             .map(|ty| concrete_to_infer(db, ty.as_type_id().unwrap()))
             .collect(),
     }
+}
+
+struct MethodCallInfos<'a> {
+    pub method_id: FunctionId,
+    pub args: &'a [InferTy],
+    pub ret_var: InferVar,
+    pub is_static: bool,
+    pub templates: &'a [InferVar],
+    pub depth: usize,
 }

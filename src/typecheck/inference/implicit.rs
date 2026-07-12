@@ -55,7 +55,7 @@ impl AstImplicitContext {
         let template_asts = templates_of_owner(db, owner);
 
         let mut template_names = HashSet::new();
-        for ast in template_asts.as_ref() {
+        for ast in template_asts {
             if !template_names.insert(ast.name) {
                 return Err(ImplicitCtxCreationError::DuplicateTemplateName(
                     ast.name,

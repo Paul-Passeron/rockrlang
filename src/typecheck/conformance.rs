@@ -57,7 +57,7 @@ fn _type_match(
                 // Problem
                 return false;
             }
-            a_args.into_iter().zip(b_args).all(|(a, b)| {
+            a_args.iter().zip(b_args).all(|(a, b)| {
                 a.as_type_id()
                     .is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
             })
@@ -96,7 +96,7 @@ fn type_ref_is_concrete(db: &dyn Db, ty: TypeRef) -> bool {
 }
 
 fn type_id_is_concrete(db: &dyn Db, ty: TypeId) -> bool {
-    ty.args(db).into_iter().all(|arg| type_ref_is_concrete(db, *arg))
+    ty.args(db).iter().all(|arg| type_ref_is_concrete(db, *arg))
 }
 
 #[salsa::tracked(returns(ref))]
@@ -188,7 +188,7 @@ fn _type_implements<'db>(
             // Problem
             return None;
         }
-        for (req, pat) in req_args.into_iter().zip(pat_args) {
+        for (req, pat) in req_args.iter().zip(pat_args) {
             let req = req.as_type_id()?;
             if !_type_match(db, req, *pat, Some(self_ty), &mut m) {
                 return None;
@@ -216,7 +216,7 @@ pub fn type_implements(
         type_id_is_concrete(db, ty)
             && interface
                 .args(db)
-                .into_iter()
+                .iter()
                 .all(|arg| type_ref_is_concrete(db, *arg)),
         "type_implements called with a non-concrete key"
     );
@@ -237,9 +237,7 @@ fn _method_impl_for<'db>(
     candidate_impls_for(db, self_ty).iter().find_map(|candidate| {
         let id = candidate.id;
         if let Some(hint) = hint {
-            let Some(iref) = id.interface(db) else {
-                return None;
-            };
+            let iref = id.interface(db)?;
             if iref.def(db) != hint {
                 return None;
             }
@@ -247,9 +245,7 @@ fn _method_impl_for<'db>(
 
         let subs: Option<Vec<TypeId>> =
             candidate.subs.iter().copied().collect();
-        let Some(subs) = subs else {
-            return None;
-        };
+        let subs = subs?;
         if !impl_bounds_hold(db, id, &subs, self_ty) {
             return None;
         }
@@ -280,14 +276,14 @@ pub struct MethodImpl {
     pub subs: Vec<TypeId>,
 }
 
-pub fn method_impl_for<'db>(
-    db: &'db dyn Db,
+pub fn method_impl_for(
+    db: &dyn Db,
     ty: TypeId,
     method: Symbol,
     arity: usize,
     is_static: bool,
     hint: Option<InterfaceId>,
-) -> Option<&'db MethodImpl> {
+) -> Option<&MethodImpl> {
     debug_assert!(
         type_id_is_concrete(db, ty),
         "method_impl_for called with a non-concrete key"
@@ -303,7 +299,7 @@ fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
             type_id.def(db),
             type_id
                 .args(db)
-                .into_iter()
+                .iter()
                 .map(|ty| sub(db, *ty, subs, zelf))
                 .collect(),
         )),
@@ -324,6 +320,6 @@ fn iref_sub(
     InterfaceRef::new(
         db,
         iref.def(db),
-        iref.args(db).into_iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
+        iref.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
     )
 }

@@ -252,7 +252,7 @@ impl TypePrinter {
         let def = type_id.def(db);
         let no_fields = fields.is_empty();
         let fields_str = fields
-            .into_iter()
+            .iter()
             .map(|ty| self.type_ref_to_string(db, *ty))
             .collect_vec()
             .join(", ");

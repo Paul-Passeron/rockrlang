@@ -84,7 +84,7 @@ impl Definition {
 impl ModuleId {
     pub fn name_span(self, db: &dyn Db) -> Option<Span> {
         let parent = self.parent(db)?;
-        for item in module_items(db, parent.interned()).into_iter().flatten() {
+        for item in module_items(db, parent.interned()).iter().flatten() {
             if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
                 && curr_mod.data.name.data == self.name(db)
             {
@@ -225,8 +225,8 @@ fn definition_of_item<'db>(
 }
 
 #[salsa::tracked]
-pub fn builtin_definitions<'db>(
-    db: &'db dyn Db,
+pub fn builtin_definitions(
+    db: &dyn Db,
 ) -> BTreeMap<Symbol, Definition> {
     let mut res = BTreeMap::from([
         (Symbol::new(db, "usize"), Definition::Type(usize_id(db).def(db))),
@@ -241,22 +241,22 @@ pub fn builtin_definitions<'db>(
     if let Some(std_module) = std_module(db) {
         res.insert(
             Symbol::new(db, "std"),
-            Definition::Module(std_module.into()),
+            Definition::Module(std_module),
         );
     }
     let core_module = core_module(db);
-    res.insert(Symbol::new(db, "core"), Definition::Module(core_module.into()));
+    res.insert(Symbol::new(db, "core"), Definition::Module(core_module));
 
     res.insert(Symbol::new(db, "str"), {
         let io = core_module
             .file_submodules(db)
-            .into_iter()
+            .iter()
             .find(|x| x.name(db) == Symbol::new(db, "io"))
             .unwrap();
         Definition::Type(TypeDefId::Struct(StructId::new(
             db,
             Symbol::new(db, "str"),
-            file_module_id(db, *io, Some(core_module.into()), core_package(db)),
+            file_module_id(db, *io, Some(core_module), core_package(db)),
         )))
     });
 

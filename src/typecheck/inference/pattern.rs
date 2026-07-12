@@ -107,7 +107,7 @@ impl<'a> InferenceCtx<'a> {
     ) -> ImplicitContext {
         let zelf = InferTy::Adt {
             def: TypeDefId::Enum(enum_id),
-            fields: template_tys.iter().cloned().collect(),
+            fields: template_tys.to_vec(),
         };
         ImplicitContext::new(
             self.db,
@@ -324,7 +324,7 @@ impl<'a> InferenceCtx<'a> {
             .get_templates_for(Definition::Type(TypeDefId::Struct(*struct_id)));
         let struct_ty = InferTy::Adt {
             def: TypeDefId::Struct(*struct_id),
-            fields: infer_templates.iter().cloned().collect(),
+            fields: infer_templates.to_vec(),
         };
         let ctx = ImplicitContext::new(
             self.db,

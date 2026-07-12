@@ -416,7 +416,7 @@ pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
                 Symbol::new(db, "str")
             ],
         ),
-        core_module(db).into(),
+        core_module(db),
     )
     .unwrap() else {
         panic!()

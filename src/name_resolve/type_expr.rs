@@ -306,7 +306,7 @@ pub fn get_templates_of_fun_only<'db>(
             res.extend(sig.data.template_args.clone())
         }
     }
-    res.into()
+    res
 }
 
 #[salsa::tracked]
@@ -334,19 +334,13 @@ fn _templates_of_owner<'db>(
     match *scope_owner.inner(db) {
         ScopeOwnerId::Module(_) => Vec::new(),
         ScopeOwnerId::Impl(impl_id) => impl_sources(db, impl_id.interned())
-            .into_iter()
+            .iter()
             .next()
             .unwrap()
-            .templates(db)
-            .iter()
-            .cloned()
-            .collect(),
+            .templates(db).to_vec(),
         ScopeOwnerId::Interface(interface_ref) => {
             interface_item(db, interface_ref.def(db).interned())
-                .template_args
-                .iter()
-                .cloned()
-                .collect()
+                .template_args.to_vec()
         }
     }
 }

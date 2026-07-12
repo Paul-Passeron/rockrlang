@@ -122,11 +122,11 @@ struct InternedTR {
 
 #[salsa::tracked]
 pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
-    let ty = match ty.tref(db) {
+    
+    match ty.tref(db) {
         TypeRef::Concrete(type_id) => mangle_type_id(db, *type_id),
         _ => MangleType::Error,
-    };
-    ty
+    }
 }
 
 fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {

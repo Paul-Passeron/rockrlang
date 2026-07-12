@@ -668,7 +668,7 @@ impl<'db> SanityChecker<'db> {
                 type_id.def(self.db),
                 type_id
                     .args(self.db)
-                    .into_iter()
+                    .iter()
                     .map(|ty| self.normalize_type(*ty))
                     .collect(),
             )),
