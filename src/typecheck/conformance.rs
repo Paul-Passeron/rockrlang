@@ -227,7 +227,7 @@ fn _method_impl_for<'db>(
     arity: usize,
     is_static: bool,
     hint: Option<InterfaceId>,
-) -> Option<(ImplId, FunctionId)> {
+) -> Option<MethodImpl> {
     let method: Symbol = method.into();
     let self_ty: TypeId = ty.into();
     candidate_impls_for(db, self_ty).iter().find_map(|candidate| {
@@ -265,8 +265,15 @@ fn _method_impl_for<'db>(
                 }
                 _ => None,
             })?;
-        Some((id, fid))
+        Some(MethodImpl { impl_id: id, method_id: fid, subs })
     })
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct MethodImpl {
+    pub impl_id: ImplId,
+    pub method_id: FunctionId,
+    pub subs: Vec<TypeId>,
 }
 
 pub fn method_impl_for<'db>(
@@ -276,7 +283,7 @@ pub fn method_impl_for<'db>(
     arity: usize,
     is_static: bool,
     hint: Option<InterfaceId>,
-) -> Option<(ImplId, FunctionId)> {
+) -> Option<MethodImpl> {
     debug_assert!(
         type_id_is_concrete(db, ty),
         "method_impl_for called with a non-concrete key"

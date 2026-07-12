@@ -262,7 +262,7 @@ impl<'db> TyCtx<'db> {
 
     fn get_ret_ty(&mut self) -> InferTy {
         let ret = self.function.ret_ty(self.db);
-        self.inf_ctx.allocate_type_ref(&ret, &self.inf_ctx.implicit_ctx())
+        self.inf_ctx.allocate_type_ref(ret, &self.inf_ctx.implicit_ctx())
     }
 
     fn type_check_match(

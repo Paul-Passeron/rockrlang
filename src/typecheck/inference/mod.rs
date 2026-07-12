@@ -186,7 +186,7 @@ impl<'db> InferenceCtx<'db> {
                     ast.ty.span.start().loc_info(db)
                 )
             );
-            let ty = this.allocate_type_ref(&ty, &this.implicit_ctx());
+            let ty = this.allocate_type_ref(ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
             this.unify(local_ty, ty)
                 .expect("First local type unification should not fail");
@@ -246,7 +246,7 @@ impl<'db> InferenceCtx<'db> {
                     let interface_args = resolved
                         .args(this.db)
                         .iter()
-                        .map(|t_ref| this.allocate_type_ref(t_ref, this.implicit_ctx().as_ref()))
+                        .map(|t_ref| this.allocate_type_ref(*t_ref, this.implicit_ctx().as_ref()))
                         .collect::<Box<[_]>>();
                     this.add_implementation(interface_id, infer_ty.clone(), &interface_args);
                 }
@@ -552,6 +552,21 @@ impl InferTy {
             Some(&args[0])
         } else {
             None
+        }
+    }
+
+    pub fn as_concrete(&self, db: &dyn Db) -> Option<TypeId> {
+        match self {
+            InferTy::Var(_) => None,
+            InferTy::Adt { def, fields } => {
+                let fields: Option<Vec<_>> = fields
+                    .iter()
+                    .map(|ty| ty.as_concrete(db).map(|ty| ty.into()))
+                    .collect();
+                let fields = fields?;
+                Some(TypeId::new(db, *def, fields))
+            }
+            InferTy::Param(_) => None,
         }
     }
 }

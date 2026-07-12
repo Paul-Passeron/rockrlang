@@ -41,7 +41,7 @@ impl<'a> InferenceCtx<'a> {
     ) -> Option<Vec<InferenceConstraintKind>> {
         match ty {
             InferTy::Var(infer_var) => {
-                let allocated = self.allocate_type_ref(&matcher, ctx);
+                let allocated = self.allocate_type_ref(matcher, ctx);
                 Some(vec![InferenceConstraintKind::Unify {
                     a: InferTy::Var(*infer_var),
                     b: allocated,
@@ -122,7 +122,7 @@ impl<'a> InferenceCtx<'a> {
                 let args = interface_ref
                     .args(self.db)
                     .iter()
-                    .map(|arg| self.allocate_type_ref(arg, &ctx))
+                    .map(|arg| self.allocate_type_ref(*arg, &ctx))
                     .collect::<Box<[_]>>();
                 constraints.push(InferenceConstraintKind::Implements {
                     ty: InferTy::Var(*infer_ty),

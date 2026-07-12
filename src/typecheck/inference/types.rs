@@ -174,7 +174,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn allocate_type_ref(
         &mut self,
-        type_ref: &TypeRef,
+        type_ref: TypeRef,
         ctx: &ImplicitContext,
     ) -> InferTy {
         match type_ref {
@@ -183,7 +183,7 @@ impl<'db> InferenceCtx<'db> {
                 fields: type_id
                     .args(self.db)
                     .iter()
-                    .map(|ty| self.allocate_type_ref(ty, ctx))
+                    .map(|ty| self.allocate_type_ref(*ty, ctx))
                     .collect(),
             },
             TypeRef::Param(type_param_id) => {
@@ -214,7 +214,7 @@ impl<'db> InferenceCtx<'db> {
     ) -> InferTy {
         match arg {
             PartialTypeArg::Known(type_ref) => {
-                self.allocate_type_ref(type_ref, ctx)
+                self.allocate_type_ref(*type_ref, ctx)
             }
             PartialTypeArg::Partial(partial_type_ref) => {
                 self.allocate_partial_type_ref(partial_type_ref, ctx)
@@ -230,7 +230,7 @@ impl<'db> InferenceCtx<'db> {
     ) -> InferTy {
         match type_ref {
             PartialTypeRef::Resolved(type_ref) => {
-                self.allocate_type_ref(type_ref, ctx)
+                self.allocate_type_ref(*type_ref, ctx)
             }
             PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
                 def: *def,
@@ -251,7 +251,7 @@ impl<'db> InferenceCtx<'db> {
         if resolved == TypeRef::Zelf {
             println!("We got a Zelf...");
         }
-        Some(self.allocate_type_ref(&resolved, ctx))
+        Some(self.allocate_type_ref(resolved, ctx))
     }
 
     pub fn is_struct(

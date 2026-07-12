@@ -257,7 +257,7 @@ impl<'db> InferenceCtx<'db> {
                             templates.iter().zip(args.iter()).try_for_each(
                                 |(infer_ty, t_ref)| {
                                     let t_ref = this.allocate_type_ref(
-                                        t_ref,
+                                        *t_ref,
                                         this.implicit_ctx().as_ref(),
                                     );
                                     this.unify(infer_ty.clone(), t_ref)
