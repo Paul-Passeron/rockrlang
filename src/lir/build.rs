@@ -399,6 +399,8 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
     // Aggregates
 
+    // TODO: make sure we correctly handle ZSTs in codegen
+    
     pub fn make_aggregate(
         &mut self,
         ty: LIRTy,

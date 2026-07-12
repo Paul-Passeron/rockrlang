@@ -243,12 +243,15 @@ impl<'a> MTLBCtx<'a> {
     ) {
         match stmt {
             Stmt::Assign { dest, rvalue } => {
-                let ptr = self.lower_place_as_ptr(b, dest, lower);
-                if self.lower_rvalue_into(b, rvalue, lower, ptr) {
-                    return;
-                }
-                let value = self.lower_rvalue(b, rvalue, lower);
-                b.store(ptr, value);
+                if !lower.value_map[&dest.local].is_zst() {
+                    let ptr = self.lower_place_as_ptr(b, dest, lower);
+                    if self.lower_rvalue_into(b, rvalue, lower, ptr) {
+                        return;
+                    }
+                    if let Some(value) = self.lower_rvalue(b, rvalue, lower) {
+                        b.store(ptr, value);
+                    }
+                };
             }
         }
     }
@@ -265,7 +268,7 @@ impl<'a> MTLBCtx<'a> {
                 let next_block = lower.block_map[next];
                 let args = arguments
                     .iter()
-                    .map(|op| self.lower_operand(&mut b, op, lower))
+                    .filter_map(|op| self.lower_operand(&mut b, op, lower))
                     .collect_vec();
                 let next = b.target(next_block, vec![]);
                 let f = match callee {
@@ -285,15 +288,17 @@ impl<'a> MTLBCtx<'a> {
                 };
                 let value = b.call(f, args);
                 if let Some(v) = value {
-                    let ptr = lower.value_map[dest].ptr();
-                    b.store(ptr, v);
+                    if !lower.value_map[dest].is_zst() {
+                        let ptr = lower.value_map[dest].ptr();
+                        b.store(ptr, v);
+                    }
                 }
                 b.terminate(Terminator::Goto(next))
             }
             MIRTerminator::Return { value, .. } => {
                 let value = value
                     .as_ref()
-                    .map(|op| self.lower_operand(&mut b, op, lower));
+                    .and_then(|op| self.lower_operand(&mut b, op, lower));
                 b.ret(value)
             }
             MIRTerminator::Goto { next } => {
@@ -301,7 +306,7 @@ impl<'a> MTLBCtx<'a> {
                 b.goto(target)
             }
             MIRTerminator::Branch { cond, then, else_, .. } => {
-                let cond = self.lower_operand(&mut b, cond, lower);
+                let cond = self.lower_operand(&mut b, cond, lower).unwrap();
                 let if_true = b.target(lower.block_map[then], vec![]);
                 let if_false = b.target(lower.block_map[else_], vec![]);
                 b.br(cond, if_true, if_false)
@@ -309,7 +314,8 @@ impl<'a> MTLBCtx<'a> {
             MIRTerminator::Switch {
                 discriminant, branches, default, ..
             } => {
-                let on = self.lower_operand(&mut b, discriminant, lower);
+                let on =
+                    self.lower_operand(&mut b, discriminant, lower).unwrap();
                 let branches = branches
                     .iter()
                     .map(|(n, blk)| {
@@ -327,7 +333,7 @@ impl<'a> MTLBCtx<'a> {
         b: &mut BlockBuilder<'ir, '_>,
         op: &MIROperand,
         lower: &LIRLower<'ir, '_>,
-    ) -> ValueId<'ir> {
+    ) -> Option<ValueId<'ir>> {
         match op {
             MIROperand::Constant(cst, ..) => match cst {
                 MIRConstant::Integer { value, ty } => {
@@ -340,23 +346,27 @@ impl<'a> MTLBCtx<'a> {
                         }
                         let layout = layout_of(self.db, pointee);
                         let pointee = LIRTy { layout, origin: Some(pointee) };
-                        b.const_null_ptr(pointee)
+                        Some(b.const_null_ptr(pointee))
                     } else {
-                        b.const_int(ty, *value).erase()
+                        Some(b.const_int(ty, *value).erase())
                     }
                 }
                 MIRConstant::Bool(value) => {
                     let layout = LayoutID::int(self.db, IntWidth::I8);
                     let ty =
                         LIRTy { layout, origin: Some(bool_id(self.db).into()) };
-                    b.const_int(ty, if *value { 1 } else { 0 }).erase()
+                    Some(b.const_int(ty, if *value { 1 } else { 0 }).erase())
                 }
                 MIRConstant::CString { contents, null_terminated } => {
-                    b.strlit(contents, *null_terminated)
+                    Some(b.strlit(contents, *null_terminated))
                 }
             },
             MIROperand::Move(place) | MIROperand::Copy(place) => {
-                self.lower_place(b, place, lower)
+                if !lower.value_map[&place.local].is_zst() {
+                    Some(self.lower_place(b, place, lower))
+                } else {
+                    None
+                }
             }
         }
     }
@@ -410,7 +420,7 @@ impl<'a> MTLBCtx<'a> {
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
             ProjKind::Regular(MIRProjection::Index { index }) => {
-                let index = self.lower_operand(b, index, lower);
+                let index = self.lower_operand(b, index, lower).unwrap();
                 let elem_ty = ty
                     .as_ptr(self.db)
                     .or_else(|| ty.as_ref(self.db))
@@ -477,13 +487,14 @@ impl<'a> MTLBCtx<'a> {
         place: &MIRPlace,
         lower: &LIRLower<'ir, '_>,
     ) -> ValueId<'ir> {
+        let slot = &lower.value_map[&place.local];
+        if slot.is_zst() {
+            unreachable!();
+        }
         self.get_proj_kinds(place)
             .into_iter()
             .fold(
-                (
-                    lower.value_map[&place.local].ptr(),
-                    lower.mir.locals[place.local].ty,
-                ),
+                (slot.ptr(), lower.mir.locals[place.local].ty),
                 |(ptr, ty), proj| self.apply_proj(b, ptr, ty, proj, lower),
             )
             .0
@@ -534,8 +545,10 @@ impl<'a> MTLBCtx<'a> {
                                 vals.values().next().unwrap()
                             }
                         };
-                        let operand = self.lower_operand(b, arg, lower);
-                        b.store(payload_ptr, operand);
+                        if let Some(operand) = self.lower_operand(b, arg, lower)
+                        {
+                            b.store(payload_ptr, operand);
+                        }
                     }
                     LayoutData::Aggregate(aggr) => {
                         // We are expecting multiple arguments
@@ -552,8 +565,11 @@ impl<'a> MTLBCtx<'a> {
                                     vals.values().next().unwrap()
                                 }
                             };
-                            let operand = self.lower_operand(b, arg, lower);
-                            b.store(payload_ptr, operand);
+                            if let Some(operand) =
+                                self.lower_operand(b, arg, lower)
+                            {
+                                b.store(payload_ptr, operand);
+                            }
                         } else {
                             todo!()
                         }
@@ -573,18 +589,22 @@ impl<'a> MTLBCtx<'a> {
         b: &mut BlockBuilder<'ir, '_>,
         rvalue: &MIRRValue,
         lower: &LIRLower<'ir, '_>,
-    ) -> ValueId<'ir> {
+    ) -> Option<ValueId<'ir>> {
         match &rvalue.kind {
             MIRRValueKind::Use(op) => self.lower_operand(b, op, lower),
             MIRRValueKind::Ref(place, _)
             | MIRRValueKind::AddressOf(place, _) => {
-                self.lower_place_as_ptr(b, place, lower)
+                if !lower.value_map[&place.local].is_zst() {
+                    Some(self.lower_place_as_ptr(b, place, lower))
+                } else {
+                    None
+                }
             }
             MIRRValueKind::BinOp(op, lhs, rhs) => {
-                let lhs = self.lower_operand(b, lhs, lower);
-                let rhs = self.lower_operand(b, rhs, lower);
+                let lhs = self.lower_operand(b, lhs, lower).unwrap();
+                let rhs = self.lower_operand(b, rhs, lower).unwrap();
                 let is_signed = true; // todo !!!
-                match op {
+                Some(match op {
                     BinaryOperator::Plus => b.arith(
                         if is_signed {
                             ArithBinop::SAdd
@@ -682,37 +702,42 @@ impl<'a> MTLBCtx<'a> {
                     BinaryOperator::BitAnd => todo!(),
                     BinaryOperator::BitOr => todo!(),
                     BinaryOperator::BitXor => todo!(),
-                }
+                })
             }
             MIRRValueKind::UnaryOp(op, operand) => {
-                let operand = self.lower_operand(b, operand, lower);
+                let operand = self.lower_operand(b, operand, lower).unwrap();
                 match op {
                     UnaryOperator::Neg => {
                         let ty = b.type_of(operand);
                         let z = b.const_int(ty, 0).erase();
-                        b.arith(ArithBinop::SSub, z, operand)
+                        Some(b.arith(ArithBinop::SSub, z, operand))
                     }
-                    UnaryOperator::LNot => b.not(operand),
+                    UnaryOperator::LNot => Some(b.not(operand)),
                 }
             }
             MIRRValueKind::Discriminant(place) => {
                 let layout = layout_of(self.db, place.ty);
                 let ty = LIRTy { layout, origin: Some(place.ty) };
                 let ptr = self.lower_place_as_ptr(b, place, lower);
-                b.get_discriminant(ptr, ty).unwrap().erase()
+                Some(b.get_discriminant(ptr, ty).unwrap().erase())
             }
             MIRRValueKind::Metadata(_) => todo!(),
             MIRRValueKind::SizeOf(type_ref) => {
                 let layout = layout_of(self.db, *type_ref);
                 let s = layout.size(self.db).bytes();
-                b.const_int(
-                    LIRTy {
-                        layout: LayoutID::int(self.db, self.db.target_width()),
-                        origin: None,
-                    },
-                    s as u128,
+                Some(
+                    b.const_int(
+                        LIRTy {
+                            layout: LayoutID::int(
+                                self.db,
+                                self.db.target_width(),
+                            ),
+                            origin: None,
+                        },
+                        s as u128,
+                    )
+                    .erase(),
                 )
-                .erase()
             }
             MIRRValueKind::Constructor { .. } => {
                 unreachable!("Should have been caught by lower_value_into")
@@ -722,22 +747,24 @@ impl<'a> MTLBCtx<'a> {
                     let item = struct_item(self.db, struct_ref.def.into());
                     item.fields
                         .iter()
-                        .map(|f| self.lower_operand(b, &fields[&f.name], lower))
+                        .filter_map(|f| {
+                            self.lower_operand(b, &fields[&f.name], lower)
+                        })
                         .collect_vec()
                 };
                 let tref = struct_ref.clone().as_type_ref(self.db);
                 let layout = layout_of(self.db, tref);
                 let ty = LIRTy { layout, origin: Some(tref) };
-                b.make_aggregate(ty, in_src_order).erase()
+                Some(b.make_aggregate(ty, in_src_order).erase())
             }
             MIRRValueKind::Tuple(ops, _) => {
                 let values = ops
                     .iter()
-                    .map(|op| self.lower_operand(b, op, lower))
+                    .filter_map(|op| self.lower_operand(b, op, lower))
                     .collect_vec();
                 let layout = layout_of(self.db, rvalue.ty);
                 let ty = LIRTy { layout, origin: Some(rvalue.ty) };
-                b.make_aggregate(ty, values).erase()
+                Some(b.make_aggregate(ty, values).erase())
             }
             MIRRValueKind::Cast(op, type_ref) => {
                 if type_ref.as_ptr(self.db).is_some() {
