@@ -265,7 +265,7 @@ impl<'db> InferenceCtx<'db> {
         self.implicit_ctx.clone()
     }
 
-    pub fn unsolved_constraints(&self) -> Box<[Arc<InferenceConstraint>]> {
+    pub fn unsolved_constraints(&self) -> Vec<Arc<InferenceConstraint>> {
         self.all_constraints
             .keys()
             .copied()

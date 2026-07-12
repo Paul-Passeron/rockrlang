@@ -374,11 +374,10 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn get_adjustments_for(
+    pub(super) fn get_adjustments_for(
         &mut self,
         mthd: FunctionId,
         depth: usize,
-        _ty: &InferTy,
     ) -> ReceiverAdjustment {
         match mthd.receiver(self.db) {
             // Error here but best to return that
@@ -479,10 +478,10 @@ impl<'db> InferenceCtx<'db> {
                 CallKind::Static
             } else {
                 CallKind::Method {
-                    adjustment: self
-                        .get_adjustments_for(method_id, depth, receiver),
+                    adjustment: self.get_adjustments_for(method_id, depth),
                 }
             },
+            zelf_ty: Some(receiver.clone()),
         };
 
         self.call_infos.insert(expr_id, call_infos);
@@ -555,6 +554,7 @@ impl<'db> InferenceCtx<'db> {
         }
 
         if let Some(result) = self.try_resolve_via_known_impl(
+            *id,
             *ret_var,
             receiver,
             *method,

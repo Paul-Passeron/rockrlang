@@ -33,11 +33,11 @@ use crate::{
         top_level::{AstInterfaceItem, AstMethodsig},
     },
     ril::{
-        BuiltinTypeId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
+        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef,
     },
     typecheck::{
-        ExprId,
+        CallKind, ExprId, InferCallInfos,
         inference::{
             InferTy, InferenceCtx, InterfaceImplem, UnificationError,
             implems::PotentialBlockRes, implicit::ImplicitContext,
@@ -177,6 +177,7 @@ impl<'db> InferenceCtx<'db> {
 
     fn try_resolve_via_known_impl(
         &mut self,
+        expr_id: ExprId,
         ret_var: InferVar,
         receiver: &InferTy,
         method: Symbol,
@@ -196,6 +197,7 @@ impl<'db> InferenceCtx<'db> {
             .next()
         {
             return Some(self.apply_interface_method(
+                expr_id,
                 iface_id,
                 implem,
                 sig.as_ref(),
@@ -209,6 +211,8 @@ impl<'db> InferenceCtx<'db> {
 
     fn apply_interface_method(
         &mut self,
+        expr_id: ExprId,
+
         iface_id: InterfaceId,
         implem: InterfaceImplem,
         sig: &AstMethodsig,
@@ -233,12 +237,13 @@ impl<'db> InferenceCtx<'db> {
             .cloned()
             .chain(args.iter().cloned())
             .collect::<Arc<[_]>>();
+        let zelf_ty = Some(self.find(&implem.ty));
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Interface(iface_ref),
             Arc::new([]),
             templates,
-            Some(self.find(&implem.ty)),
+            zelf_ty.clone(),
         )
         .unwrap();
 
@@ -257,6 +262,39 @@ impl<'db> InferenceCtx<'db> {
             }
         }
 
+        let method_id = FunctionId::new(
+            self.db,
+            sig.data.name.data,
+            ScopeOwnerId::Interface(iface_ref),
+        );
+
+        let substitution = implem
+            .templates
+            .iter()
+            .cloned()
+            .chain(sig.data.template_args.iter().map(|t| {
+                if !t.constraints.is_empty() {
+                    todo!()
+                }
+                self.fresh_var().into()
+            }))
+            .collect();
+
+        let adjustment = self.get_adjustments_for(method_id, 0);
+        self.call_infos.insert(
+            expr_id,
+            InferCallInfos {
+                expr_id,
+                callee: method_id,
+                substitution,
+                call_kind: if is_static {
+                    CallKind::Static
+                } else {
+                    CallKind::Method { adjustment }
+                },
+                zelf_ty,
+            },
+        );
         ConstraintSolveResult::Solved
     }
 
