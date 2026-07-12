@@ -641,14 +641,12 @@ impl<'db> SanityChecker<'db> {
                 for (sym, fty) in tys {
                     let fpat = &pats.iter().find(|p| p.0 == *sym).unwrap().1;
                     self.check_pattern(peeled.wrap_like(self.db, *fty), fpat);
-                    // self.check_pattern(self.reref(*fty, depth), fpat);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 tys.iter().zip(pats).for_each(|(ty, pat)| {
                     self.check_pattern(peeled.wrap_like(self.db, *ty), pat);
-                    // self.check_pattern(self.reref(*ty, depth), pat);
                 });
             }
             _ => todo!(),
@@ -672,7 +670,7 @@ impl<'db> SanityChecker<'db> {
                     .map(|ty| self.normalize_type(*ty))
                     .collect(),
             )),
-            _ => ty, // TODO Maybe
+            _ => ty,
         }
     }
 }
@@ -794,30 +792,37 @@ impl StructRef {
 impl FunctionRef {
     pub fn ret_ty(&self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.id.interned());
-        let ret_ty = match sig.ret {
-            TypeRef::Zelf => self.id.parent(db).get_canonical_zelf(db).unwrap(),
-            ret => ret,
-        };
-        ret_ty.with_substitution(db, &self.args)
+        let zelf = self.zelf_binding(db);
+        sig.ret.instantiate(db, &self.args, zelf)
     }
 
     pub fn params(&self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
         let sig = get_sig_of_function(db, self.id.interned());
-        let zelf = self.self_ty;
-        let zelf_arg: Option<TypeRef> = match (zelf, sig.zelf) {
-            (None, None) => None,
-            (Some(ty), Some(r)) => Some(
-                r.as_type_ref_for(db, ty).with_substitution(db, &self.args),
-            ),
-            (None, Some(_)) | (Some(_), None) => unreachable!(),
+        let zelf = self.zelf_binding(db);
+        println!("Trying to get the params of {}", self.id.called_to_string(db));
+        let zelf_arg = match (zelf, sig.zelf) {
+            (_, None) => None,
+            (Some(ty), Some(r)) => Some(r.as_type_ref_for(db, ty)),
+            (None, _) => unreachable!("missing zelf from binding"),
         };
         zelf_arg
             .into_iter()
             .map(|ty| (Symbol::new(db, "self"), ty))
-            .chain(sig.args.iter().map(|(symb, ty)| {
-                (*symb, ty.with_substitution(db, &self.args))
-            }))
+            .chain(
+                sig.args
+                    .iter()
+                    .map(|(s, ty)| (*s, ty.instantiate(db, &self.args, zelf))),
+            )
             .collect()
+    }
+
+    fn zelf_binding(&self, db: &dyn Db) -> Option<TypeRef> {
+        self.self_ty.or_else(|| match self.id.parent(db) {
+            ScopeOwnerId::Impl(i) => {
+                Some(i.implemented(db).with_substitution(db, &self.args))
+            }
+            _ => None,
+        })
     }
 }
 
@@ -923,5 +928,25 @@ impl WrapKind {
     pub fn wrap(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         let Self::Ref(mutability) = self;
         ref_of(db, ty, mutability.is_mut()).into()
+    }
+}
+
+impl TypeRef {
+    pub fn instantiate(
+        self,
+        db: &dyn Db,
+        subs: &[TypeRef],
+        zelf: Option<TypeRef>,
+    ) -> TypeRef {
+        match self {
+            TypeRef::Concrete(id) => TypeRef::Concrete(TypeId::new(
+                db,
+                id.def(db),
+                id.args(db).iter().map(|t| t.instantiate(db, subs, zelf)).collect(),
+            )),
+            TypeRef::Param(p) => subs[p.0], // callee-space param
+            TypeRef::Zelf => zelf.expect("Zelf in signature but no self type on FunctionRef"),
+            other => other,
+        }
     }
 }
