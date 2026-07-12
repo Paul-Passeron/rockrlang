@@ -1,0 +1,57 @@
+@include core::io
+
+interface Foo {
+    fun foo(&self): void;
+    fun theStatic(): void;
+}
+
+struct Hello<T> {
+    x: T;
+}
+
+struct First {
+    x: int;
+}
+
+impl First {
+    fun fst(): Self {
+        return Self { .x: 69 };
+    }
+}
+
+impl Foo for First {
+     fun foo(&self): void {
+        printf(c"Hello from first, x = %d\n", self.x);
+     }
+
+     fun theStatic(): void {
+         "Hey from theStatic (First)".println();
+     }
+}
+
+impl <T: Foo> Foo for Hello<T> {
+    fun foo(&self): void {
+        self.x.foo(); // This fails for the moment
+        printf(c"Hello from Hello !\n");
+    }
+
+    fun theStatic(): void {
+        T::theStatic();
+        "Hey from theStatic (Hello)".println();
+    }
+}
+
+impl <T> Hello<T> {
+    fun new(x: T): Self {
+        return Self { .x: x };
+    }
+}
+
+fun main(): int {
+    let a = First::fst();
+    let b = Hello::new(a);
+    let c = Hello::new(b);
+    c.foo();
+    Hello<Hello<First>>::theStatic();
+    return 0;
+}
