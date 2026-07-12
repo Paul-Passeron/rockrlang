@@ -278,7 +278,7 @@ impl<'db> InferenceCtx<'db> {
                 let struct_id = *struct_id;
                 let templates =
                     templates_of_struct(self.db, struct_id.interned());
-                let templates :Vec<InferTy> = templates
+                let templates: Vec<InferTy> = templates
                     .iter()
                     .map(|_| self.fresh_var().into())
                     .collect_vec();

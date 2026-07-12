@@ -292,7 +292,8 @@ pub fn method_impl_for<'db>(
         type_id_is_concrete(db, ty),
         "method_impl_for called with a non-concrete key"
     );
-    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint).as_ref()
+    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint)
+        .as_ref()
 }
 
 fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {

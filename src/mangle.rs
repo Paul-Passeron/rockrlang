@@ -82,11 +82,8 @@ pub enum MangleFun {
 #[salsa::tracked]
 fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     let fdef = *f.fdef(db);
-    let templates = f
-        .subs(db)
-        .iter()
-        .map(|ty| ty_mangle(db, *ty).clone())
-        .collect_vec();
+    let templates =
+        f.subs(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
     let path = path_of_module(db, owning_module(db, fdef.parent(db)));
     let name = fdef.name(db).to_string(db);
     let inst: FuncInst = f.into();
@@ -133,11 +130,8 @@ pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
 }
 
 fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
-    let args = id
-        .args(db)
-        .iter()
-        .map(|ty| ty_mangle(db, *ty).clone())
-        .collect_vec();
+    let args =
+        id.args(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
     let (name, path) = match id.def(db) {
         TypeDefId::Builtin(id) => return mangle_builtin_id(db, id, args),
         TypeDefId::Struct(id) => {

@@ -642,8 +642,14 @@ fn type_check_hir<'db>(
     db: &'db dyn Db,
     hir: HirBody<'db>,
 ) -> TypeCheckResults<'db> {
-    TyCtx::new(db, *hir.owner(db), hir.locals(db), hir.params(db), *hir.zelf(db))
-        .type_check(hir.stmts(db))
+    TyCtx::new(
+        db,
+        *hir.owner(db),
+        hir.locals(db),
+        hir.params(db),
+        *hir.zelf(db),
+    )
+    .type_check(hir.stmts(db))
 }
 
 #[salsa::tracked(returns(copy))]

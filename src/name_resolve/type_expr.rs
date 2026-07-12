@@ -331,7 +331,6 @@ fn _templates_of_owner<'db>(
     db: &'db dyn Db,
     scope_owner: InternedScopeOwnerId<'db>,
 ) -> Vec<AstTemplateArg> {
-    
     match *scope_owner.inner(db) {
         ScopeOwnerId::Module(_) => Vec::new(),
         ScopeOwnerId::Impl(impl_id) => impl_sources(db, impl_id.interned())

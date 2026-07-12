@@ -67,7 +67,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn str_ty(&self) -> InferTy {
-        InferTy::Adt { def: str_def(self.db), fields: Vec::new(), }
+        InferTy::Adt { def: str_def(self.db), fields: Vec::new() }
     }
 
     pub fn ptr_of(&self, ty: InferTy) -> InferTy {

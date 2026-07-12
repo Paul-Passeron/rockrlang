@@ -33,7 +33,6 @@ pub struct Spanned<T> {
     pub span: Span,
 }
 
-
 impl<T> Spanned<T> {
     pub fn new(data: T, annotations: Vec<AstAnnotation>, span: Span) -> Self {
         Self { data, annotations, span }
