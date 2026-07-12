@@ -1,0 +1,79 @@
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: core::io::str
+    _3: &core::io::str
+    _4: void
+    _5: void
+    _6: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+
+  bb1:
+    _2 = move _0
+    _3 = &_2
+    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
+
+  bb2:
+    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+
+  bb3:
+    _6 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+ref_access::bar
+mir {
+  locals:
+    _0: a :&ref_access::Foo
+    _1: b :&mut ref_access::Foo
+    _2: int
+    _3: int
+    _4: c :&&ref_access::Foo
+    _5: int
+
+  params: [
+    _0,
+    _1,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _2 = copy _0.*.x
+    _3 = copy _1.*.x
+    _4 = &_0
+    _5 = copy _4.*.*.x
+    return
+}
+
