@@ -35,13 +35,15 @@ use crate::{
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CandidateImpl {
     pub id: ImplId,
-    pub subs: Vec<TypeId>,
+
+    pub subs: Vec<Option<TypeId>>,
 }
 
 fn _type_match(
     db: &dyn Db,
     a: TypeId,
     b: TypeRef,
+    zelf: Option<TypeId>,
     constraints: &mut HashMap<usize, TypeId>, // templates
 ) -> bool {
     match b {
@@ -49,44 +51,52 @@ fn _type_match(
             if a.def(db) != b_id.def(db) {
                 return false;
             }
-            a.args(db).into_iter().zip_eq(b_id.args(db)).all(|(a, b)| {
+            let a_args = a.args(db);
+            let b_args = b_id.args(db);
+            if a_args.len() != b_args.len() {
+                // Problem
+                return false;
+            }
+            a_args.into_iter().zip(b_args).all(|(a, b)| {
                 a.as_type_id()
-                    .is_some_and(|a| _type_match(db, a, b, constraints))
+                    .is_some_and(|a| _type_match(db, a, b, zelf, constraints))
             })
         }
-        TypeRef::Param(id) => match constraints.get(&id.0).cloned() {
-            Some(prev_a_matching_template) => {
-                if a == prev_a_matching_template {
-                    return true;
-                }
-                if a.def(db) != prev_a_matching_template.def(db) {
-                    return false;
-                }
-                a.args(db)
-                    .into_iter()
-                    .zip_eq(prev_a_matching_template.args(db))
-                    .all(|(a, b)| {
-                        a.as_type_id()
-                            .is_some_and(|a| _type_match(db, a, b, constraints))
-                    })
-            }
+        TypeRef::Param(id) => match constraints.get(&id.0) {
+            Some(prev) => a == *prev,
             None => {
                 constraints.insert(id.0, a);
                 true
             }
         },
-        TypeRef::Zelf => todo!(),
+        TypeRef::Zelf => zelf.is_some_and(|z| a == z),
         _ => false,
     }
 }
 
-fn type_match(db: &dyn Db, a: TypeId, b: TypeRef) -> Option<Vec<TypeId>> {
+fn type_match(
+    db: &dyn Db,
+    a: TypeId,
+    b: TypeRef,
+    n_templates: usize,
+) -> Option<Vec<Option<TypeId>>> {
     let mut m = HashMap::new();
-    if _type_match(db, a, b, &mut m) {
-        Some((0..m.len()).into_iter().map(|arg| m[&arg]).collect())
+    if _type_match(db, a, b, None, &mut m) {
+        Some((0..n_templates).map(|i| m.get(&i).copied()).collect())
     } else {
         None
     }
+}
+
+fn type_ref_is_concrete(db: &dyn Db, ty: TypeRef) -> bool {
+    match ty {
+        TypeRef::Concrete(id) => type_id_is_concrete(db, id),
+        _ => false,
+    }
+}
+
+fn type_id_is_concrete(db: &dyn Db, ty: TypeId) -> bool {
+    ty.args(db).into_iter().all(|arg| type_ref_is_concrete(db, arg))
 }
 
 #[salsa::tracked(returns(ref))]
@@ -104,27 +114,36 @@ fn _candidate_impls_for<'db>(
         .unique()
         .filter_map(|id| {
             let implemented_ty = id.implemented(db);
-            let subs = type_match(db, ty, implemented_ty)?;
+            let n_templates = id.templates(db).len();
+            let subs = type_match(db, ty, implemented_ty, n_templates)?;
             Some(CandidateImpl { id, subs })
         })
         .collect()
 }
 
 pub fn candidate_impls_for(db: &dyn Db, ty: TypeId) -> &[CandidateImpl] {
+    debug_assert!(
+        type_id_is_concrete(db, ty),
+        "candidate_impls_for called with a non-concrete key"
+    );
     _candidate_impls_for(db, ty.into())
 }
 
-fn candidate_impl_matches(db: &dyn Db, candidate: &CandidateImpl) -> bool {
-    let subs = &candidate.subs;
-    let templs = candidate.id.templates(db);
-    if subs.len() != templs.len() {
-        // This is a bug
-        return false;
-    }
+fn impl_bounds_hold(
+    db: &dyn Db,
+    id: ImplId,
+    subs: &[TypeId],
+    zelf: TypeId,
+) -> bool {
+    let templs = id.templates(db);
+    debug_assert_eq!(subs.len(), templs.len());
+    let sub_refs = subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
     templs.iter().zip(subs).all(|(interfaces, ty)| {
-        interfaces
-            .iter()
-            .all(|interface| type_implements(db, *ty, *interface).is_some())
+        interfaces.iter().all(|interface| {
+            let bound =
+                iref_sub(db, *interface, &sub_refs, TypeRef::Concrete(zelf));
+            type_implements(db, *ty, bound).is_some()
+        })
     })
 }
 
@@ -143,14 +162,44 @@ fn _type_implements<'db>(
     ty: InternedTypeId<'db>,
     interface: InternedInterfaceRef<'db>,
 ) -> Option<ImplId> {
-    let impls = candidate_impls_for(db, ty.into());
-    impls.iter().find_map(|candidate| {
+    let self_ty: TypeId = ty.into();
+    let requested: InterfaceRef = interface.into();
+    // note: first implem matching wins here
+    candidate_impls_for(db, self_ty).iter().find_map(|candidate| {
         let id = candidate.id;
-        if id.interface(db) != Some(interface.into()) {
+        let iref = id.interface(db)?; // Do we implement an interface ?
+        if iref.def(db) != requested.def(db) {
             return None;
         }
-        let templ_matches = candidate_impl_matches(db, candidate);
-        if templ_matches { Some(id) } else { None }
+
+        let mut m: HashMap<usize, TypeId> = candidate
+            .subs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| s.map(|s| (i, s)))
+            .collect();
+        let req_args = requested.args(db);
+        let pat_args = iref.args(db);
+        if req_args.len() != pat_args.len() {
+            // Problem
+            return None;
+        }
+        for (req, pat) in req_args.into_iter().zip(pat_args) {
+            let req = req.as_type_id()?;
+            if !_type_match(db, req, pat, Some(self_ty), &mut m) {
+                return None;
+            }
+        }
+
+        let n_templates = id.templates(db).len();
+        let subs: Option<Vec<TypeId>> =
+            (0..n_templates).map(|i| m.get(&i).copied()).collect();
+        let subs = subs?;
+
+        if !impl_bounds_hold(db, id, &subs, self_ty) {
+            return None;
+        }
+        Some(id)
     })
 }
 
@@ -159,6 +208,14 @@ pub fn type_implements(
     ty: TypeId,
     interface: InterfaceRef,
 ) -> Option<ImplId> {
+    debug_assert!(
+        type_id_is_concrete(db, ty)
+            && interface
+                .args(db)
+                .into_iter()
+                .all(|arg| type_ref_is_concrete(db, arg)),
+        "type_implements called with a non-concrete key"
+    );
     _type_implements(db, ty.into(), interface.into())
 }
 
@@ -172,7 +229,8 @@ fn _method_impl_for<'db>(
     hint: Option<InterfaceId>,
 ) -> Option<(ImplId, FunctionId)> {
     let method: Symbol = method.into();
-    candidate_impls_for(db, ty.into()).iter().find_map(|candidate| {
+    let self_ty: TypeId = ty.into();
+    candidate_impls_for(db, self_ty).iter().find_map(|candidate| {
         let id = candidate.id;
         if let Some(hint) = hint {
             let Some(iref) = id.interface(db) else {
@@ -182,7 +240,13 @@ fn _method_impl_for<'db>(
                 return None;
             }
         }
-        if !candidate_impl_matches(db, candidate) {
+
+        let subs: Option<Vec<TypeId>> =
+            candidate.subs.iter().copied().collect();
+        let Some(subs) = subs else {
+            return None;
+        };
+        if !impl_bounds_hold(db, id, &subs, self_ty) {
             return None;
         }
         let fid =
@@ -213,5 +277,41 @@ pub fn method_impl_for<'db>(
     is_static: bool,
     hint: Option<InterfaceId>,
 ) -> Option<(ImplId, FunctionId)> {
+    debug_assert!(
+        type_id_is_concrete(db, ty),
+        "method_impl_for called with a non-concrete key"
+    );
     _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint)
+}
+
+fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
+    match ty {
+        TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
+            db,
+            type_id.def(db),
+            type_id
+                .args(db)
+                .into_iter()
+                .map(|ty| sub(db, ty, subs, zelf))
+                .collect(),
+        )),
+        TypeRef::Param(id) => subs[id.0],
+        TypeRef::Associated(_) => todo!(),
+        TypeRef::Zelf => zelf,
+        TypeRef::Error => TypeRef::Error,
+        TypeRef::Unknown => TypeRef::Unknown,
+    }
+}
+
+fn iref_sub(
+    db: &dyn Db,
+    iref: InterfaceRef,
+    subs: &[TypeRef],
+    zelf: TypeRef,
+) -> InterfaceRef {
+    InterfaceRef::new(
+        db,
+        iref.def(db),
+        iref.args(db).into_iter().map(|ty| sub(db, ty, subs, zelf)).collect(),
+    )
 }
