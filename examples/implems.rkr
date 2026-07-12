@@ -48,10 +48,7 @@ impl <T> Hello<T> {
 }
 
 fun main(): int {
-    let a = First::fst();
-    let b = Hello::new(a);
-    let c = Hello::new(b);
-    c.foo();
+    Hello::new(Hello::new(First::fst())).foo();
     Hello<Hello<First>>::theStatic();
     return 0;
 }
