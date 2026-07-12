@@ -1,3 +1,57 @@
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: core::io::str
+    _3: &core::io::str
+    _4: void
+    _5: void
+    _6: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+
+  bb1:
+    _2 = move _0
+    _3 = &_2
+    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
+
+  bb2:
+    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+
+  bb3:
+    _6 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
 nested_opt::some_opt
 mir {
   locals:
@@ -33,24 +87,24 @@ mir {
 
   bb1:
     _1 = discriminant(_0)
-    switch move _1 { 0 => bb6, 1 => bb3, _ => bb2 }
+    switch move _1 { 0 => bb3, 1 => bb4, _ => bb2 }
 
   bb2 (match-diverge):
     diverge
 
-  bb3:
-    _2 = discriminant(_0.downcast#1.0)
-    switch move _2 { 0 => bb5, 1 => bb4, _ => bb2 }
+  bb3 (match-branch-2):
+    return 0_int
 
-  bb4 (match-branch-0):
-    _3 = copy _0.downcast#1.0.downcast#1.0
-    return copy _3
+  bb4:
+    _2 = discriminant(_0.downcast#1.0)
+    switch move _2 { 0 => bb5, 1 => bb6, _ => bb2 }
 
   bb5 (match-branch-1):
     return 69_int
 
-  bb6 (match-branch-2):
-    return 0_int
+  bb6 (match-branch-0):
+    _3 = copy _0.downcast#1.0.downcast#1.0
+    return copy _3
 }
 
 nested_opt::bar
@@ -89,59 +143,5 @@ mir {
 
   bb6:
     goto bb2
-}
-
-core::panic::panic
-mir {
-  locals:
-    _0: message :core::io::str
-    _1: void
-    _2: core::io::str
-    _3: &core::io::str
-    _4: void
-    _5: void
-    _6: never
-
-  params: [
-    _0,
-  ]
-
-  entry: bb0
-
-  bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
-
-  bb1:
-    _2 = move _0
-    _3 = &_2
-    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
-
-  bb2:
-    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
-
-  bb3:
-    _6 = call core::sys::exit(1_int) -> bb4
-
-  bb4:
-    diverge
-}
-
-core::io::`impl core::io::str`::print
-mir {
-  locals:
-    _0: self :&core::io::str
-    _1: void
-
-  params: [
-    _0,
-  ]
-
-  entry: bb0
-
-  bb0 (entry):
-    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
-
-  bb1:
-    return
 }
 

@@ -1,25 +1,4 @@
-hello::main
-mir {
-  locals:
-    _0: core::io::str
-    _1: &core::io::str
-    _2: void
-
-  params: [
-  ]
-
-  entry: bb0
-
-  bb0 (entry):
-    _0 = str {data: "Hello, World !", len: 14_int}
-    _1 = &_0
-    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
-
-  bb1:
-    return 0_int
-}
-
-core::io::`impl core::io::str`::println
+core::io::`impl core::io::str`::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -32,7 +11,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
@@ -73,11 +52,12 @@ mir {
     diverge
 }
 
-core::io::`impl core::io::str`::print
+auto_deref_field::foo
 mir {
   locals:
-    _0: self :&core::io::str
-    _1: void
+    _0: f :&auto_deref_field::Foo
+    _1: y :int
+    _2: z :&int
 
   params: [
     _0,
@@ -86,9 +66,8 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
-
-  bb1:
+    _1 = copy _0.*.x
+    _2 = &_0.*.x
     return
 }
 

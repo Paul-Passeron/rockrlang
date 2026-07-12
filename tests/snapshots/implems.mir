@@ -1,0 +1,309 @@
+core::io::`impl core::io::str`::println
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: core::io::str
+    _3: &core::io::str
+    _4: void
+    _5: void
+    _6: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+
+  bb1:
+    _2 = move _0
+    _3 = &_2
+    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
+
+  bb2:
+    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+
+  bb3:
+    _6 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+implems::`impl implems::First`::fst
+mir {
+  locals:
+    _0: implems::First
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = First {x: 69_int}
+    return move _0
+}
+
+implems::`impl implems::Foo for implems::First`::foo
+mir {
+  locals:
+    _0: self :&implems::First
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Hello from first, x = %d\n", copy _0.*.x) -> bb1
+
+  bb1:
+    return
+}
+
+implems::`impl implems::Foo for implems::First`::theStatic
+mir {
+  locals:
+    _0: core::io::str
+    _1: &core::io::str
+    _2: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = str {data: "Hey from theStatic (First)", len: 26_int}
+    _1 = &_0
+    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
+
+  bb1:
+    return
+}
+
+implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
+mir {
+  locals:
+    _0: self :&implems::Hello<implems::First>
+    _1: implems::First
+    _2: &implems::First
+    _3: void
+    _4: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = move _0.*.x
+    _2 = &_1
+    _3 = call implems::`impl implems::Foo for implems::First`::foo(move _2) -> bb1
+
+  bb1:
+    _4 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+
+  bb2:
+    return
+}
+
+implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
+mir {
+  locals:
+    _0: self :&implems::Hello<implems::Hello<implems::First>>
+    _1: implems::Hello<implems::First>
+    _2: &implems::Hello<implems::First>
+    _3: void
+    _4: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = move _0.*.x
+    _2 = &_1
+    _3 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::First>(move _2) -> bb1
+
+  bb1:
+    _4 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+
+  bb2:
+    return
+}
+
+implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic
+mir {
+  locals:
+    _0: void
+    _1: core::io::str
+    _2: &core::io::str
+    _3: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = call implems::`impl implems::Foo for implems::First`::theStatic() -> bb1
+
+  bb1:
+    _1 = str {data: "Hey from theStatic (Hello)", len: 26_int}
+    _2 = &_1
+    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
+
+  bb2:
+    return
+}
+
+implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic
+mir {
+  locals:
+    _0: void
+    _1: core::io::str
+    _2: &core::io::str
+    _3: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::First>() -> bb1
+
+  bb1:
+    _1 = str {data: "Hey from theStatic (Hello)", len: 26_int}
+    _2 = &_1
+    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
+
+  bb2:
+    return
+}
+
+implems::`impl <T0>implems::Hello<T0>`::new
+mir {
+  locals:
+    _0: x :implems::First
+    _1: implems::Hello<implems::First>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = Hello {x: move _0}
+    return move _1
+}
+
+implems::`impl <T0>implems::Hello<T0>`::new
+mir {
+  locals:
+    _0: x :implems::Hello<implems::First>
+    _1: implems::Hello<implems::Hello<implems::First>>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = Hello {x: move _0}
+    return move _1
+}
+
+implems::main
+mir {
+  locals:
+    _0: implems::First
+    _1: a :implems::First
+    _2: implems::Hello<implems::First>
+    _3: b :implems::Hello<implems::First>
+    _4: implems::Hello<implems::Hello<implems::First>>
+    _5: c :implems::Hello<implems::Hello<implems::First>>
+    _6: implems::Hello<implems::Hello<implems::First>>
+    _7: &implems::Hello<implems::Hello<implems::First>>
+    _8: void
+    _9: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = call implems::`impl implems::First`::fst() -> bb1
+
+  bb1:
+    _1 = move _0
+    _2 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(move _1) -> bb2
+
+  bb2:
+    _3 = move _2
+    _4 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(move _3) -> bb3
+
+  bb3:
+    _5 = move _4
+    _6 = move _5
+    _7 = &_6
+    _8 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(move _7) -> bb4
+
+  bb4:
+    _9 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb5
+
+  bb5:
+    return 0_int
+}
+

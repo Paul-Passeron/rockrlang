@@ -1,0 +1,65 @@
+core/io.rkr:26:5
+thir fun core::io::`impl core::io::str`::println(&self): void {
+    core::io::printf(c%.*s\n, (*self).len, (*self).data);
+}
+
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    let _1: core::io::str = message;
+    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/implems.rkr:17:5
+thir fun implems::`impl implems::First`::fst(): Self {
+    return implems::First { x: 69 };
+}
+
+examples/implems.rkr:23:6
+thir fun implems::`impl implems::Foo for implems::First`::foo(&self): void {
+    core::io::printf(cHello from first, x = %d\n, (*self).x);
+}
+
+examples/implems.rkr:27:6
+thir fun implems::`impl implems::Foo for implems::First`::theStatic(): void {
+    let _0: core::io::str = Hey from theStatic (First);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+}
+
+examples/implems.rkr:33:5
+thir fun implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo<T0: implems::Foo>(&self): void {
+    let _1: T0 = (*self).x;
+    <T0>::implems::Foo::foo(&_1);
+    core::io::printf(cHello from Hello !\n);
+}
+
+examples/implems.rkr:38:5
+thir fun implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic<T0: implems::Foo>(): void {
+    <T0>::implems::Foo::theStatic();
+    let _0: core::io::str = Hey from theStatic (Hello);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+}
+
+examples/implems.rkr:45:5
+thir fun implems::`impl <T0>implems::Hello<T0>`::new<T0>(x: T0): Self {
+    return implems::Hello::<T0> { x: x };
+}
+
+examples/implems.rkr:50:1
+thir fun implems::main(): int {
+    let a: implems::First = <implems::First>::implems::`impl implems::First`::fst();
+    let b: implems::Hello<implems::First> = <implems::Hello<implems::First>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(a);
+    let c: implems::Hello<implems::Hello<implems::First>> = <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(b);
+    let _3: implems::Hello<implems::Hello<implems::First>> = c;
+    <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(&_3);
+    <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>();
+    return 0;
+}
+

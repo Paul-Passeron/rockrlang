@@ -1,30 +1,20 @@
-while_loop::main
+core::io::`impl core::io::str`::print
 mir {
   locals:
-    _0: mut i :int
+    _0: self :&core::io::str
     _1: void
 
   params: [
+    _0,
   ]
 
   entry: bb0
 
   bb0 (entry):
-    _0 = 0_int
-    goto bb1
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
 
-  bb1 (while-condition):
-    branch true ? bb2 : bb3
-
-  bb2 (while-body):
-    _1 = call core::io::printf(c"%d\n", copy _0) -> bb4
-
-  bb3 (while-merge):
-    return 0_int
-
-  bb4:
-    _0 = copy _0 + 1_int
-    goto bb1
+  bb1:
+    return
 }
 
 core::panic::panic
@@ -62,11 +52,11 @@ mir {
     diverge
 }
 
-core::io::`impl core::io::str`::print
+share_mut::destructure
 mir {
   locals:
-    _0: self :&core::io::str
-    _1: void
+    _0: p :&mut share_mut::Foo
+    _1: x :&mut int
 
   params: [
     _0,
@@ -75,9 +65,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
-
-  bb1:
+    _1 = &mut _0.*.x
     return
 }
 
