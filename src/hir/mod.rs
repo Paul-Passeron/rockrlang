@@ -477,7 +477,9 @@ pub fn function_ast<'db>(
             for item in
                 interface_items(db, interface_ref.def(db).interned()).iter()
             {
-                if let AstInterfaceItem::Sig(sig) = item {
+                if let AstInterfaceItem::Sig(sig) = item
+                    && sig.data.name.data == *function.name(db)
+                {
                     return InternedFunctionLikeAst::new(
                         db,
                         FunctionLikeAst::TraitMethod(sig.clone()),
