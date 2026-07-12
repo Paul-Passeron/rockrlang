@@ -799,7 +799,6 @@ impl FunctionRef {
     pub fn params(&self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
         let sig = get_sig_of_function(db, self.id.interned());
         let zelf = self.zelf_binding(db);
-        println!("Trying to get the params of {}", self.id.called_to_string(db));
         let zelf_arg = match (zelf, sig.zelf) {
             (_, None) => None,
             (Some(ty), Some(r)) => Some(r.as_type_ref_for(db, ty)),
