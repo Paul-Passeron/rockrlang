@@ -318,8 +318,9 @@ pub fn impl_sources<'db>(
     impl_id: InternedImplId<'db>,
 ) -> Vec<ImplSource<'db>> {
     module_impls(db, impl_id.parent(db).interned())
-        .into_iter()
-        .filter(|impl_| impl_.id(db) == impl_id.into())
+        .iter()
+        .filter(|impl_| *impl_.id(db) == impl_id.into())
+        .copied()
         .collect()
 }
 
@@ -342,7 +343,7 @@ pub fn interface_items<'db>(
     Arc::new(
         module_interfaces(db, interface_id.parent(db).interned())
             .iter()
-            .find(|interface| interface.name.data == interface_id.name(db))
+            .find(|interface| interface.name.data == *interface_id.name(db))
             .cloned()
             .into_iter()
             .flat_map(|interface| interface.items)
@@ -429,26 +430,28 @@ pub fn function_ast<'db>(
     let parent = function.parent(db);
     match parent {
         ScopeOwnerId::Module(module_id) => {
-            let module_items =
-                module_items(db, module_id.interned()).unwrap_or_default();
-            for item in module_items {
-                match item.data {
+            for item in module_items(db, module_id.interned())
+                .as_ref()
+                .into_iter()
+                .flatten()
+            {
+                match &item.data {
                     AstTopLevelItemDesc::Fundef(fdef)
-                        if fdef.data.name.data == function.name(db) =>
+                        if fdef.data.name.data == *function.name(db) =>
                     {
                         return InternedFunctionLikeAst::new(
                             db,
-                            FunctionLikeAst::Fundef(Arc::new(fdef)),
+                            FunctionLikeAst::Fundef(Arc::new(fdef.clone())),
                         );
                     }
                     AstTopLevelItemDesc::ExternDef(fsig, variadic)
-                        if fsig.data.name.data == function.name(db) =>
+                        if fsig.data.name.data == *function.name(db) =>
                     {
                         return InternedFunctionLikeAst::new(
                             db,
                             FunctionLikeAst::ExternDef(
-                                Arc::new(fsig),
-                                variadic,
+                                Arc::new(fsig.clone()),
+                                *variadic,
                             ),
                         );
                     }
@@ -459,11 +462,13 @@ pub fn function_ast<'db>(
         ScopeOwnerId::Impl(impl_id) => {
             for item in impl_items(db, impl_id.interned()) {
                 if let AstImplItem::Fundef(fdef) = item
-                    && fdef.data.name.data == function.name(db)
+                    && fdef.data.name.data == *function.name(db)
                 {
                     return InternedFunctionLikeAst::new(
                         db,
-                        FunctionLikeAst::Method(Arc::new(*fdef)),
+                        FunctionLikeAst::Method(Arc::new(
+                            fdef.as_ref().clone(),
+                        )),
                     );
                 }
             }
@@ -491,7 +496,7 @@ pub fn hir_body<'db>(
     _hir_body(db, function.interned())
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 fn _hir_body<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,

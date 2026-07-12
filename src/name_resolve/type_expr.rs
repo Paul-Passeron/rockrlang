@@ -213,14 +213,16 @@ pub fn resolve_type_expr<'db>(
 pub fn struct_item<'db>(
     db: &'db dyn Db,
     struct_id: InternedStructId<'db>,
-) -> Arc<AstStructDef> {
-    for item in
-        module_items(db, struct_id.parent(db).interned()).unwrap_or_default()
+) -> AstStructDef {
+    for item in module_items(db, struct_id.parent(db).interned())
+        .as_ref()
+        .into_iter()
+        .flatten()
     {
-        if let AstTopLevelItemDesc::StructDef(ast) = item.data
-            && ast.name.data == struct_id.name(db)
+        if let AstTopLevelItemDesc::StructDef(ast) = &item.data
+            && ast.name.data == *struct_id.name(db)
         {
-            return Arc::new(ast);
+            return ast.clone();
         }
     }
     unreachable!()
@@ -230,14 +232,16 @@ pub fn struct_item<'db>(
 pub fn enum_item<'db>(
     db: &'db dyn Db,
     enum_id: InternedEnumId<'db>,
-) -> Arc<AstEnumDef> {
-    for item in
-        module_items(db, enum_id.parent(db).interned()).unwrap_or_default()
+) -> AstEnumDef {
+    for item in module_items(db, enum_id.parent(db).interned())
+        .as_ref()
+        .into_iter()
+        .flatten()
     {
-        if let AstTopLevelItemDesc::EnumDef(ast) = item.data
-            && ast.name.data == enum_id.name(db)
+        if let AstTopLevelItemDesc::EnumDef(ast) = &item.data
+            && ast.name.data == *enum_id.name(db)
         {
-            return Arc::new(ast);
+            return ast.clone();
         }
     }
     unreachable!()
@@ -247,8 +251,8 @@ pub fn enum_item<'db>(
 pub fn templates_of_struct<'db>(
     db: &'db dyn Db,
     struct_id: InternedStructId<'db>,
-) -> Arc<Vec<AstTemplateArg>> {
-    Arc::new(struct_item(db, struct_id).template_args.clone())
+) -> Vec<AstTemplateArg> {
+    struct_item(db, struct_id).template_args.clone()
 }
 
 #[salsa::tracked]
@@ -285,7 +289,7 @@ pub fn templates_of_enum<'db>(
 pub fn get_templates_of_fun_only<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-) -> Box<[AstTemplateArg]> {
+) -> Vec<AstTemplateArg> {
     let mut res = vec![];
     let ast = function_ast(db, function);
     match ast.inner(db) {
@@ -309,20 +313,27 @@ pub fn get_templates_of_fun_only<'db>(
 pub fn get_templates_of_fun<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-) -> Arc<[AstTemplateArg]> {
-    templates_of_owner(db, function.parent(db))
+) -> Vec<AstTemplateArg> {
+    templates_of_owner(db, *function.parent(db))
         .iter()
         .cloned()
-        .chain(get_templates_of_fun_only(db, function))
+        .chain(get_templates_of_fun_only(db, function).iter().cloned())
         .collect()
 }
 
-pub fn templates_of_owner(
-    db: &dyn Db,
-    scope_owner: ScopeOwnerId,
-) -> Arc<[AstTemplateArg]> {
-    match scope_owner {
-        ScopeOwnerId::Module(_) => Arc::new([]),
+#[salsa::interned]
+struct InternedScopeOwnerId {
+    inner: ScopeOwnerId,
+}
+
+#[salsa::tracked]
+fn _templates_of_owner<'db>(
+    db: &'db dyn Db,
+    scope_owner: InternedScopeOwnerId<'db>,
+) -> Vec<AstTemplateArg> {
+    
+    match *scope_owner.inner(db) {
+        ScopeOwnerId::Module(_) => Vec::new(),
         ScopeOwnerId::Impl(impl_id) => impl_sources(db, impl_id.interned())
             .into_iter()
             .next()
@@ -330,7 +341,7 @@ pub fn templates_of_owner(
             .templates(db)
             .iter()
             .cloned()
-            .collect::<Arc<[_]>>(),
+            .collect(),
         ScopeOwnerId::Interface(interface_ref) => {
             interface_item(db, interface_ref.def(db).interned())
                 .template_args
@@ -339,4 +350,11 @@ pub fn templates_of_owner(
                 .collect()
         }
     }
+}
+
+pub fn templates_of_owner(
+    db: &dyn Db,
+    scope_owner: ScopeOwnerId,
+) -> &[AstTemplateArg] {
+    _templates_of_owner(db, InternedScopeOwnerId::new(db, scope_owner))
 }

@@ -180,12 +180,12 @@ impl ZelfArg {
                 if self.mutability.is_mut() {
                     InferTy::Adt {
                         def: TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)),
-                        fields: Box::new([ty]),
+                        fields: vec![ty],
                     }
                 } else {
                     InferTy::Adt {
                         def: TypeDefId::Builtin(BuiltinTypeId::ref_(db)),
-                        fields: Box::new([ty]),
+                        fields: vec![ty],
                     }
                 }
             }
@@ -193,12 +193,12 @@ impl ZelfArg {
                 if self.mutability.is_mut() {
                     InferTy::Adt {
                         def: TypeDefId::Builtin(BuiltinTypeId::mut_ptr(db)),
-                        fields: Box::new([ty]),
+                        fields: vec![ty],
                     }
                 } else {
                     InferTy::Adt {
                         def: TypeDefId::Builtin(BuiltinTypeId::ptr(db)),
-                        fields: Box::new([ty]),
+                        fields: vec![ty],
                     }
                 }
             }
@@ -282,12 +282,12 @@ impl fmt::Display for ZelfArg {
 pub fn get_sig_of_function(
     db: &dyn Db,
     function_id: InternedFunctionId<'_>,
-) -> Arc<FunctionSignature> {
+) -> FunctionSignature {
     let function_templates: Arc<[AstTemplateArg]> =
-        get_templates_of_fun_only(db, function_id).into();
+        get_templates_of_fun_only(db, function_id).iter().cloned().collect();
     let ctx = AstImplicitContext::new(
         db,
-        function_id.parent(db),
+        *function_id.parent(db),
         function_templates.clone(),
     )
     .unwrap();
@@ -304,7 +304,7 @@ pub fn get_sig_of_function(
         .collect();
 
     let implicit_templates: Vec<Vec<InterfaceRef>> =
-        templates_of_owner(db, function_id.parent(db))
+        templates_of_owner(db, *function_id.parent(db))
             .iter()
             .map(|t| {
                 t.constraints
@@ -329,14 +329,14 @@ pub fn get_sig_of_function(
     let ret = ctx
         .resolve(db, &ast.inner(db).get_ret().data)
         .unwrap_or(TypeRef::Error);
-    Arc::new(FunctionSignature {
-        name: function_id.name(db),
+    FunctionSignature {
+        name: *function_id.name(db),
         zelf,
         implicit_templates,
         added_templates,
         args,
         ret,
-    })
+    }
 }
 
 fn add_package_root_from_disk(
@@ -616,7 +616,7 @@ pub fn build_from_disk(
     Ok(())
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn is_file_direct_submodule_of_file<'db>(
     db: &'db dyn Db,
     parent: SourceFile,
@@ -661,7 +661,7 @@ pub fn submodules_of_file<'db>(
         .iter()
         .map(|sf| *sf)
         .filter(|sf| is_file_direct_submodule_of_file(db, file, *sf))
-        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf)))
+        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf).to_vec()))
         .collect()
 }
 
@@ -670,8 +670,11 @@ pub fn package_of_root<'db>(
     db: &'db dyn Db,
     root: PackageRoot,
 ) -> Package<'db> {
-    let file = root.file(db);
-    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file)))
+    let file = *root.file(db);
+    Package::new(
+        db,
+        FileModule::new(db, file, submodules_of_file(db, file).to_vec()),
+    )
 }
 
 #[salsa::tracked]
@@ -680,6 +683,6 @@ pub fn workspace_packages<'db>(
     ws: Workspace,
 ) -> Arc<Vec<Package<'db>>> {
     Arc::new(
-        ws.roots(db).iter().map(|root| package_of_root(db, *root)).collect(),
+        ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect(),
     )
 }

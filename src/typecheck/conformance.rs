@@ -59,7 +59,7 @@ fn _type_match(
             }
             a_args.into_iter().zip(b_args).all(|(a, b)| {
                 a.as_type_id()
-                    .is_some_and(|a| _type_match(db, a, b, zelf, constraints))
+                    .is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
             })
         }
         TypeRef::Param(id) => match constraints.get(&id.0) {
@@ -96,7 +96,7 @@ fn type_ref_is_concrete(db: &dyn Db, ty: TypeRef) -> bool {
 }
 
 fn type_id_is_concrete(db: &dyn Db, ty: TypeId) -> bool {
-    ty.args(db).into_iter().all(|arg| type_ref_is_concrete(db, arg))
+    ty.args(db).into_iter().all(|arg| type_ref_is_concrete(db, *arg))
 }
 
 #[salsa::tracked(returns(ref))]
@@ -109,10 +109,11 @@ fn _candidate_impls_for<'db>(
     let ty: TypeId = ty.into();
     packages
         .iter()
-        .flat_map(|pkg| impls_in_package(db, *pkg))
+        .flat_map(|pkg| impls_in_package(db, *pkg).iter())
         .map(|src| src.id(db))
         .unique()
         .filter_map(|id| {
+            let id = *id;
             let implemented_ty = id.implemented(db);
             let n_templates = id.templates(db).len();
             let subs = type_match(db, ty, implemented_ty, n_templates)?;
@@ -156,7 +157,10 @@ fn _type_implements_initial(
     None
 }
 
-#[salsa::tracked(cycle_initial=_type_implements_initial)]
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=_type_implements_initial
+)]
 fn _type_implements<'db>(
     db: &'db dyn Db,
     ty: InternedTypeId<'db>,
@@ -186,7 +190,7 @@ fn _type_implements<'db>(
         }
         for (req, pat) in req_args.into_iter().zip(pat_args) {
             let req = req.as_type_id()?;
-            if !_type_match(db, req, pat, Some(self_ty), &mut m) {
+            if !_type_match(db, req, *pat, Some(self_ty), &mut m) {
                 return None;
             }
         }
@@ -213,7 +217,7 @@ pub fn type_implements(
             && interface
                 .args(db)
                 .into_iter()
-                .all(|arg| type_ref_is_concrete(db, arg)),
+                .all(|arg| type_ref_is_concrete(db, *arg)),
         "type_implements called with a non-concrete key"
     );
     _type_implements(db, ty.into(), interface.into())
@@ -283,12 +287,12 @@ pub fn method_impl_for<'db>(
     arity: usize,
     is_static: bool,
     hint: Option<InterfaceId>,
-) -> Option<MethodImpl> {
+) -> Option<&'db MethodImpl> {
     debug_assert!(
         type_id_is_concrete(db, ty),
         "method_impl_for called with a non-concrete key"
     );
-    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint)
+    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint).as_ref()
 }
 
 fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
@@ -299,7 +303,7 @@ fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
             type_id
                 .args(db)
                 .into_iter()
-                .map(|ty| sub(db, ty, subs, zelf))
+                .map(|ty| sub(db, *ty, subs, zelf))
                 .collect(),
         )),
         TypeRef::Param(id) => subs[id.0],
@@ -319,6 +323,6 @@ fn iref_sub(
     InterfaceRef::new(
         db,
         iref.def(db),
-        iref.args(db).into_iter().map(|ty| sub(db, ty, subs, zelf)).collect(),
+        iref.args(db).into_iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
     )
 }

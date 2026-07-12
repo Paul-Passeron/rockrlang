@@ -198,7 +198,8 @@ pub fn impls_in_package<'db>(
 ) -> Set<ImplSource<'db>> {
     Set::from_iter(
         modules_in_package(db, package)
-            .into_iter()
-            .flat_map(|module| module_impls(db, module.interned())),
+            .iter()
+            .flat_map(|module| module_impls(db, module.interned()))
+            .cloned(),
     )
 }

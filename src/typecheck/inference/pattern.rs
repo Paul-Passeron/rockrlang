@@ -59,7 +59,7 @@ impl<'a> InferenceCtx<'a> {
                 Ok(InferTy::Var(self.local_map[id]))
             }
             HirPatternDesc::Tuple(pats) => {
-                let tys: Box<[_]> = pats
+                let tys = pats
                     .iter()
                     .map(|p| self.infer_pattern(p, binds_like.clone()))
                     .try_collect()?;

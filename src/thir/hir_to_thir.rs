@@ -212,7 +212,7 @@ impl<'db> ThirTranslator<'db> {
                     type_id
                         .args(db)
                         .into_iter()
-                        .map(|ty| _aux(db, owner, ty))
+                        .map(|ty| _aux(db, owner, *ty))
                         .collect(),
                 )),
                 TypeRef::Zelf => {
@@ -244,7 +244,7 @@ impl<'db> ThirTranslator<'db> {
             .iter()
             .flat_map(|stmt| self.handle_stmt(&mut b, stmt))
             .collect_vec();
-        b.finalize(self.hir.owner(self.db), params, zelf, stmts)
+        b.finalize(*self.hir.owner(self.db), params, zelf, stmts)
     }
 
     fn handle_break(&self, b: &ThirBuilder, span: Span) -> ThirStmt {
@@ -1257,11 +1257,11 @@ impl<'db> ThirTranslator<'db> {
                 if builtin.is_ptr_like(self.db).is_none() {
                     todo!("error diagnostic")
                 }
-                let mut args = type_id.args(self.db);
+                let args = type_id.args(self.db);
                 if args.is_empty() {
                     todo!("Problem")
                 }
-                let deref_ty = args.remove(0);
+                let deref_ty = args[0];
                 b.with_projection(base, Projection::Deref, deref_ty, place.span)
             }
             HirPlaceKind::Index { base, index } => {
@@ -1324,9 +1324,10 @@ impl TypeRef {
     pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
-            TypeDefId::Struct(struct_id) => {
-                Some(StructRef { def: struct_id, args: type_id.args(db) })
-            }
+            TypeDefId::Struct(struct_id) => Some(StructRef {
+                def: struct_id,
+                args: type_id.args(db).to_vec(),
+            }),
             _ => None,
         }
     }
@@ -1335,7 +1336,7 @@ impl TypeRef {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
             TypeDefId::Enum(enum_id) => {
-                Some(EnumRef { def: enum_id, args: type_id.args(db) })
+                Some(EnumRef { def: enum_id, args: type_id.args(db).to_vec() })
             }
             _ => None,
         }
@@ -1344,7 +1345,7 @@ impl TypeRef {
     pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
         let type_id = self.as_type_id()?;
         if type_id.def(db) == TypeDefId::Builtin(BuiltinTypeId::tuple(db)) {
-            Some(type_id.args(db))
+            Some(type_id.args(db).to_vec())
         } else {
             None
         }

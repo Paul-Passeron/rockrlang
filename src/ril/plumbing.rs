@@ -58,19 +58,19 @@ impl ModuleId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> Option<ModuleId> {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 
-    pub fn file_submodules(self, db: &dyn crate::Db) -> Vec<FileModule<'_>> {
+    pub fn file_submodules(self, db: &dyn crate::Db) -> &[FileModule<'_>] {
         self.interned().file_submodules(db)
     }
 
     pub fn package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
-        self.interned().package(db)
+        *self.interned().package(db)
     }
 
     pub fn owning_package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
@@ -103,11 +103,11 @@ impl FunctionId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> ScopeOwnerId {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 }
 
@@ -133,11 +133,11 @@ impl StructId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 }
 
@@ -171,18 +171,18 @@ impl ImplId {
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 
     pub fn implemented(self, db: &dyn crate::Db) -> TypeRef {
-        self.interned().implemented(db)
+        *self.interned().implemented(db)
     }
 
     pub fn interface(self, db: &dyn crate::Db) -> Option<InterfaceRef> {
-        self.interned().interface(db)
+        *self.interned().interface(db)
     }
 
-    pub fn templates(self, db: &dyn crate::Db) -> Vec<Set<InterfaceRef>> {
+    pub fn templates(self, db: &dyn crate::Db) -> &[Set<InterfaceRef>] {
         self.interned().templates(db)
     }
 }
@@ -209,11 +209,11 @@ impl InterfaceId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 }
 
@@ -239,10 +239,10 @@ impl TypeId {
     }
 
     pub fn def(self, db: &dyn crate::Db) -> TypeDefId {
-        self.interned().def(db)
+        *self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn crate::Db) -> Vec<TypeRef> {
+    pub fn args(self, db: &dyn crate::Db) -> &[TypeRef] {
         self.interned().args(db)
     }
 }
@@ -269,7 +269,7 @@ impl BuiltinTypeId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn ptr(db: &dyn crate::Db) -> Self {
@@ -403,7 +403,7 @@ pub fn char_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::char(db).into(), vec![])
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
     // in std::io
     let Definition::Type(def) = resolve_path(
@@ -424,19 +424,22 @@ pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
     def
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn str_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, str_def(db), vec![])
 }
 
+#[salsa::tracked(returns(copy))]
 pub fn void_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
 }
 
+#[salsa::tracked(returns(copy))]
 pub fn bool_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::bool(db).into(), vec![])
 }
 
+#[salsa::tracked(returns(copy))]
 pub fn never_id(db: &dyn crate::Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::never(db).into(), vec![])
 }
@@ -467,10 +470,10 @@ impl InterfaceRef {
     }
 
     pub fn def(self, db: &dyn crate::Db) -> InterfaceId {
-        self.interned().def(db)
+        *self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn crate::Db) -> Vec<TypeRef> {
+    pub fn args(self, db: &dyn crate::Db) -> &[TypeRef] {
         self.interned().args(db)
     }
 }
@@ -497,10 +500,10 @@ impl EnumId {
     }
 
     pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        self.interned().name(db)
+        *self.interned().name(db)
     }
 
     pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
-        self.interned().parent(db)
+        *self.interned().parent(db)
     }
 }

@@ -190,7 +190,7 @@ fn definition_of_item<'db>(
                 Some(m_id),
                 None,
                 vec![],
-                parent.package(db),
+                *parent.package(db),
             )))
         }
         AstTopLevelItemDesc::Fundef(fundef) => {
@@ -256,7 +256,7 @@ pub fn builtin_definitions<'db>(
         Definition::Type(TypeDefId::Struct(StructId::new(
             db,
             Symbol::new(db, "str"),
-            file_module_id(db, io, Some(core_module.into()), core_package(db)),
+            file_module_id(db, *io, Some(core_module.into()), core_package(db)),
         )))
     });
 
@@ -294,13 +294,13 @@ pub fn module_definitions<'db>(
     module: InternedModuleId<'db>,
 ) -> Vec<(Symbol, Definition)> {
     if module.package(db).is_none() {
-        builtin_definitions(db).into_iter().collect()
+        builtin_definitions(db).iter().map(|(s, d)| (*s, *d)).collect()
     } else {
         let mut res = Vec::new();
         for sub in module.file_submodules(db) {
             let id = file_module_id(
                 db,
-                sub,
+                *sub,
                 Some(module.into()),
                 module.package(db).unwrap(),
             );
@@ -321,7 +321,7 @@ pub fn module_definitions<'db>(
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(clone))]
 pub fn module_includes<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
@@ -329,7 +329,7 @@ pub fn module_includes<'db>(
     let Some(file) = module.file(db) else {
         return vec![];
     };
-    let ast = parse_file(db, file);
+    let ast = parse_file(db, *file);
     ast.includes(db)
         .iter()
         .map(|include| Segments::new(db, include.data.to_segments()))
@@ -341,7 +341,7 @@ pub fn def_map_in_module<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
 ) -> BTreeMap<Symbol, Definition> {
-    module_definitions(db, module).into_iter().collect()
+    module_definitions(db, module).iter().map(|(s, d)| (*s, *d)).collect()
 }
 
 fn find_module_in_chain<'db>(
@@ -358,7 +358,7 @@ fn find_module_in_chain<'db>(
         .and_then(|parent| find_module_in_chain(db, name, parent.interned()))
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn resolve_include_path<'db>(
     db: &'db dyn Db,
     segments: Segments<'db>,
@@ -381,7 +381,7 @@ pub fn resolve_in_module(
     _resolve_in_module(db, name.interned(), module.interned())
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 fn _resolve_in_module<'db>(
     db: &'db dyn Db,
     name: InternedSymbol<'db>,
@@ -423,7 +423,7 @@ pub fn resolve_path(
     _resolve_path(db, segments, module.interned())
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 fn _resolve_path<'db>(
     db: &'db dyn Db,
     segments: Segments<'db>,

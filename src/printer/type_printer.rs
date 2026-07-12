@@ -253,7 +253,7 @@ impl TypePrinter {
         let no_fields = fields.is_empty();
         let fields_str = fields
             .into_iter()
-            .map(|ty| self.type_ref_to_string(db, ty))
+            .map(|ty| self.type_ref_to_string(db, *ty))
             .collect_vec()
             .join(", ");
         if self.options.has(TypePrinterOption::PrettyPrintBuiltinADTs)
@@ -380,7 +380,7 @@ impl TypePrinter {
         format!(
             "{}::{}",
             self.scope_owner_to_string(db, function_id.parent(db)),
-            self.function_sig_to_string(db, sig.as_ref())
+            self.function_sig_to_string(db, sig)
         )
     }
 

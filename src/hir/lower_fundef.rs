@@ -850,8 +850,8 @@ impl<'db> LowerFundef<'db> {
             PartialTypeRef::Resolved(type_ref) => match type_ref {
                 TypeRef::Concrete(type_id) => type_id
                     .args(self.db)
-                    .into_iter()
-                    .map(PartialTypeArg::Known)
+                    .iter()
+                    .map(|arg| PartialTypeArg::Known(*arg))
                     .collect(),
                 TypeRef::Param(_) => {
                     unreachable!()
@@ -1349,7 +1349,7 @@ impl<'db> LowerFundef<'db> {
                 receiver: iterator_candidate.boxed(),
                 method: Symbol::new(self.db, "into_iter"),
                 args: vec![],
-                interface_hint: Some(into_iter_interface),
+                interface_hint: Some(*into_iter_interface),
             },
             iterator_span,
         );
@@ -1375,7 +1375,7 @@ impl<'db> LowerFundef<'db> {
 
                 method: Symbol::new(self.db, "next"),
                 args: vec![],
-                interface_hint: Some(iter_interface),
+                interface_hint: Some(*iter_interface),
             },
             iterator_span,
         );

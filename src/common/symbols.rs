@@ -38,7 +38,7 @@ impl Symbol {
         Self::from(InternedSymbol::new(db, s.to_string()))
     }
 
-    pub fn interned(&self) -> InternedSymbol<'_> {
+    pub fn interned<'db>(&self) -> InternedSymbol<'db> {
         InternedSymbol(self.0, PhantomData)
     }
 

@@ -31,7 +31,7 @@ pub mod implems;
 pub mod interfaces;
 pub mod type_expr;
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn module_to_file<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
@@ -41,7 +41,7 @@ pub fn module_to_file<'db>(
     })
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
     ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![], None)
 }
@@ -49,7 +49,7 @@ pub fn builtin_module<'db>(db: &'db dyn Db) -> ModuleId {
 /// Build the ModuleId hierarchy for a FileModule tree rooted at a package root.
 /// The package root's parent is builtin_module; all submodules are parented to
 /// it.
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn file_module_id<'db>(
     db: &'db dyn Db,
     file_module: FileModule<'db>,
@@ -61,7 +61,7 @@ pub fn file_module_id<'db>(
         db,
         file_module.name(db),
         Some(actual_parent),
-        Some(file_module.file(db)),
+        Some(*file_module.file(db)),
         file_module.submodules(db).clone(),
         Some(package),
     );
@@ -101,7 +101,7 @@ pub fn root_module<'db>(
         db,
         name,
         Some(builtin_module(db)),
-        Some(file),
+        Some(*file),
         file_module.submodules(db).clone(),
         Some(package),
     )
@@ -114,9 +114,9 @@ pub fn module_items<'db>(
     module: InternedModuleId<'db>,
 ) -> Option<Vec<AstTopLevelItem>> {
     if let Some(file) = module.file(db) {
-        let ast = parse_file(db, file);
+        let ast = parse_file(db, *file);
         let parse_errors: Vec<&ParseError> =
-            parse_file::accumulated::<ParseError>(db, file);
+            parse_file::accumulated::<ParseError>(db, *file);
         for err in parse_errors {
             let span = Span::new(err.file, err.start, err.end);
             Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
@@ -128,7 +128,7 @@ pub fn module_items<'db>(
             Some(parent_ast) => {
                 parent_ast.iter().find_map(|item| match &item.data {
                     AstTopLevelItemDesc::Module(module_ast) => {
-                        if module_ast.data.name.data == module.name(db) {
+                        if module_ast.data.name.data == *module.name(db) {
                             Some(module_ast.data.items.clone())
                         } else {
                             None
@@ -153,7 +153,7 @@ pub fn module_items<'db>(
     })
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
     if db.config().no_std {
         None
@@ -169,17 +169,14 @@ pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
     }
 }
 
-#[salsa::tracked]
-pub fn std_module<'db>(db: &'db dyn Db) -> Option<InternedModuleId<'db>> {
+#[salsa::tracked(returns(copy))]
+pub fn std_module<'db>(db: &'db dyn Db) -> Option<ModuleId> {
     let package = std_package(db)?;
     let file_module = package.root(db);
-    Some(
-        file_module_id(db, file_module, Some(builtin_module(db)), package)
-            .interned(),
-    )
+    Some(file_module_id(db, *file_module, Some(builtin_module(db)), package))
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
     let ws = Workspace::get(db);
     let packages = workspace_packages(db, ws);
@@ -191,12 +188,11 @@ pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
     unreachable!()
 }
 
-#[salsa::tracked]
-pub fn core_module<'db>(db: &'db dyn Db) -> InternedModuleId<'db> {
+#[salsa::tracked(returns(copy))]
+pub fn core_module<'db>(db: &'db dyn Db) -> ModuleId {
     let package = core_package(db);
     let file_module = package.root(db);
-    file_module_id(db, file_module, Some(builtin_module(db)), package)
-        .interned()
+    file_module_id(db, *file_module, Some(builtin_module(db)), package)
 }
 
 fn collect_modules_in_file_module<'db>(
@@ -252,12 +248,12 @@ pub fn modules_in_package<'db>(
     db: &'db dyn Db,
     package: Package<'db>,
 ) -> Set<ModuleId> {
-    let root_id = file_module_id(db, package.root(db), None, package);
+    let root_id = file_module_id(db, *package.root(db), None, package);
 
     let mut set = Set::new();
     collect_modules_in_file_module(
         db,
-        package.root(db),
+        *package.root(db),
         root_id,
         package,
         &mut set,

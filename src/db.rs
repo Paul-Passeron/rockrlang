@@ -35,7 +35,7 @@ pub struct RockrDb {
 
 #[salsa::db]
 pub trait Db: salsa::Database {
-    fn config(&self) -> compiler::Config {
+    fn config(&self) -> &compiler::Config {
         Workspace::get(self).config(self)
     }
 

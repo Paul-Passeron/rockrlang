@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_iter_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
@@ -54,7 +54,7 @@ pub fn core_mem_module<'db>(db: &'db dyn Db) -> ModuleId {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
     let core_module = core_module(db);
     let iter_module =
@@ -65,7 +65,7 @@ pub fn core_opt_module<'db>(db: &'db dyn Db) -> ModuleId {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_opt_enum<'db>(db: &'db dyn Db) -> EnumId {
     let opt_module = core_opt_module(db);
     let iter_module = resolve_in_module(db, Symbol::new(db, "opt"), opt_module);
@@ -111,7 +111,7 @@ pub fn core_into_iterator_interface<'db>(db: &'db dyn Db) -> InterfaceId {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_int_iter_struct<'db>(db: &'db dyn Db) -> StructId {
     let core_iter_module = core_iter_module(db);
     let int_iter =
@@ -131,9 +131,9 @@ pub fn module_interfaces<'db>(
         module_items(db, module)
             .into_iter()
             .flatten()
-            .filter_map(|item| match item.data {
+            .filter_map(|item| match &item.data {
                 AstTopLevelItemDesc::Interface(ast_interface) => {
-                    Some(ast_interface)
+                    Some(ast_interface.clone())
                 }
                 _ => None,
             })
@@ -149,7 +149,7 @@ pub fn interface_item<'db>(
     Arc::new(
         module_interfaces(db, interface.parent(db).interned())
             .iter()
-            .find(|inter| inter.name.data == interface.name(db))
+            .find(|inter| inter.name.data == *interface.name(db))
             .unwrap()
             .clone(),
     )

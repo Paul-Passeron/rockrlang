@@ -100,7 +100,7 @@ impl<'db> InferenceCtx<'db> {
                         Mutability::Const => BuiltinTypeId::ref_(self.db),
                         Mutability::Mutable => BuiltinTypeId::mut_ref(self.db),
                     }),
-                    fields: Box::new([inner.clone()]),
+                    fields: vec![inner.clone()],
                 }
             } else {
                 inner.clone()
@@ -287,7 +287,7 @@ impl<'db> InferenceCtx<'db> {
                 if lid == rid {
                     let ty = InferTy::Adt {
                         def: TypeDefId::Builtin(lid),
-                        fields: Box::new([]),
+                        fields: Vec::new(),
                     };
                     if let Err(err) = self.unify(res_ty.into(), ty) {
                         return ConstraintSolveResult::Error(err);
@@ -314,7 +314,7 @@ impl<'db> InferenceCtx<'db> {
                         let ty = int_ty_with_witdh(self.db, max_width);
                         let infer_ty = InferTy::Adt {
                             def: ty.def(self.db),
-                            fields: Box::new([]),
+                            fields: Vec::new(),
                         };
                         if let Err(err) = self.unify(res_ty.into(), infer_ty) {
                             return ConstraintSolveResult::Error(err);
@@ -519,14 +519,14 @@ impl<'db> InferenceCtx<'db> {
                     let templates = subs
                         .into_iter()
                         .map(|tid| {
-                            let infer_ty = concrete_to_infer(self.db, tid);
+                            let infer_ty = concrete_to_infer(self.db, *tid);
                             let var = self.fresh_var();
                             self.unify(infer_ty, var.into()).unwrap();
                             var
                         })
                         .collect_vec();
                     return self.finish_method_call(
-                        *id, receiver, method_id, args, *ret_var, *is_static,
+                        *id, receiver, *method_id, args, *ret_var, *is_static,
                         &templates, depth,
                     );
                 }
@@ -588,7 +588,7 @@ impl<'db> InferenceCtx<'db> {
         let method_id = FunctionId::new(
             self.db,
             *method,
-            ScopeOwnerId::Impl(src.id(self.db)),
+            ScopeOwnerId::Impl(*src.id(self.db)),
         );
 
         let ast = impl_items(self.db, src.id(self.db).interned())

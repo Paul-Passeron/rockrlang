@@ -32,13 +32,13 @@ use crate::{
 
 impl Symbol {
     pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db)
+        self.interned().contents(db).to_string()
     }
 }
 
 impl StrLit {
     pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db)
+        self.interned().contents(db).to_string()
     }
 }
 
