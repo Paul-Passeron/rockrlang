@@ -95,39 +95,36 @@ pub(crate) fn reachable_mir_instances(
             let zelf =
                 call_info.zelf_ty.map(|ty| ty.with_substitution(db, &subs));
 
-            let (fdef, callee_subs) = if let ScopeOwnerId::Interface(i_ref) =
-                call_info.callee.parent(db)
-            {
-                let zelf = zelf.unwrap().as_type_id().unwrap();
-                let is_static = call_info.callee.receiver(db).is_static();
-                let arity = call_info.callee.args(db).1.len();
-                let hint = Some(i_ref.def(db));
-                let method = method_impl_for(
-                    db,
-                    zelf,
-                    call_info.callee.name(db),
-                    arity,
-                    is_static,
-                    hint,
-                )
-                .unwrap();
-                let mut new_subs = method
-                    .subs
-                    .iter()
-                    .map(|ty| TypeRef::Concrete(*ty))
-                    .collect_vec();
-                new_subs.extend(callee_subs);
-
-                (method.method_id, new_subs)
-            } else {
-                (call_info.callee, callee_subs)
-            };
+            let (fdef, callee_subs) =
+                concretize_fid(db, call_info.callee, &callee_subs, zelf);
 
             worklist.push((fdef, callee_subs));
         }
     }
 
     res
+}
+
+pub fn concretize_fid(
+    db: &dyn Db,
+    f_id: FunctionId,
+    callee_subs: &[TypeRef],
+    zelf: Option<TypeRef>,
+) -> (FunctionId, Vec<TypeRef>) {
+    let ScopeOwnerId::Interface(i_ref) = f_id.parent(db) else {
+        return (f_id, callee_subs.to_vec());
+    };
+    let zelf = zelf.unwrap().as_type_id().unwrap();
+    let is_static = f_id.receiver(db).is_static();
+    let arity = f_id.args(db).1.len();
+    let hint = Some(i_ref.def(db));
+    let method =
+        method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint)
+            .unwrap();
+    let mut new_subs =
+        method.subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
+    new_subs.extend(callee_subs);
+    (method.method_id, new_subs)
 }
 
 fn process_mir_instance(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) {

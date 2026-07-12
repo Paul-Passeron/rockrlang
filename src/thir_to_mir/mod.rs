@@ -24,6 +24,7 @@ use itertools::{Either, Itertools};
 
 use crate::{
     Db,
+    check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
     compiler::{Workspace, get_sig_of_function, workspace_packages},
     hir::{Mutability, function_ast},
@@ -52,7 +53,6 @@ use crate::{
         thir_body,
     },
     thir_to_mir::lower_match::MatchLowerer,
-    typecheck::conformance::method_impl_for,
 };
 
 pub mod decision_tree;
@@ -905,40 +905,10 @@ impl TypeId {
 
 impl FunctionRef {
     pub fn concretize(mut self, db: &dyn Db, subs: &[TypeRef]) -> Self {
-        if let ScopeOwnerId::Interface(i_ref) = self.id.parent(db) {
-            let zelf = self
-                .self_ty
-                .unwrap()
-                .with_substitution(db, subs)
-                .as_type_id()
-                .unwrap();
-            let is_static = self.id.receiver(db).is_static();
-            let arity = self.params(db).len() - if is_static { 0 } else { 1 };
-            let hint = Some(i_ref.def(db));
-            let method = method_impl_for(
-                db,
-                zelf,
-                self.id.name(db),
-                arity,
-                is_static,
-                hint,
-            )
-            .unwrap_or_else(|| {
-                panic!(
-                    "Could not find method {} of interface {} for type {} (arity = {})!!!",
-                    self.id.name(db).to_string(db),
-                    i_ref.def(db).to_string(db),
-                    TypeRef::Concrete(zelf).to_string(db),
-                    arity
-                )
-            });
-            let mut new_subs = method
-                .subs
-                .iter()
-                .map(|ty| TypeRef::Concrete(*ty))
-                .collect_vec();
-            new_subs.extend(self.args);
-            self.id = method.method_id;
+        let zelf = self.self_ty.map(|ty| ty.with_substitution(db, subs));
+        let (id, new_subs) = concretize_fid(db, self.id, &self.args, zelf);
+        if id != self.id {
+            self.id = id;
             self.args = new_subs;
         }
         self
