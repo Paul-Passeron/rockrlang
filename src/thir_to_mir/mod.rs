@@ -571,6 +571,8 @@ impl<'a> ThirToMIR<'a> {
             }
             ExprKind::SliceLit(_) => todo!(),
             ExprKind::Error => {
+                println!("Thir is:");
+                println!("{}", self.thir.display(self.db));
                 panic!("Can only produce MIR of error-less THIR")
             }
             _ => {
