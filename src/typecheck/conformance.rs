@@ -114,6 +114,20 @@ pub fn candidate_impls_for(db: &dyn Db, ty: TypeId) -> &[CandidateImpl] {
     _candidate_impls_for(db, ty.into())
 }
 
+fn candidate_impl_matches(db: &dyn Db, candidate: &CandidateImpl) -> bool {
+    let subs = &candidate.subs;
+    let templs = candidate.id.templates(db);
+    if subs.len() != templs.len() {
+        // This is a bug
+        return false;
+    }
+    templs.iter().zip(subs).all(|(interfaces, ty)| {
+        interfaces
+            .iter()
+            .all(|interface| type_implements(db, *ty, *interface).is_some())
+    })
+}
+
 fn _type_implements_initial(
     _db: &dyn Db,
     _id: salsa::Id,
@@ -130,22 +144,12 @@ fn _type_implements<'db>(
     interface: InternedInterfaceRef<'db>,
 ) -> Option<ImplId> {
     let impls = candidate_impls_for(db, ty.into());
-    impls.iter().find_map(|impl_id| {
-        let id = impl_id.id;
-        let subs = &impl_id.subs;
+    impls.iter().find_map(|candidate| {
+        let id = candidate.id;
         if id.interface(db) != Some(interface.into()) {
             return None;
         }
-        let templs = id.templates(db);
-        if subs.len() != templs.len() {
-            // This is a bug
-            return None;
-        }
-        let templ_matches = templs.iter().zip(subs).all(|(interfaces, ty)| {
-            interfaces
-                .iter()
-                .all(|interface| type_implements(db, *ty, *interface).is_some())
-        });
+        let templ_matches = candidate_impl_matches(db, candidate);
         if templ_matches { Some(id) } else { None }
     })
 }
@@ -178,18 +182,7 @@ fn _method_impl_for<'db>(
                 return None;
             }
         }
-        let subs = &candidate.subs;
-        let templs = id.templates(db);
-        if subs.len() != templs.len() {
-            // This is a bug
-            return None;
-        }
-        let templ_matches = templs.iter().zip(subs).all(|(interfaces, ty)| {
-            interfaces
-                .iter()
-                .all(|interface| type_implements(db, *ty, *interface).is_some())
-        });
-        if !templ_matches {
+        if !candidate_impl_matches(db, candidate) {
             return None;
         }
         let fid =
