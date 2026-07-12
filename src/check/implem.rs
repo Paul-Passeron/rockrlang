@@ -51,7 +51,7 @@ fn check_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
             let id = FunctionId::new(
                 db,
                 fdef.data.name.data,
-                ScopeOwnerId::Impl(implem.id(db)),
+                ScopeOwnerId::Impl(*implem.id(db)),
             );
             check_fundef(db, id);
         }

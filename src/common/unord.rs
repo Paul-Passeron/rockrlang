@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #![allow(dead_code)]
 use std::hash::Hash;
 
-use salsa::Update;
+use salsa::SalsaValue;
 
 /// Unordered collection of items for easy interning of set-like objects in
 /// salsa
@@ -128,15 +128,4 @@ where
     }
 }
 
-unsafe impl<T> Update for Set<T>
-where
-    T: Eq + Ord + Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        unsafe {
-            old_pointer.as_mut().is_none_or(|val| {
-                Vec::<T>::maybe_update(&mut val.items, new_value.items)
-            })
-        }
-    }
-}
+unsafe impl<T> SalsaValue for Set<T> where T: Eq + Ord + SalsaValue {}

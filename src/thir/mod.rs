@@ -30,7 +30,6 @@ use crate::{
     thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };
-use std::sync::Arc;
 
 pub mod display;
 pub mod expr;
@@ -225,30 +224,31 @@ pub struct ThirMatchBranch {
     pub body: Vec<ThirStmt>,
 }
 
-#[derive(Clone)]
-pub struct ThirArc(Arc<Thir>);
+// Does this match the old behaviour ?
 
-impl PartialEq for ThirArc {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+impl PartialEq for Thir {
+    fn eq(&self, _: &Self) -> bool {
+        false
     }
 }
-impl Eq for ThirArc {}
 
-pub fn thir_body(db: &dyn Db, function: FunctionId) -> Option<Arc<Thir>> {
-    _thir_body(db, function.interned()).map(|arc| arc.0)
+pub fn thir_body<'db>(
+    db: &'db dyn Db,
+    function: FunctionId,
+) -> Option<&'db Thir> {
+    _thir_body(db, function.interned()).as_ref()
 }
 
 #[salsa::tracked]
 pub fn _thir_body<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
-) -> Option<ThirArc> {
+) -> Option<Thir> {
     let f_id: FunctionId = function.into();
     let hir = hir_body(db, function.into())?;
     let tc = type_check_function(db, f_id)?;
     let thir = thir_body_from_hir(db, hir, tc);
-    Some(ThirArc(Arc::new(thir)))
+    Some(thir)
 }
 
 fn get_thir_body_span(db: &dyn Db, thir: &Thir) -> Span {

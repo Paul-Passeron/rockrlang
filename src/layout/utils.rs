@@ -140,11 +140,11 @@ impl LayoutID {
     }
 
     pub fn size(self, db: &dyn Db) -> Size {
-        self.interned().size(db)
+        *self.interned().size(db)
     }
 
     pub fn align(self, db: &dyn Db) -> Align {
-        self.interned().align(db)
+        *self.interned().align(db)
     }
 }
 

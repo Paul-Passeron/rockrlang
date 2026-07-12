@@ -93,7 +93,7 @@ fn _loc_info(db: &dyn Db, loc: Location) -> LocationInfo {
     struct Interned {
         inner: Location,
     }
-    #[salsa::tracked]
+    #[salsa::tracked(returns(clone))]
     fn _tracked<'a>(db: &'a dyn Db, loc: Interned<'a>) -> LocationInfo {
         let loc = loc.inner(db);
         let mut line = 1;

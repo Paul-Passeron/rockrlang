@@ -34,57 +34,57 @@ impl<'db> InferenceCtx<'db> {
     pub fn void_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::void(self.db)),
-            fields: Box::new([]),
+            fields: Vec::new(),
         }
     }
 
     pub fn int_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::int(self.db)),
-            fields: Box::new([]),
+            fields: Vec::new(),
         }
     }
 
     pub fn usize_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::usize(self.db)),
-            fields: Box::new([]),
+            fields: Vec::new(),
         }
     }
 
     pub fn bool_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::bool(self.db)),
-            fields: Box::new([]),
+            fields: Vec::new(),
         }
     }
 
     pub fn char_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::char(self.db)),
-            fields: Box::new([]),
+            fields: Vec::new(),
         }
     }
 
     pub fn str_ty(&self) -> InferTy {
-        InferTy::Adt { def: str_def(self.db), fields: Box::new([]) }
+        InferTy::Adt { def: str_def(self.db), fields: Vec::new(), }
     }
 
     pub fn ptr_of(&self, ty: InferTy) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::ptr(self.db)),
-            fields: Box::new([ty]),
+            fields: vec![ty],
         }
     }
 
     pub fn slice_of(&self, ty: InferTy) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db)),
-            fields: Box::new([ty]),
+            fields: vec![ty],
         }
     }
 
-    pub fn tuple_of(&self, tys: Box<[InferTy]>) -> InferTy {
+    pub fn tuple_of(&self, tys: Vec<InferTy>) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
             fields: tys,

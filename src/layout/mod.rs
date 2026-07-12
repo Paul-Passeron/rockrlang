@@ -143,11 +143,11 @@ struct InternedTRef {
     inner: TypeRef,
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
     let ty = ty.inner(db);
     if ty.is_fat_ptr(db) {
-        return fat_ptr_layout_for(db, ty).into();
+        return fat_ptr_layout_for(db, *ty).into();
     }
     match ty {
         TypeRef::Concrete(type_id) => match type_id.def(db) {

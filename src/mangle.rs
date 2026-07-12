@@ -81,11 +81,11 @@ pub enum MangleFun {
 
 #[salsa::tracked]
 fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
-    let fdef = f.fdef(db);
+    let fdef = *f.fdef(db);
     let templates = f
         .subs(db)
         .iter()
-        .map(|ty| ty_mangle(db, *ty).as_ref().clone())
+        .map(|ty| ty_mangle(db, *ty).clone())
         .collect_vec();
     let path = path_of_module(db, owning_module(db, fdef.parent(db)));
     let name = fdef.name(db).to_string(db);
@@ -93,9 +93,9 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     let parameters = inst
         .params(db)
         .iter()
-        .map(|(_, ty)| ty_mangle(db, *ty).as_ref().clone())
+        .map(|(_, ty)| ty_mangle(db, *ty).clone())
         .collect_vec();
-    let ret = ty_mangle(db, inst.ret_ty(db)).as_ref().clone();
+    let ret = ty_mangle(db, inst.ret_ty(db)).clone();
     let sig = MangleSig { name, parameters, ret };
     match function_ast(db, fdef.into()).inner(db) {
         FunctionLikeAst::ExternDef(_, _) => {
@@ -106,7 +106,7 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
         }
         FunctionLikeAst::Method(method) => {
             let zelf = fdef.parent(db).get_canonical_zelf(db).unwrap();
-            let ty = ty_mangle(db, zelf).as_ref().clone();
+            let ty = ty_mangle(db, zelf).clone();
             let is_static = method.data.receiver.is_static();
             Arc::new(MangleFun::Method { is_static, ty, sig, templates })
         }
@@ -114,7 +114,7 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     }
 }
 
-pub fn fun_mangle(db: &dyn Db, f: FuncInst) -> Arc<MangleFun> {
+pub fn fun_mangle(db: &dyn Db, f: FuncInst) -> &MangleFun {
     _fun_mangle(db, f.interned())
 }
 
@@ -124,22 +124,19 @@ struct InternedTR {
 }
 
 #[salsa::tracked]
-pub fn _ty_mangle<'db>(
-    db: &'db dyn Db,
-    ty: InternedTR<'db>,
-) -> Arc<MangleType> {
+pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
     let ty = match ty.tref(db) {
-        TypeRef::Concrete(type_id) => mangle_type_id(db, type_id),
+        TypeRef::Concrete(type_id) => mangle_type_id(db, *type_id),
         _ => MangleType::Error,
     };
-    Arc::new(ty)
+    ty
 }
 
 fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
     let args = id
         .args(db)
         .iter()
-        .map(|ty| ty_mangle(db, *ty).as_ref().clone())
+        .map(|ty| ty_mangle(db, *ty).clone())
         .collect_vec();
     let (name, path) = match id.def(db) {
         TypeDefId::Builtin(id) => return mangle_builtin_id(db, id, args),
@@ -195,7 +192,7 @@ fn mangle_builtin_id(
     }
 }
 
-pub fn ty_mangle(db: &dyn Db, tref: TypeRef) -> Arc<MangleType> {
+pub fn ty_mangle(db: &dyn Db, tref: TypeRef) -> &MangleType {
     _ty_mangle(db, InternedTR::new(db, tref))
 }
 

@@ -15,10 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use salsa::Accumulator;
@@ -90,10 +87,10 @@ pub fn check_duplicate_defs(
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn check_module<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) {
     // Skip the core module if config says so
-    if db.config().skip_core && module == core_module(db) {
+    if db.config().skip_core && module == core_module(db).into() {
         return;
     }
     let defs = module_definitions(db, module);
@@ -102,7 +99,7 @@ pub fn check_module<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) {
         check_definition(db, def.1);
     }
     for implem in module_impls(db, module) {
-        check_implem(db, implem);
+        check_implem(db, *implem);
     }
 }
 
@@ -124,10 +121,13 @@ fn collect_module_functions<'db>(
     let mut funcs = vec![];
     for (_, def) in module_definitions(db, module) {
         match def {
-            Definition::Function(function_id) => funcs.push(function_id),
+            Definition::Function(function_id) => funcs.push(*function_id),
             Definition::Module(module_id) => {
-                funcs
-                    .extend(collect_module_functions(db, module_id.interned()));
+                funcs.extend(
+                    collect_module_functions(db, module_id.interned())
+                        .iter()
+                        .copied(),
+                );
             }
             Definition::Interface(_) | Definition::Type(_) => (),
         }
@@ -139,8 +139,8 @@ fn collect_module_functions<'db>(
 pub fn reachable_frefs<'db>(
     db: &'db dyn Db,
     pkg: Package<'db>,
-) -> Arc<Vec<FuncInst>> {
-    let module = file_module_id(db, pkg.root(db), None, pkg);
+) -> Vec<FuncInst> {
+    let module = file_module_id(db, *pkg.root(db), None, pkg);
     let roots = collect_module_functions(db, module.interned());
 
     let mut seen: HashSet<MIRKey> = HashSet::new();
@@ -159,10 +159,10 @@ pub fn reachable_frefs<'db>(
             }
         }
     }
-    Arc::new(frefs)
+    frefs
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn check_package<'db>(db: &'db dyn Db, pkg: Package<'db>) {
-    check_file_module(db, pkg.root(db), pkg, None);
+    check_file_module(db, *pkg.root(db), pkg, None);
 }

@@ -419,7 +419,7 @@ impl<'db> InferenceCtx<'db> {
             InferenceConstraintKind::Deref { var, target } => {
                 let adt = InferTy::Adt {
                     def: TypeDefId::Builtin(BuiltinTypeId::ref_(self.db)),
-                    fields: Box::new([target.clone()]),
+                    fields: vec![target.clone()],
                 };
                 match self.unify(var.into(), adt) {
                     Ok(()) => ConstraintSolveResult::Solved,

@@ -29,8 +29,7 @@ use std::collections::HashSet;
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     if let Some(thir) = thir_body(db, fdef) {
-        // println!("{}", thir.display(db));
-        validate_thir(db, thir.as_ref());
+        validate_thir(db, thir);
     }
 
     for (fdef, subs) in reachable_mir_instances(db, fdef) {

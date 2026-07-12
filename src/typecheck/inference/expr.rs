@@ -105,7 +105,7 @@ impl<'db> InferenceCtx<'db> {
                 let tys = exprs
                     .iter()
                     .map(|expr| self.infer_expr(expr))
-                    .collect::<Result<Box<[_]>, _>>()?;
+                    .try_collect()?;
                 Ok(self.tuple_of(tys))
             }
             HirExprDesc::SliceLit(exprs) => {
@@ -131,7 +131,8 @@ impl<'db> InferenceCtx<'db> {
                 Diag::generic_error(
                     "function not found in current scope".into(),
                     expr.span,
-                ).accumulate(self.db);
+                )
+                .accumulate(self.db);
                 Ok(InferTy::Var(self.fresh_var()))
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
@@ -229,7 +230,7 @@ impl<'db> InferenceCtx<'db> {
     fn allocate_struct_partial_ref(
         &mut self,
         type_ref: &PartialTypeRef,
-    ) -> Option<(StructId, Box<[InferTy]>)> {
+    ) -> Option<(StructId, Vec<InferTy>)> {
         match type_ref {
             PartialTypeRef::Resolved(TypeRef::Zelf) => {
                 let zelf = self.implicit_ctx().zelf()?.clone();
@@ -248,10 +249,10 @@ impl<'db> InferenceCtx<'db> {
                     TypeDefId::Struct(struct_id) => {
                         let templates =
                             templates_of_struct(self.db, struct_id.interned());
-                        let templates = templates
+                        let templates: Vec<InferTy> = templates
                             .iter()
                             .map(|_| self.fresh_var().into())
-                            .collect::<Box<[InferTy]>>();
+                            .collect_vec();
                         let args = type_id.args(self.db);
                         self.snapshot(|this| {
                             templates.iter().zip(args.iter()).try_for_each(
@@ -277,10 +278,10 @@ impl<'db> InferenceCtx<'db> {
                 let struct_id = *struct_id;
                 let templates =
                     templates_of_struct(self.db, struct_id.interned());
-                let templates = templates
+                let templates :Vec<InferTy> = templates
                     .iter()
                     .map(|_| self.fresh_var().into())
-                    .collect::<Box<[InferTy]>>();
+                    .collect_vec();
 
                 self.snapshot(|this| {
                     args.iter()
@@ -290,7 +291,7 @@ impl<'db> InferenceCtx<'db> {
                                 this.implicit_ctx().as_ref(),
                             )
                         })
-                        .collect::<Box<[_]>>()
+                        .collect_vec()
                         .into_iter()
                         .zip(templates.iter())
                         .try_for_each(|(t_ref, infer_ty)| {
@@ -324,7 +325,7 @@ impl<'db> InferenceCtx<'db> {
             self.diagnose_bad_struct_fields(
                 fields,
                 span,
-                &ast,
+                ast,
                 &inferred_fields,
                 struct_id,
             )?;
@@ -375,7 +376,7 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         _fields: &[(Symbol, HirExpr)],
         _span: Span,
-        ast: &Arc<AstStructDef>,
+        ast: &AstStructDef,
         inferred_fields: &HashMap<Symbol, InferTy>,
         _struct_id: StructId,
     ) -> Result<(), UnificationError> {

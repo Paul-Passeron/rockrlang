@@ -65,7 +65,7 @@ use var::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferTy {
     Var(InferVar),
-    Adt { def: TypeDefId, fields: Box<[InferTy]> },
+    Adt { def: TypeDefId, fields: Vec<InferTy> },
     Param(TypeParamId),
 }
 
@@ -230,7 +230,7 @@ impl<'db> InferenceCtx<'db> {
 
         infer_templates
             .iter()
-            .zip(templates.as_ref())
+            .zip(templates)
             .for_each(|(infer_ty, ast)| {
                 let constraints = &ast.constraints;
                 for cons in constraints {
@@ -473,30 +473,24 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn get_templates_for(&mut self, def: Definition) -> Box<[InferTy]> {
-        let asts: Arc<[AstTemplateArg]> = match def {
+    pub fn get_templates_for(&mut self, def: Definition) -> Vec<InferTy> {
+        let asts: &[AstTemplateArg] = match def {
             Definition::Function(func) => {
                 get_templates_of_fun(self.db, func.interned())
             }
             Definition::Interface(_) => todo!(),
             Definition::Module(_) => {
-                return Box::new([]);
+                return Vec::new();
             }
             Definition::Type(tdef) => match tdef {
                 TypeDefId::Builtin(_) => {
-                    return Box::new([]);
+                    return Vec::new();
                 }
                 TypeDefId::Struct(struct_id) => {
                     templates_of_struct(self.db, struct_id.interned())
-                        .iter()
-                        .cloned()
-                        .collect()
                 }
                 TypeDefId::Enum(enum_id) => {
                     templates_of_enum(self.db, enum_id.interned())
-                        .iter()
-                        .cloned()
-                        .collect()
                 }
             },
         };

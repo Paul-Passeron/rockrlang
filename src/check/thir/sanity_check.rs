@@ -557,9 +557,9 @@ impl<'db> SanityChecker<'db> {
                 if before.def(self.db).is_ptr_like(self.db).is_none() {
                     None
                 } else {
-                    let mut args = before.args(self.db);
+                    let args = before.args(self.db);
                     assert_eq!(args.len(), 1);
-                    args.pop()
+                    Some(args[0])
                 }
             }
             Projection::Field(symbol, type_ref) => {
@@ -669,7 +669,7 @@ impl<'db> SanityChecker<'db> {
                 type_id
                     .args(self.db)
                     .into_iter()
-                    .map(|ty| self.normalize_type(ty))
+                    .map(|ty| self.normalize_type(*ty))
                     .collect(),
             )),
             _ => ty, // TODO Maybe
@@ -825,9 +825,9 @@ impl TypeRef {
     pub fn as_slice(self, db: &dyn Db) -> Option<Self> {
         let ty = self.as_type_id()?;
         if ty.def(db) == TypeDefId::Builtin(BuiltinTypeId::slice(db)) {
-            let mut args = ty.args(db);
+            let args = ty.args(db);
             assert_eq!(args.len(), 1);
-            Some(args.remove(0))
+            Some(args[0])
         } else {
             None
         }

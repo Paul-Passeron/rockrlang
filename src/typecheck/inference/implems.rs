@@ -61,7 +61,7 @@ impl<'a> InferenceCtx<'a> {
                     fields.iter().zip(other_fields).try_for_each(
                         |(infer_ty, matcher)| {
                             constraints.extend(
-                                self.matches_ty(infer_ty, matcher, ctx)?,
+                                self.matches_ty(infer_ty, *matcher, ctx)?,
                             );
                             Some(())
                         },
@@ -105,7 +105,7 @@ impl<'a> InferenceCtx<'a> {
 
         let ctx = ImplicitContext::new(
             self.db,
-            ScopeOwnerId::Impl(source.id(self.db)),
+            ScopeOwnerId::Impl(*source.id(self.db)),
             Arc::new([]),
             mapped_templates.iter().cloned().collect(),
             Some(ty.clone()),
@@ -135,7 +135,7 @@ impl<'a> InferenceCtx<'a> {
         Some(PotentialBlockRes { templates: infer_templates, constraints })
     }
 
-    fn get_packages(db: &dyn Db) -> Arc<Vec<Package<'_>>> {
+    fn get_packages(db: &dyn Db) -> &[Package<'_>] {
         workspace_packages(db, Workspace::get(db))
     }
 
@@ -143,15 +143,13 @@ impl<'a> InferenceCtx<'a> {
         &mut self,
         ty: &InferTy,
     ) -> HashMap<ImplSource<'a>, PotentialBlockRes> {
-        Self::get_packages(self.db)
+        let db = self.db;
+        Self::get_packages(db)
             .iter()
-            .copied()
-            .collect::<Box<[_]>>()
-            .into_iter()
-            .flat_map(|package| impls_in_package(self.db, package))
+            .flat_map(|package| impls_in_package(self.db, *package).iter())
             .filter_map(|impl_source| {
-                self.is_potential_block(ty, impl_source)
-                    .map(|res| (impl_source, res))
+                self.is_potential_block(ty, *impl_source)
+                    .map(|res| (*impl_source, res))
             })
             .collect()
     }

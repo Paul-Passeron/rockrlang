@@ -89,7 +89,7 @@ impl FuncInst {
     }
 
     pub fn fdef(self, db: &dyn Db) -> FunctionId {
-        self.interned().fdef(db)
+        *self.interned().fdef(db)
     }
 
     pub fn subs(self, db: &dyn Db) -> &[TypeRef] {
@@ -156,7 +156,8 @@ impl FuncInst {
             main_pkg = Some(*pkg);
         }
         let main_pkg = main_pkg.unwrap();
-        let file_module = file_module_id(db, main_pkg.root(db), None, main_pkg);
+        let file_module =
+            file_module_id(db, *main_pkg.root(db), None, main_pkg);
         let f_id = FunctionId::new(
             db,
             Symbol::new(db, "main"),
@@ -175,10 +176,10 @@ impl FuncInst {
 
 #[salsa::tracked(returns(ref))]
 pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
-    let Some(thir) = thir_body(db, key.fdef(db)) else {
+    let Some(thir) = thir_body(db, *key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
     };
-    ThirToMIR::new(db, thir.as_ref(), key.subs(db)).lower()
+    ThirToMIR::new(db, thir, key.subs(db)).lower()
 }
 
 pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &MIR {
@@ -201,9 +202,10 @@ impl<'a> ThirToMIR<'a> {
 
     pub fn is_valid_ty(&self, ty: TypeRef) -> bool {
         match ty {
-            TypeRef::Concrete(type_id) => {
-                type_id.args(self.db).into_iter().all(|ty| self.is_valid_ty(ty))
-            }
+            TypeRef::Concrete(type_id) => type_id
+                .args(self.db)
+                .into_iter()
+                .all(|ty| self.is_valid_ty(*ty)),
             TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
             _ => false,
@@ -219,7 +221,7 @@ impl<'a> ThirToMIR<'a> {
                 type_id
                     .args(self.db)
                     .into_iter()
-                    .map(|ty| self.ty(ty))
+                    .map(|ty| self.ty(*ty))
                     .collect(),
             )),
             TypeRef::Param(id) => self.subs[id.0],
@@ -774,7 +776,7 @@ impl<'a> ThirToMIR<'a> {
                 ty: char_id(self.db).into(),
             }),
             ExprKind::CStrLit(str_lit) => Some(MIRConstant::CString {
-                contents: str_lit.interned().contents(self.db),
+                contents: str_lit.interned().contents(self.db).to_string(),
                 null_terminated: true,
             }),
             ExprKind::BoolLit(value) => Some(MIRConstant::Bool(*value)),

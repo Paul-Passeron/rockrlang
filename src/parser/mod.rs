@@ -172,7 +172,7 @@ impl<'db> Parser<'db> {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
     let lex_res = lex_file(db, file);
     let tokens = match lex_res {

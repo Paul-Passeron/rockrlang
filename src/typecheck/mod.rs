@@ -124,7 +124,14 @@ impl<'db> TyCtx<'db> {
             locals.iter().map(|local| local.id).collect::<Box<[_]>>();
         let inf_ctx = InferenceCtx::new(db, &local_ids, function, zelf, params);
 
-        Self { db, function, locals, params, templates, inf_ctx }
+        Self {
+            db,
+            function,
+            locals,
+            params,
+            templates: templates.iter().cloned().collect(),
+            inf_ctx,
+        }
     }
 
     fn concretize_infos(&mut self, infos: InferCallInfos) -> CallInfos {
@@ -635,11 +642,11 @@ fn type_check_hir<'db>(
     db: &'db dyn Db,
     hir: HirBody<'db>,
 ) -> TypeCheckResults<'db> {
-    TyCtx::new(db, hir.owner(db), hir.locals(db), hir.params(db), hir.zelf(db))
+    TyCtx::new(db, *hir.owner(db), hir.locals(db), hir.params(db), *hir.zelf(db))
         .type_check(hir.stmts(db))
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn _type_check_function<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
