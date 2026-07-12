@@ -15,15 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use itertools::Itertools;
+
 use crate::{
     Db,
     check::{mir::check_mir, thir::validate_thir},
     hir::function_ast,
     name_resolve::type_expr::get_templates_of_fun,
-    ril::{FunctionId, TypeRef},
+    ril::{FunctionId, ScopeOwnerId, TypeRef},
     thir::thir_body,
     thir_to_mir::{_mir, MIRKey, mir},
-    typecheck::type_check_function,
+    typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;
 
@@ -85,7 +87,43 @@ pub(crate) fn reachable_mir_instances(
                 .map(|ty| ty.with_substitution(db, &subs))
                 .collect();
 
-            worklist.push((call_info.callee, callee_subs));
+            assert_eq!(
+                get_templates_of_fun(db, call_info.callee.into()).len(),
+                callee_subs.len()
+            );
+
+            let zelf =
+                call_info.zelf_ty.map(|ty| ty.with_substitution(db, &subs));
+
+            let (fdef, callee_subs) = if let ScopeOwnerId::Interface(i_ref) =
+                call_info.callee.parent(db)
+            {
+                let zelf = zelf.unwrap().as_type_id().unwrap();
+                let is_static = call_info.callee.receiver(db).is_static();
+                let arity = call_info.callee.args(db).1.len();
+                let hint = Some(i_ref.def(db));
+                let method = method_impl_for(
+                    db,
+                    zelf,
+                    call_info.callee.name(db),
+                    arity,
+                    is_static,
+                    hint,
+                )
+                .unwrap();
+                let mut new_subs = method
+                    .subs
+                    .iter()
+                    .map(|ty| TypeRef::Concrete(*ty))
+                    .collect_vec();
+                new_subs.extend(callee_subs);
+
+                (method.method_id, new_subs)
+            } else {
+                (call_info.callee, callee_subs)
+            };
+
+            worklist.push((fdef, callee_subs));
         }
     }
 

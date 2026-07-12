@@ -949,10 +949,8 @@ impl<'db> ThirTranslator<'db> {
                     thir_args
                 };
 
-                let zelf_ty = call_infos
-                    .zelf_ty
-                    .clone()
-                    .or_else(|| match call_infos.callee.parent(self.db) {
+                let zelf_ty = call_infos.zelf_ty.clone().or_else(|| {
+                    match call_infos.callee.parent(self.db) {
                         ScopeOwnerId::Impl(impl_id) => Some(
                             impl_id.implemented(self.db).with_substitution(
                                 self.db,
@@ -960,7 +958,8 @@ impl<'db> ThirTranslator<'db> {
                             ),
                         ),
                         _ => None,
-                    });
+                    }
+                });
 
                 let fref = FunctionRef {
                     id: call_infos.callee,
@@ -991,7 +990,7 @@ impl<'db> ThirTranslator<'db> {
                 let fref = FunctionRef {
                     id: call_infos.callee,
                     args: call_infos.substitution.clone(),
-                    self_ty: None,
+                    self_ty: call_infos.zelf_ty,
                     dispatch: Dispatch::Direct,
                 };
                 ExprKind::Call { called: fref, args: thir_args }
