@@ -1,0 +1,17 @@
+interface Foo {
+    fun bar(&self): void;
+}
+
+struct X { }
+
+impl Foo for X {
+    fun bar(&self): void {}
+}
+
+fun baz<T: Foo>(t: T): void {
+    t.foo();
+}
+
+fun qux(x: X): void {
+    baz(x);
+}
