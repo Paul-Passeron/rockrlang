@@ -24,7 +24,7 @@ use crate::{
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, ScopeOwnerId, TypeRef},
     thir::thir_body,
-    thir_to_mir::{_mir, MIRKey, mir},
+    thir_to_mir::{MIRKey, mir},
     typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;
@@ -35,7 +35,6 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     }
 
     for (fdef, subs) in reachable_mir_instances(db, fdef) {
-        process_mir_instance(db, fdef, subs.clone());
         if fdef.has_body(db) {
             let the_mir = mir(db, fdef, subs);
             check_mir(db, the_mir);
@@ -125,49 +124,4 @@ pub fn concretize_fid(
         method.subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
     new_subs.extend(callee_subs);
     (method.method_id, new_subs)
-}
-
-fn process_mir_instance(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) {
-    _process_mir_instance(db, MIRKey::new(db, fdef, subs));
-}
-
-#[salsa::tracked]
-fn _process_mir_instance<'db>(db: &'db dyn Db, key: MIRKey<'db>) {
-    let fdef = key.fdef(db);
-    if !fdef.has_body(db) {
-        return;
-    }
-
-    let the_mir = _mir(db, key);
-
-    check_mir(db, the_mir);
-
-    // let subs = key.subs(db);
-    // println!(
-    //     "{}: {}{}",
-    //     fdef.span(db).start().loc_info(db),
-    //     fdef.called_to_string(db),
-    //     if subs.is_empty() {
-    //         String::new()
-    //     } else {
-    //         format!(
-    //             " with substitutions <{}>",
-    //             subs.iter().map(|ty| ty.to_string(db)).join(", ")
-    //         )
-    //     }
-    // );
-
-    // println!("{}", the_mir.display(db),);
-
-    // let liveness = the_mir.as_ref().liveness(db);
-    // println!("Liveness analysis:");
-    // println!("{liveness}");
-
-    // let init = the_mir.init_tracking(db);
-    // println!("init analysis:");
-    // println!("{init}");
-
-    // let loans = the_mir.loans(db);
-    // println!("loans analysis:");
-    // println!("{}", loans.display(db));
 }
