@@ -78,8 +78,6 @@ pub(crate) fn reachable_mir_instances(
             continue;
         };
         for call_info in tc.call_infos(db).values() {
-            // Compose: the callee's substitution is written in terms of
-            // the *caller's* params; instantiate it with our own subs.
             let callee_subs: Vec<TypeRef> = call_info
                 .substitution
                 .iter()
