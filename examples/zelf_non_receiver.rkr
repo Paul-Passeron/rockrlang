@@ -10,6 +10,10 @@ impl Foo {
         core::io::printf(c"  .y = %d,\n", self.y);
         "}".println();
     }
+
+    fun comsuming_add(self, other: Self): Self {
+        return self.add(&other);
+    }
 }
 
 interface Addable {
@@ -48,5 +52,9 @@ fun main(): int {
     f2.dump(); nl();
     f3.dump(); nl();
     f4.dump(); nl();
+    let f5 = f1.comsuming_add(f2);
+    f5.dump(); nl();
+    // f1.dump(); nl(); // Use after move
+    
     return 0;
 }
