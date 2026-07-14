@@ -6,8 +6,11 @@ impl Empty {
     }
 
     fun twice(&self): void {
-        self.hello();
-        self.hello();
+        "Saying hello twice !".println();
+    }
+
+    fun consuming(self): void {
+        "This is consuming".println();
     }
 }
 
@@ -15,5 +18,7 @@ fun main(): int {
     let empty: Empty = Empty {};
     empty.hello();
     empty.twice();
+    empty.consuming();
+    
     return 0;
 }
