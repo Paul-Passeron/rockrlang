@@ -1,0 +1,310 @@
+core::io::`impl core::io::str`::println
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+
+  bb1:
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+
+  bb2:
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+
+  bb3:
+    _5 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump
+mir {
+  locals:
+    _0: self :&zelf_non_receiver::Foo
+    _1: core::io::str
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: void
+    _6: core::io::str
+    _7: &core::io::str
+    _8: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = str {data: "Foo {", len: 5_int}
+    _2 = &_1
+    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb1
+
+  bb1:
+    _4 = call core::io::printf(c"  .x = %d,\n", copy _0.*.x) -> bb2
+
+  bb2:
+    _5 = call core::io::printf(c"  .y = %d,\n", copy _0.*.y) -> bb3
+
+  bb3:
+    _6 = str {data: "}", len: 1_int}
+    _7 = &_6
+    _8 = call core::io::`impl core::io::str`::println(move _7) -> bb4
+
+  bb4:
+    return
+}
+
+zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add
+mir {
+  locals:
+    _0: self :zelf_non_receiver::Foo
+    _1: other :zelf_non_receiver::Foo
+    _2: &zelf_non_receiver::Foo
+    _3: &zelf_non_receiver::Foo
+    _4: zelf_non_receiver::Foo
+
+  params: [
+    _0,
+    _1,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _2 = &_0
+    _3 = &_1
+    _4 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _2, move _3) -> bb1
+
+  bb1:
+    return move _4
+}
+
+zelf_non_receiver::sum_twice
+mir {
+  locals:
+    _0: a :&zelf_non_receiver::Foo
+    _1: &zelf_non_receiver::Foo
+    _2: zelf_non_receiver::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = &_0.*
+    _2 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _1, copy _0) -> bb1
+
+  bb1:
+    return move _2
+}
+
+zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add
+mir {
+  locals:
+    _0: self :&zelf_non_receiver::Foo
+    _1: other :&zelf_non_receiver::Foo
+    _2: int
+    _3: int
+    _4: zelf_non_receiver::Foo
+
+  params: [
+    _0,
+    _1,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _2 = copy _0.*.x + copy _1.*.x
+    _3 = copy _0.*.y + copy _1.*.y
+    _4 = Foo {x: move _2, y: move _3}
+    return move _4
+}
+
+zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double
+mir {
+  locals:
+    _0: self :&zelf_non_receiver::Foo
+    _1: zelf_non_receiver::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call zelf_non_receiver::sum_twice::<T0>(copy _0) -> bb1
+
+  bb1:
+    return move _1
+}
+
+zelf_non_receiver::nl
+mir {
+  locals:
+    _0: core::io::str
+    _1: &core::io::str
+    _2: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = str {data: "", len: 0_int}
+    _1 = &_0
+    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
+
+  bb1:
+    return
+}
+
+zelf_non_receiver::main
+mir {
+  locals:
+    _0: f1 :zelf_non_receiver::Foo
+    _1: f2 :zelf_non_receiver::Foo
+    _2: &zelf_non_receiver::Foo
+    _3: &zelf_non_receiver::Foo
+    _4: zelf_non_receiver::Foo
+    _5: f3 :zelf_non_receiver::Foo
+    _6: &zelf_non_receiver::Foo
+    _7: zelf_non_receiver::Foo
+    _8: f4 :zelf_non_receiver::Foo
+    _9: &zelf_non_receiver::Foo
+    _10: void
+    _11: void
+    _12: &zelf_non_receiver::Foo
+    _13: void
+    _14: void
+    _15: &zelf_non_receiver::Foo
+    _16: void
+    _17: void
+    _18: &zelf_non_receiver::Foo
+    _19: void
+    _20: void
+    _21: zelf_non_receiver::Foo
+    _22: f5 :zelf_non_receiver::Foo
+    _23: &zelf_non_receiver::Foo
+    _24: void
+    _25: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = Foo {x: 123_int, y: 456_int}
+    _1 = Foo {x: 321_int, y: 654_int}
+    _2 = &_0
+    _3 = &_1
+    _4 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _2, move _3) -> bb1
+
+  bb1:
+    _5 = move _4
+    _6 = &_0
+    _7 = call zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double::<zelf_non_receiver::Foo>(move _6) -> bb2
+
+  bb2:
+    _8 = move _7
+    _9 = &_0
+    _10 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _9) -> bb3
+
+  bb3:
+    _11 = call zelf_non_receiver::nl() -> bb4
+
+  bb4:
+    _12 = &_1
+    _13 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _12) -> bb5
+
+  bb5:
+    _14 = call zelf_non_receiver::nl() -> bb6
+
+  bb6:
+    _15 = &_5
+    _16 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _15) -> bb7
+
+  bb7:
+    _17 = call zelf_non_receiver::nl() -> bb8
+
+  bb8:
+    _18 = &_8
+    _19 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _18) -> bb9
+
+  bb9:
+    _20 = call zelf_non_receiver::nl() -> bb10
+
+  bb10:
+    _21 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(move _0, move _1) -> bb11
+
+  bb11:
+    _22 = move _21
+    _23 = &_22
+    _24 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _23) -> bb12
+
+  bb12:
+    _25 = call zelf_non_receiver::nl() -> bb13
+
+  bb13:
+    return 0_int
+}
+

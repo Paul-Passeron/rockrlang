@@ -106,6 +106,7 @@ mod thir {
     thir_snapshot_test!(simple_match, "simple_match");
     thir_snapshot_test!(while_loop, "while_loop");
     thir_snapshot_test!(implems, "implems");
+    thir_snapshot_test!(zelf_non_receiver, "zelf_non_receiver");
 }
 
 mod mir {
@@ -127,4 +128,5 @@ mod mir {
     mir_snapshot_test!(simple_match, "simple_match");
     mir_snapshot_test!(while_loop, "while_loop");
     mir_snapshot_test!(implems, "implems");
+    mir_snapshot_test!(zelf_non_receiver, "zelf_non_receiver");
 }

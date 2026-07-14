@@ -1,0 +1,74 @@
+core/io.rkr:26:5
+thir fun core::io::`impl core::io::str`::println(&self): void {
+    core::io::printf(c%.*s\n, (*self).len, (*self).data);
+}
+
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/zelf_non_receiver.rkr:7:5
+thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&self): void {
+    let _1: core::io::str = Foo {;
+    <core::io::str>::core::io::`impl core::io::str`::println(&_1);
+    core::io::printf(c  .x = %d,\n, (*self).x);
+    core::io::printf(c  .y = %d,\n, (*self).y);
+    let _2: core::io::str = };
+    <core::io::str>::core::io::`impl core::io::str`::println(&_2);
+}
+
+examples/zelf_non_receiver.rkr:14:5
+thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(self, other: Self): Self {
+    return <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&self, &other);
+}
+
+examples/zelf_non_receiver.rkr:23:1
+thir fun zelf_non_receiver::sum_twice<T0: zelf_non_receiver::Addable>(a: &T0): T0 {
+    return <T0>::zelf_non_receiver::Addable::add(&(*a), a);
+}
+
+examples/zelf_non_receiver.rkr:28:5
+thir fun zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&self, other: &Self): Self {
+    return zelf_non_receiver::Foo { x: ((*self).x + (*other).x), y: ((*self).y + (*other).y) };
+}
+
+examples/zelf_non_receiver.rkr:37:5
+thir fun zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double<T0: zelf_non_receiver::Addable>(&self): Self {
+    return zelf_non_receiver::sum_twice::<T0>(self);
+}
+
+examples/zelf_non_receiver.rkr:42:1
+thir fun zelf_non_receiver::nl(): void {
+    let _0: core::io::str = ;
+    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+}
+
+examples/zelf_non_receiver.rkr:46:1
+thir fun zelf_non_receiver::main(): int {
+    let f1: zelf_non_receiver::Foo = zelf_non_receiver::Foo { x: 123, y: 456 };
+    let f2: zelf_non_receiver::Foo = zelf_non_receiver::Foo { x: 321, y: 654 };
+    let f3: zelf_non_receiver::Foo = <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&f1, &f2);
+    let f4: zelf_non_receiver::Foo = <zelf_non_receiver::Foo>::zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double::<zelf_non_receiver::Foo>(&f1);
+    <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&f1);
+    zelf_non_receiver::nl();
+    <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&f2);
+    zelf_non_receiver::nl();
+    <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&f3);
+    zelf_non_receiver::nl();
+    <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&f4);
+    zelf_non_receiver::nl();
+    let f5: zelf_non_receiver::Foo = <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(f1, f2);
+    <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&f5);
+    zelf_non_receiver::nl();
+    return 0;
+}
+
