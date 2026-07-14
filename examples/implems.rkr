@@ -41,6 +41,10 @@ impl <T: Foo> Foo for Hello<T> {
     }
 }
 
+fun theStatic<T: Foo>(): void {
+    T::theStatic();
+}
+
 impl <T> Hello<T> {
     fun new(x: T): Self {
         return Self { .x: x };
@@ -49,6 +53,7 @@ impl <T> Hello<T> {
 
 fun main(): int {
     Hello::new(Hello::new(First::fst())).foo();
-    Hello<Hello<First>>::theStatic();
+    theStatic::<Hello<Hello<First>>>();
+    let empty = Empty {};
     return 0;
 }
