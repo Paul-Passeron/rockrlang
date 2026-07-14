@@ -185,36 +185,84 @@ impl<'db> InferenceCtx<'db> {
         interface_hint: Option<InterfaceId>,
         is_static: bool,
     ) -> Option<ConstraintSolveResult> {
-        if let Some((iface_id, implem, sig)) = self
-            .known_impls_providing(
-                receiver,
+        let mut cur = self.find(receiver);
+        let mut depth = 0;
+        loop {
+            if let Some((iface_id, implem, sig)) = self.find_known_impl_method(
+                &cur,
                 method,
-                args.len(),
                 interface_hint,
+                args.len(),
                 is_static,
-            )
-            .into_iter()
-            .next()
-        {
-            return Some(self.apply_interface_method(
-                expr_id,
-                iface_id,
-                implem,
-                sig.as_ref(),
-                ret_var,
-                args,
-                is_static,
-            ));
+            ) {
+                return Some(self.apply_interface_method(
+                    expr_id, receiver, depth, iface_id, implem, method, &sig,
+                    ret_var, args, is_static,
+                ));
+            }
+            match cur.as_ref(self.db) {
+                Some((_, inner)) => {
+                    cur = inner.clone();
+                    depth += 1;
+                }
+                None => return None,
+            }
         }
+    }
+
+    fn find_known_impl_method(
+        &mut self,
+        cur: &InferTy,
+        method: Symbol,
+        interface_hint: Option<InterfaceId>,
+        arity: usize,
+        is_static: bool,
+    ) -> Option<(InterfaceId, InterfaceImplem, AstMethodsig)> {
+        let candidates = self
+            .implements
+            .iter()
+            .filter(|(iface_id, _)| {
+                interface_hint.is_none_or(|hint| hint == **iface_id)
+            })
+            .flat_map(|(iface_id, implems)| {
+                implems.iter().map(|implem| (*iface_id, implem.clone()))
+            })
+            .collect_vec();
+
+        for (iface_id, implem) in candidates {
+            if self.find(&implem.ty) != *cur {
+                continue;
+            }
+
+            let sig = interface_items(self.db, iface_id.interned())
+                .iter()
+                .find_map(|item| match item {
+                    AstInterfaceItem::Sig(sig)
+                        if sig.data.name.data == method
+                            && sig.data.receiver.is_static() == is_static
+                            && sig.data.args.len() == arity =>
+                    {
+                        Some(sig.clone())
+                    }
+                    _ => None,
+                });
+
+            if let Some(sig) = sig {
+                return Some((iface_id, implem, sig.as_ref().clone()));
+            }
+        }
+
         None
     }
 
     fn apply_interface_method(
         &mut self,
         expr_id: ExprId,
-
+        receiver: &InferTy,
+        depth: usize,
         iface_id: InterfaceId,
         implem: InterfaceImplem,
+        method: Symbol,
         sig: &AstMethodsig,
         ret_var: InferVar,
         args: &[InferTy],
@@ -229,21 +277,38 @@ impl<'db> InferenceCtx<'db> {
         if ref_args.iter().any(|a| matches!(a, TypeRef::Error)) {
             return ConstraintSolveResult::Pending;
         }
-
         let iface_ref = InterfaceRef::new(self.db, iface_id, ref_args);
-        let templates = implem
+
+        let zelf_ty = self.peel_receiver(receiver, depth);
+
+        if let Err(e) = self.unify(zelf_ty.clone(), implem.ty.clone()) {
+            return ConstraintSolveResult::Error(e);
+        }
+
+        let method_id = FunctionId::new(
+            self.db,
+            method,
+            ScopeOwnerId::Interface(iface_ref),
+        );
+
+        let method_templates = implem
             .templates
             .iter()
             .cloned()
-            .chain(args.iter().cloned())
+            .chain(sig.data.template_args.iter().map(|t| {
+                if !t.constraints.is_empty() {
+                    todo!()
+                }
+                self.fresh_var().into()
+            }))
             .collect::<Arc<[_]>>();
-        let zelf_ty = Some(self.find(&implem.ty));
+
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Interface(iface_ref),
             Arc::new([]),
-            templates,
-            zelf_ty.clone(),
+            method_templates.clone(),
+            Some(zelf_ty.clone()),
         )
         .unwrap();
 
@@ -262,74 +327,22 @@ impl<'db> InferenceCtx<'db> {
             }
         }
 
-        let method_id = FunctionId::new(
-            self.db,
-            sig.data.name.data,
-            ScopeOwnerId::Interface(iface_ref),
-        );
-
-        let substitution = implem
-            .templates
-            .iter()
-            .cloned()
-            .chain(sig.data.template_args.iter().map(|t| {
-                if !t.constraints.is_empty() {
-                    todo!()
-                }
-                self.fresh_var().into()
-            }))
-            .collect();
-
-        let adjustment = self.get_adjustments_for(method_id, 0);
-        self.call_infos.insert(
+        let call_infos = InferCallInfos {
             expr_id,
-            InferCallInfos {
-                expr_id,
-                callee: method_id,
-                substitution,
-                call_kind: if is_static {
-                    CallKind::Static
-                } else {
-                    CallKind::Method { adjustment }
-                },
-                zelf_ty,
+            callee: method_id,
+            substitution: method_templates.iter().cloned().collect_vec(),
+            call_kind: if is_static {
+                CallKind::Static
+            } else {
+                CallKind::Method {
+                    adjustment: self.get_adjustments_for(method_id, depth),
+                }
             },
-        );
-        ConstraintSolveResult::Solved
-    }
+            zelf_ty: Some(zelf_ty),
+        };
 
-    fn known_impls_providing(
-        &mut self,
-        receiver: &InferTy,
-        method: Symbol,
-        arity: usize,
-        hint: Option<InterfaceId>,
-        is_static: bool,
-    ) -> Vec<(InterfaceId, InterfaceImplem, Arc<AstMethodsig>)> {
-        let mut out = vec![];
-        let receiver = self.find(receiver);
-        let implements = self.implements.clone(); // same clone as before, fix later
-        for (iface_id, implems) in implements {
-            if hint.is_some_and(|h| h != iface_id) {
-                continue;
-            }
-            for implem in implems {
-                if self.find(&implem.ty) != receiver {
-                    continue;
-                }
-                for item in interface_items(self.db, iface_id.interned()).iter()
-                {
-                    if let AstInterfaceItem::Sig(sig) = item
-                        && sig.data.name.data == method
-                        && sig.data.args.len() == arity
-                        && sig.data.receiver.is_static() == is_static
-                    {
-                        out.push((iface_id, implem.clone(), sig.clone()));
-                    }
-                }
-            }
-        }
-        out
+        self.call_infos.insert(expr_id, call_infos);
+        ConstraintSolveResult::Solved
     }
 
     fn get_working_impls(

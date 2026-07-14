@@ -410,7 +410,24 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    // TODO: this has too many arguments :(
+    pub(super) fn peel_receiver(
+        &mut self,
+        receiver: &InferTy,
+        depth: usize,
+    ) -> InferTy {
+        let mut zelf_ty = self.find(receiver);
+        for _ in 0..depth {
+            if let Some(adt) = zelf_ty.as_adt() {
+                zelf_ty = adt.1[0].clone();
+            } else {
+                let pointee = self.fresh_var();
+                let ptr = self.emit_deref_constraint(pointee.into());
+                self.unify(zelf_ty, ptr.into()).unwrap();
+                zelf_ty = pointee.into();
+            }
+        }
+        zelf_ty
+    }
 
     fn finish_method_call(
         &mut self,
@@ -442,11 +459,13 @@ impl<'db> InferenceCtx<'db> {
             }))
             .collect_vec();
 
+        let zelf_ty = self.peel_receiver(receiver, depth);
+
         let method_ctx = ImplicitContext::from_function(
             self.db,
             method_id,
             method_templates.iter().cloned().collect(),
-            Some(receiver.clone()),
+            Some(zelf_ty.clone()),
         )
         .unwrap();
 
@@ -468,20 +487,6 @@ impl<'db> InferenceCtx<'db> {
 
         if let Err(err) = self.unify(ret_var.into(), ret_ty.clone()) {
             return ConstraintSolveResult::Error(err);
-        }
-
-        let mut zelf_ty = receiver.clone();
-        // Peel ref 
-        // FIXME: Is there a better way of doing this ? Surely
-        for _ in 0..depth {
-            if let Some(adt) = zelf_ty.as_adt() {
-                zelf_ty = adt.1[0].clone();
-            } else {
-                let pointee = self.fresh_var();
-                let ptr = self.emit_deref_constraint(pointee.into());
-                self.unify(zelf_ty, ptr.into()).unwrap();
-                zelf_ty = pointee.into();
-            }
         }
 
         let call_infos = InferCallInfos {
@@ -527,7 +532,7 @@ impl<'db> InferenceCtx<'db> {
                 if let Some(MethodImpl { method_id, subs, .. }) =
                     method_impl_for(
                         self.db,
-                        tid,
+                        ty,
                         *method,
                         args.len(),
                         *is_static,
