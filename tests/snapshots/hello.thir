@@ -11,8 +11,7 @@ thir fun core::io::`impl core::io::str`::print(&self): void {
 core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
     core::io::printf(cOh no, a panic has occurred!\nmsg: \');
-    let _1: core::io::str = message;
-    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    <core::io::str>::core::io::`impl core::io::str`::print(&message);
     core::io::printf(c\'\n\nExitting with code 1...\n);
     core::sys::exit(1);
 }

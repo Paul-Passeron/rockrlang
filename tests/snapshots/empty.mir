@@ -22,11 +22,10 @@ mir {
   locals:
     _0: message :core::io::str
     _1: void
-    _2: core::io::str
-    _3: &core::io::str
+    _2: &core::io::str
+    _3: void
     _4: void
-    _5: void
-    _6: never
+    _5: never
 
   params: [
     _0,
@@ -38,15 +37,14 @@ mir {
     _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
 
   bb1:
-    _2 = move _0
-    _3 = &_2
-    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
 
   bb2:
-    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
 
   bb3:
-    _6 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_int) -> bb4
 
   bb4:
     diverge

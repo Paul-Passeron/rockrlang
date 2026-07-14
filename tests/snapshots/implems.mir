@@ -41,11 +41,10 @@ mir {
   locals:
     _0: message :core::io::str
     _1: void
-    _2: core::io::str
-    _3: &core::io::str
+    _2: &core::io::str
+    _3: void
     _4: void
-    _5: void
-    _6: never
+    _5: never
 
   params: [
     _0,
@@ -57,15 +56,14 @@ mir {
     _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
 
   bb1:
-    _2 = move _0
-    _3 = &_2
-    _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
 
   bb2:
-    _5 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
 
   bb3:
-    _6 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_int) -> bb4
 
   bb4:
     diverge
@@ -130,10 +128,9 @@ implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
 mir {
   locals:
     _0: self :&implems::Hello<implems::First>
-    _1: implems::First
-    _2: &implems::First
+    _1: &implems::First
+    _2: void
     _3: void
-    _4: void
 
   params: [
     _0,
@@ -142,12 +139,11 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = move _0.*.x
-    _2 = &_1
-    _3 = call implems::`impl implems::Foo for implems::First`::foo(move _2) -> bb1
+    _1 = &_0.*.x
+    _2 = call implems::`impl implems::Foo for implems::First`::foo(move _1) -> bb1
 
   bb1:
-    _4 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+    _3 = call core::io::printf(c"Hello from Hello !\n") -> bb2
 
   bb2:
     return
@@ -157,10 +153,9 @@ implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
 mir {
   locals:
     _0: self :&implems::Hello<implems::Hello<implems::First>>
-    _1: implems::Hello<implems::First>
-    _2: &implems::Hello<implems::First>
+    _1: &implems::Hello<implems::First>
+    _2: void
     _3: void
-    _4: void
 
   params: [
     _0,
@@ -169,12 +164,11 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = move _0.*.x
-    _2 = &_1
-    _3 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::First>(move _2) -> bb1
+    _1 = &_0.*.x
+    _2 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::First>(move _1) -> bb1
 
   bb1:
-    _4 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+    _3 = call core::io::printf(c"Hello from Hello !\n") -> bb2
 
   bb2:
     return
@@ -268,15 +262,12 @@ implems::main
 mir {
   locals:
     _0: implems::First
-    _1: a :implems::First
-    _2: implems::Hello<implems::First>
-    _3: b :implems::Hello<implems::First>
-    _4: implems::Hello<implems::Hello<implems::First>>
-    _5: c :implems::Hello<implems::Hello<implems::First>>
-    _6: implems::Hello<implems::Hello<implems::First>>
-    _7: &implems::Hello<implems::Hello<implems::First>>
-    _8: void
-    _9: void
+    _1: implems::Hello<implems::First>
+    _2: implems::Hello<implems::Hello<implems::First>>
+    _3: implems::Hello<implems::Hello<implems::First>>
+    _4: &implems::Hello<implems::Hello<implems::First>>
+    _5: void
+    _6: void
 
   params: [
   ]
@@ -287,21 +278,18 @@ mir {
     _0 = call implems::`impl implems::First`::fst() -> bb1
 
   bb1:
-    _1 = move _0
-    _2 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(move _1) -> bb2
+    _1 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(move _0) -> bb2
 
   bb2:
-    _3 = move _2
-    _4 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(move _3) -> bb3
+    _2 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(move _1) -> bb3
 
   bb3:
-    _5 = move _4
-    _6 = move _5
-    _7 = &_6
-    _8 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(move _7) -> bb4
+    _3 = move _2
+    _4 = &_3
+    _5 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(move _4) -> bb4
 
   bb4:
-    _9 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb5
+    _6 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb5
 
   bb5:
     return 0_int
