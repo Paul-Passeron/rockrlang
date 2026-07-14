@@ -17,7 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::symbols::{StrLit, Symbol},
-    parse_tree::{Spanned, type_expr::AstTypeExpr},
+    parse_tree::{
+        Spanned,
+        type_expr::{AstAnyTypeExpr, AstTypeExpr},
+    },
 };
 
 pub type AstExpr = Spanned<AstExprDesc>;
@@ -39,6 +42,7 @@ pub enum AstExprDesc {
     },
     StaticCall {
         ty: AstTypeExpr,
+        type_args: Vec<AstAnyTypeExpr>,
         method: Symbol,
         args: Vec<AstExpr>,
     },
@@ -78,11 +82,13 @@ pub enum AstExprDesc {
 
     Call {
         callee: Box<AstExpr>,
+        type_args: Vec<AstAnyTypeExpr>,
         args: Vec<AstExpr>,
     },
     MethodCall {
         object: Box<AstExpr>,
         method: Symbol,
+        type_args: Vec<AstAnyTypeExpr>,
         args: Vec<AstExpr>,
     },
 

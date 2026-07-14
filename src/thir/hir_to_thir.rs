@@ -898,7 +898,7 @@ impl<'db> ThirTranslator<'db> {
                 let args = self.expr_args(b, args, stmts);
                 ExprKind::Constructor { enum_def, idx, args }
             }
-            HirExprDesc::CallDirect { target, args } => {
+            HirExprDesc::CallDirect { target, args, .. } => {
                 let args = args
                     .iter()
                     .map(|arg| self.expr(b, arg, stmts))

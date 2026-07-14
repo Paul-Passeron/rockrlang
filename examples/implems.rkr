@@ -54,6 +54,5 @@ impl <T> Hello<T> {
 fun main(): int {
     Hello::new(Hello::new(First::fst())).foo();
     theStatic::<Hello<Hello<First>>>();
-    let empty = Empty {};
     return 0;
 }

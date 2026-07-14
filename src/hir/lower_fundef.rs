@@ -468,7 +468,7 @@ impl<'db> LowerFundef<'db> {
         {
             let tref = TypeRef::Param(TypeParamId(pos));
             match &to.data {
-                AstExprDesc::Call { callee, args } => {
+                AstExprDesc::Call { callee, args, type_args } => {
                     let AstExprDesc::Name(callee) = &callee.data else {
                         todo!()
                     };
@@ -476,10 +476,20 @@ impl<'db> LowerFundef<'db> {
                         .iter()
                         .map(|arg| self.lower_expr(arg, scope, self.module))
                         .collect_vec();
+                    let type_args = type_args
+                        .iter()
+                        .map(|arg| {
+                            arg.as_known().map_or(
+                                PartialTypeRef::Resolved(TypeRef::Unknown),
+                                |ty| self.resolve_holed(&ty),
+                            )
+                        })
+                        .collect_vec();
                     HirExprDesc::CallStatic {
                         ty: PartialTypeRef::Resolved(tref),
                         method: *callee,
                         args,
+                        type_args,
                     }
                 }
                 _ => todo!(),
@@ -526,6 +536,7 @@ impl<'db> LowerFundef<'db> {
         &mut self,
         ty: &AstTypeExpr,
         method: Symbol,
+        type_args: &[AstAnyTypeExpr],
         args: &[AstExpr],
         scope: &Scope,
         module: ModuleId,
@@ -533,7 +544,16 @@ impl<'db> LowerFundef<'db> {
         let ty = self.resolve_holed(ty);
         let args =
             args.iter().map(|a| self.lower_expr(a, scope, module)).collect();
-        HirExprDesc::CallStatic { ty, method, args }
+        let type_args = type_args
+            .iter()
+            .map(|arg| {
+                arg.as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    })
+            })
+            .collect_vec();
+        HirExprDesc::CallStatic { ty, method, args, type_args }
     }
 
     fn lower_binop(
@@ -575,6 +595,7 @@ impl<'db> LowerFundef<'db> {
     fn lower_call(
         &mut self,
         callee: &AstExpr,
+        type_args: &[AstAnyTypeExpr],
         args: &[AstExpr],
         scope: &Scope,
         module: ModuleId,
@@ -596,10 +617,27 @@ impl<'db> LowerFundef<'db> {
                     .map(|a| self.lower_expr(a, scope, module))
                     .collect();
 
+                let type_args = type_args
+                    .iter()
+                    .map(|arg| {
+                        arg.as_known().map_or(
+                            PartialTypeRef::Resolved(TypeRef::Unknown),
+                            |ty| self.resolve_holed(&ty),
+                        )
+                    })
+                    .collect_vec();
+
                 // Module-level: must be a free function
                 match resolve_in_module(self.db, *symbol, module) {
                     Some(Definition::Function(fid)) => {
-                        HirExprDesc::CallDirect { target: fid, args }
+                        if !type_args.is_empty() {
+                            let temps =
+                                get_templates_of_fun(self.db, fid.into());
+                            if temps.len() != type_args.len() {
+                                todo!("Diag type args mismatch")
+                            }
+                        }
+                        HirExprDesc::CallDirect { target: fid, args, type_args }
                     }
                     _ => HirExprDesc::UnresolvedCallDirect {
                         target: FunctionId::new(
@@ -607,6 +645,7 @@ impl<'db> LowerFundef<'db> {
                             *symbol,
                             ScopeOwnerId::Module(module),
                         ),
+                        type_args,
                         args,
                     },
                 }
@@ -619,6 +658,7 @@ impl<'db> LowerFundef<'db> {
                             AstExprDesc::Call {
                                 callee: to.clone(),
                                 args: args.to_vec(),
+                                type_args: vec![], // TODO
                             },
                             vec![],
                             span,
@@ -639,10 +679,20 @@ impl<'db> LowerFundef<'db> {
         &mut self,
         object: &AstExpr,
         method: Symbol,
+        type_args: &[AstAnyTypeExpr],
         args: &[AstExpr],
         scope: &Scope,
         module: ModuleId,
     ) -> HirExprDesc {
+        let type_args = type_args
+            .iter()
+            .map(|arg| {
+                arg.as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    })
+            })
+            .collect_vec();
         HirExprDesc::CallMethod {
             receiver: self.lower_expr(object, scope, module).boxed(),
             method,
@@ -651,6 +701,7 @@ impl<'db> LowerFundef<'db> {
                 .map(|arg| self.lower_expr(arg, scope, module))
                 .collect(),
             interface_hint: None,
+            type_args,
         }
     }
 
@@ -809,9 +860,8 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::NameResolved { from, to } => {
                 self.lower_name_resolved(*from, to, scope, module)
             }
-            AstExprDesc::StaticCall { ty, method, args } => {
-                self.lower_static_call(ty, *method, args, scope, module)
-            }
+            AstExprDesc::StaticCall { ty, method, args, type_args } => self
+                .lower_static_call(ty, *method, type_args, args, scope, module),
             AstExprDesc::BinOp { lhs, op, rhs } => {
                 self.lower_binop(lhs, rhs, *op, scope)
             }
@@ -828,12 +878,12 @@ impl<'db> LowerFundef<'db> {
                 place: self.expr_as_place(place, scope, module),
                 mutability: Mutability::Const, // TODO: mut address-of
             },
-            AstExprDesc::Call { callee, args } => {
-                self.lower_call(callee, args, scope, module, expr.span)
-            }
-            AstExprDesc::MethodCall { object, method, args } => {
-                self.lower_method_call(object, *method, args, scope, module)
-            }
+            AstExprDesc::Call { callee, args, type_args } => self
+                .lower_call(callee, type_args, args, scope, module, expr.span),
+            AstExprDesc::MethodCall { object, method, args, type_args } => self
+                .lower_method_call(
+                    object, *method, type_args, args, scope, module,
+                ),
             AstExprDesc::StructLit { ty, variant, fields } => {
                 self.lower_structlit(ty, *variant, fields, scope)
             }
@@ -871,7 +921,11 @@ impl<'db> LowerFundef<'db> {
     fn compute_template_hints(
         &mut self,
         ty: PartialTypeRef,
+        type_args: Vec<PartialTypeRef>,
     ) -> Vec<PartialTypeArg> {
+        if !type_args.is_empty() {
+            todo!()
+        }
         match ty {
             PartialTypeRef::Resolved(type_ref) => match type_ref {
                 TypeRef::Concrete(type_id) => type_id
@@ -896,6 +950,7 @@ impl<'db> LowerFundef<'db> {
         &mut self,
         type_def_id: TypeDefId,
         symbol: Symbol,
+        type_args: Vec<PartialTypeRef>,
         args: Vec<HirExpr>,
     ) -> HirExprDesc {
         let ty = self.instantiate_holed(type_def_id);
@@ -905,24 +960,22 @@ impl<'db> LowerFundef<'db> {
                 variant.name == symbol
                     && matches!(&variant.kind, AstEnumVariantKind::TupleLike(_))
             }) {
-                HirExprDesc::Constructor {
+                return HirExprDesc::Constructor {
                     enum_def: enum_id,
                     name: symbol,
                     args: HirConstructorArgs::TupleLike(args),
-                    template_hints: self.compute_template_hints(ty),
-                }
-            } else {
-                HirExprDesc::CallStatic { ty, method: symbol, args }
+                    template_hints: self.compute_template_hints(ty, type_args),
+                };
             }
-        } else {
-            HirExprDesc::CallStatic { ty, method: symbol, args }
         }
+        HirExprDesc::CallStatic { ty, method: symbol, args, type_args }
     }
 
     fn lower_name_resolved_from_type_call(
         &mut self,
         type_def_id: TypeDefId,
         callee: &AstExpr,
+        type_args: &[AstAnyTypeExpr],
         args: &[AstExpr],
         scope: &Scope,
         module: ModuleId,
@@ -932,7 +985,21 @@ impl<'db> LowerFundef<'db> {
             .iter()
             .map(|a| self.lower_expr(a, scope, module))
             .collect_vec();
-        self.lower_constructor_or_static_call(type_def_id, method, args)
+        let type_args = type_args
+            .iter()
+            .map(|arg| {
+                arg.as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    })
+            })
+            .collect_vec();
+        self.lower_constructor_or_static_call(
+            type_def_id,
+            method,
+            type_args,
+            args,
+        )
     }
 
     fn lower_structlit_that_is_actually_enum_variant(
@@ -987,10 +1054,11 @@ impl<'db> LowerFundef<'db> {
         type_def_id: TypeDefId,
     ) -> HirExprDesc {
         match &to.data {
-            AstExprDesc::Call { callee, args } => self
+            AstExprDesc::Call { callee, args, type_args } => self
                 .lower_name_resolved_from_type_call(
                     type_def_id,
                     callee,
+                    type_args,
                     args,
                     scope,
                     module,
@@ -1376,6 +1444,7 @@ impl<'db> LowerFundef<'db> {
                 method: Symbol::new(self.db, "into_iter"),
                 args: vec![],
                 interface_hint: Some(*into_iter_interface),
+                type_args: vec![],
             },
             iterator_span,
         );
@@ -1402,6 +1471,7 @@ impl<'db> LowerFundef<'db> {
                 method: Symbol::new(self.db, "next"),
                 args: vec![],
                 interface_hint: Some(*iter_interface),
+                type_args: vec![],
             },
             iterator_span,
         );

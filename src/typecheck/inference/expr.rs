@@ -67,23 +67,25 @@ impl<'db> InferenceCtx<'db> {
                 let place_ty = self.infer_place(place)?;
                 Ok(self.some_ptr_to(place_ty))
             }
-            HirExprDesc::CallDirect { target, args } => {
-                self.infer_direct(ExprId(expr.id), *target, args)
+            HirExprDesc::CallDirect { target, args, type_args } => {
+                self.infer_direct(ExprId(expr.id), *target, type_args, args)
             }
             HirExprDesc::CallMethod {
                 receiver,
                 method,
                 args,
                 interface_hint,
+                type_args,
             } => self.infer_method(
                 ExprId(expr.id),
                 receiver,
                 *method,
+                type_args,
                 args,
                 *interface_hint,
             ),
-            HirExprDesc::CallStatic { ty, method, args } => {
-                self.infer_static(ExprId(expr.id), ty, *method, args)
+            HirExprDesc::CallStatic { ty, method, args, type_args } => {
+                self.infer_static(ExprId(expr.id), ty, *method, type_args, args)
             }
             HirExprDesc::BinOp { lhs, op, rhs } => {
                 self.infer_binop(lhs, *op, rhs)
@@ -547,8 +549,12 @@ impl<'db> InferenceCtx<'db> {
         id: ExprId,
         ty: &PartialTypeRef,
         method: Symbol,
+        type_args: &[PartialTypeRef],
         args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
+        if !type_args.is_empty() {
+            todo!()
+        }
         let receiver_ty =
             self.allocate_partial_type_ref(ty, self.implicit_ctx().as_ref());
         let inferred_args = args
@@ -571,9 +577,13 @@ impl<'db> InferenceCtx<'db> {
         id: ExprId,
         receiver: &HirExpr,
         method: Symbol,
+        type_args: &[PartialTypeRef],
         args: &[HirExpr],
         interface_hint: Option<InterfaceId>,
     ) -> Result<InferTy, UnificationError> {
+        if !type_args.is_empty() {
+            todo!()
+        }
         let receiver_ty = self.infer_expr(receiver)?;
         let inferred_args = args
             .iter()
@@ -638,16 +648,26 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         id: ExprId,
         target: FunctionId,
+        type_args: &[PartialTypeRef],
         args: &[HirExpr],
     ) -> Result<InferTy, UnificationError> {
         self.check_args_count(target, args.len())?;
         let (receiver, ast_args) = target.args(self.db);
         assert!(receiver.is_none());
         let templates = get_templates_of_fun(self.db, target.interned());
-        let inferred_templates = templates
-            .iter()
-            .map(|_| InferTy::Var(self.fresh_var()))
-            .collect::<Arc<[_]>>();
+        let inferred_templates = if type_args.is_empty() {
+            templates
+                .iter()
+                .map(|_| InferTy::Var(self.fresh_var()))
+                .collect::<Arc<[_]>>()
+        } else {
+            assert_eq!(templates.len(), type_args.len());
+            let ctx = self.implicit_ctx.clone();
+            type_args
+                .iter()
+                .map(|arg| self.allocate_partial_type_ref(arg, ctx.as_ref()))
+                .collect()
+        };
 
         let ctx = ImplicitContext::from_function(
             self.db,

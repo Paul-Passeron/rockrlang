@@ -153,18 +153,21 @@ pub enum HirExprDesc {
         // instance
         target: FunctionId,
         args: Vec<HirExpr>,
+        type_args: Vec<PartialTypeRef>,
     },
 
     UnresolvedCallDirect {
         // The function id here is not valid
         target: FunctionId,
         args: Vec<HirExpr>,
+        type_args: Vec<PartialTypeRef>,
     },
 
     CallMethod {
         receiver: Box<HirExpr>,
         method: Symbol,
         args: Vec<HirExpr>,
+        type_args: Vec<PartialTypeRef>,
 
         // None: regular method call    : expr.method(...)
         // Some(Trait)                  : Trait::method(expr, ...)
@@ -175,6 +178,7 @@ pub enum HirExprDesc {
         ty: PartialTypeRef,
         method: Symbol,
         args: Vec<HirExpr>,
+        type_args: Vec<PartialTypeRef>,
     },
 
     BinOp {
