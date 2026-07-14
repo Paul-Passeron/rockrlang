@@ -79,7 +79,10 @@ impl AstImplicitContext {
         zelf: Option<InferTy>,
     ) -> ImplResult<ImplicitContext> {
         if self.template_asts.len() != templates.len() {
-            return Err(ImplicitCtxCreationError::TemplateLenMismatch);
+            return Err(ImplicitCtxCreationError::TemplateLenMismatch {
+                expected: self.template_asts.len(),
+                got: templates.len(),
+            });
         }
 
         Ok(ImplicitContext {
@@ -100,7 +103,7 @@ pub struct ImplicitContext {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ImplicitCtxCreationError {
-    TemplateLenMismatch,
+    TemplateLenMismatch { got: usize, expected: usize },
     DuplicateTemplateName(Symbol),
 }
 
