@@ -1,0 +1,52 @@
+struct Foo {
+    x: int;
+    y: int;
+}
+
+impl Foo {
+    fun dump(&self): void {
+        "Foo {".println();
+        core::io::printf(c"  .x = %d,\n", self.x);
+        core::io::printf(c"  .y = %d,\n", self.y);
+        "}".println();
+    }
+}
+
+interface Addable {
+    fun add(&self, other: &Self): Self;
+}
+
+fun sum_twice<T: Addable>(a: &T): T {
+    return a.add(a);
+}
+
+impl Addable for Foo {
+    fun add(&self, other: &Self): Self {
+        return Self {
+            .x: self.x + other.x,
+            .y: self.y + other.y,
+        };
+    }
+}
+
+impl <T: Addable> T {
+    fun double(&self): Self {
+        return sum_twice(self);
+    }
+} 
+
+fun nl(): void {
+    "".println();
+}
+
+fun main(): int {
+    let f1 = Foo { .x: 123, .y: 456 };
+    let f2 = Foo { .x: 321, .y: 654 };
+    let f3 = f1.add(&f2);
+    let f4 = f1.double();
+    f1.dump(); nl(); 
+    f2.dump(); nl();
+    f3.dump(); nl();
+    f4.dump(); nl();
+    return 0;
+}
