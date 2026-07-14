@@ -123,16 +123,23 @@ impl FuncInst {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         let fdef = self.fdef(db);
         let zelf = fdef.parent(db).get_canonical_zelf(db);
-        let zelf = sig.zelf.map(|arg| {
+        let receiver = sig.zelf.map(|arg| {
             (
                 Symbol::new(db, "self"),
                 arg.as_type_ref_for(db, zelf.unwrap())
                     .with_substitution(db, self.subs(db)),
             )
         });
-        zelf.into_iter()
+        receiver
+            .into_iter()
             .chain(sig.args.iter().map(|(symb, ty)| {
-                (*symb, ty.with_substitution(db, self.subs(db)))
+                (
+                    *symb,
+                    match ty.with_substitution(db, self.subs(db)) {
+                        TypeRef::Zelf => zelf.unwrap(),
+                        ty => ty,
+                    },
+                )
             }))
             .collect()
     }
@@ -208,10 +215,10 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
-    pub fn is_valid_ty(&self, ty: TypeRef) -> bool {
+    pub fn is_concrete(&self, ty: TypeRef) -> bool {
         match ty {
             TypeRef::Concrete(type_id) => {
-                type_id.args(self.db).iter().all(|ty| self.is_valid_ty(*ty))
+                type_id.args(self.db).iter().all(|ty| self.is_concrete(*ty))
             }
             TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
@@ -245,7 +252,7 @@ impl<'a> ThirToMIR<'a> {
             TypeRef::Associated(_) => todo!(),
             _ => ty,
         };
-        if !self.is_valid_ty(res) {
+        if !self.is_concrete(res) {
             panic!("Not a valid ty: {}", res.to_string(self.db))
         }
         res
@@ -276,7 +283,7 @@ impl<'a> ThirToMIR<'a> {
 
     fn check_substitution(&self) {
         for ty in self.subs {
-            if !self.is_valid_ty(*ty) {
+            if !self.is_concrete(*ty) {
                 panic!(
                     "Expecting a valid type in substitution but got {}",
                     ty.to_string(self.db)
