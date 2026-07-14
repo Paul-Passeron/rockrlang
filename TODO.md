@@ -37,6 +37,11 @@ This can be a great starting point for contributors looking for something to do.
   - [x] Do we want our own SSA IR before backend or will the mid-level IR be enough
     - [ ] Yep, we even got two (MIR -> LIR -> LLVM)
 
+Other:
+
+- [ ] Type-safe way of having concrete types instead of using TypeRef / TypeId everywhere, especially for MIR, and to enforce the fact that all types have been substituted
+- [ ] Remove `PartialTypeRef` and `PartialTypeArg` as TypeRef seems to do what they do (`TypeRef::Unkwown`)
+
 ## Long-term
 
 - [ ] Make it expr-based instead of stmt-based. The language is statement-based for the moment, more like C than Rust. This is because this is simpler to implement for the moment. I can see us moving to expressions once the architecture is a bit more mature.
