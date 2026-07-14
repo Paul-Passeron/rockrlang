@@ -127,7 +127,7 @@ impl<'ir> InProgressBody<'ir> {
         Ok(())
     }
 
-    pub fn finalize(self) -> Result<FunctionBody, VerifyError> {
+    pub fn finalize(self, db: &dyn Db) -> Result<FunctionBody, VerifyError> {
         self.verify()?;
         let arena = Arena::new();
         self.blocks.into_values().for_each(|block| {
@@ -139,9 +139,9 @@ impl<'ir> InProgressBody<'ir> {
             stack_slots: self
                 .slots
                 .into_iter()
-                .map(|slot| StackSlot {
-                    value: slot.value.idx,
-                    pointee_ty: slot.ty,
+                .map(|slot| {
+                    debug_assert!(!slot.ty.is_zst(db));
+                    StackSlot { value: slot.value.idx, pointee_ty: slot.ty }
                 })
                 .collect(),
             entry: Idx::from_raw(self.entry.idx.into_raw()),

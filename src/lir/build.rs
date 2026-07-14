@@ -67,7 +67,7 @@ impl Module<Building> {
             body: InProgressBody::new(guard, db, id, &sigs[id.0]),
         };
         f(&mut builder);
-        let body = builder.body.finalize()?;
+        let body = builder.body.finalize(db)?;
         let slot = match &mut bodies[id.0] {
             Body::Defined(_, Some(_)) => {
                 panic!("Cannot write multiple bodies for the same function")
