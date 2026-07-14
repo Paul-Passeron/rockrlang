@@ -224,6 +224,23 @@ mir {
     return
 }
 
+implems::theStatic
+mir {
+  locals:
+    _0: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb1
+
+  bb1:
+    return
+}
+
 implems::`impl <T0>implems::Hello<T0>`::new
 mir {
   locals:
@@ -289,7 +306,7 @@ mir {
     _5 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(move _4) -> bb4
 
   bb4:
-    _6 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb5
+    _6 = call implems::theStatic::<implems::Hello<implems::Hello<implems::First>>>() -> bb5
 
   bb5:
     return 0_int

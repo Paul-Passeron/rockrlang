@@ -45,16 +45,21 @@ thir fun implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::
     <core::io::str>::core::io::`impl core::io::str`::println(&_0);
 }
 
-examples/implems.rkr:45:5
+examples/implems.rkr:44:1
+thir fun implems::theStatic<T0: implems::Foo>(): void {
+    <T0>::implems::Foo::theStatic();
+}
+
+examples/implems.rkr:49:5
 thir fun implems::`impl <T0>implems::Hello<T0>`::new<T0>(x: T0): Self {
     return implems::Hello::<T0> { x: x };
 }
 
-examples/implems.rkr:50:1
+examples/implems.rkr:54:1
 thir fun implems::main(): int {
     let _0: implems::Hello<implems::Hello<implems::First>> = <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(<implems::Hello<implems::First>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(<implems::First>::implems::`impl implems::First`::fst()));
     <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(&_0);
-    <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>();
+    implems::theStatic::<implems::Hello<implems::Hello<implems::First>>>();
     return 0;
 }
 

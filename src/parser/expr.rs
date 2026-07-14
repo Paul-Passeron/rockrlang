@@ -252,6 +252,53 @@ impl<'db> Parser<'db> {
                     );
                 }
 
+                Some(TokenKind::Access)
+                    if self.peek_n(1).map(|t| &t.kind)
+                        == Some(&TokenKind::Lt) =>
+                {
+                    let start = expr.span.start();
+                    self.consume(); // consume `::`; current token is now `<`
+                    let type_args = self.parse_turbofish_args()?;
+
+                    match self.peek_n(0).map(|t| t.kind) {
+                        // `expr::<T>(args)` — expr is a generic *value* callee
+                        // (free function, or path to one).
+                        Some(TokenKind::OpenPar) => {
+                            self.consume();
+                            let args = self.parse_expr_args()?;
+                            self.expect(TokenKind::ClosePar)?;
+                            self.consume();
+                            let end = self.get_end();
+                            let span = start.span(end);
+                            expr = Spanned::new(
+                                AstExprDesc::Call {
+                                    callee: Box::new(expr),
+                                    args,
+                                    type_args,
+                                },
+                                vec![],
+                                span,
+                            );
+                        }
+                        // `expr::<T>::name...` — expr is a *type*; produce the
+                        // same node shapes as the
+                        // `expr<T>::name` spelling.
+                        Some(TokenKind::Access) => {
+                            self.consume();
+                            let lhs_ty = self.reinterpret_expr_as_ty(expr)?;
+                            let ty_span = start.span(self.get_end());
+                            let ty = self
+                                .apply_type_args(lhs_ty, type_args, ty_span)?;
+                            expr = self.finish_qualified_path(ty, start)?;
+                        }
+                        _ => {
+                            return Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
+                                "`(` or `::` after turbofish type arguments".to_string(),
+                            )));
+                        }
+                    }
+                }
+
                 Some(TokenKind::Dot) => {
                     self.consume();
                     if let Some(TokenKind::IntLit(index)) =
@@ -271,6 +318,31 @@ impl<'db> Parser<'db> {
                         continue;
                     }
                     let field = self.parse_symbol()?;
+                    let mut type_args = vec![];
+                    if self.peek_n(0).map(|t| &t.kind)
+                        == Some(&TokenKind::Access)
+                    {
+                        self.consume();
+                        self.expect(TokenKind::Lt)?;
+                        self.consume();
+
+                        while self.peek_n(0).map(|t| &t.kind)
+                            != Some(&TokenKind::Gt)
+                        {
+                            let arg = self.parse_any_type_expr()?;
+                            type_args.push(arg);
+                            if self.peek_n(0).map(|t| &t.kind)
+                                != Some(&TokenKind::Comma)
+                            {
+                                break;
+                            }
+                            self.expect(TokenKind::Comma)?;
+                            self.consume();
+                        }
+
+                        self.expect(TokenKind::Gt)?;
+                        self.consume();
+                    }
                     if self.peek_n(0).map(|t| &t.kind)
                         == Some(&TokenKind::OpenPar)
                     {
@@ -285,6 +357,7 @@ impl<'db> Parser<'db> {
                                 object: Box::new(expr),
                                 method: field.data,
                                 args,
+                                type_args,
                             },
                             vec![],
                             span,
@@ -328,7 +401,11 @@ impl<'db> Parser<'db> {
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
-                        AstExprDesc::Call { callee: Box::new(expr), args },
+                        AstExprDesc::Call {
+                            callee: Box::new(expr),
+                            args,
+                            type_args: vec![],
+                        },
                         vec![],
                         span,
                     );
@@ -591,7 +668,10 @@ impl<'db> Parser<'db> {
                 self.consume();
 
                 match self.peek_n(0).map(|t| t.kind) {
-                    Some(TokenKind::Access) => {
+                    Some(TokenKind::Access)
+                        if self.peek_n(1).map(|t| &t.kind)
+                            != Some(&TokenKind::Lt) =>
+                    {
                         self.consume();
                         let rhs = self.parse_postfix_inner(true)?;
                         let end = self.get_end();
@@ -663,7 +743,16 @@ impl<'db> Parser<'db> {
 
         self.consume(); // consume `<`
 
-        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
+        let mut type_args = if self
+            .peek_n(0)
+            .is_some_and(|t| matches!(t.kind, TokenKind::Access))
+            && self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Lt)
+        {
+            self.consume(); // `::`
+            self.parse_turbofish_args()?
+        } else {
+            vec![]
+        };
 
         while let Some(t) = self.peek_n(0)
             && t.kind != TokenKind::Gt
@@ -698,7 +787,12 @@ impl<'db> Parser<'db> {
 
         let end = self.get_end();
         Ok(Spanned::new(
-            AstExprDesc::StaticCall { ty, method: method_sym.data, args },
+            AstExprDesc::StaticCall {
+                ty,
+                method: method_sym.data,
+                args,
+                type_args: vec![], // TODO
+            },
             vec![],
             start.span(end),
         ))
@@ -783,7 +877,12 @@ impl<'db> Parser<'db> {
             self.consume();
             let end = self.get_end();
             Ok(Spanned::new(
-                AstExprDesc::StaticCall { ty, method: variant_sym.data, args },
+                AstExprDesc::StaticCall {
+                    ty,
+                    method: variant_sym.data,
+                    args,
+                    type_args: vec![], // TODO
+                },
                 vec![],
                 start.span(end),
             ))
@@ -794,6 +893,109 @@ impl<'db> Parser<'db> {
                 vec![],
                 start.span(end),
             ))
+        }
+    }
+
+    fn parse_turbofish_args(
+        &mut self,
+    ) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
+        self.expect(TokenKind::Lt)?;
+        self.consume();
+
+        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
+        while let Some(t) = self.peek_n(0)
+            && t.kind != TokenKind::Gt
+        {
+            type_args.push(self.parse_any_type_expr()?);
+            if let Some(t) = self.peek_n(0)
+                && t.kind == TokenKind::Comma
+            {
+                self.consume();
+            } else {
+                break;
+            }
+        }
+
+        self.expect(TokenKind::Gt)?;
+        self.consume();
+        Ok(type_args)
+    }
+
+    fn finish_qualified_path(
+        &mut self,
+        ty: AstTypeExpr,
+        start: location::Location,
+    ) -> Result<AstExpr, ParseError> {
+        let name_sym = self.parse_symbol()?;
+
+        // Struct literal only with field syntax (or empty braces) — this path
+        // is committed (no backtracking), so it must not swallow a `match`
+        // block by accident.
+        let is_struct_lit = self
+            .peek_n(0)
+            .is_some_and(|t| matches!(t.kind, TokenKind::OpenBra))
+            && self.peek_n(1).is_some_and(|t| {
+                matches!(t.kind, TokenKind::Dot | TokenKind::CloseBra)
+            });
+
+        if is_struct_lit {
+            self.consume();
+            let fields = self.parse_struct_fields()?;
+            self.expect(TokenKind::CloseBra)?;
+            self.consume();
+            let end = self.get_end();
+            Ok(Spanned::new(
+                AstExprDesc::StructLit {
+                    ty,
+                    variant: Some(name_sym.data),
+                    fields,
+                },
+                vec![],
+                start.span(end),
+            ))
+        } else {
+            // Optional method turbofish before the call parens.
+            let type_args = if self
+                .peek_n(0)
+                .is_some_and(|t| matches!(t.kind, TokenKind::Access))
+                && self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Lt)
+            {
+                self.consume(); // `::`
+                let ta = self.parse_turbofish_args()?;
+                // Method turbofish is only meaningful on a call.
+                self.expect(TokenKind::OpenPar)?;
+                ta
+            } else {
+                vec![]
+            };
+
+            if self
+                .peek_n(0)
+                .is_some_and(|t| matches!(t.kind, TokenKind::OpenPar))
+            {
+                self.consume();
+                let args = self.parse_expr_args()?;
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+                let end = self.get_end();
+                Ok(Spanned::new(
+                    AstExprDesc::StaticCall {
+                        ty,
+                        method: name_sym.data,
+                        args,
+                        type_args,
+                    },
+                    vec![],
+                    start.span(end),
+                ))
+            } else {
+                let end = self.get_end();
+                Ok(Spanned::new(
+                    AstExprDesc::QualifiedPath { ty, name: name_sym.data },
+                    vec![],
+                    start.span(end),
+                ))
+            }
         }
     }
 

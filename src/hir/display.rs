@@ -350,8 +350,19 @@ fn write_expr(
             }
             write_place(f, place, db)
         }
-        HirExprDesc::UnresolvedCallDirect { target, args } => {
-            write!(f, "#<unresolved>{}(", target.name(db).to_string(db))?;
+        HirExprDesc::UnresolvedCallDirect { target, args, type_args } => {
+            write!(f, "#<unresolved>{}", target.name(db).to_string(db))?;
+            if type_args.len() > 0 {
+                write!(f, "::<")?;
+                for (i, arg) in type_args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_partial_type(f, arg, db)?;
+                }
+                write!(f, ">")?;
+            }
+            write!(f, "(")?;
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
@@ -361,8 +372,19 @@ fn write_expr(
             write!(f, ")")
         }
 
-        HirExprDesc::CallDirect { target, args } => {
-            write!(f, "{}(", target.called_to_string(db))?;
+        HirExprDesc::CallDirect { target, args, type_args } => {
+            write!(f, "{}", target.called_to_string(db))?;
+            if type_args.len() > 0 {
+                write!(f, "::<")?;
+                for (i, arg) in type_args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_partial_type(f, arg, db)?;
+                }
+                write!(f, ">")?;
+            }
+            write!(f, "(")?;
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
@@ -371,34 +393,60 @@ fn write_expr(
             }
             write!(f, ")")
         }
-        HirExprDesc::CallMethod { receiver, method, args, interface_hint } => {
-            match interface_hint {
-                Some(id) => {
-                    write!(f, "{}::{}(", id.to_string(db), method.display(db))?;
-                    write_expr(f, receiver, db)?;
-                    for arg in args {
-                        write!(f, ", ")?;
-                        write_expr(f, arg, db)?;
-                    }
-                    write!(f, ")")
-                }
-                None => {
-                    write_expr(f, receiver, db)?;
-                    write!(f, ".{}(", method.display(db))?;
-                    for (i, arg) in args.iter().enumerate() {
+        HirExprDesc::CallMethod {
+            receiver,
+            method,
+            args,
+            interface_hint,
+            type_args,
+        } => match interface_hint {
+            Some(id) => {
+                write!(f, "{}::{}", id.to_string(db), method.display(db))?;
+                if type_args.len() > 0 {
+                    write!(f, "::<")?;
+                    for (i, arg) in type_args.iter().enumerate() {
                         if i > 0 {
                             write!(f, ", ")?;
                         }
-                        write_expr(f, arg, db)?;
+                        write_partial_type(f, arg, db)?;
                     }
-                    write!(f, ")")
+                    write!(f, ">")?;
                 }
+                write!(f, "(")?;
+                write_expr(f, receiver, db)?;
+                for arg in args {
+                    write!(f, ", ")?;
+                    write_expr(f, arg, db)?;
+                }
+                write!(f, ")")
             }
-        }
+            None => {
+                write_expr(f, receiver, db)?;
+                write!(f, ".{}(", method.display(db))?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_expr(f, arg, db)?;
+                }
+                write!(f, ")")
+            }
+        },
 
-        HirExprDesc::CallStatic { ty, method, args } => {
+        HirExprDesc::CallStatic { ty, method, args, type_args } => {
             write_partial_type(f, ty, db)?;
-            write!(f, "::{}(", method.display(db))?;
+            write!(f, "::{}", method.display(db))?;
+            if type_args.len() > 0 {
+                write!(f, "::<")?;
+                for (i, arg) in type_args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_partial_type(f, arg, db)?;
+                }
+                write!(f, ">")?;
+            }
+            write!(f, "(")?;
             for (i, arg) in args.iter().enumerate() {
                 if i > 0 {
                     write!(f, ", ")?;
