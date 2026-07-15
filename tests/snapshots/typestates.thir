@@ -1,0 +1,61 @@
+core/io.rkr:26:5
+thir fun core::io::`impl core::io::str`::println(&self): void {
+    core::io::printf(c%.*s\n, (*self).len, (*self).data);
+}
+
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/typestates.rkr:20:5
+thir fun typestates::`impl typestates::Foo<typestates::A>`::new(): Self {
+    return typestates::Foo::<typestates::A> { _phantom: typestates::PhantomData::<typestates::A> {} };
+}
+
+examples/typestates.rkr:24:5
+thir fun typestates::`impl typestates::Foo<typestates::A>`::next(self): typestates::Foo<typestates::B> {
+    return typestates::Foo::<typestates::B> { _phantom: typestates::PhantomData::<typestates::B> {} };
+}
+
+examples/typestates.rkr:30:5
+thir fun typestates::`impl typestates::Foo<typestates::B>`::next(self): typestates::Foo<typestates::C> {
+    return typestates::Foo::<typestates::C> { _phantom: typestates::PhantomData::<typestates::C> {} };
+}
+
+examples/typestates.rkr:36:5
+thir fun typestates::`impl typestates::Foo<typestates::C>`::next(self): typestates::Foo<typestates::Last> {
+    return typestates::Foo::<typestates::Last> { _phantom: typestates::PhantomData::<typestates::Last> {} };
+}
+
+examples/typestates.rkr:41:1
+thir fun typestates::type_name<T0>(of: &T0): core::io::str {
+    return sizeof(T0);
+}
+
+examples/typestates.rkr:45:1
+thir fun typestates::main(): int {
+    let a: typestates::A = typestates::A {};
+    let f: typestates::Foo<typestates::A> = <typestates::Foo<typestates::A>>::typestates::`impl typestates::Foo<typestates::A>`::new();
+    let _5: core::io::str = typestates::type_name::<typestates::Foo<typestates::A>>(&f);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_5);
+    let f: typestates::Foo<typestates::B> = <typestates::Foo<typestates::A>>::typestates::`impl typestates::Foo<typestates::A>`::next(f);
+    let _6: core::io::str = typestates::type_name::<typestates::Foo<typestates::B>>(&f);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_6);
+    let f: typestates::Foo<typestates::C> = <typestates::Foo<typestates::B>>::typestates::`impl typestates::Foo<typestates::B>`::next(f);
+    let _7: core::io::str = typestates::type_name::<typestates::Foo<typestates::C>>(&f);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_7);
+    let f: typestates::Foo<typestates::Last> = <typestates::Foo<typestates::C>>::typestates::`impl typestates::Foo<typestates::C>`::next(f);
+    let _8: core::io::str = typestates::type_name::<typestates::Foo<typestates::Last>>(&f);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_8);
+    return 0;
+}
+

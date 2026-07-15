@@ -1,0 +1,308 @@
+core::io::`impl core::io::str`::println
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+
+  bb1:
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+
+  bb2:
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+
+  bb3:
+    _5 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+typestates::`impl typestates::Foo<typestates::A>`::new
+mir {
+  locals:
+    _0: typestates::PhantomData<typestates::A>
+    _1: typestates::Foo<typestates::A>
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = PhantomData {}
+    _1 = Foo {_phantom: move _0}
+    return move _1
+}
+
+typestates::`impl typestates::Foo<typestates::A>`::next
+mir {
+  locals:
+    _0: self :typestates::Foo<typestates::A>
+    _1: typestates::PhantomData<typestates::B>
+    _2: typestates::Foo<typestates::B>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = PhantomData {}
+    _2 = Foo {_phantom: move _1}
+    return move _2
+}
+
+typestates::`impl typestates::Foo<typestates::B>`::next
+mir {
+  locals:
+    _0: self :typestates::Foo<typestates::B>
+    _1: typestates::PhantomData<typestates::C>
+    _2: typestates::Foo<typestates::C>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = PhantomData {}
+    _2 = Foo {_phantom: move _1}
+    return move _2
+}
+
+typestates::`impl typestates::Foo<typestates::C>`::next
+mir {
+  locals:
+    _0: self :typestates::Foo<typestates::C>
+    _1: typestates::PhantomData<typestates::Last>
+    _2: typestates::Foo<typestates::Last>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = PhantomData {}
+    _2 = Foo {_phantom: move _1}
+    return move _2
+}
+
+typestates::type_name
+mir {
+  locals:
+    _0: of :&typestates::Foo<typestates::A>
+    _1: core::io::str
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = str {data: "typestates::Foo<typestates::A>", len: 30_int}
+    return move _1
+}
+
+typestates::type_name
+mir {
+  locals:
+    _0: of :&typestates::Foo<typestates::B>
+    _1: core::io::str
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = str {data: "typestates::Foo<typestates::B>", len: 30_int}
+    return move _1
+}
+
+typestates::type_name
+mir {
+  locals:
+    _0: of :&typestates::Foo<typestates::C>
+    _1: core::io::str
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = str {data: "typestates::Foo<typestates::C>", len: 30_int}
+    return move _1
+}
+
+typestates::type_name
+mir {
+  locals:
+    _0: of :&typestates::Foo<typestates::Last>
+    _1: core::io::str
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = str {data: "typestates::Foo<typestates::Last>", len: 33_int}
+    return move _1
+}
+
+typestates::main
+mir {
+  locals:
+    _0: a :typestates::A
+    _1: typestates::Foo<typestates::A>
+    _2: f :typestates::Foo<typestates::A>
+    _3: &typestates::Foo<typestates::A>
+    _4: core::io::str
+    _5: core::io::str
+    _6: &core::io::str
+    _7: void
+    _8: typestates::Foo<typestates::B>
+    _9: f :typestates::Foo<typestates::B>
+    _10: &typestates::Foo<typestates::B>
+    _11: core::io::str
+    _12: core::io::str
+    _13: &core::io::str
+    _14: void
+    _15: typestates::Foo<typestates::C>
+    _16: f :typestates::Foo<typestates::C>
+    _17: &typestates::Foo<typestates::C>
+    _18: core::io::str
+    _19: core::io::str
+    _20: &core::io::str
+    _21: void
+    _22: typestates::Foo<typestates::Last>
+    _23: f :typestates::Foo<typestates::Last>
+    _24: &typestates::Foo<typestates::Last>
+    _25: core::io::str
+    _26: core::io::str
+    _27: &core::io::str
+    _28: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = A {}
+    _1 = call typestates::`impl typestates::Foo<typestates::A>`::new() -> bb1
+
+  bb1:
+    _2 = move _1
+    _3 = &_2
+    _4 = call typestates::type_name::<typestates::Foo<typestates::A>>(move _3) -> bb2
+
+  bb2:
+    _5 = move _4
+    _6 = &_5
+    _7 = call core::io::`impl core::io::str`::println(move _6) -> bb3
+
+  bb3:
+    _8 = call typestates::`impl typestates::Foo<typestates::A>`::next(move _2) -> bb4
+
+  bb4:
+    _9 = move _8
+    _10 = &_9
+    _11 = call typestates::type_name::<typestates::Foo<typestates::B>>(move _10) -> bb5
+
+  bb5:
+    _12 = move _11
+    _13 = &_12
+    _14 = call core::io::`impl core::io::str`::println(move _13) -> bb6
+
+  bb6:
+    _15 = call typestates::`impl typestates::Foo<typestates::B>`::next(move _9) -> bb7
+
+  bb7:
+    _16 = move _15
+    _17 = &_16
+    _18 = call typestates::type_name::<typestates::Foo<typestates::C>>(move _17) -> bb8
+
+  bb8:
+    _19 = move _18
+    _20 = &_19
+    _21 = call core::io::`impl core::io::str`::println(move _20) -> bb9
+
+  bb9:
+    _22 = call typestates::`impl typestates::Foo<typestates::C>`::next(move _16) -> bb10
+
+  bb10:
+    _23 = move _22
+    _24 = &_23
+    _25 = call typestates::type_name::<typestates::Foo<typestates::Last>>(move _24) -> bb11
+
+  bb11:
+    _26 = move _25
+    _27 = &_26
+    _28 = call core::io::`impl core::io::str`::println(move _27) -> bb12
+
+  bb12:
+    return 0_int
+}
+
