@@ -15,7 +15,7 @@ This can be a great starting point for contributors looking for something to do.
   - [ ] Improve the type-checker
     - [ ] Formalize the interface system
       - [ ] Actually check that implementations implement the interface
-      - [x] Keep track of what types implement which interface at a program-level (For the moment the work is done for every function-like thing)
+      - [x] Keep track of what types implement which interface at a program-level (implemented as a set of queries on concrete types)
     - [x] Keep track of implicit things the compiler should do
       - [x] auto-deref
       - [x] function/method call informations
@@ -25,22 +25,34 @@ This can be a great starting point for contributors looking for something to do.
       - [ ] Speculative execution / make constraints aware of each other: This will allow things like `This type has fields a and b, Foo is the only struct having both fields so it is Foo` which isn't possible for the moment
 - [ ] Parsing
   - [x] We have no turbofish for the moment, which can make some struct / enum literals impossible to express without type hints. Look into either adding turbofish or some other syntax to remove ambiguity
+  - [ ] Make sure turbofish is everywhere we want it to be
+  - [ ] Make sure turbofish implementation is resilient
+  - [ ] Maybe rewrite the parser at one point, it's a bit of a mess
+  - [ ] See if we support unicode in files
+  - [ ] Improve match branch parsing (For the moment we force them to be `{ ... }`)
 - [x] Create typed IR from HIR + type inference
 - [x] Create mid-level IR from typed IR
   - [x] Run borrow-checker on it
     - [ ] Make said borrow checker smarter (partial move / mut borrow)
   - [x] Run path analysis (Do all path return, etc...)
   - [ ] Maybe some language-specific optimizations ?
+    - [ ] Constant folding struct/tuple field accesses etc... Like `Foo {.bar: 1, .baz: 2}.baz` would just become `2`
+    - [ ] Inlining also, so that constant-folding can work across function-boundaries maybe
 - [ ] Codegen
   - [x] Figure out what backend to use: Inkwell (LLVM), cranelift, ...
     - [ ] Went for inkwell, look for other interesting ones
   - [x] Do we want our own SSA IR before backend or will the mid-level IR be enough
-    - [ ] Yep, we even got two (MIR -> LIR -> LLVM)
+    - [x] Yep, we even got two (MIR -> LIR -> LLVM)
+    - [ ] Finish verification of LIR (Or start it, maybe)
+    - [ ] Make a pretty printer for LIR, maybe and add it as a display target
+    - [ ] Look into ZSTs spilling into LLVM. Maybe it's not important, but doesn't hurt to look into it
 
 Other:
 
 - [ ] Type-safe way of having concrete types instead of using TypeRef / TypeId everywhere, especially for MIR, and to enforce the fact that all types have been substituted
 - [ ] Remove `PartialTypeRef` and `PartialTypeArg` as TypeRef seems to do what they do (`TypeRef::Unkwown`)
+- [ ] Make sure performance of the typechecker is acceptable
+- [ ] Have like a `diagnose_solver(unresolved: &[], errors: &[])` function to create good diagnostic from solver error output
 
 ## Long-term
 
