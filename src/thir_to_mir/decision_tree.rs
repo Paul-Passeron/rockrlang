@@ -471,19 +471,29 @@ impl VariantArity {
 }
 
 impl<'a> ThirToMIR<'a> {
+    fn deref_through_refs(
+        &self,
+        base: &MIRPlace,
+    ) -> (Vec<MIRProjection>, TypeRef) {
+        let mut projections = base.projections.clone();
+        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
+        projections
+            .extend(std::iter::repeat_n(MIRProjection::Deref, peeled.depth()));
+        (projections, peeled.inner)
+    }
+
     pub fn project_downcast_tuple_field(
         &mut self,
         base: &MIRPlace,
         variant_idx: usize,
         tuple_idx: usize,
     ) -> MIRPlace {
-        let mut projections = base.projections.clone();
+        let (mut projections, enum_ty) = self.deref_through_refs(base);
         projections.push(MIRProjection::Downcast { variant: variant_idx });
-        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
-        let ConstructorType::Tuple(tys) = peeled
-            .inner
+
+        let ConstructorType::Tuple(tys) = enum_ty
             .as_enum_ref(self.db)
-            .expect("Bad type")
+            .expect("downcast base must peel to an enum")
             .get_cons(self.db, variant_idx)
             .unwrap()
         else {
@@ -509,23 +519,20 @@ impl<'a> ThirToMIR<'a> {
         variant_idx: usize,
         field: Symbol,
     ) -> MIRPlace {
-        let mut projections = base.projections.clone();
+        let (mut projections, enum_ty) = self.deref_through_refs(base);
         projections.push(MIRProjection::Downcast { variant: variant_idx });
-        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
-        let ConstructorType::Struct(tys) = peeled
-            .inner
+
+        let ConstructorType::Struct(tys) = enum_ty
             .as_enum_ref(self.db)
-            .expect("Should we peel it ?")
+            .expect("downcast base must peel to an enum")
             .get_cons(self.db, variant_idx)
             .unwrap()
         else {
-            panic!("Expected tuple constructor");
+            panic!("Expected struct constructor");
         };
         let resulting_ty =
             tys.iter().find(|(name, _)| *name == field).unwrap().1;
-        for _ in &peeled.refs {
-            projections.push(MIRProjection::Deref);
-        }
+
         projections.push(MIRProjection::Field { name: field, resulting_ty });
         MIRPlace {
             local: base.local,

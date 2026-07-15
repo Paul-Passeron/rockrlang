@@ -152,11 +152,16 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 }
                 ScalarKind::Float(_) => todo!(),
             },
-            LayoutData::Aggregate(aggregate_layout) => self
-                .ctx
-                .i8_type()
-                .array_type(aggregate_layout.size(self.db).bytes() as u32)
-                .into(),
+            LayoutData::Aggregate(aggregate_layout) => {
+                let field_types = &aggregate_layout
+                    .fields
+                    .iter()
+                    .filter_map(|(_, ty)| {
+                        BasicTypeEnum::try_from(self.lower_layout(*ty)).ok()
+                    })
+                    .collect_vec();
+                self.ctx.struct_type(&field_types, false).into()
+            }
             LayoutData::Union(_) => self
                 .ctx
                 .i8_type()
@@ -225,7 +230,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             });
 
                         for inst in &data.insts {
-                            self.lower_inst(inst, body, &mut fn_ctx);
+                            self.lower_inst(inst, &mut fn_ctx);
                         }
                     } else {
                         self.build_block(blk, body, &mut fn_ctx);
@@ -278,14 +283,13 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             });
 
         for inst in &blk_data.insts {
-            self.lower_inst(inst, body, ctx);
+            self.lower_inst(inst, ctx);
         }
     }
 
     fn lower_inst(
         &mut self,
         inst: &Instruction<Finalized>,
-        body: &FunctionBody,
         ctx: &mut FnCtx<'ctx>,
     ) {
         match inst {
@@ -446,59 +450,29 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         ty,
                         fields_in_src_order,
                     } => {
-                        let llvm_ty = self.basic(ty.layout); // [N x i8]
-                        let align = ty.layout.align(self.db).bytes() as u32;
-
-                        // 1. Stack slot (see note about entry-block placement
-                        //    below)
-                        let slot = self.b.build_alloca(llvm_ty, "agg").unwrap();
-                        slot.as_instruction()
-                            .unwrap()
-                            .set_alignment(align)
-                            .unwrap();
-
-                        // Optional but recommended: zero the slot first so
-                        // padding
-                        // bytes are deterministic.
-                        self.b.build_store(slot, llvm_ty.const_zero()).unwrap();
-
-                        let agg = ty.aggregate_layout(self.db).unwrap();
-                        for (src_idx, field) in
-                            fields_in_src_order.iter().enumerate()
+                        let llvm_ty = self.basic(ty.layout);
+                        let aggr_layout = ty.aggregate_layout(self.db).unwrap();
+                        let mut res = llvm_ty.const_zero().into_struct_value();
+                        for (i, to_layout) in
+                            aggr_layout.source_to_layout.iter().enumerate()
                         {
-                            let fty = body.defs[*field].ty;
-                            if fty.is_zst(self.db) {
+                            if aggr_layout
+                                .source_field(i as u32)
+                                .unwrap()
+                                .1
+                                .is_zst(self.db)
+                            {
                                 continue;
                             }
-                            let offset =
-                                agg.source_field(src_idx as u32).unwrap().0;
-                            let field_ptr = unsafe {
-                                self.b
-                                    .build_in_bounds_gep(
-                                        self.ctx.i8_type(),
-                                        slot,
-                                        &[self
-                                            .ctx
-                                            .i64_type()
-                                            .const_int(offset.bytes(), false)],
-                                        "agg_field_ptr",
-                                    )
-                                    .unwrap()
-                            };
-                            let store = self
+                            let value =
+                                ctx.values[&fields_in_src_order[i as usize]];
+                            res = self
                                 .b
-                                .build_store(field_ptr, ctx.values[field])
-                                .unwrap();
-                            store
-                                .set_alignment(
-                                    fty.layout.align(self.db).bytes() as u32,
-                                )
-                                .unwrap();
+                                .build_insert_value(res, value, *to_layout, "")
+                                .unwrap()
+                                .into_struct_value();
                         }
-
-                        self.b
-                            .build_load(llvm_ty, slot, "loaded_aggregate")
-                            .unwrap()
+                        res.into()
                     }
                     ValueInstKind::ExtractField { .. } => {
                         todo!()

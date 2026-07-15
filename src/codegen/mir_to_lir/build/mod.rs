@@ -436,7 +436,9 @@ impl<'a> MTLBCtx<'a> {
                 (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
             }
             ProjKind::DowncastThen { next, variant } => {
-                let _enum_ref = ty.as_enum_ref(self.db);
+                let _enum_ref = ty.as_enum_ref(self.db).unwrap_or_else(|| {
+                    panic!("Expected an enum but got {}", ty.to_string(self.db))
+                });
                 match next {
                     MIRProjection::Field { .. } => todo!(),
                     MIRProjection::TupleField { index, resulting_ty } => {

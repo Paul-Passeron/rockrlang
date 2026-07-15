@@ -88,8 +88,8 @@ pub struct VariantsLayout {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AggregateLayout {
-    fields: Vec<(Offset, LayoutID)>,
-    source_to_layout: Vec<u32>,
+    pub fields: Vec<(Offset, LayoutID)>,
+    pub source_to_layout: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
