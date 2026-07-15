@@ -1,0 +1,52 @@
+struct A {}
+struct B {}
+struct C {}
+struct Last {}
+
+struct PhantomData<T> {}
+
+interface State {}
+
+impl State for A {}
+impl State for B {}
+impl State for C {}
+impl State for Last {}
+
+struct Foo<S: State> {
+    _phantom: PhantomData<S>
+}
+
+impl Foo<A> {
+    fun new(): Self {
+        return Self { ._phantom: PhantomData {}};
+    }
+
+    fun next(self): Foo<B> {
+        return Foo { ._phantom: PhantomData {}};
+    }
+}
+
+impl Foo<B> {
+    fun next(self): Foo<C> {
+        return Foo { ._phantom: PhantomData {}};
+    }
+}
+
+impl Foo<C> {
+    fun next(self): Foo<Last> {
+        return Foo { ._phantom: PhantomData {}};
+    }
+}
+
+fun type_name<T>(of: &T): str {
+    return @type_name(T);
+}
+
+fun main(): int {
+    let a = A {};
+    let f = Foo<A>::new(); type_name(&f).println();
+    let f = f.next(); type_name(&f).println();
+    let f = f.next(); type_name(&f).println();
+    let f = f.next(); type_name(&f).println();
+    return 0;
+}
