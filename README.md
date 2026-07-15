@@ -28,12 +28,14 @@ fun main(): int {
 ## Fun stuff
 You can do (what I consider) some pretty fun stuff in Rockr, like:
 ```
+@include core::opt
+
 fun type_name<T>(of: &T): str {
   return @type_name(T);
 }
 
 fun main(): int {
-  let x = core::opt::opt::Some("Hello, World !");
+  let x = opt::Some("Hello, World !");
   type_name(&x).println(); // Outputs `core::opt::opt<core::io::str>` as of today
   return 0;
 }
