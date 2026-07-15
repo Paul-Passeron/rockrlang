@@ -16,7 +16,17 @@ thir fun core::panic::panic(message: core::io::str): never {
     core::sys::exit(1);
 }
 
-examples/pretty_print.rkr:9:5
+examples/pretty_print.rkr:14:5
+thir fun pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print<T0: pretty_print::PrettyPrint>(&self): void {
+    core::io::printf(cMyStruct<);
+    let _1: core::io::str = sizeof(T0);
+    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    core::io::printf(c> { .x: %d, .y: , (*self).x);
+    <core::opt::opt<T0>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<T0>(&(*self).y);
+    core::io::printf(c });
+}
+
+examples/pretty_print.rkr:24:5
 thir fun pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print<T0: pretty_print::PrettyPrint>(&self): void {
     match self {
         core::opt::opt::<T0>::#1(val) => 's0: {
@@ -31,24 +41,29 @@ thir fun pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::Pretty
     }
 }
 
-examples/pretty_print.rkr:25:5
+examples/pretty_print.rkr:40:5
 thir fun pretty_print::`impl pretty_print::PrettyPrint for int`::print(&self): void {
     core::io::printf(c%d, (*self));
 }
 
-examples/pretty_print.rkr:30:1
+examples/pretty_print.rkr:45:1
 thir fun pretty_print::type_name<T0>(of: &T0): core::io::str {
     return sizeof(T0);
 }
 
-examples/pretty_print.rkr:34:1
+examples/pretty_print.rkr:49:1
 thir fun pretty_print::main(): int {
-    let x: core::opt::opt<core::opt::opt<core::opt::opt<int>>> = core::opt::opt::<core::opt::opt<core::opt::opt<int>>>::#1(core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(123456)));
+    let x: int = 123456;
+    let x: core::opt::opt<core::opt::opt<core::opt::opt<int>>> = core::opt::opt::<core::opt::opt<core::opt::opt<int>>>::#1(core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(x)));
     <core::opt::opt<core::opt::opt<core::opt::opt<int>>>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<int>>>(&x);
-    let _1: core::io::str = ;
-    <core::io::str>::core::io::`impl core::io::str`::println(&_1);
-    let _2: core::io::str = pretty_print::type_name::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>(&x);
-    <core::io::str>::core::io::`impl core::io::str`::println(&_2);
+    let _3: core::io::str = ;
+    <core::io::str>::core::io::`impl core::io::str`::println(&_3);
+    let _4: core::io::str = pretty_print::type_name::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>(&x);
+    <core::io::str>::core::io::`impl core::io::str`::println(&_4);
+    let wrapper: pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<int>>>> = pretty_print::MyStruct::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>> { x: 5, y: core::opt::opt::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>::#1(x) };
+    <pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>(&wrapper);
+    let _5: core::io::str = ;
+    <core::io::str>::core::io::`impl core::io::str`::println(&_5);
     return 0;
 }
 
