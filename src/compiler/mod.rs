@@ -606,12 +606,12 @@ pub fn build_from_disk(
 
     let llvm_ctx = Context::create();
     let cg = Codegen::<MIRToLIRDeclare>::new(&db);
-    
+
     // Collect MIR
-    let cg = build(&db, ws, cg); 
+    let cg = build(&db, ws, cg);
 
     // MIR -> LIR
-    let cg = cg.run(); 
+    let cg = cg.run();
 
     // LIR -> LLVM
     let llvm_module = cg.finalize(&llvm_ctx);
@@ -620,7 +620,7 @@ pub fn build_from_disk(
         llvm_module.print_to_stderr();
     }
 
-    let machine = optimize(&llvm_module, OptimizationLevel::None);
+    let machine = optimize(&llvm_module, OptimizationLevel::Aggressive);
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();

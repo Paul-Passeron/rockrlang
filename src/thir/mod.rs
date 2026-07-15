@@ -153,6 +153,7 @@ pub enum ExprKind {
     Tuple(Vec<ExprId>),
     SliceLit(Vec<ExprId>),
     SizeOf(TypeRef),
+    TypeName(TypeRef), 
 
     Constructor {
         enum_def: EnumRef,
@@ -164,7 +165,8 @@ pub enum ExprKind {
 
     Cast(ExprId, TypeRef),
 
-    Error, // Todo: Add metadata maybe
+    Error,
+    // Todo: Add metadata maybe
 }
 
 pub struct ThirExprWithSetup {

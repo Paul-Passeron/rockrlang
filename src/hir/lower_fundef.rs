@@ -897,6 +897,9 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::SizeOf(ty) => {
                 HirExprDesc::SizeOf(self.resolve_holed(ty))
             }
+            AstExprDesc::TypeName(ty) => {
+                HirExprDesc::TypeName(self.resolve_holed(ty))
+            }
             AstExprDesc::QualifiedPath { ty, name } => {
                 self.lower_qualified(*name, ty)
             }

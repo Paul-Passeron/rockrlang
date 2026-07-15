@@ -572,6 +572,40 @@ impl<'a> ThirToMIR<'a> {
                 span,
             ),
             ExprKind::SizeOf(ty) => MIRRValueKind::SizeOf(self.ty(*ty)),
+            ExprKind::TypeName(ty) => {
+                let ty = self.ty(*ty);
+                let name = ty.to_string(self.db);
+                let name_len = name.len();
+
+                let tref: TypeRef = str_id(self.db).into();
+                let struct_ref = tref.as_struct_ref(self.db).unwrap();
+
+                let data = MIROperand::Constant(
+                    MIRConstant::CString {
+                        contents: name,
+                        null_terminated: false,
+                    },
+                    span,
+                );
+                let len_symb = Symbol::new(self.db, "len");
+                let len_ty =
+                    struct_ref.typeof_field(self.db, len_symb).unwrap();
+                let len = MIROperand::Constant(
+                    MIRConstant::Integer {
+                        value: name_len as u128,
+                        ty: len_ty,
+                    },
+                    span,
+                );
+                MIRRValueKind::StructLit {
+                    struct_ref,
+                    fields: BTreeMap::from_iter([
+                        (Symbol::new(self.db, "data"), data),
+                        (len_symb, len),
+                    ]),
+                    span,
+                }
+            }
             ExprKind::Metadata(expr) => {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }

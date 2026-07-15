@@ -510,6 +510,11 @@ fn write_expr(
             write_partial_type(f, ty, db)?;
             write!(f, ")")
         }
+        HirExprDesc::TypeName(ty) => {
+            write!(f, "@type_name(")?;
+            write_partial_type(f, ty, db)?;
+            write!(f, ")")
+        }
         HirExprDesc::Constructor { name, enum_def, args, template_hints } => {
             write!(f, "{}", enum_def.name(db).display(db))?;
             if !template_hints.is_empty() {

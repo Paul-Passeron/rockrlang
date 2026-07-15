@@ -663,6 +663,28 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
+            
+            TokenKind::Directive(dir)
+                if dir == Symbol::new(self.db, "type_name") =>
+            {
+                self.consume();
+
+                self.expect(TokenKind::OpenPar)?;
+                self.consume();
+
+                let ty = self.parse_type_expr()?;
+
+                self.expect(TokenKind::ClosePar)?;
+                self.consume();
+
+                let end = self.get_end();
+
+                Ok(AstExpr::new(
+                    AstExprDesc::TypeName(ty),
+                    vec![],
+                    start.span(end),
+                ))
+            }
 
             TokenKind::Identifier(name) => {
                 self.consume();

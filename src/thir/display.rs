@@ -269,6 +269,10 @@ impl<'a> ThirPrinter<'a> {
             ExprKind::SizeOf(ty) => {
                 format!("sizeof({})", ty.to_string(self.db))
             }
+            ExprKind::TypeName(ty) => {
+                format!("sizeof({})", ty.to_string(self.db))
+                
+            },
 
             ExprKind::Constructor { enum_def, idx, args } => {
                 let name = TypeDefId::Enum(enum_def.def).to_string(self.db);

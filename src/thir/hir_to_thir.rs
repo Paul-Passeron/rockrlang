@@ -888,6 +888,9 @@ impl<'db> ThirTranslator<'db> {
             HirExprDesc::SizeOf(partial_type_ref) => {
                 ExprKind::SizeOf(partial_type_ref.plugged_by_unknown(self.db))
             }
+            HirExprDesc::TypeName(partial_type_ref) => {
+                ExprKind::TypeName(partial_type_ref.plugged_by_unknown(self.db))
+            }
             HirExprDesc::Constructor { name, args, .. } => {
                 let enum_def = ty.as_enum_ref(self.db).expect("TODO");
                 let idx = enum_item(self.db, enum_def.def.interned())

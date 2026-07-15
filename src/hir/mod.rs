@@ -197,6 +197,7 @@ pub enum HirExprDesc {
     Tuple(Vec<HirExpr>),
     SliceLit(Vec<HirExpr>),
     SizeOf(PartialTypeRef),
+    TypeName(PartialTypeRef),
     Constructor {
         enum_def: EnumId,
         name: Symbol,

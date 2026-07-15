@@ -120,6 +120,7 @@ impl<'db> InferenceCtx<'db> {
                 Ok(self.slice_of(elem_var.into()))
             }
             HirExprDesc::SizeOf(_) => Ok(self.usize_ty()),
+            HirExprDesc::TypeName(_) => Ok(self.str_ty()),
             HirExprDesc::Constructor {
                 enum_def,
                 name,

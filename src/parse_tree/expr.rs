@@ -108,11 +108,12 @@ pub enum AstExprDesc {
     SliceLit(Vec<AstExpr>),
 
     SizeOf(AstTypeExpr),
-    Ref(bool, Box<AstExpr>),
-
+    TypeName(AstTypeExpr),
     /// @metadata(<expr>), retrives the metadata for the fat-pointer expr
     /// <expr>.
     Metadata(Box<AstExpr>),
+
+    Ref(bool, Box<AstExpr>),
 
     As {
         expr: Box<AstExpr>,

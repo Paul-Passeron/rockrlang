@@ -210,7 +210,7 @@ impl<'db> SanityChecker<'db> {
     fn check_expr(&mut self, expr: ExprId) -> TypeRef {
         let infos = &self.thir.exprs[expr];
         match &infos.kind {
-            ExprKind::SizeOf(_) | ExprKind::IntLit(_) => {
+            ExprKind::SizeOf(_) | ExprKind::TypeName(_) | ExprKind::IntLit(_) => {
                 // TODO
             }
             ExprKind::Charlit(_) => self.check_types(
