@@ -1,0 +1,39 @@
+@include core::opt
+@include core::io
+
+interface PrettyPrint {
+    fun print(&self): void;
+}
+
+impl <T: PrettyPrint> PrettyPrint for opt<T> {
+    fun print(&self): void {
+        match self {
+            opt::Some(val) => {
+                let x: &T = val; // Necessary, seems we don't bind the inner type in this case for some reason
+                printf(c"Some(");
+                x.print();
+                printf(c")");
+            }
+            _ => {
+                printf(c"None");
+            }
+        }
+    }
+}
+
+impl PrettyPrint for int {
+    fun print(&self): void {
+        printf(c"%d", *self);
+    }
+}
+
+fun type_name<T>(of: &T): str {
+    return @type_name(T);
+}
+
+fun main(): int {
+    let x = opt::Some(opt::Some(opt::Some(123456)));
+    x.print(); "".println();
+    type_name(&x).println();
+    return 0;
+}
