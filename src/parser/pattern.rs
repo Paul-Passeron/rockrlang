@@ -42,9 +42,7 @@ impl<'db> Parser<'db> {
                     start.span(self.get_end()),
                 ))
             }
-            TokenKind::Identifier(name)
-                if name == Symbol::new(self.db, "_") =>
-            {
+            TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();
                 Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(end)))
@@ -67,22 +65,14 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(_) => {
                 let named = self.parse_named_pattern()?;
                 let end = self.get_end();
-                Ok(Spanned::new(
-                    AstPatternDesc::Named(named),
-                    vec![],
-                    start.span(end),
-                ))
+                Ok(Spanned::new(AstPatternDesc::Named(named), vec![], start.span(end)))
             }
 
             TokenKind::IntLit(x) => {
                 self.consume();
                 let end = self.get_end();
 
-                Ok(Spanned::new(
-                    AstPatternDesc::IntLiteral(x),
-                    vec![],
-                    start.span(end),
-                ))
+                Ok(Spanned::new(AstPatternDesc::IntLiteral(x), vec![], start.span(end)))
             }
 
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
@@ -98,10 +88,7 @@ impl<'db> Parser<'db> {
             Some(TokenKind::Access) => {
                 self.consume();
                 let rhs = self.parse_named_pattern()?;
-                Ok(AstNamedPattern::NameResolved {
-                    from: name,
-                    to: Box::new(rhs),
-                })
+                Ok(AstNamedPattern::NameResolved { from: name, to: Box::new(rhs) })
             }
 
             Some(TokenKind::OpenPar) => {
@@ -133,9 +120,7 @@ impl<'db> Parser<'db> {
                             pattern: associated,
                         })
                     } else {
-                        fields.push(StructFieldPattern::Name(
-                            name.data, name.span,
-                        ));
+                        fields.push(StructFieldPattern::Name(name.data, name.span));
                     }
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Comma)

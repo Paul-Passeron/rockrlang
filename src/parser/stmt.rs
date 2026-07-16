@@ -17,9 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     lexer::TokenKind,
-    parse_tree::stmt::{
-        AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp,
-    },
+    parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
     parser::{ParseError, Parser},
 };
 
@@ -42,9 +40,7 @@ impl<'db> Parser<'db> {
         Ok(res)
     }
 
-    pub(super) fn parse_block_as_stmt(
-        &mut self,
-    ) -> Result<AstStmt, ParseError> {
+    pub(super) fn parse_block_as_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_end();
         let stmts = self.parse_block()?;
         let end = self.get_end();
@@ -141,18 +137,16 @@ impl<'db> Parser<'db> {
         };
 
         // Match directly on the dedicated compound-assign tokens or plain `=`
-        let compound_op: Option<CompoundAssignOp> =
-            match self.peek_n(0).map(|t| t.kind) {
-                Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
-                Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
-                Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
-                Some(TokenKind::DivEq) => Some(CompoundAssignOp::Div),
-                Some(TokenKind::ModuloEq) => Some(CompoundAssignOp::Modulo),
-                _ => None,
-            };
+        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind) {
+            Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
+            Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
+            Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
+            Some(TokenKind::DivEq) => Some(CompoundAssignOp::Div),
+            Some(TokenKind::ModuloEq) => Some(CompoundAssignOp::Modulo),
+            _ => None,
+        };
 
-        let is_plain_assign =
-            self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
+        let is_plain_assign = self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
 
         if compound_op.is_none() && !is_plain_assign {
             self.position = saved_pos;
@@ -192,14 +186,9 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::OpenBra)?;
         self.consume();
         let mut branches = Vec::new();
-        while self
-            .peek_n(0)
-            .is_some_and(|t| !matches!(t.kind, TokenKind::CloseBra))
-        {
+        while self.peek_n(0).is_some_and(|t| !matches!(t.kind, TokenKind::CloseBra)) {
             let pat = self.parse_pattern()?;
-            let guard = if self
-                .peek_n(0)
-                .is_some_and(|t| matches!(t.kind, TokenKind::If))
+            let guard = if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::If))
             {
                 self.consume();
                 Some(self.parse_expr()?)
@@ -237,11 +226,7 @@ impl<'db> Parser<'db> {
         };
         let end = self.get_end();
         Ok(AstStmt::new(
-            AstStmtDesc::If {
-                cond,
-                then: Box::new(then),
-                else_: else_.map(Box::new),
-            },
+            AstStmtDesc::If { cond, then: Box::new(then), else_: else_.map(Box::new) },
             vec![],
             start.span(end),
         ))
@@ -269,11 +254,7 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let stmt = self.parse_stmt()?;
                 let span = start.span(stmt.span.end());
-                Ok(AstStmt::new(
-                    AstStmtDesc::Defer(Box::new(stmt)),
-                    vec![],
-                    span,
-                ))
+                Ok(AstStmt::new(AstStmtDesc::Defer(Box::new(stmt)), vec![], span))
             }
             _ => {
                 if let Some(assignement) = self.try_parse_assign() {

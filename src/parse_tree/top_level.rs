@@ -193,22 +193,17 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                 Ok(())
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                write!(
-                    f,
-                    "{}::{}",
-                    from.display(self.db),
-                    to.data.display(self.db)
-                )
+                write!(f, "{}::{}", from.display(self.db), to.data.display(self.db))
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
                 write!(
                     f,
                     "&{}{}",
                     if *mutable { "mut " } else { "" },
-                    pointee.as_known().map_or_else(|| "_".into(), |ty| ty
-                        .data
-                        .display(self.db)
-                        .to_string())
+                    pointee.as_known().map_or_else(
+                        || "_".into(),
+                        |ty| ty.data.display(self.db).to_string()
+                    )
                 )
             }
             AstTypeExprDesc::Pointer { mutable, pointee } => {
@@ -216,25 +211,21 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     f,
                     "*{}{}",
                     if *mutable { "mut " } else { "" },
-                    pointee.as_known().map_or_else(|| "_".into(), |ty| ty
-                        .data
-                        .display(self.db)
-                        .to_string())
+                    pointee.as_known().map_or_else(
+                        || "_".into(),
+                        |ty| ty.data.display(self.db).to_string()
+                    )
                 )
             }
             AstTypeExprDesc::Slice { ty, len } => {
                 write!(
                     f,
                     "[{}{}]",
-                    ty.as_known().map_or_else(|| "_".into(), |ty| ty
-                        .data
-                        .display(self.db)
-                        .to_string()),
-                    if let Some(len) = len {
-                        format!("; {len}")
-                    } else {
-                        String::new()
-                    }
+                    ty.as_known().map_or_else(
+                        || "_".into(),
+                        |ty| ty.data.display(self.db).to_string()
+                    ),
+                    if let Some(len) = len { format!("; {len}") } else { String::new() }
                 )
             }
             AstTypeExprDesc::Tuple(spanneds) => {
@@ -243,10 +234,10 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     "({})",
                     spanneds
                         .iter()
-                        .map(|ty| ty.as_known().map_or_else(|| "_".into(), |ty| ty
-                            .data
-                            .display(self.db)
-                            .to_string()))
+                        .map(|ty| ty.as_known().map_or_else(
+                            || "_".into(),
+                            |ty| ty.data.display(self.db).to_string()
+                        ))
                         .collect_vec()
                         .join(", ")
                 )
@@ -354,11 +345,7 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
         symbols.reverse();
 
         symbols.into_iter().fold(
-            AstIncludePath::new(
-                AstIncludePathDesc::Symbol(symbol),
-                vec![],
-                span,
-            ),
+            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
             |acc, symb| {
                 let total_span = start_loc.span(symb.span.end());
                 AstIncludePath::new(

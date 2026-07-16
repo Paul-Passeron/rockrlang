@@ -28,8 +28,8 @@ use crate::{
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     printer::render_diagnostics,
     ril::{
-        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package,
-        TypeDefId, TypeRef, ptr_of, ref_of,
+        BuiltinTypeId, FileModule, InterfaceRef, InternedFunctionId, Package, TypeDefId,
+        TypeRef, ptr_of, ref_of,
     },
     thir::thir_body,
     typecheck::inference::{
@@ -44,8 +44,7 @@ use inkwell::{
     module::Module,
     passes::PassBuilderOptions,
     targets::{
-        CodeModel, FileType, InitializationConfig, RelocMode, Target,
-        TargetMachine,
+        CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
     },
 };
 use itertools::Itertools;
@@ -148,11 +147,7 @@ impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CompilerError::NoCompilationUnitFound(path_buf) => {
-                write!(
-                    f,
-                    "No compilation unit found at `{}`",
-                    path_buf.display()
-                )
+                write!(f, "No compilation unit found at `{}`", path_buf.display())
             }
             CompilerError::STDLibNotFound => {
                 write!(f, "Standard library (`std`) package not found.")
@@ -211,12 +206,8 @@ impl ZelfArg {
     pub fn as_type_ref_for(&self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         match self.kind {
             ZelfKind::Zelf => ty,
-            ZelfKind::RefZelf => {
-                ref_of(db, ty, self.mutability.is_mut()).into()
-            }
-            ZelfKind::PtrZelf => {
-                ptr_of(db, ty, self.mutability.is_mut()).into()
-            }
+            ZelfKind::RefZelf => ref_of(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::PtrZelf => ptr_of(db, ty, self.mutability.is_mut()).into(),
         }
     }
 }
@@ -257,12 +248,8 @@ impl AstReceiver {
                 return None;
             }
             AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
-            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => {
-                ZelfKind::RefZelf
-            }
-            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => {
-                ZelfKind::PtrZelf
-            }
+            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
+            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
         };
         Some(ZelfArg { mutability, kind })
     }
@@ -288,20 +275,15 @@ pub fn get_sig_of_function(
 ) -> FunctionSignature {
     let function_templates: Arc<[AstTemplateArg]> =
         get_templates_of_fun_only(db, function_id).iter().cloned().collect();
-    let ctx = AstImplicitContext::new(
-        db,
-        *function_id.parent(db),
-        function_templates.clone(),
-    )
-    .unwrap();
+    let ctx =
+        AstImplicitContext::new(db, *function_id.parent(db), function_templates.clone())
+            .unwrap();
     let added_templates: Vec<Vec<InterfaceRef>> = function_templates
         .iter()
         .map(|t| {
             t.constraints
                 .iter()
-                .flat_map(|constraint| {
-                    ctx.resolve_interface(db, &constraint.data)
-                })
+                .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                 .collect()
         })
         .collect();
@@ -312,9 +294,7 @@ pub fn get_sig_of_function(
             .map(|t| {
                 t.constraints
                     .iter()
-                    .flat_map(|constraint| {
-                        ctx.resolve_interface(db, &constraint.data)
-                    })
+                    .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                     .collect_vec()
             })
             .collect_vec();
@@ -341,13 +321,12 @@ fn add_package_root_from_disk(
     db: &mut dyn Db,
     root: PathBuf,
 ) -> Result<(), CompilerError> {
-    let root =
-        root.canonicalize().map_err(|_| CompilerError::NoFileFoundAt(root))?;
+    let root = root.canonicalize().map_err(|_| CompilerError::NoFileFoundAt(root))?;
     let path_to_file =
         if root.is_dir() { root.join(ANCHOR_FILE_NAME) } else { root.clone() };
     let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
-    let root_file = read_source_file(db, &path_to_file)
-        .ok_or(CompilerError::NoFileFoundAt(root))?;
+    let root_file =
+        read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
     let root = PackageRoot::new(db, package_name, root_file);
     Workspace::get(db).add_package_root(db, root);
     Ok(())
@@ -362,19 +341,12 @@ fn std_path() -> Result<PathBuf, CompilerError> {
 }
 
 fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
-    std::env::var(env).map_err(|_| CompilerError::CoreLibNotFound).and_then(
-        |path| {
-            PathBuf::from(path)
-                .canonicalize()
-                .map_err(|_| CompilerError::CoreLibNotFound)
-        },
-    )
+    std::env::var(env).map_err(|_| CompilerError::CoreLibNotFound).and_then(|path| {
+        PathBuf::from(path).canonicalize().map_err(|_| CompilerError::CoreLibNotFound)
+    })
 }
 
-fn compute_package_roots(
-    db: &mut dyn Db,
-    root: PathBuf,
-) -> Result<(), CompilerError> {
+fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
     add_package_root_from_disk(db, root)?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {
@@ -414,8 +386,7 @@ fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
         walk(
             db,
             if path.is_file()
-                && path.file_name().unwrap().to_str().unwrap()
-                    == ANCHOR_FILE_NAME
+                && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME
             {
                 path.parent().unwrap().to_path_buf()
             } else {
@@ -444,10 +415,7 @@ fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
     (has_errors, raw_diags)
 }
 
-pub fn check_from_disk(
-    root: PathBuf,
-    config: Config,
-) -> Result<(), CompilerError> {
+pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -487,8 +455,7 @@ pub fn build<'db, 'ctx>(
         .collect_vec();
 
     if db.config().display_thir {
-        let fids =
-            frefs.iter().map(|fref| fref.fdef(db)).collect::<HashSet<_>>();
+        let fids = frefs.iter().map(|fref| fref.fdef(db)).collect::<HashSet<_>>();
         let mut fids = fids.into_iter().collect_vec();
         fids.sort_by_key(|id| id.span(db).start().loc_info(db));
         for fid in fids {
@@ -535,10 +502,7 @@ pub fn write_object_file(
     machine.write_to_file(&m, FileType::Object, path).map_err(|e| e.to_string())
 }
 
-pub fn optimize(
-    module: &Module,
-    opt_level: OptimizationLevel,
-) -> TargetMachine {
+pub fn optimize(module: &Module, opt_level: OptimizationLevel) -> TargetMachine {
     module.verify().unwrap();
 
     Target::initialize_native(&InitializationConfig::default())
@@ -576,10 +540,7 @@ pub fn optimize(
     machine
 }
 
-pub fn build_from_disk(
-    root: PathBuf,
-    config: Config,
-) -> Result<(), CompilerError> {
+pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -624,12 +585,10 @@ pub fn build_from_disk(
         llvm_module.print_to_stderr();
     }
 
-    write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(
-        |err| {
-            eprintln!("LLVM errors:\n{err}");
-            CompilerError::CompiledWithErrors
-        },
-    )?;
+    write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(|err| {
+        eprintln!("LLVM errors:\n{err}");
+        CompilerError::CompiledWithErrors
+    })?;
     Ok(())
 }
 
@@ -683,23 +642,12 @@ pub fn submodules_of_file<'db>(
 }
 
 #[salsa::tracked]
-pub fn package_of_root<'db>(
-    db: &'db dyn Db,
-    root: PackageRoot,
-) -> Package<'db> {
+pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> {
     let file = *root.file(db);
-    Package::new(
-        db,
-        FileModule::new(db, file, submodules_of_file(db, file).to_vec()),
-    )
+    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file).to_vec()))
 }
 
 #[salsa::tracked]
-pub fn workspace_packages<'db>(
-    db: &'db dyn Db,
-    ws: Workspace,
-) -> Arc<Vec<Package<'db>>> {
-    Arc::new(
-        ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect(),
-    )
+pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Arc<Vec<Package<'db>>> {
+    Arc::new(ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect())
 }

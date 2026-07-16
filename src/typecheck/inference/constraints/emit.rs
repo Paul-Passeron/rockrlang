@@ -100,17 +100,15 @@ impl<'db> InferenceCtx<'db> {
         is_static: bool,
     ) -> InferVar {
         let ret_var = self.fresh_var();
-        self.emit_constraint(InferenceConstraintKind::Method(
-            MethodConstraint {
-                ret_var,
-                ty,
-                id,
-                method,
-                args,
-                interface_hint,
-                is_static,
-            },
-        ));
+        self.emit_constraint(InferenceConstraintKind::Method(MethodConstraint {
+            ret_var,
+            ty,
+            id,
+            method,
+            args,
+            interface_hint,
+            is_static,
+        }));
         ret_var
     }
 
@@ -120,11 +118,7 @@ impl<'db> InferenceCtx<'db> {
         id: InterfaceId,
         args: Box<[InferTy]>,
     ) {
-        self.emit_constraint(InferenceConstraintKind::Implements {
-            ty,
-            id,
-            args,
-        });
+        self.emit_constraint(InferenceConstraintKind::Implements { ty, id, args });
     }
 
     pub fn emit_binop_constraint(
@@ -163,15 +157,8 @@ impl<'db> InferenceCtx<'db> {
         res_ty
     }
 
-    pub fn emit_is_inner_constraint(
-        &mut self,
-        inner: InferTy,
-        ref_ty: InferTy,
-    ) {
-        self.emit_constraint(InferenceConstraintKind::IsInner {
-            inner,
-            ref_ty,
-        });
+    pub fn emit_is_inner_constraint(&mut self, inner: InferTy, ref_ty: InferTy) {
+        self.emit_constraint(InferenceConstraintKind::IsInner { inner, ref_ty });
     }
 
     pub fn emit_fat_ptr_constraint(&mut self) -> InferVar {

@@ -67,12 +67,9 @@ impl MIRAnalysis<'_, '_> for MIRLoanAnalysis {
         let loans = self.collect_loans(mir);
         let by_holder = loans.by_holder();
         let liveness = mir.liveness(db);
-        let loans_live_in =
-            self.project_liveness(&liveness.live_in, &by_holder);
-        let loans_live_out =
-            self.project_liveness(&liveness.live_out, &by_holder);
-        let indices =
-            loans.iter().map(|(id, loan)| (loan.created_at, id)).collect();
+        let loans_live_in = self.project_liveness(&liveness.live_in, &by_holder);
+        let loans_live_out = self.project_liveness(&liveness.live_out, &by_holder);
+        let indices = loans.iter().map(|(id, loan)| (loan.created_at, id)).collect();
         MIRLoanOut { loans, indices, loans_live_in, loans_live_out }
     }
 }
@@ -85,8 +82,7 @@ impl MIRLoanAnalysis {
                 match stmt {
                     Stmt::Assign { dest, rvalue } => {
                         if let MIRRValueKind::Ref(place, mutability)
-                        | MIRRValueKind::AddressOf(place, mutability) =
-                            &rvalue.kind
+                        | MIRRValueKind::AddressOf(place, mutability) = &rvalue.kind
                         {
                             let loan = Loan {
                                 place: place.clone(),
@@ -116,9 +112,7 @@ impl MIRLoanAnalysis {
                 (
                     *blk,
                     ids.iter()
-                        .flat_map(|local| {
-                            Some(by_holder.get(local)?.iter().copied())
-                        })
+                        .flat_map(|local| Some(by_holder.get(local)?.iter().copied()))
                         .flatten()
                         .collect(),
                 )

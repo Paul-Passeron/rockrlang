@@ -21,8 +21,8 @@ use crate::{
     Db,
     common::arena::Arena,
     mir::{
-        BasicBlock, BlockID, Local, LocalID, MIR, Terminator,
-        basic_block::Stmt, cache::MIRCache,
+        BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt,
+        cache::MIRCache,
     },
     thir_to_mir::FuncInst,
 };

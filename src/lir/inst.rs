@@ -83,16 +83,8 @@ pub struct BlockTarget<R: Refs> {
 
 pub enum Terminator<R: Refs> {
     Goto(BlockTarget<R>),
-    Br {
-        cond: R::Val,
-        if_true: BlockTarget<R>,
-        if_false: BlockTarget<R>,
-    },
-    Switch {
-        on: R::Val,
-        branches: Vec<(u128, BlockTarget<R>)>,
-        default: BlockTarget<R>,
-    },
+    Br { cond: R::Val, if_true: BlockTarget<R>, if_false: BlockTarget<R> },
+    Switch { on: R::Val, branches: Vec<(u128, BlockTarget<R>)>, default: BlockTarget<R> },
 
     Return(Option<R::Val>),
     Diverge,

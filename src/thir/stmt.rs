@@ -17,9 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{
-        ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch,
-    },
+    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
 };
 
 pub struct ThirStmt {
@@ -80,10 +78,7 @@ impl ThirStmt {
         else_scope: Option<ScopeId>,
         span: Span,
     ) -> Self {
-        Self {
-            kind: StmtKind::If { cond, then, then_scope, else_, else_scope },
-            span,
-        }
+        Self { kind: StmtKind::If { cond, then, then_scope, else_, else_scope }, span }
     }
 
     pub fn expr(expr: ExprId, span: Span) -> Self {

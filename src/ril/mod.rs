@@ -23,7 +23,11 @@ pub mod plumbing;
 pub use plumbing::*;
 
 use crate::{
-    Db, SourceFile, common::{location::Span, symbols::Symbol, unord::Set}, name_resolve::type_expr::{templates_of_enum, templates_of_struct}, parse_tree::top_level::{AstImplItem, AstTemplateArg}, printer::type_printer::TypePrinter,
+    Db, SourceFile,
+    common::{location::Span, symbols::Symbol, unord::Set},
+    name_resolve::type_expr::{templates_of_enum, templates_of_struct},
+    parse_tree::top_level::{AstImplItem, AstTemplateArg},
+    printer::type_printer::TypePrinter,
 };
 
 #[salsa::tracked]

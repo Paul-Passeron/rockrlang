@@ -80,10 +80,7 @@ impl<'a> DCECtx<'a> {
         self.reachable = reachable.into_iter().collect();
     }
 
-    fn add_and_get_local_to_mapping(
-        &mut self,
-        original: MIRLocalID,
-    ) -> MIRLocalID {
+    fn add_and_get_local_to_mapping(&mut self, original: MIRLocalID) -> MIRLocalID {
         if let Some(res) = self.local_map.get(&original) {
             return *res;
         }
@@ -122,10 +119,7 @@ impl<'a> DCECtx<'a> {
         let p1_last = *p1.last().unwrap();
         let p2_fst = *p2.first().unwrap();
 
-        if !matches!(
-            &self.mir.blocks[p1_last].terminator,
-            MIRTerminator::Goto { .. },
-        ) {
+        if !matches!(&self.mir.blocks[p1_last].terminator, MIRTerminator::Goto { .. },) {
             return None;
         }
 
@@ -150,12 +144,12 @@ impl<'a> DCECtx<'a> {
         &self,
         paths: &[Vec<OldBlockID>],
     ) -> Option<PathCompressionRes> {
-        (0..paths.len())
-            .flat_map(|i| (0..i).map(|j| (i, j)).collect_vec())
-            .find_map(|(i, j)| {
+        (0..paths.len()).flat_map(|i| (0..i).map(|j| (i, j)).collect_vec()).find_map(
+            |(i, j)| {
                 let reversed = self.can_compress_paths(&paths[i], &paths[j])?;
                 Some(PathCompressionRes { i, j, reversed })
-            })
+            },
+        )
     }
 
     fn compress_paths(
@@ -175,8 +169,7 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_paths(&mut self) -> Vec<Vec<OldBlockID>> {
-        let mut paths =
-            self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
+        let mut paths = self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
         while let Some(PathCompressionRes { i, j, reversed }) =
             self.find_next_path_compression(&paths)
         {
@@ -189,11 +182,7 @@ impl<'a> DCECtx<'a> {
         &mut self,
         paths: &[Vec<OldBlockID>],
     ) -> HashMap<OldBlockID, usize> {
-        paths
-            .iter()
-            .enumerate()
-            .map(|(i, p)| (*p.first().unwrap(), i))
-            .collect()
+        paths.iter().enumerate().map(|(i, p)| (*p.first().unwrap(), i)).collect()
     }
 
     fn compute_successors(&mut self) {
@@ -223,26 +212,20 @@ impl<'a> DCECtx<'a> {
     fn copy_rvalue(&mut self, rvalue: &MIRRValue) -> MIRRValue {
         let kind = match &rvalue.kind {
             MIRRValueKind::Use(op) => MIRRValueKind::Use(self.copy_operand(op)),
-            MIRRValueKind::Ref(p, m) => {
-                MIRRValueKind::Ref(self.copy_place(p), *m)
-            }
+            MIRRValueKind::Ref(p, m) => MIRRValueKind::Ref(self.copy_place(p), *m),
             MIRRValueKind::AddressOf(p, m) => {
                 MIRRValueKind::AddressOf(self.copy_place(p), *m)
             }
-            MIRRValueKind::BinOp(bop, l, r) => MIRRValueKind::BinOp(
-                *bop,
-                self.copy_operand(l),
-                self.copy_operand(r),
-            ),
+            MIRRValueKind::BinOp(bop, l, r) => {
+                MIRRValueKind::BinOp(*bop, self.copy_operand(l), self.copy_operand(r))
+            }
             MIRRValueKind::UnaryOp(uop, op) => {
                 MIRRValueKind::UnaryOp(*uop, self.copy_operand(op))
             }
             MIRRValueKind::Discriminant(p) => {
                 MIRRValueKind::Discriminant(self.copy_place(p))
             }
-            MIRRValueKind::Metadata(op) => {
-                MIRRValueKind::Metadata(self.copy_operand(op))
-            }
+            MIRRValueKind::Metadata(op) => MIRRValueKind::Metadata(self.copy_operand(op)),
             MIRRValueKind::SizeOf(t) => MIRRValueKind::SizeOf(*t),
             MIRRValueKind::Constructor { enum_ref, idx, args, span } => {
                 MIRRValueKind::Constructor {
@@ -286,16 +269,10 @@ impl<'a> DCECtx<'a> {
         match proj {
             MIRProjection::Deref => MIRProjection::Deref,
             MIRProjection::Field { name, resulting_ty } => {
-                MIRProjection::Field {
-                    name: *name,
-                    resulting_ty: *resulting_ty,
-                }
+                MIRProjection::Field { name: *name, resulting_ty: *resulting_ty }
             }
             MIRProjection::TupleField { index, resulting_ty } => {
-                MIRProjection::TupleField {
-                    index: *index,
-                    resulting_ty: *resulting_ty,
-                }
+                MIRProjection::TupleField { index: *index, resulting_ty: *resulting_ty }
             }
             MIRProjection::Index { index } => {
                 MIRProjection::Index { index: self.copy_operand(index) }
@@ -319,29 +296,21 @@ impl<'a> DCECtx<'a> {
         }
     }
 
-    fn copy_cons_args(
-        &mut self,
-        args: &MIRConstructorArgs,
-    ) -> MIRConstructorArgs {
+    fn copy_cons_args(&mut self, args: &MIRConstructorArgs) -> MIRConstructorArgs {
         match args {
             MIRConstructorArgs::None => MIRConstructorArgs::None,
             MIRConstructorArgs::Tuple(ops) => MIRConstructorArgs::Tuple(
                 ops.iter().map(|op| self.copy_operand(op)).collect(),
             ),
             MIRConstructorArgs::Struct(fields) => MIRConstructorArgs::Struct(
-                fields
-                    .iter()
-                    .map(|(key, val)| (*key, self.copy_operand(val)))
-                    .collect(),
+                fields.iter().map(|(key, val)| (*key, self.copy_operand(val))).collect(),
             ),
         }
     }
 
     fn copy_operand(&mut self, operand: &MIROperand) -> MIROperand {
         match operand {
-            MIROperand::Constant(cst, span) => {
-                MIROperand::Constant(cst.clone(), *span)
-            }
+            MIROperand::Constant(cst, span) => MIROperand::Constant(cst.clone(), *span),
             MIROperand::Move(p) => MIROperand::Move(self.copy_place(p)),
             MIROperand::Copy(p) => MIROperand::Copy(self.copy_place(p)),
         }
@@ -380,17 +349,15 @@ impl<'a> DCECtx<'a> {
                 value: value.as_ref().map(|operand| self.copy_operand(operand)),
                 span: *span,
             },
-            MIRTerminator::Goto { next } => MIRTerminator::Goto {
-                next: self.get_bb(*next, bbs, path_heads),
-            },
-            MIRTerminator::Branch { cond, then, else_, span } => {
-                MIRTerminator::Branch {
-                    cond: self.copy_operand(cond),
-                    then: self.get_bb(*then, bbs, path_heads),
-                    else_: self.get_bb(*else_, bbs, path_heads),
-                    span: *span,
-                }
+            MIRTerminator::Goto { next } => {
+                MIRTerminator::Goto { next: self.get_bb(*next, bbs, path_heads) }
             }
+            MIRTerminator::Branch { cond, then, else_, span } => MIRTerminator::Branch {
+                cond: self.copy_operand(cond),
+                then: self.get_bb(*then, bbs, path_heads),
+                else_: self.get_bb(*else_, bbs, path_heads),
+                span: *span,
+            },
             MIRTerminator::Switch { discriminant, branches, default, span } => {
                 MIRTerminator::Switch {
                     discriminant: self.copy_operand(discriminant),
@@ -432,8 +399,7 @@ impl<'a> DCECtx<'a> {
                 self.b.emit(new_stmt);
             });
             let terminator = &self.mir.blocks[*p.last().unwrap()].terminator;
-            let new_terminator =
-                self.copy_terminator(terminator, &bbs, &path_heads);
+            let new_terminator = self.copy_terminator(terminator, &bbs, &path_heads);
             self.b.terminate(new_terminator).unwrap();
         }
     }

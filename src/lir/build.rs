@@ -21,20 +21,18 @@ use crate::{
     Db,
     common::symbols::Symbol,
     layout::{
-        AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID,
-        ScalarKind, VariantsLayout,
+        AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID, ScalarKind,
+        VariantsLayout,
     },
     lir::{
-        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig,
-        Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar,
-        ScalarMarker, ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass,
-        ValueDef, ValueId, ValueKind, VerifyError,
-        branded::{
-            BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody,
-        },
+        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig, Int,
+        IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar, ScalarMarker,
+        ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass, ValueDef, ValueId,
+        ValueKind, VerifyError,
+        branded::{BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody},
         inst::{
-            BlockTarget, CastKind, ConstValue, Terminator::Return,
-            ValueInstKind, VoidInstKind,
+            BlockTarget, CastKind, ConstValue, Terminator::Return, ValueInstKind,
+            VoidInstKind,
         },
     },
     ril::ptr_of,
@@ -136,11 +134,7 @@ impl<'ir, K: ValueKind> TypedPtr<'ir, K> {
 }
 
 impl<'ir> ValueId<'ir> {
-    fn typed<V: ValueKind>(
-        self,
-        ty: LIRTy,
-        db: &dyn Db,
-    ) -> Option<Typed<'ir, V>> {
+    fn typed<V: ValueKind>(self, ty: LIRTy, db: &dyn Db) -> Option<Typed<'ir, V>> {
         if V::matches(ty.class(db)) {
             Some(Typed { id: self, ty, _k: PhantomData })
         } else {
@@ -223,17 +217,12 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         debug_assert!(self.body.defs[ptr.idx].ty.is_ptr(self.db));
         debug_assert!(ty.is_union(self.db));
         debug_assert!(
-            ty.union_layout(self.db)
-                .is_some_and(|vs| vs.variants.len() > idx as usize)
+            ty.union_layout(self.db).is_some_and(|vs| vs.variants.len() > idx as usize)
         );
         self.push_void(VoidInstKind::SetDiscriminant { ptr, ty, idx });
     }
 
-    pub fn set_discriminant_typed(
-        &mut self,
-        ptr: TypedPtr<'ir, Union>,
-        idx: u32,
-    ) {
+    pub fn set_discriminant_typed(&mut self, ptr: TypedPtr<'ir, Union>, idx: u32) {
         self.set_discriminant(ptr.erase(), ptr.pointee, idx);
     }
 
@@ -246,19 +235,14 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             ty.class(self.db),
             ValueClass::Scalar(ScalarKind::Int(_))
         ));
-        let val = self.push_value(
-            ty,
-            ValueInstKind::Const(ConstValue::Int { ty, value: v }),
-        );
+        let val =
+            self.push_value(ty, ValueInstKind::Const(ConstValue::Int { ty, value: v }));
         IntValue { id: val, ty, _k: PhantomData }
     }
 
     pub fn const_null_ptr(&mut self, pointee: LIRTy) -> ValueId<'ir> {
         let ptr_ty = self.ptr_of(pointee);
-        self.push_value(
-            ptr_ty,
-            ValueInstKind::Const(ConstValue::NullPtr { pointee }),
-        )
+        self.push_value(ptr_ty, ValueInstKind::Const(ConstValue::NullPtr { pointee }))
     }
 
     pub fn zeroed(&mut self, ty: LIRTy) -> ValueId<'ir> {
@@ -298,10 +282,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_value(ty, ValueInstKind::Load { ptr, ty })
     }
 
-    pub fn load_typed<K: ValueKind>(
-        &mut self,
-        ptr: TypedPtr<'ir, K>,
-    ) -> Typed<'ir, K> {
+    pub fn load_typed<K: ValueKind>(&mut self, ptr: TypedPtr<'ir, K>) -> Typed<'ir, K> {
         self.load(ptr.raw, ptr.pointee).typed(ptr.pointee, self.db).unwrap()
     }
 
@@ -316,9 +297,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         debug_assert!(self.body.defs[ptr.idx].ty.is_ptr(self.db));
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert!(
-            ty.aggregate_layout(self.db)
-                .and_then(|l| l.source_field(src_idx))
-                .is_some()
+            ty.aggregate_layout(self.db).and_then(|l| l.source_field(src_idx)).is_some()
         );
         let ptr_ty = self.ptr_of(ty);
         self.push_value(ptr_ty, ValueInstKind::FieldPtr { ptr, ty, src_idx })
@@ -373,8 +352,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         };
         let discr_ty = LIRTy { layout: discr_layout, origin: None };
 
-        let val = self
-            .push_value(discr_ty, ValueInstKind::GetDiscriminant { ptr, ty });
+        let val = self.push_value(discr_ty, ValueInstKind::GetDiscriminant { ptr, ty });
         val.typed(discr_ty, self.db)
     }
 
@@ -400,7 +378,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     // Aggregates
 
     // TODO: make sure we correctly handle ZSTs in codegen
-    
+
     pub fn make_aggregate(
         &mut self,
         ty: LIRTy,
@@ -409,12 +387,9 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     ) -> Typed<'ir, Aggregate> {
         debug_assert!(ty.is_aggregate(self.db));
         // TODO: check fields
-        self.push_value(
-            ty,
-            ValueInstKind::MakeAggregate { ty, fields_in_src_order },
-        )
-        .typed(ty, self.db)
-        .unwrap()
+        self.push_value(ty, ValueInstKind::MakeAggregate { ty, fields_in_src_order })
+            .typed(ty, self.db)
+            .unwrap()
     }
 
     pub fn extract_field(
@@ -426,21 +401,12 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
         debug_assert!(
-            ty.aggregate_layout(self.db)
-                .and_then(|l| l.source_field(src_idx))
-                .is_some()
+            ty.aggregate_layout(self.db).and_then(|l| l.source_field(src_idx)).is_some()
         );
-        let field_layout = ty
-            .aggregate_layout(self.db)
-            .unwrap()
-            .source_field(src_idx)
-            .unwrap()
-            .1;
+        let field_layout =
+            ty.aggregate_layout(self.db).unwrap().source_field(src_idx).unwrap().1;
         let field_ty = LIRTy { layout: field_layout, origin: None };
-        self.push_value(
-            field_ty,
-            ValueInstKind::ExtractField { value, ty, src_idx },
-        )
+        self.push_value(field_ty, ValueInstKind::ExtractField { value, ty, src_idx })
     }
 
     pub fn extract_field_typed(
@@ -461,22 +427,13 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         debug_assert!(ty.is_aggregate(self.db));
         debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
         debug_assert!(
-            ty.aggregate_layout(self.db)
-                .and_then(|l| l.source_field(src_idx))
-                .is_some()
+            ty.aggregate_layout(self.db).and_then(|l| l.source_field(src_idx)).is_some()
         );
         debug_assert_eq!(
-            ty.aggregate_layout(self.db)
-                .unwrap()
-                .source_field(src_idx)
-                .unwrap()
-                .1,
+            ty.aggregate_layout(self.db).unwrap().source_field(src_idx).unwrap().1,
             self.body.defs[field.idx].ty.layout
         );
-        self.push_value(
-            ty,
-            ValueInstKind::InsertField { value, ty, src_idx, field },
-        )
+        self.push_value(ty, ValueInstKind::InsertField { value, ty, src_idx, field })
     }
 
     pub fn insert_field_typed(
@@ -534,9 +491,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         lhs: Typed<'ir, Scalar<Int>>,
         rhs: Typed<'ir, Scalar<Int>>,
     ) -> Typed<'ir, Scalar<Int>> {
-        self.cmp(op, lhs.erase(), rhs.erase())
-            .typed(self.bool_ty(), self.db)
-            .unwrap()
+        self.cmp(op, lhs.erase(), rhs.erase()).typed(self.bool_ty(), self.db).unwrap()
     }
 
     pub fn logic(
@@ -559,9 +514,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     ) -> IntValue<'ir> {
         debug_assert_eq!(lhs.width(self.db), IntWidth::I8);
         debug_assert_eq!(rhs.width(self.db), IntWidth::I8);
-        self.logic(op, lhs.erase(), rhs.erase())
-            .typed(self.bool_ty(), self.db)
-            .unwrap()
+        self.logic(op, lhs.erase(), rhs.erase()).typed(self.bool_ty(), self.db).unwrap()
     }
 
     pub fn not(&mut self, value: ValueId<'ir>) -> ValueId<'ir> {
@@ -586,11 +539,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_value(ty, ValueInstKind::Cast { kind, value, to })
     }
 
-    pub fn bitcast(
-        &mut self,
-        value: ValueId<'ir>,
-        to: ScalarKind,
-    ) -> ValueId<'ir> {
+    pub fn bitcast(&mut self, value: ValueId<'ir>, to: ScalarKind) -> ValueId<'ir> {
         self.cast(CastKind::Bitcast, value, to)
     }
 
@@ -867,10 +816,7 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
         value
     }
 
-    pub fn stack_slot_typed<K: ValueKind>(
-        &mut self,
-        ty: LIRTy,
-    ) -> TypedPtr<'ir, K> {
+    pub fn stack_slot_typed<K: ValueKind>(&mut self, ty: LIRTy) -> TypedPtr<'ir, K> {
         assert!(K::matches(ty.class(self.db)));
         self.stack_slot(ty).typed_ptr(ty, self.db).unwrap()
     }

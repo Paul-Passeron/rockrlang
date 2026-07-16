@@ -56,8 +56,7 @@ impl<T> Frozen<T> {
 
     pub fn push(&self, item: T) {
         let mut data = self.data.lock().unwrap();
-        if data.is_empty()
-            || self.next_bucket_idx.load(Ordering::Relaxed) == BUCKET_SIZE
+        if data.is_empty() || self.next_bucket_idx.load(Ordering::Relaxed) == BUCKET_SIZE
         {
             self.next_bucket_idx.store(0, Ordering::Relaxed);
             data.push(Box::new([const { MaybeUninit::uninit() }; BUCKET_SIZE]));
@@ -125,8 +124,7 @@ impl<T> Frozen<T> {
     pub fn is_empty(&self) -> bool {
         let data = self.data.lock().unwrap();
         data.is_empty()
-            || (data.len() == 1
-                && self.next_bucket_idx.load(Ordering::Relaxed) == 0)
+            || (data.len() == 1 && self.next_bucket_idx.load(Ordering::Relaxed) == 0)
     }
 
     pub fn len(&self) -> usize {
@@ -134,8 +132,7 @@ impl<T> Frozen<T> {
             0
         } else {
             let data = self.data.lock().unwrap();
-            self.next_bucket_idx.load(Ordering::Relaxed)
-                + (data.len() - 1) * BUCKET_SIZE
+            self.next_bucket_idx.load(Ordering::Relaxed) + (data.len() - 1) * BUCKET_SIZE
         }
     }
 }
@@ -149,10 +146,7 @@ impl<T> Drop for Frozen<T> {
         for (i, bucket) in data.iter_mut().enumerate() {
             let count = if i == last { next_bucket_idx } else { BUCKET_SIZE };
             unsafe {
-                bucket
-                    .iter_mut()
-                    .take(count)
-                    .for_each(|elem| elem.assume_init_drop());
+                bucket.iter_mut().take(count).for_each(|elem| elem.assume_init_drop());
             }
         }
     }
@@ -162,8 +156,7 @@ impl<'a, T> Iterator for FrozenIter<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let res =
-            self.frozen.get(self.item_idx + self.bucket_idx * BUCKET_SIZE);
+        let res = self.frozen.get(self.item_idx + self.bucket_idx * BUCKET_SIZE);
         self.item_idx += 1;
         if self.item_idx >= BUCKET_SIZE {
             self.item_idx = 0;
@@ -191,8 +184,7 @@ impl<'a, T> Iterator for FrozenIterMut<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let res = unsafe {
             transmute::<Option<&mut T>, Option<&'a mut T>>(
-                self.frozen
-                    .get_mut(self.item_idx + self.bucket_idx * BUCKET_SIZE),
+                self.frozen.get_mut(self.item_idx + self.bucket_idx * BUCKET_SIZE),
             )
         };
         self.item_idx += 1;
@@ -282,11 +274,7 @@ impl<T> IntoIterator for Frozen<T> {
                     }
                 }
             } else {
-                res.extend(
-                    values
-                        .into_iter()
-                        .map(|item| unsafe { item.assume_init() }),
-                );
+                res.extend(values.into_iter().map(|item| unsafe { item.assume_init() }));
             }
         }
         res.reverse();
@@ -323,13 +311,9 @@ impl<T: Clone> Clone for Frozen<T> {
                     .iter()
                     .enumerate()
                     .map(|(i, x)| {
-                        let mut arr =
-                            [const { MaybeUninit::uninit() }; BUCKET_SIZE];
-                        let max_idx = if i == last_bucket {
-                            next_bucket_idx
-                        } else {
-                            BUCKET_SIZE
-                        };
+                        let mut arr = [const { MaybeUninit::uninit() }; BUCKET_SIZE];
+                        let max_idx =
+                            if i == last_bucket { next_bucket_idx } else { BUCKET_SIZE };
                         for j in 0..max_idx {
                             unsafe {
                                 arr[j].write(x[j].assume_init_ref().clone());
@@ -393,9 +377,7 @@ impl<T> Frozen<T> {
                 right = mid;
             }
         }
-        (left < l && self.get(left).map(cmp) == Some(value))
-            .then_some(left)
-            .ok_or(left)
+        (left < l && self.get(left).map(cmp) == Some(value)).then_some(left).ok_or(left)
     }
 }
 

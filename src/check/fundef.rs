@@ -89,8 +89,7 @@ pub(crate) fn reachable_mir_instances(
                 callee_subs.len()
             );
 
-            let zelf =
-                call_info.zelf_ty.map(|ty| ty.with_substitution(db, &subs));
+            let zelf = call_info.zelf_ty.map(|ty| ty.with_substitution(db, &subs));
 
             let (fdef, callee_subs) =
                 concretize_fid(db, call_info.callee, &callee_subs, zelf);
@@ -116,10 +115,8 @@ pub fn concretize_fid(
     let arity = f_id.args(db).1.len();
     let hint = Some(i_ref.def(db));
     let method =
-        method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint)
-            .unwrap();
-    let mut new_subs =
-        method.subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
+        method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint).unwrap();
+    let mut new_subs = method.subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
     new_subs.extend(callee_subs);
     (method.method_id, new_subs)
 }

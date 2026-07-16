@@ -67,11 +67,7 @@ pub enum ParseErrorKind {
 }
 
 impl<'db> Parser<'db> {
-    pub fn new(
-        db: &'db dyn Db,
-        tokens: &'db [Token],
-        file: SourceFile,
-    ) -> Self {
+    pub fn new(db: &'db dyn Db, tokens: &'db [Token], file: SourceFile) -> Self {
         Self { position: 0, tokens, db, file, annotations: Vec::new() }
     }
 
@@ -80,13 +76,13 @@ impl<'db> Parser<'db> {
     }
 
     pub fn last_span(&self) -> Span {
-        let (start, end) =
-            if self.tokens.is_empty() || self.position >= self.tokens.len() {
-                (0, 0)
-            } else {
-                let span = &self.tokens[self.position].location;
-                (span.start_offset, span.end_offset)
-            };
+        let (start, end) = if self.tokens.is_empty() || self.position >= self.tokens.len()
+        {
+            (0, 0)
+        } else {
+            let span = &self.tokens[self.position].location;
+            (span.start_offset, span.end_offset)
+        };
         Span::new(self.file, start, end)
     }
 
@@ -135,12 +131,7 @@ impl<'db> Parser<'db> {
     fn parse_error(&self, kind: ParseErrorKind) -> ParseError {
         let s = self.last_span();
         // panic!("{}:{} {kind:?}", s.file.display(), s.start);
-        ParseError {
-            kind,
-            file: s.file,
-            start: s.start_offset,
-            end: s.end_offset,
-        }
+        ParseError { kind, file: s.file, start: s.start_offset, end: s.end_offset }
     }
 
     fn parse_symbol(&mut self) -> Result<Spanned<Symbol>, ParseError> {

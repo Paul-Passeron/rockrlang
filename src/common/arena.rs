@@ -155,10 +155,7 @@ impl<T: PartialEq + Eq> Eq for Arena<T> {}
 
 impl<T> Arena<T> {
     pub fn iter(&self) -> impl Iterator<Item = (Idx<T>, &T)> {
-        self.inner
-            .iter()
-            .enumerate()
-            .map(|(i, value)| (Idx(i, PhantomData), value))
+        self.inner.iter().enumerate().map(|(i, value)| (Idx(i, PhantomData), value))
     }
 
     pub fn keys(&self) -> impl Iterator<Item = Idx<T>> {
@@ -168,32 +165,23 @@ impl<T> Arena<T> {
 
 impl<T> IntoIterator for Arena<T> {
     fn into_iter(self) -> Self::IntoIter {
-        self.inner
-            .into_iter()
-            .enumerate()
-            .map(|(i, value)| (Idx(i, PhantomData), value))
+        self.inner.into_iter().enumerate().map(|(i, value)| (Idx(i, PhantomData), value))
     }
 
     type Item = (Idx<T>, T);
 
-    type IntoIter =
-        Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
+    type IntoIter = Map<Enumerate<FrozenIntoIter<T>>, fn((usize, T)) -> (Idx<T>, T)>;
 }
 
 impl<'a, T> IntoIterator for &'a Arena<T> {
     fn into_iter(self) -> Self::IntoIter {
-        self.inner
-            .iter()
-            .enumerate()
-            .map(|(i, value)| (Idx(i, PhantomData), value))
+        self.inner.iter().enumerate().map(|(i, value)| (Idx(i, PhantomData), value))
     }
 
     type Item = (Idx<T>, &'a T);
 
-    type IntoIter = Map<
-        Enumerate<FrozenIter<'a, T>>,
-        fn((usize, &'a T)) -> (Idx<T>, &'a T),
-    >;
+    type IntoIter =
+        Map<Enumerate<FrozenIter<'a, T>>, fn((usize, &'a T)) -> (Idx<T>, &'a T)>;
 }
 
 impl<T> Idx<T> {

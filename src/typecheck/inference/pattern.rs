@@ -18,10 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::EitherOrBoth;
 
 use crate::{
-    hir::{
-        HirPattern, HirPatternConstructorArgs, HirPatternDesc,
-        HirStructFieldPattern,
-    },
+    hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     ril::{EnumId, ScopeOwnerId},
@@ -52,12 +49,8 @@ impl<'a> InferenceCtx<'a> {
         binds_like: Option<InferTy>,
     ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
-            HirPatternDesc::Error | HirPatternDesc::Any => {
-                Ok(self.fresh_var().into())
-            }
-            HirPatternDesc::Bind { id, .. } => {
-                Ok(InferTy::Var(self.local_map[id]))
-            }
+            HirPatternDesc::Error | HirPatternDesc::Any => Ok(self.fresh_var().into()),
+            HirPatternDesc::Bind { id, .. } => Ok(InferTy::Var(self.local_map[id])),
             HirPatternDesc::Tuple(pats) => {
                 let tys = pats
                     .iter()
@@ -65,13 +58,10 @@ impl<'a> InferenceCtx<'a> {
                     .try_collect()?;
                 Ok(self.tuple_of(tys))
             }
-            HirPatternDesc::IntLit(_) => {
-                Ok(InferTy::Var(self.emit_intlike_constraint()))
+            HirPatternDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
+            HirPatternDesc::DestructureBinding { resolution: struct_id, fields } => {
+                self._infer_destructure_binding(binds_like, struct_id, fields)
             }
-            HirPatternDesc::DestructureBinding {
-                resolution: struct_id,
-                fields,
-            } => self._infer_destructure_binding(binds_like, struct_id, fields),
             HirPatternDesc::Constructor { resolution, name, fields } => {
                 self._infer_constructor(*resolution, *name, fields, binds_like)
             }
@@ -80,8 +70,7 @@ impl<'a> InferenceCtx<'a> {
 
     fn get_unit_type_or_diagnose(&mut self, enum_id: EnumId, name: Symbol) {
         let item = enum_item(self.db, enum_id.interned());
-        let Some(variant) =
-            item.variants.iter().find(|variant| variant.name == name)
+        let Some(variant) = item.variants.iter().find(|variant| variant.name == name)
         else {
             todo!()
         };
@@ -91,11 +80,7 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    fn get_enum_variant(
-        &self,
-        enum_id: EnumId,
-        name: Symbol,
-    ) -> Option<AstEnumVariant> {
+    fn get_enum_variant(&self, enum_id: EnumId, name: Symbol) -> Option<AstEnumVariant> {
         let item = enum_item(self.db, enum_id.interned());
         item.variants.iter().find(|variant| variant.name == name).cloned()
     }
@@ -105,10 +90,8 @@ impl<'a> InferenceCtx<'a> {
         enum_id: EnumId,
         template_tys: &[InferTy],
     ) -> ImplicitContext {
-        let zelf = InferTy::Adt {
-            def: TypeDefId::Enum(enum_id),
-            fields: template_tys.to_vec(),
-        };
+        let zelf =
+            InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys.to_vec() };
         ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(enum_id.parent(self.db)),
@@ -129,9 +112,7 @@ impl<'a> InferenceCtx<'a> {
         name: Symbol,
         template_tys: &[InferTy],
     ) -> Vec<InferTy> {
-        let Some(variant) = self.get_enum_variant(enum_id, name) else {
-            todo!()
-        };
+        let Some(variant) = self.get_enum_variant(enum_id, name) else { todo!() };
         match &variant.kind {
             AstEnumVariantKind::TupleLike(tys) => {
                 let ctx = self.get_ctx_for_enum(enum_id, template_tys);
@@ -152,9 +133,7 @@ impl<'a> InferenceCtx<'a> {
         name: Symbol,
         template_tys: &[InferTy],
     ) -> HashMap<Symbol, InferTy> {
-        let Some(variant) = self.get_enum_variant(enum_id, name) else {
-            todo!()
-        };
+        let Some(variant) = self.get_enum_variant(enum_id, name) else { todo!() };
         let ctx = self.get_ctx_for_enum(enum_id, template_tys);
         match &variant.kind {
             AstEnumVariantKind::StructLike(fields) => fields
@@ -179,11 +158,8 @@ impl<'a> InferenceCtx<'a> {
         template_tys: &[InferTy],
         binds_like: Option<InferTy>,
     ) {
-        let field_types = self.get_field_types_of_variant_or_diagnose(
-            enum_id,
-            name,
-            template_tys,
-        );
+        let field_types =
+            self.get_field_types_of_variant_or_diagnose(enum_id, name, template_tys);
         self._infer_fields(fields, &field_types, binds_like);
     }
 
@@ -223,11 +199,7 @@ impl<'a> InferenceCtx<'a> {
         Ok(InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys })
     }
 
-    fn apply_binds_like(
-        &mut self,
-        like: Option<&InferTy>,
-        target: InferTy,
-    ) -> InferTy {
+    fn apply_binds_like(&mut self, like: Option<&InferTy>, target: InferTy) -> InferTy {
         if let Some(ty) = like {
             let var = self.fresh_var();
             self.unify(ty.clone(), var.into()).unwrap();
@@ -245,11 +217,8 @@ impl<'a> InferenceCtx<'a> {
         template_tys: &[InferTy],
         binds_like: Option<InferTy>,
     ) {
-        let variant_tys = self.get_tuple_fields_or_diagnose(
-            enum_id,
-            name,
-            template_tys.as_ref(),
-        );
+        let variant_tys =
+            self.get_tuple_fields_or_diagnose(enum_id, name, template_tys.as_ref());
 
         let tys: Box<_> = hir_patterns
             .iter()
@@ -271,9 +240,7 @@ impl<'a> InferenceCtx<'a> {
                 let (variant_ty, pat_ty, pattern) = match zipped {
                     EitherOrBoth::Both(a, (b, c)) => (a, b, Some(c)),
                     EitherOrBoth::Left(a) => (a, self.fresh_var().into(), None),
-                    EitherOrBoth::Right((b, c)) => {
-                        (self.fresh_var().into(), b, Some(c))
-                    }
+                    EitherOrBoth::Right((b, c)) => (self.fresh_var().into(), b, Some(c)),
                 };
                 self.unify_pattern_depending_on_kind(
                     binds_like.as_ref(),
@@ -320,8 +287,8 @@ impl<'a> InferenceCtx<'a> {
         struct_id: &StructId,
     ) -> (InferTy, HashMap<Symbol, InferTy>) {
         let templates = templates_of_struct(self.db, struct_id.interned());
-        let infer_templates = self
-            .get_templates_for(Definition::Type(TypeDefId::Struct(*struct_id)));
+        let infer_templates =
+            self.get_templates_for(Definition::Type(TypeDefId::Struct(*struct_id)));
         let struct_ty = InferTy::Adt {
             def: TypeDefId::Struct(*struct_id),
             fields: infer_templates.to_vec(),
@@ -359,9 +326,8 @@ impl<'a> InferenceCtx<'a> {
         for field in fields {
             match field {
                 HirStructFieldPattern::Rebind { name, pattern } => {
-                    let inferred = self
-                        .infer_pattern(pattern, binds_like.clone())
-                        .expect("TODO");
+                    let inferred =
+                        self.infer_pattern(pattern, binds_like.clone()).expect("TODO");
                     let field_ty = field_types
                         .get(name)
                         .cloned()
@@ -379,8 +345,7 @@ impl<'a> InferenceCtx<'a> {
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
-                    let adjusted =
-                        self.apply_binds_like(binds_like.as_ref(), field_ty);
+                    let adjusted = self.apply_binds_like(binds_like.as_ref(), field_ty);
                     self.unify(adjusted, local_ty).expect("TODO");
                 }
             }

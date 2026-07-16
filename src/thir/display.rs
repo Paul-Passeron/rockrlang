@@ -17,9 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::stmt::{StmtKind, ThirStmt};
 use super::{
-    Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection,
-    ScopeId, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
-    ThirPattern, ThirPatternKind,
+    Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection, ScopeId, Thir,
+    ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+    ThirPatternKind,
 };
 use crate::ril::TypeDefId;
 use crate::{Db, hir::Mutability, ril::TypeRef};
@@ -50,10 +50,7 @@ impl<'a> ThirPrinter<'a> {
         let thir = self.thir;
 
         let name = thir.id.sig_to_string(self.db);
-        self.line(&format!(
-            "{}",
-            thir.id.span(self.db).start().loc_info(self.db)
-        ));
+        self.line(&format!("{}", thir.id.span(self.db).start().loc_info(self.db)));
         self.line(&format!("thir fun {name} {{"));
         self.indent += 1;
         self.print_stmts(&thir.root);
@@ -167,8 +164,7 @@ impl<'a> ThirPrinter<'a> {
 
     fn print_branch(&mut self, branch: &'a ThirMatchBranch) {
         let pat = self.render_pattern(&branch.pattern);
-        let guard_inline =
-            branch.guard.as_ref().map(|g| self.render_expr(g.expr));
+        let guard_inline = branch.guard.as_ref().map(|g| self.render_expr(g.expr));
         let lbl = self.scope_label(branch.body_scope);
         let header = match guard_inline {
             Some(g) => format!("{pat} if {g} => {lbl}: {{"),
@@ -246,11 +242,7 @@ impl<'a> ThirPrinter<'a> {
                     let fs = fields
                         .iter()
                         .map(|(s, e)| {
-                            format!(
-                                "{}: {}",
-                                s.to_string(self.db),
-                                self.render_expr(*e)
-                            )
+                            format!("{}: {}", s.to_string(self.db), self.render_expr(*e))
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
@@ -271,8 +263,7 @@ impl<'a> ThirPrinter<'a> {
             }
             ExprKind::TypeName(ty) => {
                 format!("sizeof({})", ty.to_string(self.db))
-                
-            },
+            }
 
             ExprKind::Constructor { enum_def, idx, args } => {
                 let name = TypeDefId::Enum(enum_def.def).to_string(self.db);
@@ -306,11 +297,7 @@ impl<'a> ThirPrinter<'a> {
                 let s = items
                     .iter()
                     .map(|(sym, e)| {
-                        format!(
-                            "{}: {}",
-                            sym.to_string(self.db),
-                            self.render_expr(*e)
-                        )
+                        format!("{}: {}", sym.to_string(self.db), self.render_expr(*e))
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -332,9 +319,7 @@ impl<'a> ThirPrinter<'a> {
                     s = format!("{s}.{}", sym.to_string(self.db))
                 }
                 Projection::TupleField(n, _) => s = format!("{s}.{n}"),
-                Projection::Index(e) => {
-                    s = format!("{s}[{}]", self.render_expr(*e))
-                }
+                Projection::Index(e) => s = format!("{s}[{}]", self.render_expr(*e)),
             }
         }
         s
@@ -400,11 +385,7 @@ impl<'a> ThirPrinter<'a> {
                 let s = items
                     .iter()
                     .map(|(sym, p)| {
-                        format!(
-                            "{}: {}",
-                            sym.to_string(self.db),
-                            self.render_pattern(p)
-                        )
+                        format!("{}: {}", sym.to_string(self.db), self.render_pattern(p))
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -430,11 +411,8 @@ impl<'a> ThirPrinter<'a> {
         if args.is_empty() {
             String::new()
         } else {
-            let s = args
-                .iter()
-                .map(|t| t.to_string(self.db))
-                .collect::<Vec<_>>()
-                .join(", ");
+            let s =
+                args.iter().map(|t| t.to_string(self.db)).collect::<Vec<_>>().join(", ");
             format!("::<{s}>")
         }
     }

@@ -21,8 +21,8 @@ use crate::{
     Db,
     check::thir::sanity_check::ConstructorType,
     layout::{
-        Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID,
-        Offset, Size, VariantsLayout, finish_aggregate, layout_of,
+        Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
+        VariantsLayout, finish_aggregate, layout_of,
     },
     ril::{EnumId, TypeRef},
     thir::EnumRef,
@@ -43,11 +43,7 @@ fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
     finish_aggregate(db, source_ordered)
 }
 
-pub(super) fn enum_layout(
-    db: &dyn Db,
-    enum_id: EnumId,
-    args: &[TypeRef],
-) -> LayoutID {
+pub(super) fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {
     let enum_ref = EnumRef { def: enum_id, args: args.to_vec() };
 
     let variant_tys = enum_ref.variants(db);
@@ -76,19 +72,13 @@ pub(super) fn enum_layout(
     }
 }
 
-fn always_tagged_layout(
-    db: &dyn Db,
-    source_ordered: Vec<LayoutID>,
-) -> LayoutID {
+fn always_tagged_layout(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
     let tag_width = tag_width_for(source_ordered.len() as u32);
     let tag_align: Align = tag_width.into();
     let tag_size: Size = tag_width.into();
 
-    let payload_align = source_ordered
-        .iter()
-        .map(|layout| layout.align(db))
-        .max()
-        .unwrap_or(Align::BYTE);
+    let payload_align =
+        source_ordered.iter().map(|layout| layout.align(db)).max().unwrap_or(Align::BYTE);
 
     let payload_size = source_ordered
         .iter()
@@ -107,11 +97,9 @@ fn always_tagged_layout(
 
     let global_align = tag_align.max(payload_align);
 
-    let size =
-        (payload_offset + payload_size).align_to(global_align) - Offset::ZERO;
+    let size = (payload_offset + payload_size).align_to(global_align) - Offset::ZERO;
 
-    let discriminant =
-        Discriminant::Tagged { offset: Offset::ZERO, kind: tag_width };
+    let discriminant = Discriminant::Tagged { offset: Offset::ZERO, kind: tag_width };
 
     LayoutID::new(
         db,

@@ -24,9 +24,7 @@ use crate::{
     },
     hir::{self, Mutability, function_ast, hir_body},
     parse_tree::expr::BinaryOperator,
-    ril::{
-        EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef,
-    },
+    ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
     thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };
@@ -123,29 +121,13 @@ pub enum ExprKind {
 
     // Places
     Use(PlaceId),
-    AddressOf {
-        place: PlaceId,
-        mutability: Mutability,
-    },
-    Ref {
-        place: PlaceId,
-        mutability: Mutability,
-    },
-    Call {
-        called: FunctionRef,
-        args: Vec<ExprId>,
-    },
+    AddressOf { place: PlaceId, mutability: Mutability },
+    Ref { place: PlaceId, mutability: Mutability },
+    Call { called: FunctionRef, args: Vec<ExprId> },
 
-    BinOp {
-        op: BinaryOperator,
-        lhs: ExprId,
-        rhs: ExprId,
-    },
+    BinOp { op: BinaryOperator, lhs: ExprId, rhs: ExprId },
 
-    StructLit {
-        struct_def: StructRef,
-        fields: Vec<(Symbol, ExprId)>,
-    },
+    StructLit { struct_def: StructRef, fields: Vec<(Symbol, ExprId)> },
 
     Neg(ExprId),
     Not(ExprId),
@@ -153,13 +135,9 @@ pub enum ExprKind {
     Tuple(Vec<ExprId>),
     SliceLit(Vec<ExprId>),
     SizeOf(TypeRef),
-    TypeName(TypeRef), 
+    TypeName(TypeRef),
 
-    Constructor {
-        enum_def: EnumRef,
-        idx: usize,
-        args: ThirConstructorArgs<ExprId>,
-    },
+    Constructor { enum_def: EnumRef, idx: usize, args: ThirConstructorArgs<ExprId> },
 
     Metadata(ExprId),
 
@@ -189,20 +167,10 @@ pub struct ThirPattern {
 
 pub enum ThirPatternKind {
     Any,
-    Bind {
-        local: LocalId,
-        mutable: bool,
-    },
+    Bind { local: LocalId, mutable: bool },
     Tuple(Vec<ThirPattern>),
-    Struct {
-        def: StructRef,
-        fields: Vec<(Symbol, ThirPattern)>,
-    },
-    Constructor {
-        def: EnumRef,
-        idx: usize,
-        args: ThirConstructorArgs<ThirPattern>,
-    },
+    Struct { def: StructRef, fields: Vec<(Symbol, ThirPattern)> },
+    Constructor { def: EnumRef, idx: usize, args: ThirConstructorArgs<ThirPattern> },
     IntLit(i64),
 
     Error,
@@ -234,10 +202,7 @@ impl PartialEq for Thir {
     }
 }
 
-pub fn thir_body(
-    db: &dyn Db,
-    function: FunctionId,
-) -> Option<&Thir> {
+pub fn thir_body(db: &dyn Db, function: FunctionId) -> Option<&Thir> {
     _thir_body(db, function.interned()).as_ref()
 }
 

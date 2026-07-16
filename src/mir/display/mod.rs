@@ -19,13 +19,11 @@ use crate::mir::{
     MIRLocalID,
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
-        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
-        MIRProjection, MIRRValue, MIRRValueKind,
+        MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection,
+        MIRRValue, MIRRValueKind,
     },
 };
-use crate::{
-    Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator,
-};
+use crate::{Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
 use std::fmt;
 
 pub mod graphviz;
@@ -95,11 +93,7 @@ pub fn fmt_local_id<W: MIRWrite>(w: &mut W, id: MIRLocalID) -> fmt::Result {
     mwrite!(w, "_{}", id.into_raw())
 }
 
-pub fn fmt_place<W: MIRWrite>(
-    w: &mut W,
-    db: &dyn Db,
-    place: &MIRPlace,
-) -> fmt::Result {
+pub fn fmt_place<W: MIRWrite>(w: &mut W, db: &dyn Db, place: &MIRPlace) -> fmt::Result {
     fmt_local_id(w, place.local)?;
     for proj in &place.projections {
         fmt_projection(w, db, proj)?;
@@ -179,11 +173,7 @@ pub fn fmt_rvalue<W: MIRWrite>(
             fmt_place(w, db, place)
         }
         MIRRValueKind::AddressOf(place, mutability) => {
-            w.write_str(if mutability.is_mut() {
-                "addr_of_mut "
-            } else {
-                "addr_of "
-            })?;
+            w.write_str(if mutability.is_mut() { "addr_of_mut " } else { "addr_of " })?;
             fmt_place(w, db, place)
         }
         MIRRValueKind::BinOp(op, lhs, rhs) => {
@@ -349,11 +339,7 @@ pub fn fmt_terminator<W: MIRWrite>(
     }
 }
 
-pub fn fmt_stmt<W: MIRWrite>(
-    w: &mut W,
-    db: &dyn Db,
-    stmt: &Stmt,
-) -> fmt::Result {
+pub fn fmt_stmt<W: MIRWrite>(w: &mut W, db: &dyn Db, stmt: &Stmt) -> fmt::Result {
     match stmt {
         Stmt::Assign { dest, rvalue } => {
             fmt_place(w, db, dest)?;

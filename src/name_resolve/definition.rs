@@ -28,15 +28,12 @@ use crate::{
         module_items, std_module,
         type_expr::{enum_item, struct_item},
     },
-    parse_tree::top_level::{
-        AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc,
-    },
+    parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     printer::type_printer::TypePrinter,
     ril::{
-        EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId,
-        ScopeOwnerId, StructId, TypeDefId, bool_id, char_id, int_id, never_id,
-        usize_id, void_id,
+        EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
+        StructId, TypeDefId, bool_id, char_id, int_id, never_id, usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -69,12 +66,8 @@ impl Definition {
 
     pub fn name_span(self, db: &dyn Db) -> Option<Span> {
         match self {
-            Definition::Function(function_id) => {
-                Some(function_id.name_span(db))
-            }
-            Definition::Interface(interface_id) => {
-                Some(interface_id.name_span(db))
-            }
+            Definition::Function(function_id) => Some(function_id.name_span(db)),
+            Definition::Interface(interface_id) => Some(interface_id.name_span(db)),
             Definition::Module(module_id) => module_id.name_span(db),
             Definition::Type(type_def_id) => type_def_id.name_span(db),
         }
@@ -183,29 +176,19 @@ fn definition_of_item<'db>(
 ) -> Option<Definition> {
     let m_id = ModuleId::from(parent);
     match &item.data {
-        AstTopLevelItemDesc::Module(module) => {
-            Some(Definition::Module(ModuleId::new(
-                db,
-                module.data.name.data,
-                Some(m_id),
-                None,
-                vec![],
-                *parent.package(db),
-            )))
-        }
-        AstTopLevelItemDesc::Fundef(fundef) => {
-            Some(Definition::Function(FunctionId::new(
-                db,
-                fundef.data.name.data,
-                ScopeOwnerId::Module(m_id),
-            )))
-        }
+        AstTopLevelItemDesc::Module(module) => Some(Definition::Module(ModuleId::new(
+            db,
+            module.data.name.data,
+            Some(m_id),
+            None,
+            vec![],
+            *parent.package(db),
+        ))),
+        AstTopLevelItemDesc::Fundef(fundef) => Some(Definition::Function(
+            FunctionId::new(db, fundef.data.name.data, ScopeOwnerId::Module(m_id)),
+        )),
         AstTopLevelItemDesc::Interface(interface) => {
-            Some(Definition::Interface(InterfaceId::new(
-                db,
-                interface.name.data,
-                m_id,
-            )))
+            Some(Definition::Interface(InterfaceId::new(db, interface.name.data, m_id)))
         }
         AstTopLevelItemDesc::Impl(_) => None,
         AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(
@@ -214,20 +197,14 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::EnumDef(ast_enum_def) => Some(Definition::Type(
             TypeDefId::Enum(EnumId::new(db, ast_enum_def.name.data, m_id)),
         )),
-        AstTopLevelItemDesc::ExternDef(funsig, _) => {
-            Some(Definition::Function(FunctionId::new(
-                db,
-                funsig.data.name.data,
-                ScopeOwnerId::Module(m_id),
-            )))
-        }
+        AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(
+            FunctionId::new(db, funsig.data.name.data, ScopeOwnerId::Module(m_id)),
+        )),
     }
 }
 
 #[salsa::tracked]
-pub fn builtin_definitions(
-    db: &dyn Db,
-) -> BTreeMap<Symbol, Definition> {
+pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
     let mut res = BTreeMap::from([
         (Symbol::new(db, "usize"), Definition::Type(usize_id(db).def(db))),
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
@@ -239,10 +216,7 @@ pub fn builtin_definitions(
     ]);
 
     if let Some(std_module) = std_module(db) {
-        res.insert(
-            Symbol::new(db, "std"),
-            Definition::Module(std_module),
-        );
+        res.insert(Symbol::new(db, "std"), Definition::Module(std_module));
     }
     let core_module = core_module(db);
     res.insert(Symbol::new(db, "core"), Definition::Module(core_module));
@@ -309,11 +283,9 @@ pub fn module_definitions<'db>(
         let items = module_items(db, module);
         items.iter().for_each(|items| {
             items.iter().for_each(|item| {
-                definition_of_item(db, module, item).into_iter().for_each(
-                    |def| {
-                        res.push((def.name(db), def));
-                    },
-                )
+                definition_of_item(db, module, item).into_iter().for_each(|def| {
+                    res.push((def.name(db), def));
+                })
             })
         });
 
@@ -353,9 +325,7 @@ fn find_module_in_chain<'db>(
     if let Some(Definition::Module(m)) = defs.get(&name) {
         return Some(*m);
     }
-    module
-        .parent(db)
-        .and_then(|parent| find_module_in_chain(db, name, parent.interned()))
+    module.parent(db).and_then(|parent| find_module_in_chain(db, name, parent.interned()))
 }
 
 #[salsa::tracked(returns(copy))]
@@ -394,10 +364,9 @@ fn _resolve_in_module<'db>(
     // Check includes declared on this module
     let includes = module_includes(db, module);
     for included_module in includes {
-        if let Some(included_id) =
-            resolve_include_path(db, included_module, module)
-            && let Some(def) = def_map_in_module(db, included_id.interned())
-                .get(&Symbol::from(name))
+        if let Some(included_id) = resolve_include_path(db, included_module, module)
+            && let Some(def) =
+                def_map_in_module(db, included_id.interned()).get(&Symbol::from(name))
         {
             return Some(*def);
         }
@@ -405,9 +374,7 @@ fn _resolve_in_module<'db>(
 
     // Walk up to parent — this is where parent includes get checked too,
     // since the parent will run its own module_includes when we recurse into it
-    module
-        .parent(db)
-        .and_then(|parent| _resolve_in_module(db, name, parent.interned()))
+    module.parent(db).and_then(|parent| _resolve_in_module(db, name, parent.interned()))
 }
 
 #[salsa::tracked]
@@ -431,16 +398,13 @@ fn _resolve_path<'db>(
 ) -> Option<Definition> {
     let segments = segments.segments(db);
     let (head, tail) = segments.split_first();
-    tail.iter().fold(
-        _resolve_in_module(db, head.interned(), module),
-        |acc, name| {
-            if let Some(Definition::Module(module_id)) = acc {
-                _resolve_in_module(db, name.interned(), module_id.interned())
-            } else {
-                None
-            }
-        },
-    )
+    tail.iter().fold(_resolve_in_module(db, head.interned(), module), |acc, name| {
+        if let Some(Definition::Module(module_id)) = acc {
+            _resolve_in_module(db, name.interned(), module_id.interned())
+        } else {
+            None
+        }
+    })
 }
 
 #[salsa::tracked]

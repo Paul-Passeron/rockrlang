@@ -24,16 +24,20 @@ use itertools::Itertools;
 use salsa::Accumulator;
 
 use crate::{
-    Db, common::{
+    Db,
+    common::{
         arena::Arena,
         ids::{IdGen, IdWrapper},
         location::Span,
         symbols::Symbol,
-    }, compiler::diagnostic::Diag, hir::{
+    },
+    compiler::diagnostic::Diag,
+    hir::{
         HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
         HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability,
-    }, name_resolve::{
+    },
+    name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
         interfaces::{
             core_int_iter_struct, core_into_iterator_interface, core_iter_interface,
@@ -42,7 +46,8 @@ use crate::{
             enum_item, get_template_param_count, get_templates_of_fun, templates_of_enum,
             templates_of_struct,
         },
-    }, parse_tree::{
+    },
+    parse_tree::{
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
         pattern::{
             AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc,
@@ -54,9 +59,12 @@ use crate::{
             AstTemplateArg,
         },
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
-    }, ril::{
-        BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef, compute_template_hints, tuple_of,
-    }, thir::EnumRef,
+    },
+    ril::{
+        BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
+        TypeParamId, TypeRef, compute_template_hints, tuple_of,
+    },
+    thir::EnumRef,
 };
 
 pub struct LowerFundef<'db> {

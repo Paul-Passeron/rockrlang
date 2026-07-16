@@ -15,9 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{
-    FmtWriter, MIRWrite, StringWriter, fmt_stmt, fmt_terminator, mwrite,
-};
+use super::{FmtWriter, MIRWrite, StringWriter, fmt_stmt, fmt_terminator, mwrite};
 use crate::{
     Db,
     mir::{MIR, basic_block::MIRTerminator},
@@ -31,11 +29,7 @@ pub struct MIRDotDisplay<'a> {
 }
 
 impl MIR {
-    pub fn dot<'a>(
-        &'a self,
-        db: &'a dyn Db,
-        name: &'a str,
-    ) -> MIRDotDisplay<'a> {
+    pub fn dot<'a>(&'a self, db: &'a dyn Db, name: &'a str) -> MIRDotDisplay<'a> {
         MIRDotDisplay { mir: self, db, name }
     }
 }
@@ -47,10 +41,7 @@ impl<'a> fmt::Display for MIRDotDisplay<'a> {
         let mir = self.mir;
 
         mwrite!(w, "digraph {} {{\n", dot_escape(self.name))?;
-        mwrite!(
-            w,
-            "  node [shape=record fontname=\"Courier New\" fontsize=10]\n"
-        )?;
+        mwrite!(w, "  node [shape=record fontname=\"Courier New\" fontsize=10]\n")?;
         mwrite!(w, "  edge [fontname=\"Courier New\" fontsize=9]\n\n")?;
 
         let entry_idx = mir.entry.into_raw();
@@ -118,24 +109,12 @@ fn fmt_dot_edges<W: super::MIRWrite>(
             mwrite!(w, "  bb{from} -> bb{}\n", next.into_raw())
         }
         MIRTerminator::Branch { then, else_, .. } => {
-            mwrite!(
-                w,
-                "  bb{from} -> bb{} [label=\"true\"]\n",
-                then.into_raw()
-            )?;
-            mwrite!(
-                w,
-                "  bb{from} -> bb{} [label=\"false\"]\n",
-                else_.into_raw()
-            )
+            mwrite!(w, "  bb{from} -> bb{} [label=\"true\"]\n", then.into_raw())?;
+            mwrite!(w, "  bb{from} -> bb{} [label=\"false\"]\n", else_.into_raw())
         }
         MIRTerminator::Switch { branches, default, .. } => {
             for (value, block) in branches {
-                mwrite!(
-                    w,
-                    "  bb{from} -> bb{} [label=\"{value}\"]\n",
-                    block.into_raw()
-                )?;
+                mwrite!(w, "  bb{from} -> bb{} [label=\"{value}\"]\n", block.into_raw())?;
             }
             mwrite!(w, "  bb{from} -> bb{} [label=\"_\"]\n", default.into_raw())
         }

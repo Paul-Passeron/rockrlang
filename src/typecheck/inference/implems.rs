@@ -60,20 +60,16 @@ impl<'a> InferenceCtx<'a> {
                     let mut constraints = Vec::new();
                     fields.iter().zip(other_fields).try_for_each(
                         |(infer_ty, matcher)| {
-                            constraints.extend(
-                                self.matches_ty(infer_ty, *matcher, ctx)?,
-                            );
+                            constraints.extend(self.matches_ty(infer_ty, *matcher, ctx)?);
                             Some(())
                         },
                     )?;
                     Some(constraints)
                 }
-                TypeRef::Param(id) => {
-                    Some(vec![InferenceConstraintKind::Unify {
-                        a: ty.clone(),
-                        b: ctx.get_template(id.0)?.clone(),
-                    }])
-                }
+                TypeRef::Param(id) => Some(vec![InferenceConstraintKind::Unify {
+                    a: ty.clone(),
+                    b: ctx.get_template(id.0)?.clone(),
+                }]),
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
             },
@@ -98,10 +94,8 @@ impl<'a> InferenceCtx<'a> {
         let templates = source.id(self.db).templates(self.db);
         let infer_templates =
             templates.iter().map(|_| self.fresh_var()).collect::<Box<[_]>>();
-        let mapped_templates = infer_templates
-            .iter()
-            .map(|var| InferTy::Var(*var))
-            .collect::<Box<[_]>>();
+        let mapped_templates =
+            infer_templates.iter().map(|var| InferTy::Var(*var)).collect::<Box<[_]>>();
 
         let ctx = ImplicitContext::new(
             self.db,
@@ -148,8 +142,7 @@ impl<'a> InferenceCtx<'a> {
             .iter()
             .flat_map(|package| impls_in_package(self.db, *package).iter())
             .filter_map(|impl_source| {
-                self.is_potential_block(ty, *impl_source)
-                    .map(|res| (*impl_source, res))
+                self.is_potential_block(ty, *impl_source).map(|res| (*impl_source, res))
             })
             .collect()
     }

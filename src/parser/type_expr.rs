@@ -20,17 +20,13 @@ use crate::{
     lexer::TokenKind,
     parse_tree::{
         Spanned,
-        type_expr::{
-            AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
-        },
+        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
 impl<'db> Parser<'db> {
-    pub(super) fn parse_type_expr(
-        &mut self,
-    ) -> Result<AstTypeExpr, ParseError> {
+    pub(super) fn parse_type_expr(&mut self) -> Result<AstTypeExpr, ParseError> {
         let start = self.get_start();
 
         match self.current_token()?.kind {
@@ -81,15 +77,9 @@ impl<'db> Parser<'db> {
                 } else {
                     Ok(Spanned::new(
                         if is_ptr {
-                            AstTypeExprDesc::Pointer {
-                                mutable,
-                                pointee: Box::new(inner),
-                            }
+                            AstTypeExprDesc::Pointer { mutable, pointee: Box::new(inner) }
                         } else {
-                            AstTypeExprDesc::Ref {
-                                mutable,
-                                pointee: Box::new(inner),
-                            }
+                            AstTypeExprDesc::Ref { mutable, pointee: Box::new(inner) }
                         },
                         vec![],
                         start.span(end),
@@ -100,8 +90,7 @@ impl<'db> Parser<'db> {
             TokenKind::OpenSqr => {
                 self.consume();
                 let ty = self.parse_any_type_expr()?;
-                let len = if self.peek_n(0).map(|t| t.kind)
-                    == Some(TokenKind::Semicolon)
+                let len = if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Semicolon)
                 {
                     self.consume();
                     Some(self.parse_int_lit()?.data)
@@ -141,11 +130,7 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let end = self.get_end();
 
-                Ok(AstTypeExpr::new(
-                    AstTypeExprDesc::Tuple(tys),
-                    vec![],
-                    start.span(end),
-                ))
+                Ok(AstTypeExpr::new(AstTypeExprDesc::Tuple(tys), vec![], start.span(end)))
             }
 
             TokenKind::Identifier(name) => {
@@ -196,9 +181,7 @@ impl<'db> Parser<'db> {
         }
     }
 
-    pub(super) fn parse_any_type_expr(
-        &mut self,
-    ) -> Result<AstAnyTypeExpr, ParseError> {
+    pub(super) fn parse_any_type_expr(&mut self) -> Result<AstAnyTypeExpr, ParseError> {
         let start = self.get_start();
 
         if let TokenKind::Identifier(name) = self.current_token()?.kind
@@ -206,11 +189,7 @@ impl<'db> Parser<'db> {
         {
             self.consume();
             let end = self.get_end();
-            return Ok(Spanned::new(
-                AstAnyTypeExprDesc::Any,
-                vec![],
-                start.span(end),
-            ));
+            return Ok(Spanned::new(AstAnyTypeExprDesc::Any, vec![], start.span(end)));
         }
 
         let ty = self.parse_type_expr()?;
@@ -218,9 +197,7 @@ impl<'db> Parser<'db> {
         Ok(Spanned::new(AstAnyTypeExprDesc::Known(ty.data), vec![], span))
     }
 
-    fn parse_any_type_args(
-        &mut self,
-    ) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
+    fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
         let mut args = vec![];
 
         while let Some(t) = self.peek_n(0) {

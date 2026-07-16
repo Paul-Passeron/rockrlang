@@ -164,27 +164,19 @@ impl<'a> MTLBCtx<'a> {
         data: &MIRBasicBlock,
         lower: &mut LIRLower<'ir, '_>,
     ) {
-        let b = b.new_block(
-            data.name.as_ref().map(|name| Symbol::new(self.db, name)),
-        );
+        let b = b.new_block(data.name.as_ref().map(|name| Symbol::new(self.db, name)));
         lower.block_map.insert(id, b);
     }
 
     pub fn lower<'ir>(&mut self, b: &mut FunctionBuilder<'ir, '_>) {
         let mir = self.mir_map[b.id];
-        let mut lower = LIRLower {
-            mir,
-            block_map: HashMap::new(),
-            value_map: HashMap::new(),
-        };
+        let mut lower =
+            LIRLower { mir, block_map: HashMap::new(), value_map: HashMap::new() };
         mir.blocks
             .iter()
             .for_each(|(blk, data)| self.add_block(b, blk, data, &mut lower));
-        let params = b.body.blocks[b.body.entry.idx]
-            .params
-            .iter()
-            .map(|p| p.id())
-            .collect_vec();
+        let params =
+            b.body.blocks[b.body.entry.idx].params.iter().map(|p| p.id()).collect_vec();
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty);
             if layout.is_zst(self.db) {
@@ -212,8 +204,7 @@ impl<'a> MTLBCtx<'a> {
                 }
             }
 
-            let mir_entry_target =
-                bb.target(lower.block_map[&mir.entry], vec![]);
+            let mir_entry_target = bb.target(lower.block_map[&mir.entry], vec![]);
             bb.goto(mir_entry_target)
         });
         mir.blocks.keys().for_each(|blk| {
@@ -278,9 +269,7 @@ impl<'a> MTLBCtx<'a> {
                         fref.args = fref
                             .args
                             .iter()
-                            .map(|ty| {
-                                ty.with_substitution(self.db, caller_subs)
-                            })
+                            .map(|ty| ty.with_substitution(self.db, caller_subs))
                             .collect();
                         let inst = FuncInst::from_funcref(self.db, fref);
                         self.mir_map.mir_to_lir[&inst]
@@ -296,9 +285,8 @@ impl<'a> MTLBCtx<'a> {
                 b.terminate(Terminator::Goto(next))
             }
             MIRTerminator::Return { value, .. } => {
-                let value = value
-                    .as_ref()
-                    .and_then(|op| self.lower_operand(&mut b, op, lower));
+                let value =
+                    value.as_ref().and_then(|op| self.lower_operand(&mut b, op, lower));
                 b.ret(value)
             }
             MIRTerminator::Goto { next } => {
@@ -311,16 +299,11 @@ impl<'a> MTLBCtx<'a> {
                 let if_false = b.target(lower.block_map[else_], vec![]);
                 b.br(cond, if_true, if_false)
             }
-            MIRTerminator::Switch {
-                discriminant, branches, default, ..
-            } => {
-                let on =
-                    self.lower_operand(&mut b, discriminant, lower).unwrap();
+            MIRTerminator::Switch { discriminant, branches, default, .. } => {
+                let on = self.lower_operand(&mut b, discriminant, lower).unwrap();
                 let branches = branches
                     .iter()
-                    .map(|(n, blk)| {
-                        (*n, b.target(lower.block_map[blk], vec![]))
-                    })
+                    .map(|(n, blk)| (*n, b.target(lower.block_map[blk], vec![])))
                     .collect_vec();
                 let default = b.target(lower.block_map[default], vec![]);
                 b.switch(on, branches, default)
@@ -353,8 +336,7 @@ impl<'a> MTLBCtx<'a> {
                 }
                 MIRConstant::Bool(value) => {
                     let layout = LayoutID::int(self.db, IntWidth::I8);
-                    let ty =
-                        LIRTy { layout, origin: Some(bool_id(self.db).into()) };
+                    let ty = LIRTy { layout, origin: Some(bool_id(self.db).into()) };
                     Some(b.const_int(ty, if *value { 1 } else { 0 }).erase())
                 }
                 MIRConstant::CString { contents, null_terminated } => {
@@ -381,10 +363,8 @@ impl<'a> MTLBCtx<'a> {
     ) -> (ValueId<'ir>, TypeRef) {
         match proj {
             ProjKind::Regular(MIRProjection::Deref) => {
-                let new_ty = ty
-                    .as_ptr(self.db)
-                    .unwrap_or_else(|| ty.as_ref(self.db).unwrap())
-                    .1;
+                let new_ty =
+                    ty.as_ptr(self.db).unwrap_or_else(|| ty.as_ref(self.db).unwrap()).1;
                 let ptr_layout = layout_of(self.db, ty); // layout of the pointer type itself
                 let lir_ty = LIRTy { layout: ptr_layout, origin: Some(ty) };
                 (b.load(ptr, lir_ty), new_ty)
@@ -402,36 +382,23 @@ impl<'a> MTLBCtx<'a> {
                             .def
                             .into(),
                     );
-                    let pos = item
-                        .fields
-                        .iter()
-                        .position(|f| f.name == *name)
-                        .unwrap();
+                    let pos = item.fields.iter().position(|f| f.name == *name).unwrap();
                     pos as u32
                 };
                 (b.field_ptr(ptr, lir_ty, src_idx), *resulting_ty)
             }
-            ProjKind::Regular(MIRProjection::TupleField {
-                index,
-                resulting_ty,
-            }) => {
+            ProjKind::Regular(MIRProjection::TupleField { index, resulting_ty }) => {
                 let layout = layout_of(self.db, ty);
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
             ProjKind::Regular(MIRProjection::Index { index }) => {
                 let index = self.lower_operand(b, index, lower).unwrap();
-                let elem_ty = ty
-                    .as_ptr(self.db)
-                    .or_else(|| ty.as_ref(self.db))
-                    .unwrap()
-                    .1;
-                let lir_elem = LIRTy {
-                    layout: layout_of(self.db, elem_ty),
-                    origin: Some(elem_ty),
-                };
-                let ptr_ty =
-                    LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) };
+                let elem_ty =
+                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db)).unwrap().1;
+                let lir_elem =
+                    LIRTy { layout: layout_of(self.db, elem_ty), origin: Some(elem_ty) };
+                let ptr_ty = LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) };
                 let base_ptr = b.load(ptr, ptr_ty);
                 (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
             }
@@ -447,12 +414,9 @@ impl<'a> MTLBCtx<'a> {
                         assert!(lir_ty.is_union(self.db));
                         let vlayout = lir_ty.union_layout(self.db).unwrap();
                         let variant_layout = vlayout.variants[variant as usize];
-                        let variant_ty =
-                            LIRTy { layout: variant_layout, origin: None };
-                        let payload_ptr =
-                            b.union_payload_ptr(ptr, lir_ty, variant);
-                        let field_ptr =
-                            b.field_ptr(payload_ptr, variant_ty, *index);
+                        let variant_ty = LIRTy { layout: variant_layout, origin: None };
+                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, variant);
+                        let field_ptr = b.field_ptr(payload_ptr, variant_ty, *index);
                         (field_ptr, *resulting_ty)
                     }
                     _ => unreachable!(),
@@ -462,20 +426,14 @@ impl<'a> MTLBCtx<'a> {
         }
     }
 
-    fn get_proj_kinds<'place>(
-        &self,
-        place: &'place MIRPlace,
-    ) -> Vec<ProjKind<'place>> {
+    fn get_proj_kinds<'place>(&self, place: &'place MIRPlace) -> Vec<ProjKind<'place>> {
         let mut projs = place.projections.iter().collect_vec();
         projs.reverse();
         let mut res = vec![];
         while let Some(proj) = projs.pop() {
             if let MIRProjection::Downcast { variant } = proj {
                 let next = projs.pop().unwrap();
-                res.push(ProjKind::DowncastThen {
-                    variant: *variant as u32,
-                    next,
-                });
+                res.push(ProjKind::DowncastThen { variant: *variant as u32, next });
             } else {
                 res.push(ProjKind::Regular(proj));
             }
@@ -495,10 +453,9 @@ impl<'a> MTLBCtx<'a> {
         }
         self.get_proj_kinds(place)
             .into_iter()
-            .fold(
-                (slot.ptr(), lower.mir.locals[place.local].ty),
-                |(ptr, ty), proj| self.apply_proj(b, ptr, ty, proj, lower),
-            )
+            .fold((slot.ptr(), lower.mir.locals[place.local].ty), |(ptr, ty), proj| {
+                self.apply_proj(b, ptr, ty, proj, lower)
+            })
             .0
     }
 
@@ -540,15 +497,12 @@ impl<'a> MTLBCtx<'a> {
                             MIRConstructorArgs::None => {
                                 panic!("Expected one argument but got 0")
                             }
-                            MIRConstructorArgs::Tuple(ops) => {
-                                ops.iter().next().unwrap()
-                            }
+                            MIRConstructorArgs::Tuple(ops) => ops.iter().next().unwrap(),
                             MIRConstructorArgs::Struct(vals) => {
                                 vals.values().next().unwrap()
                             }
                         };
-                        if let Some(operand) = self.lower_operand(b, arg, lower)
-                        {
+                        if let Some(operand) = self.lower_operand(b, arg, lower) {
                             b.store(payload_ptr, operand);
                         }
                     }
@@ -567,9 +521,7 @@ impl<'a> MTLBCtx<'a> {
                                     vals.values().next().unwrap()
                                 }
                             };
-                            if let Some(operand) =
-                                self.lower_operand(b, arg, lower)
-                            {
+                            if let Some(operand) = self.lower_operand(b, arg, lower) {
                                 b.store(payload_ptr, operand);
                             }
                         } else {
@@ -594,8 +546,7 @@ impl<'a> MTLBCtx<'a> {
     ) -> Option<ValueId<'ir>> {
         match &rvalue.kind {
             MIRRValueKind::Use(op) => self.lower_operand(b, op, lower),
-            MIRRValueKind::Ref(place, _)
-            | MIRRValueKind::AddressOf(place, _) => {
+            MIRRValueKind::Ref(place, _) | MIRRValueKind::AddressOf(place, _) => {
                 if !lower.value_map[&place.local].is_zst() {
                     Some(self.lower_place_as_ptr(b, place, lower))
                 } else {
@@ -608,47 +559,27 @@ impl<'a> MTLBCtx<'a> {
                 let is_signed = true; // todo !!!
                 Some(match op {
                     BinaryOperator::Plus => b.arith(
-                        if is_signed {
-                            ArithBinop::SAdd
-                        } else {
-                            ArithBinop::UAdd
-                        },
+                        if is_signed { ArithBinop::SAdd } else { ArithBinop::UAdd },
                         lhs,
                         rhs,
                     ),
                     BinaryOperator::Minus => b.arith(
-                        if is_signed {
-                            ArithBinop::SSub
-                        } else {
-                            ArithBinop::USub
-                        },
+                        if is_signed { ArithBinop::SSub } else { ArithBinop::USub },
                         lhs,
                         rhs,
                     ),
                     BinaryOperator::Times => b.arith(
-                        if is_signed {
-                            ArithBinop::SMul
-                        } else {
-                            ArithBinop::UMul
-                        },
+                        if is_signed { ArithBinop::SMul } else { ArithBinop::UMul },
                         lhs,
                         rhs,
                     ),
                     BinaryOperator::Div => b.arith(
-                        if is_signed {
-                            ArithBinop::SDiv
-                        } else {
-                            ArithBinop::UDiv
-                        },
+                        if is_signed { ArithBinop::SDiv } else { ArithBinop::UDiv },
                         lhs,
                         rhs,
                     ),
                     BinaryOperator::Modulo => b.arith(
-                        if is_signed {
-                            ArithBinop::SMod
-                        } else {
-                            ArithBinop::UMod
-                        },
+                        if is_signed { ArithBinop::SMod } else { ArithBinop::UMod },
                         lhs,
                         rhs,
                     ),
@@ -658,11 +589,7 @@ impl<'a> MTLBCtx<'a> {
                         b.not(eq)
                     }
                     BinaryOperator::Lt => b.cmp(
-                        if is_signed {
-                            CmpBinop::SLessThan
-                        } else {
-                            CmpBinop::ULessThan
-                        },
+                        if is_signed { CmpBinop::SLessThan } else { CmpBinop::ULessThan },
                         lhs,
                         rhs,
                     ),
@@ -679,11 +606,7 @@ impl<'a> MTLBCtx<'a> {
                         b.not(gt)
                     }
                     BinaryOperator::Gt => b.cmp(
-                        if is_signed {
-                            CmpBinop::SLessThan
-                        } else {
-                            CmpBinop::ULessThan
-                        },
+                        if is_signed { CmpBinop::SLessThan } else { CmpBinop::ULessThan },
                         rhs,
                         lhs,
                     ),
@@ -730,10 +653,7 @@ impl<'a> MTLBCtx<'a> {
                 Some(
                     b.const_int(
                         LIRTy {
-                            layout: LayoutID::int(
-                                self.db,
-                                self.db.target_width(),
-                            ),
+                            layout: LayoutID::int(self.db, self.db.target_width()),
                             origin: None,
                         },
                         s as u128,
@@ -749,9 +669,7 @@ impl<'a> MTLBCtx<'a> {
                     let item = struct_item(self.db, struct_ref.def.into());
                     item.fields
                         .iter()
-                        .filter_map(|f| {
-                            self.lower_operand(b, &fields[&f.name], lower)
-                        })
+                        .filter_map(|f| self.lower_operand(b, &fields[&f.name], lower))
                         .collect_vec()
                 };
                 let tref = struct_ref.clone().as_type_ref(self.db);
@@ -769,9 +687,8 @@ impl<'a> MTLBCtx<'a> {
                 Some(b.make_aggregate(ty, values).erase())
             }
             MIRRValueKind::Cast(op, type_ref) => {
-                let as_ptr_like = |ty: TypeRef| {
-                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db))
-                };
+                let as_ptr_like =
+                    |ty: TypeRef| ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db));
                 if let Some((muta, _)) = as_ptr_like(*type_ref) {
                     let operand_ty = op.ty(self.db);
                     let (op_m, _) = as_ptr_like(operand_ty).unwrap();

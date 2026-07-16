@@ -29,9 +29,7 @@ use crate::{
             loans::{LoanID, MIRLoanOut, MIRStmtIndex},
         },
         basic_block::{MIRTerminator, Stmt},
-        operand::{
-            MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind,
-        },
+        operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
 };
 
@@ -52,11 +50,7 @@ fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     check_terminator(db, &block.terminator, loans, &state);
 }
 
-fn live_in_per_stmt(
-    db: &dyn Db,
-    mir: &MIR,
-    blk: MIRBlockID,
-) -> Vec<HashSet<MIRLocalID>> {
+fn live_in_per_stmt(db: &dyn Db, mir: &MIR, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
     let seed = mir.liveness(db).live_out[&blk].clone();
     let mut res = vec![seed];
     for stmt in mir.blocks[blk].stmts.iter().rev() {
@@ -140,11 +134,8 @@ fn check_access(
             AccessKind::Copy => loan.mutability.is_mut(),
         };
         if violates {
-            Diag::generic_error(
-                "Conflict here (place)!".to_string(),
-                place.span,
-            )
-            .accumulate(db);
+            Diag::generic_error("Conflict here (place)!".to_string(), place.span)
+                .accumulate(db);
         }
     }
 }
@@ -176,8 +167,7 @@ fn check_rvalue_conflicts(
     loans: &MIRLoanOut,
 ) {
     match &rvalue.kind {
-        MIRRValueKind::Ref(p, mutability)
-        | MIRRValueKind::AddressOf(p, mutability) => {
+        MIRRValueKind::Ref(p, mutability) | MIRRValueKind::AddressOf(p, mutability) => {
             p.for_each_operand(|op| check_operand(db, op, state, loans));
 
             for loan_id in state {
@@ -186,11 +176,8 @@ fn check_rvalue_conflicts(
                     let incompatible =
                         mutability.is_mut() || existing.mutability.is_mut();
                     if incompatible {
-                        Diag::generic_error(
-                            "Conflict here !".to_string(),
-                            rvalue.span,
-                        )
-                        .accumulate(db);
+                        Diag::generic_error("Conflict here !".to_string(), rvalue.span)
+                            .accumulate(db);
                     }
                 }
             }

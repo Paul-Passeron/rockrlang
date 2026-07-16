@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     common::{location::Span, symbols::Symbol},
     hir::{
-        HirExpr, HirExprDesc, HirMatchBranch, HirPattern,
-        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
-        HirStmt, HirStmtKind, LocalId, lower_fundef::LowerFundef,
+        HirExpr, HirExprDesc, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
+        HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, LocalId,
+        lower_fundef::LowerFundef,
     },
     name_resolve::interfaces::core_opt_enum,
 };
@@ -90,13 +90,10 @@ impl LowerFundef<'_> {
                         body: stmt.boxed(),
                     },
                     HirMatchBranch {
-                        pattern: self
-                            .new_pattern(HirPatternDesc::Any, pat_span),
+                        pattern: self.new_pattern(HirPatternDesc::Any, pat_span),
                         locals: vec![],
                         guard: None,
-                        body: self
-                            .new_stmt(HirStmtKind::Break, pat_span)
-                            .boxed(),
+                        body: self.new_stmt(HirStmtKind::Break, pat_span).boxed(),
                     },
                 ],
             },
@@ -114,11 +111,7 @@ impl LowerFundef<'_> {
         self.new_stmt(
             HirStmtKind::Let {
                 pattern: self.new_pattern(
-                    HirPatternDesc::Bind {
-                        id: var_id,
-                        name: var_name,
-                        mutable: true,
-                    },
+                    HirPatternDesc::Bind { id: var_id, name: var_name, mutable: true },
                     span,
                 ),
                 locals: vec![var_id],

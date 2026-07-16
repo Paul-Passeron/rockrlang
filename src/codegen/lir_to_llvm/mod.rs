@@ -25,9 +25,7 @@ use inkwell::{
     context::Context,
     module::Linkage,
     targets::TargetData,
-    types::{
-        AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType,
-    },
+    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType},
     values::{AnyValue, BasicValue, BasicValueEnum, FunctionValue, PhiValue},
 };
 use itertools::Itertools;
@@ -36,15 +34,11 @@ use crate::{
     Db,
     codegen::{Codegen, IModule, LIRToLLVM},
     common::arena::Idx,
-    layout::{
-        Discriminant, IntWidth, LayoutData, LayoutID, Offset, ScalarKind,
-    },
+    layout::{Discriminant, IntWidth, LayoutData, LayoutID, Offset, ScalarKind},
     lir::{
         self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
         finalized::{BlockData, FunctionBody, StackSlot},
-        inst::{
-            ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
-        },
+        inst::{ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind},
     },
     ril::never_id,
 };
@@ -99,10 +93,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     None
                 } else {
                     Some(
-                        BasicMetadataTypeEnum::try_from(
-                            self.lower_layout(layout.layout),
-                        )
-                        .unwrap(),
+                        BasicMetadataTypeEnum::try_from(self.lower_layout(layout.layout))
+                            .unwrap(),
                     )
                 }
             })
@@ -118,13 +110,11 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             fn_ty,
             match sig.kind {
                 lir::SigKind::Import { .. } => None,
-                lir::SigKind::Defined(defined_linkage) => {
-                    Some(match defined_linkage {
-                        lir::DefinedLinkage::Export => Linkage::External,
-                        lir::DefinedLinkage::Local => Linkage::Private,
-                        lir::DefinedLinkage::Weak => Linkage::ExternalWeak,
-                    })
-                }
+                lir::SigKind::Defined(defined_linkage) => Some(match defined_linkage {
+                    lir::DefinedLinkage::Export => Linkage::External,
+                    lir::DefinedLinkage::Local => Linkage::Private,
+                    lir::DefinedLinkage::Weak => Linkage::ExternalWeak,
+                }),
             },
         );
 
@@ -144,12 +134,8 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
         match layout.data(self.db) {
             LayoutData::ZeroSized => self.ctx.void_type().into(),
             LayoutData::Scalar(scalar_kind) => match scalar_kind {
-                ScalarKind::Int(int_width) => {
-                    self.get_int_ty(*int_width).into()
-                }
-                ScalarKind::Ptr => {
-                    self.ctx.ptr_type(AddressSpace::default()).into()
-                }
+                ScalarKind::Int(int_width) => self.get_int_ty(*int_width).into(),
+                ScalarKind::Ptr => self.ctx.ptr_type(AddressSpace::default()).into(),
                 ScalarKind::Float(_) => todo!(),
             },
             LayoutData::Aggregate(aggregate_layout) => {
@@ -162,11 +148,9 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     .collect_vec();
                 self.ctx.struct_type(&field_types, false).into()
             }
-            LayoutData::Union(_) => self
-                .ctx
-                .i8_type()
-                .array_type(layout.size(self.db).bytes() as u32)
-                .into(),
+            LayoutData::Union(_) => {
+                self.ctx.i8_type().array_type(layout.size(self.db).bytes() as u32).into()
+            }
         }
     }
 
@@ -193,18 +177,15 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 // Handle the entry differently
                 for (blk, data) in &body.blocks {
                     if blk == body.entry {
-                        let entry_bb =
-                            self.ctx.append_basic_block(fn_ctx.func, "entry");
+                        let entry_bb = self.ctx.append_basic_block(fn_ctx.func, "entry");
                         fn_ctx.blocks.insert(blk, entry_bb);
                         self.b.position_at_end(entry_bb);
 
                         for slot in &body.stack_slots {
                             let StackSlot { value, pointee_ty } = slot;
                             let pointee = self.basic(pointee_ty.layout);
-                            let ptr = self
-                                .b
-                                .build_alloca(pointee, "alloca_slot")
-                                .unwrap();
+                            let ptr =
+                                self.b.build_alloca(pointee, "alloca_slot").unwrap();
                             fn_ctx.values.insert(*value, ptr.into());
                         }
 
@@ -212,20 +193,13 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             .iter()
                             .filter_map(|param| {
                                 let ty = body.defs[*param].ty;
-                                if ty.is_zst(self.db) {
-                                    None
-                                } else {
-                                    Some(*param)
-                                }
+                                if ty.is_zst(self.db) { None } else { Some(*param) }
                             })
                             .enumerate()
                             .for_each(|(i, param)| {
                                 fn_ctx.values.insert(
                                     param,
-                                    fn_ctx
-                                        .func
-                                        .get_nth_param(i as u32)
-                                        .unwrap(),
+                                    fn_ctx.func.get_nth_param(i as u32).unwrap(),
                                 );
                             });
 
@@ -287,11 +261,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
         }
     }
 
-    fn lower_inst(
-        &mut self,
-        inst: &Instruction<Finalized>,
-        ctx: &mut FnCtx<'ctx>,
-    ) {
+    fn lower_inst(&mut self, inst: &Instruction<Finalized>, ctx: &mut FnCtx<'ctx>) {
         match inst {
             Instruction::Void(void_inst_kind) => match void_inst_kind {
                 VoidInstKind::Store { ptr, value } => {
@@ -336,21 +306,21 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     ValueInstKind::Const(const_value) => match const_value {
                         ConstValue::Int { ty, value } => {
                             let int_ty = self.basic(ty.layout).into_int_type();
-                            int_ty.const_int(*value as u64, true /* FIXME: Do not hardcode signedness of the int literals */).into()
+                            int_ty
+                                .const_int(
+                                    *value as u64,
+                                    true, /* FIXME: Do not hardcode signedness of the
+                                           * int literals */
+                                )
+                                .into()
                         }
-                        ConstValue::NullPtr { .. } => self
-                            .ctx
-                            .ptr_type(AddressSpace::default())
-                            .const_null()
-                            .into(),
-                        ConstValue::Zeroed { ty } => {
-                            self.basic(ty.layout).const_zero()
+                        ConstValue::NullPtr { .. } => {
+                            self.ctx.ptr_type(AddressSpace::default()).const_null().into()
                         }
+                        ConstValue::Zeroed { ty } => self.basic(ty.layout).const_zero(),
                         ConstValue::Strlit { contents, null_terminated } => {
                             let array_value = self.ctx.const_string(
-                                unescaper::unescape(contents)
-                                    .unwrap()
-                                    .as_bytes(),
+                                unescaper::unescape(contents).unwrap().as_bytes(),
                                 *null_terminated,
                             );
                             let g = self.m.add_global(
@@ -368,10 +338,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         ConstValue::FunctionAddr(lirfunction_id) => {
                             let function = self.get_llvm_func(*lirfunction_id);
                             // TODO: is this right ?
-                            function
-                                .as_any_value_enum()
-                                .into_pointer_value()
-                                .into()
+                            function.as_any_value_enum().into_pointer_value().into()
                         }
                     },
                     ValueInstKind::Load { ptr, ty } => {
@@ -432,24 +399,15 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             // maybe ?
                             Discriminant::Niche { .. } => todo!(),
                             Discriminant::Tagged { offset, kind } => {
-                                let tag_ptr = if offset == Offset::ZERO {
-                                    ptr
-                                } else {
-                                    todo!()
-                                };
-                                let int_ty = self.get_int_ty(kind);
                                 let tag_ptr =
-                                    ctx.values[tag_ptr].into_pointer_value();
-                                self.b
-                                    .build_load(int_ty, tag_ptr, "the_discr")
-                                    .unwrap()
+                                    if offset == Offset::ZERO { ptr } else { todo!() };
+                                let int_ty = self.get_int_ty(kind);
+                                let tag_ptr = ctx.values[tag_ptr].into_pointer_value();
+                                self.b.build_load(int_ty, tag_ptr, "the_discr").unwrap()
                             }
                         }
                     }
-                    ValueInstKind::MakeAggregate {
-                        ty,
-                        fields_in_src_order,
-                    } => {
+                    ValueInstKind::MakeAggregate { ty, fields_in_src_order } => {
                         let llvm_ty = self.basic(ty.layout);
                         let aggr_layout = ty.aggregate_layout(self.db).unwrap();
                         let mut res = llvm_ty.const_zero().into_struct_value();
@@ -464,8 +422,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             {
                                 continue;
                             }
-                            let value =
-                                ctx.values[&fields_in_src_order[i as usize]];
+                            let value = ctx.values[&fields_in_src_order[i as usize]];
                             res = self
                                 .b
                                 .build_insert_value(res, value, *to_layout, "")
@@ -483,16 +440,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         let rhs = ctx.values[rhs].into_int_value();
                         match op {
                             lir::ArithBinop::SAdd | lir::ArithBinop::UAdd => {
-                                self.b
-                                    .build_int_add(lhs, rhs, "int-add")
-                                    .unwrap()
-                                    .into()
+                                self.b.build_int_add(lhs, rhs, "int-add").unwrap().into()
                             }
                             lir::ArithBinop::SMul | lir::ArithBinop::UMul => {
-                                self.b
-                                    .build_int_mul(lhs, rhs, "int-mul")
-                                    .unwrap()
-                                    .into()
+                                self.b.build_int_mul(lhs, rhs, "int-mul").unwrap().into()
                             }
                             lir::ArithBinop::UDiv => self
                                 .b
@@ -515,73 +466,48 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                 .unwrap()
                                 .into(),
                             lir::ArithBinop::SSub | lir::ArithBinop::USub => {
-                                self.b
-                                    .build_int_sub(lhs, rhs, "int-sub")
-                                    .unwrap()
-                                    .into()
+                                self.b.build_int_sub(lhs, rhs, "int-sub").unwrap().into()
                             }
                         }
                     }
                     ValueInstKind::Cmp { op, lhs, rhs } => {
                         let lhs = ctx.values[lhs];
                         let rhs = ctx.values[rhs];
-                        let (lhs, rhs) = if lhs.is_int_value()
-                            && rhs.is_int_value()
-                        {
+                        let (lhs, rhs) = if lhs.is_int_value() && rhs.is_int_value() {
                             let lhs = lhs.into_int_value();
                             let rhs = rhs.into_int_value();
                             (lhs, rhs)
                         } else if lhs.is_int_value() && rhs.is_pointer_value() {
                             let lhs = lhs.into_int_value();
                             let rhs = rhs.into_pointer_value();
-                            let rhs = self
-                                .b
-                                .build_ptr_to_int(rhs, lhs.get_type(), "")
-                                .unwrap();
+                            let rhs =
+                                self.b.build_ptr_to_int(rhs, lhs.get_type(), "").unwrap();
                             (lhs, rhs)
                         } else if lhs.is_pointer_value() && rhs.is_int_value() {
                             let rhs = rhs.into_int_value();
                             let lhs = lhs.into_pointer_value();
-                            let lhs = self
-                                .b
-                                .build_ptr_to_int(lhs, rhs.get_type(), "")
-                                .unwrap();
+                            let lhs =
+                                self.b.build_ptr_to_int(lhs, rhs.get_type(), "").unwrap();
                             (lhs, rhs)
-                        } else if lhs.is_pointer_value()
-                            && rhs.is_pointer_value()
-                        {
+                        } else if lhs.is_pointer_value() && rhs.is_pointer_value() {
                             let lhs = lhs.into_pointer_value();
                             let rhs = rhs.into_pointer_value();
-                            let ptrint = self.ctx.ptr_sized_int_type(
-                                &TargetData::create(""),
-                                None,
-                            );
-                            let lhs = self
-                                .b
-                                .build_ptr_to_int(lhs, ptrint, "")
-                                .unwrap();
-                            let rhs = self
-                                .b
-                                .build_ptr_to_int(rhs, ptrint, "")
-                                .unwrap();
+                            let ptrint = self
+                                .ctx
+                                .ptr_sized_int_type(&TargetData::create(""), None);
+                            let lhs = self.b.build_ptr_to_int(lhs, ptrint, "").unwrap();
+                            let rhs = self.b.build_ptr_to_int(rhs, ptrint, "").unwrap();
                             (lhs, rhs)
                         } else {
                             todo!()
                         };
 
                         let op = match op {
-                            lir::CmpBinop::SLessThan => {
-                                inkwell::IntPredicate::SLT
-                            }
-                            lir::CmpBinop::ULessThan => {
-                                inkwell::IntPredicate::ULT
-                            }
+                            lir::CmpBinop::SLessThan => inkwell::IntPredicate::SLT,
+                            lir::CmpBinop::ULessThan => inkwell::IntPredicate::ULT,
                             lir::CmpBinop::Eq => inkwell::IntPredicate::EQ,
                         };
-                        self.b
-                            .build_int_compare(op, lhs, rhs, "cmp")
-                            .unwrap()
-                            .into()
+                        self.b.build_int_compare(op, lhs, rhs, "cmp").unwrap().into()
                     }
                     ValueInstKind::Logic { .. } => todo!(),
                     ValueInstKind::Not { value } => {
@@ -608,13 +534,11 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             }
             Instruction::Call { dest, id, args } => {
                 let f = self.get_llvm_func(*id);
-                let args =
-                    args.iter().map(|arg| ctx.values[arg].into()).collect_vec();
+                let args = args.iter().map(|arg| ctx.values[arg].into()).collect_vec();
                 let callsite = self.b.build_call(f, &args, "callsite").unwrap();
                 if let Some(v) = dest {
                     let value =
-                        BasicValueEnum::try_from(callsite.as_any_value_enum())
-                            .unwrap();
+                        BasicValueEnum::try_from(callsite.as_any_value_enum()).unwrap();
                     ctx.values.insert(*v, value);
                 }
             }
@@ -672,9 +596,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 });
                 let then_block = ctx.blocks[&if_true.block];
                 let else_block = ctx.blocks[&if_false.block];
-                self.b
-                    .build_conditional_branch(cond, then_block, else_block)
-                    .unwrap();
+                self.b.build_conditional_branch(cond, then_block, else_block).unwrap();
             }
             Terminator::Switch { on, branches, default } => {
                 let value = ctx.values[on].into_int_value();

@@ -52,10 +52,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         Self { db: ctx.db, ctx, scrut, merge_bb }
     }
 
-    fn build_match_matrix(
-        &mut self,
-        branches: &'a [ThirMatchBranch],
-    ) -> Matrix<'a> {
+    fn build_match_matrix(&mut self, branches: &'a [ThirMatchBranch]) -> Matrix<'a> {
         let rows = branches
             .iter()
             .enumerate()
@@ -72,12 +69,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         Matrix { cols: vec![self.scrut.clone()], rows }
     }
 
-    fn _lower_dt(
-        &mut self,
-        dt: &DecisionTree,
-        bbs: &[MIRBlockID],
-        diverge: MIRBlockID,
-    ) {
+    fn _lower_dt(&mut self, dt: &DecisionTree, bbs: &[MIRBlockID], diverge: MIRBlockID) {
         match dt {
             DecisionTree::Leaf { branch_idx, bindings } => {
                 for (local, place) in bindings {
@@ -97,9 +89,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 // let (ty, depth) = place.ty.peel_aux(self.db);
                 if ty.as_enum_ref(self.db).is_some() {
                     let mut scrut_place = place.clone();
-                    scrut_place
-                        .projections
-                        .extend(repeat_n(MIRProjection::Deref, depth));
+                    scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
 
@@ -107,9 +97,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
                     let vlayout = lir_ty.union_layout(self.db).unwrap();
                     let discr_width = match vlayout.discriminant {
-                        crate::layout::Discriminant::Tagged {
-                            kind, ..
-                        } => kind,
+                        crate::layout::Discriminant::Tagged { kind, .. } => kind,
                         _ => todo!(),
                     };
 
@@ -122,10 +110,9 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         span,
                     };
                     let discr_place = self.ctx.synthetic_place(discr_ty, span);
-                    self.ctx.builder.emit(Stmt::Assign {
-                        dest: discr_place.clone(),
-                        rvalue: discr,
-                    });
+                    self.ctx
+                        .builder
+                        .emit(Stmt::Assign { dest: discr_place.clone(), rvalue: discr });
 
                     let current = self.ctx.builder.current_block();
 
@@ -135,8 +122,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                             let Constructor::Variant(variant_idx) = ctor else {
                                 unreachable!()
                             };
-                            let next_dec_tree_bb =
-                                self.ctx.builder.new_block(None);
+                            let next_dec_tree_bb = self.ctx.builder.new_block(None);
                             self.ctx.switch_to(next_dec_tree_bb);
                             self._lower_dt(next_dec_tree, bbs, diverge);
                             (*variant_idx as u128, next_dec_tree_bb)
@@ -159,23 +145,19 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         default,
                         span,
                     });
-                } else if ty.as_type_id().is_some_and(|ty| {
-                    ty.def(self.db).is_int_like(self.db).is_some()
-                }) {
+                } else if ty
+                    .as_type_id()
+                    .is_some_and(|ty| ty.def(self.db).is_int_like(self.db).is_some())
+                {
                     let mut scrut_place = place.clone();
-                    scrut_place
-                        .projections
-                        .extend(repeat_n(MIRProjection::Deref, depth));
+                    scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
                     let current = self.ctx.builder.current_block();
 
                     let branches: BTreeMap<u128, MIRBlockID> = cases
                         .iter()
                         .map(|(ctor, next_dec_tree)| {
-                            let Constructor::IntLit(value) = ctor else {
-                                unreachable!()
-                            };
-                            let next_dec_tree_bb =
-                                self.ctx.builder.new_block(None);
+                            let Constructor::IntLit(value) = ctor else { unreachable!() };
+                            let next_dec_tree_bb = self.ctx.builder.new_block(None);
                             self.ctx.switch_to(next_dec_tree_bb);
                             self._lower_dt(next_dec_tree, bbs, diverge);
                             (*value as u128, next_dec_tree_bb)
@@ -211,15 +193,9 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         }
     }
 
-    fn lower_decision_tree(
-        &mut self,
-        dt: &DecisionTree,
-        branches: &[ThirMatchBranch],
-    ) {
+    fn lower_decision_tree(&mut self, dt: &DecisionTree, branches: &[ThirMatchBranch]) {
         let branch_bodies = (0..branches.len())
-            .map(|idx| {
-                self.ctx.builder.new_block(Some(format!("match-branch-{idx}")))
-            })
+            .map(|idx| self.ctx.builder.new_block(Some(format!("match-branch-{idx}"))))
             .collect_vec();
         let diverge = self.ctx.builder.new_block(Some("match-diverge".into()));
         self._lower_dt(dt, &branch_bodies, diverge);
@@ -255,11 +231,7 @@ impl StructRef {
 }
 
 impl<'a> ThirToMIR<'a> {
-    pub fn wrap_ref_to_fit(
-        &mut self,
-        target: TypeRef,
-        place: &MIRPlace,
-    ) -> MIRRValue {
+    pub fn wrap_ref_to_fit(&mut self, target: TypeRef, place: &MIRPlace) -> MIRRValue {
         let span = self.builder.locals[place.local].span;
         if place.ty == target || target.as_ref(self.db).is_none() {
             return MIRRValue {
@@ -269,10 +241,9 @@ impl<'a> ThirToMIR<'a> {
             };
         }
 
-        let RefWrappedTy { mut refs, .. } = RefWrappedTy::peel_until(
-            self.db, target, place.ty,
-        )
-        .unwrap_or_else(|| RefWrappedTy::from_type_ref(self.db, place.ty));
+        let RefWrappedTy { mut refs, .. } =
+            RefWrappedTy::peel_until(self.db, target, place.ty)
+                .unwrap_or_else(|| RefWrappedTy::from_type_ref(self.db, place.ty));
         if refs.is_empty() {
             // TODO: weird ???
             return MIRRValue {

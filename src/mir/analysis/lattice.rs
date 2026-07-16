@@ -216,9 +216,7 @@ pub type FixedPointBlockRes<L> = FixedPointIterRes<MIRBlockID, L>;
 pub type FixedPointStmtRes<L> = FixedPointIterRes<MIRStmtIndex, L>;
 
 impl MIR {
-    pub fn get_block_bottoms<L: Lattice>(
-        &self,
-    ) -> impl Iterator<Item = (MIRBlockID, L)> {
+    pub fn get_block_bottoms<L: Lattice>(&self) -> impl Iterator<Item = (MIRBlockID, L)> {
         self.blocks.keys().map(|blk| (blk, L::bottom()))
     }
 
@@ -246,11 +244,10 @@ impl MIR {
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&block_out[p]));
-                    let new_in =
-                        match in_seed.as_ref().and_then(|s| s.get(&blk)) {
-                            Some(seed) => from_preds.join(seed),
-                            None => from_preds,
-                        };
+                    let new_in = match in_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_preds.join(seed),
+                        None => from_preds,
+                    };
                     let new_out = transfer(blk, &new_in);
                     (new_in, new_out)
                 }
@@ -260,30 +257,24 @@ impl MIR {
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&block_in[p]));
-                    let new_out =
-                        match out_seed.as_ref().and_then(|s| s.get(&blk)) {
-                            Some(seed) => from_succs.join(seed),
-                            None => from_succs,
-                        };
+                    let new_out = match out_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_succs.join(seed),
+                        None => from_succs,
+                    };
                     let new_in = transfer(blk, &new_out);
                     (new_in, new_out)
                 }
             };
 
-            let changed =
-                block_in[&blk] != new_in || block_out[&blk] != new_out;
+            let changed = block_in[&blk] != new_in || block_out[&blk] != new_out;
 
             block_in.insert(blk, new_in);
             block_out.insert(blk, new_out);
 
             if changed {
                 match direction {
-                    Direction::Forward => {
-                        worklist.extend(succs[&blk].iter().copied())
-                    }
-                    Direction::Backward => {
-                        worklist.extend(preds[&blk].iter().copied())
-                    }
+                    Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
+                    Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
                 }
             }
         }
@@ -306,9 +297,7 @@ impl MIR {
         self.stmt_index_iter().map(|idx| (idx, L::bottom()))
     }
 
-    pub fn stmt_successors(
-        &self,
-    ) -> HashMap<MIRStmtIndex, HashSet<MIRStmtIndex>> {
+    pub fn stmt_successors(&self) -> HashMap<MIRStmtIndex, HashSet<MIRStmtIndex>> {
         let mut res: HashMap<_, _> =
             self.stmt_index_iter().map(|idx| (idx, HashSet::new())).collect();
         let actual = self.successors();
@@ -349,16 +338,14 @@ impl MIR {
         in_seed: Option<HashMap<MIRStmtIndex, L>>,
         out_seed: Option<HashMap<MIRStmtIndex, L>>,
     ) -> FixedPointStmtRes<L> {
-        let mut stmt_in: HashMap<_, _> =
-            HashMap::from_iter(self.get_stmt_bottoms::<L>());
+        let mut stmt_in: HashMap<_, _> = HashMap::from_iter(self.get_stmt_bottoms::<L>());
         let mut stmt_out: HashMap<_, _> =
             HashMap::from_iter(self.get_stmt_bottoms::<L>());
 
         let succs = self.stmt_successors();
         let preds = self.stmt_predecessors(&succs);
 
-        let mut worklist: BTreeSet<_> =
-            BTreeSet::from_iter(self.stmt_index_iter());
+        let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.stmt_index_iter());
 
         while let Some(blk) = worklist.pop_last() {
             let (new_in, new_out) = match direction {
@@ -368,11 +355,10 @@ impl MIR {
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&stmt_out[p]));
-                    let new_in =
-                        match in_seed.as_ref().and_then(|s| s.get(&blk)) {
-                            Some(seed) => from_preds.join(seed),
-                            None => from_preds,
-                        };
+                    let new_in = match in_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_preds.join(seed),
+                        None => from_preds,
+                    };
                     let new_out = transfer(blk, &new_in);
                     (new_in, new_out)
                 }
@@ -382,11 +368,10 @@ impl MIR {
                         .into_iter()
                         .flatten()
                         .fold(L::bottom(), |l, p| l.join(&stmt_in[p]));
-                    let new_out =
-                        match out_seed.as_ref().and_then(|s| s.get(&blk)) {
-                            Some(seed) => from_succs.join(seed),
-                            None => from_succs,
-                        };
+                    let new_out = match out_seed.as_ref().and_then(|s| s.get(&blk)) {
+                        Some(seed) => from_succs.join(seed),
+                        None => from_succs,
+                    };
                     let new_in = transfer(blk, &new_out);
                     (new_in, new_out)
                 }
@@ -399,12 +384,8 @@ impl MIR {
 
             if changed {
                 match direction {
-                    Direction::Forward => {
-                        worklist.extend(succs[&blk].iter().copied())
-                    }
-                    Direction::Backward => {
-                        worklist.extend(preds[&blk].iter().copied())
-                    }
+                    Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
+                    Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
                 }
             }
         }

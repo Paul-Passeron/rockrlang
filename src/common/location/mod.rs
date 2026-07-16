@@ -49,11 +49,7 @@ impl Span {
         Location { file: self.file, offset: self.end_offset }
     }
 
-    pub fn new(
-        file: SourceFile,
-        start_offset: usize,
-        end_offset: usize,
-    ) -> Self {
+    pub fn new(file: SourceFile, start_offset: usize, end_offset: usize) -> Self {
         Self { file, start_offset, end_offset }
     }
 }
@@ -136,8 +132,7 @@ impl Ord for LocationInfo {
 impl Display for LocationInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cwd = std::env::current_dir().unwrap_or_default();
-        let path =
-            pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
+        let path = pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
         write!(f, "{}:{}:{}", path.display(), self.line, self.column)
     }
 }

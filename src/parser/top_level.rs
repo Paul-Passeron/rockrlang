@@ -26,13 +26,12 @@ use crate::{
         Spanned,
         annotation::{AstAnnotation, AstAnnotationArg, AstAnnotationItem},
         top_level::{
-            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef,
-            AstEnumVariant, AstEnumVariantKind, AstFundef, AstFundefArg,
-            AstFundefDesc, AstFunsig, AstFunsigDesc, AstImplBlock, AstImplItem,
-            AstIncludePath, AstInterface, AstInterfaceItem, AstMethodDef,
-            AstMethodDefDesc, AstMethodsig, AstMethodsigDesc, AstModule,
-            AstModuleDesc, AstReceiver, AstStructDef, AstStructDefField,
-            AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
+            AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef, AstEnumVariant,
+            AstEnumVariantKind, AstFundef, AstFundefArg, AstFundefDesc, AstFunsig,
+            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
+            AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig,
+            AstMethodsigDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
+            AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
     parser::{ParseError, ParseErrorKind, Parser},
@@ -53,9 +52,7 @@ impl<'db> Parser<'db> {
     ) -> Result<AstAnyTopLevelItem, ParseError> {
         let start = self.get_start();
         match &self.current_token()?.kind {
-            TokenKind::Directive(dir)
-                if *dir == Symbol::new(self.db, "include") =>
-            {
+            TokenKind::Directive(dir) if *dir == Symbol::new(self.db, "include") => {
                 self.consume();
                 let include_path = self.parse_include_path()?;
                 let end = self.get_end();
@@ -160,16 +157,10 @@ impl<'db> Parser<'db> {
         } else {
             vec![]
         };
-        Ok(AstTemplateArg {
-            name,
-            constraints,
-            span: start.span(self.get_end()),
-        })
+        Ok(AstTemplateArg { name, constraints, span: start.span(self.get_end()) })
     }
 
-    fn parse_template_args(
-        &mut self,
-    ) -> Result<Vec<AstTemplateArg>, ParseError> {
+    fn parse_template_args(&mut self) -> Result<Vec<AstTemplateArg>, ParseError> {
         let mut args = vec![];
 
         while let Some(t) = self.peek_n(0)
@@ -233,9 +224,7 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutRefZelf(
-                            start.span(self.get_end()),
-                        ))
+                        Some(AstReceiver::MutRefZelf(start.span(self.get_end())))
                     } else {
                         self.expect_self()?;
                         Some(AstReceiver::RefZelf(start.span(self.get_end())))
@@ -248,9 +237,7 @@ impl<'db> Parser<'db> {
                     {
                         self.consume();
                         self.expect_self()?;
-                        Some(AstReceiver::MutPtrZelf(
-                            start.span(self.get_end()),
-                        ))
+                        Some(AstReceiver::MutPtrZelf(start.span(self.get_end())))
                     } else {
                         self.expect_self()?;
                         Some(AstReceiver::PtrZelf(start.span(self.get_end())))
@@ -283,13 +270,7 @@ impl<'db> Parser<'db> {
         ) = self.parse_any_funsig(true, false)?;
         let receiver = receiver.unwrap();
         Ok(AstMethodsig::new(
-            AstMethodsigDesc {
-                name,
-                receiver,
-                args,
-                template_args,
-                return_type,
-            },
+            AstMethodsigDesc { name, receiver, args, template_args, return_type },
             annotations,
             span,
         ))
@@ -374,14 +355,7 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::Fun)?;
         self.consume();
         let AstMethodsig {
-            data:
-                AstMethodsigDesc {
-                    name,
-                    receiver,
-                    args,
-                    template_args,
-                    return_type,
-                },
+            data: AstMethodsigDesc { name, receiver, args, template_args, return_type },
             annotations,
             ..
         } = self.parse_methodsig()?;
@@ -425,14 +399,7 @@ impl<'db> Parser<'db> {
         let body_span = body_start.span(end);
         let span = start.span(end);
         Ok(AstFundef::new(
-            AstFundefDesc {
-                name,
-                args,
-                template_args,
-                return_type,
-                body_span,
-                body,
-            },
+            AstFundefDesc { name, args, template_args, return_type, body_span, body },
             annotations,
             span,
         ))
@@ -459,8 +426,7 @@ impl<'db> Parser<'db> {
                 {
                     // Try to parse as a type expression; fall back to bare
                     // symbol
-                    let arg =
-                        self.parse_type_expr().map(AstAnnotationArg::Type)?;
+                    let arg = self.parse_type_expr().map(AstAnnotationArg::Type)?;
                     args.push(arg);
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Comma)
@@ -507,8 +473,7 @@ impl<'db> Parser<'db> {
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
-                let Spanned { data: name, span: name_span, .. } =
-                    self.parse_symbol()?;
+                let Spanned { data: name, span: name_span, .. } = self.parse_symbol()?;
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;
@@ -579,9 +544,7 @@ impl<'db> Parser<'db> {
         Ok(AstImplBlock { template_args, interface, implemented, items, span })
     }
 
-    fn parse_struct_def_field(
-        &mut self,
-    ) -> Result<AstStructDefField, ParseError> {
+    fn parse_struct_def_field(&mut self) -> Result<AstStructDefField, ParseError> {
         let start = self.get_start();
         let name = self.parse_symbol()?.data;
         self.expect(TokenKind::Colon)?;
@@ -591,9 +554,7 @@ impl<'db> Parser<'db> {
         Ok(AstStructDefField { name, ty, span: start.span(end) })
     }
 
-    fn parse_struct_def_fields(
-        &mut self,
-    ) -> Result<Vec<AstStructDefField>, ParseError> {
+    fn parse_struct_def_fields(&mut self) -> Result<Vec<AstStructDefField>, ParseError> {
         let mut fields = Vec::new();
         while let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Identifier(_))
@@ -625,12 +586,9 @@ impl<'db> Parser<'db> {
             Some(TokenKind::OpenPar) => {
                 self.consume();
                 let mut fields = Vec::new();
-                while self.peek_n(0).map(|t| t.kind)
-                    != Some(TokenKind::ClosePar)
-                {
+                while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::ClosePar) {
                     fields.push(self.parse_type_expr()?);
-                    if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma)
-                    {
+                    if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
                         self.consume();
                     } else {
                         break;
@@ -646,14 +604,11 @@ impl<'db> Parser<'db> {
         Ok(AstEnumVariant { name, kind, span: start.span(end) })
     }
 
-    fn parse_enum_variants(
-        &mut self,
-    ) -> Result<Vec<AstEnumVariant>, ParseError> {
+    fn parse_enum_variants(&mut self) -> Result<Vec<AstEnumVariant>, ParseError> {
         let mut variants = vec![];
         while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::CloseBra) {
             let variant = self.parse_enum_variant()?;
-            let is_struct =
-                matches!(variant.kind, AstEnumVariantKind::StructLike(_));
+            let is_struct = matches!(variant.kind, AstEnumVariantKind::StructLike(_));
             variants.push(variant);
             if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
                 self.consume();
@@ -675,12 +630,7 @@ impl<'db> Parser<'db> {
         let variants = self.parse_enum_variants()?;
         self.expect(TokenKind::CloseBra)?;
         self.consume();
-        Ok(AstEnumDef {
-            name,
-            template_args,
-            variants,
-            span: start.span(self.get_end()),
-        })
+        Ok(AstEnumDef { name, template_args, variants, span: start.span(self.get_end()) })
     }
 
     fn parse_struct_def(&mut self) -> Result<AstStructDef, ParseError> {
@@ -695,12 +645,7 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::CloseBra)?;
         self.consume();
 
-        Ok(AstStructDef {
-            name,
-            template_args,
-            fields,
-            span: start.span(self.get_end()),
-        })
+        Ok(AstStructDef { name, template_args, fields, span: start.span(self.get_end()) })
     }
 
     fn parse_interface_item(&mut self) -> Result<AstInterfaceItem, ParseError> {
@@ -731,9 +676,7 @@ impl<'db> Parser<'db> {
         }
     }
 
-    pub fn parse_toplevel_item(
-        &mut self,
-    ) -> Result<AstTopLevelItem, ParseError> {
+    pub fn parse_toplevel_item(&mut self) -> Result<AstTopLevelItem, ParseError> {
         self.collect_annotations()?;
         let annotations = self.annotations();
         match &self.current_token()?.kind {
@@ -858,11 +801,7 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
-            x => todo!(
-                "{}: {}",
-                self.get_start().loc_info(self.db),
-                x.display(self.db)
-            ),
+            x => todo!("{}: {}", self.get_start().loc_info(self.db), x.display(self.db)),
         }
     }
 }

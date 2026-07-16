@@ -33,15 +33,14 @@ use crate::{
         top_level::{AstInterfaceItem, AstMethodsig},
     },
     ril::{
-        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef,
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef,
+        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
+        TypeDefId, TypeId, TypeRef,
     },
     typecheck::{
         CallKind, ExprId, InferCallInfos,
         inference::{
             InferTy, InferenceCtx, InterfaceImplem, UnificationError,
-            implems::PotentialBlockRes, implicit::ImplicitContext,
-            var::InferVar,
+            implems::PotentialBlockRes, implicit::ImplicitContext, var::InferVar,
         },
     },
 };
@@ -62,60 +61,19 @@ pub struct InferenceConstraint {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferenceConstraintKind {
-    Deref {
-        var: InferVar,
-        target: InferTy,
-    },
-    BindsLike {
-        ty: InferVar,
-        inner: InferTy,
-        like: InferVar,
-    },
-    IndexedBy {
-        elem_var: InferVar,
-        base_ty: InferTy,
-        index_ty: InferTy,
-    },
-    Tuple {
-        elem_var: InferVar,
-        tuple_ty: InferTy,
-        has_index: u32,
-    },
-    StructField {
-        elem_var: InferVar,
-        struct_ty: InferTy,
-        field: Symbol,
-    },
+    Deref { var: InferVar, target: InferTy },
+    BindsLike { ty: InferVar, inner: InferTy, like: InferVar },
+    IndexedBy { elem_var: InferVar, base_ty: InferTy, index_ty: InferTy },
+    Tuple { elem_var: InferVar, tuple_ty: InferTy, has_index: u32 },
+    StructField { elem_var: InferVar, struct_ty: InferTy, field: Symbol },
     Method(MethodConstraint),
-    Implements {
-        ty: InferTy,
-        id: InterfaceId,
-        args: Box<[InferTy]>,
-    },
-    Unify {
-        a: InferTy,
-        b: InferTy,
-    },
-    Binop {
-        res_ty: InferVar,
-        lhs_ty: InferTy,
-        rhs_ty: InferTy,
-        op: BinaryOperator,
-    },
-    IntLike {
-        res_ty: InferVar,
-    },
-    IsInner {
-        inner: InferTy,
-        ref_ty: InferTy,
-    },
-    FatPtr {
-        fat_ptr_var: InferVar,
-    },
-    MetadataOfFatPtr {
-        fat_ptr_var: InferVar,
-        metadata_var: InferVar,
-    },
+    Implements { ty: InferTy, id: InterfaceId, args: Box<[InferTy]> },
+    Unify { a: InferTy, b: InferTy },
+    Binop { res_ty: InferVar, lhs_ty: InferTy, rhs_ty: InferTy, op: BinaryOperator },
+    IntLike { res_ty: InferVar },
+    IsInner { inner: InferTy, ref_ty: InferTy },
+    FatPtr { fat_ptr_var: InferVar },
+    MetadataOfFatPtr { fat_ptr_var: InferVar, metadata_var: InferVar },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -148,9 +106,7 @@ enum ConstraintSolveResult {
 
 impl<'db> InferenceCtx<'db> {
     fn is_builtin_indexed_by_int(&self, ty: &InferTy) -> Option<InferTy> {
-        self.is_slice(ty)
-            .or_else(|| self.is_ref_to_slice(ty))
-            .or_else(|| self.is_ptr(ty))
+        self.is_slice(ty).or_else(|| self.is_ref_to_slice(ty)).or_else(|| self.is_ptr(ty))
     }
 }
 
@@ -160,10 +116,8 @@ impl<'db> InferenceCtx<'db> {
         match ty {
             InferTy::Var(_) => TypeRef::Error,
             InferTy::Adt { def, fields } => {
-                let args = fields
-                    .into_iter()
-                    .map(|f| self.infer_to_ref(&f))
-                    .collect::<Vec<_>>();
+                let args =
+                    fields.into_iter().map(|f| self.infer_to_ref(&f)).collect::<Vec<_>>();
                 for arg in &args {
                     if matches!(arg, TypeRef::Error) {
                         return TypeRef::Error;
@@ -196,8 +150,8 @@ impl<'db> InferenceCtx<'db> {
                 is_static,
             ) {
                 return Some(self.apply_interface_method(
-                    expr_id, receiver, depth, iface_id, implem, method, &sig,
-                    ret_var, args, is_static,
+                    expr_id, receiver, depth, iface_id, implem, method, &sig, ret_var,
+                    args, is_static,
                 ));
             }
             let (_, inner) = cur.ptr_like(self.db)?;
@@ -217,9 +171,7 @@ impl<'db> InferenceCtx<'db> {
         let candidates = self
             .implements
             .iter()
-            .filter(|(iface_id, _)| {
-                interface_hint.is_none_or(|hint| hint == **iface_id)
-            })
+            .filter(|(iface_id, _)| interface_hint.is_none_or(|hint| hint == **iface_id))
             .flat_map(|(iface_id, implems)| {
                 implems.iter().map(|implem| (*iface_id, implem.clone()))
             })
@@ -230,17 +182,18 @@ impl<'db> InferenceCtx<'db> {
                 continue;
             }
 
-            let sig = interface_items(self.db, iface_id.interned())
-                .iter()
-                .find_map(|item| match item {
-                    AstInterfaceItem::Sig(sig)
-                        if sig.data.name.data == method
-                            && sig.data.receiver.is_static() == is_static
-                            && sig.data.args.len() == arity =>
-                    {
-                        Some(sig.clone())
+            let sig =
+                interface_items(self.db, iface_id.interned()).iter().find_map(|item| {
+                    match item {
+                        AstInterfaceItem::Sig(sig)
+                            if sig.data.name.data == method
+                                && sig.data.receiver.is_static() == is_static
+                                && sig.data.args.len() == arity =>
+                        {
+                            Some(sig.clone())
+                        }
+                        _ => None,
                     }
-                    _ => None,
                 });
 
             if let Some(sig) = sig {
@@ -265,11 +218,8 @@ impl<'db> InferenceCtx<'db> {
         is_static: bool,
     ) -> ConstraintSolveResult {
         assert!(sig.data.receiver.is_static() == is_static);
-        let ref_args = implem
-            .templates
-            .iter()
-            .map(|a| self.infer_to_ref(a))
-            .collect::<Vec<_>>();
+        let ref_args =
+            implem.templates.iter().map(|a| self.infer_to_ref(a)).collect::<Vec<_>>();
         if ref_args.iter().any(|a| matches!(a, TypeRef::Error)) {
             return ConstraintSolveResult::Pending;
         }
@@ -281,11 +231,8 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Error(e);
         }
 
-        let method_id = FunctionId::new(
-            self.db,
-            method,
-            ScopeOwnerId::Interface(iface_ref),
-        );
+        let method_id =
+            FunctionId::new(self.db, method, ScopeOwnerId::Interface(iface_ref));
 
         let method_templates = implem
             .templates
@@ -308,16 +255,14 @@ impl<'db> InferenceCtx<'db> {
         )
         .unwrap();
 
-        let ret_ty = self
-            .allocate_ast_type_expr(&sig.data.return_type.data, &ctx)
-            .unwrap();
+        let ret_ty =
+            self.allocate_ast_type_expr(&sig.data.return_type.data, &ctx).unwrap();
         if let Err(e) = self.unify(ret_var.into(), ret_ty) {
             return ConstraintSolveResult::Error(e);
         }
 
         for (ast_arg, call_arg) in sig.data.args.iter().zip(args) {
-            let expected =
-                self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
+            let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
             if let Err(e) = self.unify(expected, call_arg.clone()) {
                 return ConstraintSolveResult::Error(e);
             }
@@ -343,9 +288,7 @@ impl<'db> InferenceCtx<'db> {
 
     fn get_working_impls(
         &mut self,
-        competing_impls: impl IntoIterator<
-            Item = (ImplSource<'db>, PotentialBlockRes),
-        >,
+        competing_impls: impl IntoIterator<Item = (ImplSource<'db>, PotentialBlockRes)>,
     ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
         let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
         if competing_impls.len() > 1 {
@@ -377,26 +320,16 @@ impl<'db> InferenceCtx<'db> {
         templates: &[InferTy],
     ) -> bool {
         let ty = self.find(ty);
-        let templates =
-            templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if !self.implements.contains_key(&id) {
             return false;
         }
-        for implem in self
-            .implements
-            .get(&id)
-            .unwrap()
-            .iter()
-            .cloned()
-            .collect::<Box<[_]>>()
-            .iter()
+        for implem in
+            self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>().iter()
         {
             let implem_ty = self.find(&implem.ty);
-            let implem_templates = implem
-                .templates
-                .iter()
-                .map(|t| self.find(t))
-                .collect::<Box<[_]>>();
+            let implem_templates =
+                implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
             if ty == implem_ty && templates == implem_templates {
                 return true;
             }
@@ -411,8 +344,7 @@ impl<'db> InferenceCtx<'db> {
         templates: &[InferTy],
     ) {
         let ty = self.find(&ty);
-        let templates =
-            templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+        let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if let Entry::Vacant(e) = self.implements.entry(id) {
             e.insert(HashSet::from_iter(once(InterfaceImplem {
                 interface: id,
@@ -430,11 +362,8 @@ impl<'db> InferenceCtx<'db> {
                 .iter()
             {
                 let implem_ty = self.find(&implem.ty);
-                let implem_templates = implem
-                    .templates
-                    .iter()
-                    .map(|t| self.find(t))
-                    .collect::<Box<[_]>>();
+                let implem_templates =
+                    implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
                 if ty == implem_ty && templates == implem_templates {
                     return;
                 }
@@ -532,51 +461,31 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
                     "BindsLike {{ty: {}, inner: {}, like: {}}}",
                     self.ctx.find_const(&InferTy::Var(*ty)).to_string(self.db),
                     inner.to_string(self.db),
-                    self.ctx
-                        .find_const(&InferTy::Var(*like))
-                        .to_string(self.db)
+                    self.ctx.find_const(&InferTy::Var(*like)).to_string(self.db)
                 )
             }
-            InferenceConstraintKind::IndexedBy {
-                elem_var,
-                base_ty,
-                index_ty,
-            } => {
+            InferenceConstraintKind::IndexedBy { elem_var, base_ty, index_ty } => {
                 write!(
                     f,
                     "IndexedBy {{elem_var: {}, base_ty: {}, index_ty: {}}}",
-                    self.ctx
-                        .find_const(&InferTy::Var(*elem_var))
-                        .to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*elem_var)).to_string(self.db),
                     self.ctx.find_const(base_ty).to_string(self.db),
                     self.ctx.find_const(index_ty).to_string(self.db)
                 )
             }
-            InferenceConstraintKind::Tuple {
-                elem_var,
-                tuple_ty,
-                has_index,
-            } => {
+            InferenceConstraintKind::Tuple { elem_var, tuple_ty, has_index } => {
                 write!(
                     f,
                     "Tuple {{elem_var: {}, tuple_ty: {}, has_index: {has_index}}}",
-                    self.ctx
-                        .find_const(&InferTy::Var(*elem_var))
-                        .to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*elem_var)).to_string(self.db),
                     self.ctx.find_const(tuple_ty).to_string(self.db),
                 )
             }
-            InferenceConstraintKind::StructField {
-                elem_var,
-                struct_ty,
-                field,
-            } => {
+            InferenceConstraintKind::StructField { elem_var, struct_ty, field } => {
                 write!(
                     f,
                     "StructField {{elem_var: {}, struct_ty: {}, field: {}}}",
-                    self.ctx
-                        .find_const(&InferTy::Var(*elem_var))
-                        .to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*elem_var)).to_string(self.db),
                     self.ctx.find_const(struct_ty).to_string(self.db),
                     field.display(self.db)
                 )
@@ -593,9 +502,7 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
                 write!(
                     f,
                     "Method {{ret_var: {}, ty: {}, id: ExprId({:?}), method: {}, args: [{}], interface_hint: {}, is_static: {is_static}}}",
-                    self.ctx
-                        .find_const(&InferTy::Var(*ret_var))
-                        .to_string(self.db),
+                    self.ctx.find_const(&InferTy::Var(*ret_var)).to_string(self.db),
                     self.ctx.find_const(ty).to_string(self.db),
                     id.0,
                     method.display(self.db),
@@ -647,10 +554,7 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
             InferenceConstraintKind::FatPtr { fat_ptr_var } => {
                 write!(f, "FatPtr {{ fat_ptr_var: {} }}", fat_ptr_var)
             }
-            InferenceConstraintKind::MetadataOfFatPtr {
-                fat_ptr_var,
-                metadata_var,
-            } => {
+            InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
                 write!(
                     f,
                     "MetadataOfFatPtr {{ fat_ptr_var: {}, metadata_var: {} }}",
@@ -696,11 +600,7 @@ impl InferenceConstraintKind {
                 .chain(ctx.find(&ty.into()).listeners())
                 .chain(ctx.find(&like.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::IndexedBy {
-                elem_var,
-                base_ty,
-                index_ty,
-            } => ctx
+            InferenceConstraintKind::IndexedBy { elem_var, base_ty, index_ty } => ctx
                 .find(base_ty)
                 .listeners()
                 .into_iter()
@@ -713,11 +613,7 @@ impl InferenceConstraintKind {
                 .into_iter()
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::StructField {
-                elem_var,
-                struct_ty,
-                ..
-            } => ctx
+            InferenceConstraintKind::StructField { elem_var, struct_ty, .. } => ctx
                 .find(struct_ty)
                 .listeners()
                 .into_iter()
@@ -749,9 +645,7 @@ impl InferenceConstraintKind {
                 .into_iter()
                 .chain(ctx.find(b).listeners())
                 .collect(),
-            InferenceConstraintKind::Binop {
-                res_ty, lhs_ty, rhs_ty, ..
-            } => lhs_ty
+            InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, .. } => lhs_ty
                 .listeners()
                 .into_iter()
                 .chain(rhs_ty.listeners())
@@ -769,15 +663,13 @@ impl InferenceConstraintKind {
             InferenceConstraintKind::FatPtr { fat_ptr_var } => {
                 ctx.find(&fat_ptr_var.into()).listeners()
             }
-            InferenceConstraintKind::MetadataOfFatPtr {
-                fat_ptr_var,
-                metadata_var,
-            } => ctx
-                .find(&fat_ptr_var.into())
-                .listeners()
-                .into_iter()
-                .chain(ctx.find(&metadata_var.into()).listeners())
-                .collect(),
+            InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
+                ctx.find(&fat_ptr_var.into())
+                    .listeners()
+                    .into_iter()
+                    .chain(ctx.find(&metadata_var.into()).listeners())
+                    .collect()
+            }
         }
     }
 }

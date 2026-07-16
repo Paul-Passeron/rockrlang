@@ -27,8 +27,7 @@ use crate::mir::{
     },
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
-        MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-        MIRRValueKind,
+        MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind,
     },
 };
 
@@ -75,9 +74,7 @@ impl MIRInitAnalysis {
     fn get_seed(&self, mir: &MIR) -> BlockMap<LocalMap<InitState>> {
         BlockMap::from([(
             mir.entry,
-            LocalMap::from_iter(
-                mir.parameters.iter().map(|loc| (*loc, InitState::Init)),
-            ),
+            LocalMap::from_iter(mir.parameters.iter().map(|loc| (*loc, InitState::Init))),
         )])
     }
 }
@@ -100,10 +97,7 @@ impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
 }
 
 impl MIRBasicBlock {
-    pub fn init_states(
-        &self,
-        state: &LocalMap<InitState>,
-    ) -> LocalMap<InitState> {
+    pub fn init_states(&self, state: &LocalMap<InitState>) -> LocalMap<InitState> {
         let mut res = state.clone();
         for stmt in &self.stmts {
             match stmt {
@@ -155,12 +149,8 @@ impl IterOperand for MIRRValue {
             | MIRRValueKind::UnaryOp(_, op)
             | MIRRValueKind::Metadata(op) => vec![op],
             MIRRValueKind::SizeOf(_) => vec![],
-            MIRRValueKind::Constructor { args, .. } => {
-                args.iter_each_operand().collect()
-            }
-            MIRRValueKind::StructLit { fields, .. } => {
-                fields.values().collect()
-            }
+            MIRRValueKind::Constructor { args, .. } => args.iter_each_operand().collect(),
+            MIRRValueKind::StructLit { fields, .. } => fields.values().collect(),
             MIRRValueKind::Tuple(ops, _) => ops.iter().collect(),
         }
         .into_iter()

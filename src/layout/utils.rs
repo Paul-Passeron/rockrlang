@@ -23,8 +23,8 @@ use std::{
 use crate::{
     Db,
     layout::{
-        AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData,
-        LayoutID, Offset, ScalarKind, Size, VariantsLayout,
+        AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData, LayoutID,
+        Offset, ScalarKind, Size, VariantsLayout,
     },
 };
 
@@ -130,12 +130,7 @@ impl LayoutID {
         self.interned().inner(db)
     }
 
-    pub fn new(
-        db: &dyn Db,
-        size: Size,
-        align: Align,
-        data: LayoutData,
-    ) -> Self {
+    pub fn new(db: &dyn Db, size: Size, align: Align, data: LayoutData) -> Self {
         Layout::new(db, size, align, data).into()
     }
 
@@ -206,12 +201,7 @@ impl LayoutID {
     }
 
     pub fn float(db: &dyn Db, width: FloatWidth) -> Self {
-        Self::new(
-            db,
-            width.into(),
-            width.into(),
-            ScalarKind::Float(width).into(),
-        )
+        Self::new(db, width.into(), width.into(), ScalarKind::Float(width).into())
     }
 
     pub fn ptr(db: &dyn Db) -> Self {
@@ -242,8 +232,7 @@ impl From<VariantsLayout> for LayoutData {
 
 impl AggregateLayout {
     pub fn source_field(&self, src_idx: u32) -> Option<(Offset, LayoutID)> {
-        let idx =
-            self.source_to_layout.iter().position(|idx| src_idx == *idx)?;
+        let idx = self.source_to_layout.iter().position(|idx| src_idx == *idx)?;
         Some(self.fields[idx])
     }
 }

@@ -20,8 +20,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     codegen::{
-        Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx,
-        mir_to_lir::build::MIRMap,
+        Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap,
     },
     layout::{LIRTy, layout_of},
     lir::{DefinedLinkage::Export, Module, Signature},
@@ -57,10 +56,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
     ) {
         let params = params
             .iter()
-            .map(|ty| LIRTy {
-                layout: layout_of(self.db, *ty),
-                origin: Some(*ty),
-            })
+            .map(|ty| LIRTy { layout: layout_of(self.db, *ty), origin: Some(*ty) })
             .collect_vec();
         let ret_layout = layout_of(self.db, ret_ty);
         let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
@@ -75,10 +71,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
             .func
             .params(self.db)
             .into_iter()
-            .map(|(_, ty)| LIRTy {
-                layout: layout_of(self.db, ty),
-                origin: Some(ty),
-            })
+            .map(|(_, ty)| LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) })
             .collect_vec();
         let ret_ty = mir.func.ret_ty(self.db);
         let ret_layout = layout_of(self.db, ret_ty);

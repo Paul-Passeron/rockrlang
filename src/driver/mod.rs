@@ -61,12 +61,8 @@ fn discover_dir(dir: &Path) -> Option<DiscoveredModule> {
             if let Some(m) = discover_dir(&entry_path) {
                 submodules.push(m);
             }
-        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr")
-        {
-            submodules.push(DiscoveredModule {
-                path: entry_path,
-                submodules: vec![],
-            });
+        } else if entry_path.extension().and_then(|e| e.to_str()) == Some("rkr") {
+            submodules.push(DiscoveredModule { path: entry_path, submodules: vec![] });
         }
     }
     Some(DiscoveredModule { path: main, submodules })

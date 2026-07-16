@@ -27,8 +27,8 @@ use crate::{
     },
     layout::LIRTy,
     lir::{
-        Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef,
-        ValueId, VerifyError,
+        Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef, ValueId,
+        VerifyError,
         finalized::{BlockData, FunctionBody, StackSlot},
         inst::{BlockTarget, ValueInstKind, VoidInstKind},
     },
@@ -190,11 +190,9 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
             Self::GetDiscriminant { ptr, ty } => {
                 ValueInstKind::GetDiscriminant { ptr: ptr.idx, ty }
             }
-            Self::IndexPtr { ptr, elem_ty, index } => ValueInstKind::IndexPtr {
-                ptr: ptr.idx,
-                elem_ty,
-                index: index.idx,
-            },
+            Self::IndexPtr { ptr, elem_ty, index } => {
+                ValueInstKind::IndexPtr { ptr: ptr.idx, elem_ty, index: index.idx }
+            }
             Self::MakeAggregate { ty, fields_in_src_order } => {
                 ValueInstKind::MakeAggregate {
                     ty,
@@ -251,24 +249,20 @@ impl<'ir> VoidInstKind<Branded<'ir>> {
 impl<'ir> Terminator<'ir> {
     pub fn finalize(self) -> FTerminator {
         match self {
-            Terminator::Goto(block_target) => {
-                FTerminator::Goto(block_target.finalize())
-            }
+            Terminator::Goto(block_target) => FTerminator::Goto(block_target.finalize()),
             Terminator::Br { cond, if_true, if_false } => FTerminator::Br {
                 cond: cond.idx,
                 if_true: if_true.finalize(),
                 if_false: if_false.finalize(),
             },
-            Terminator::Switch { on, branches, default } => {
-                FTerminator::Switch {
-                    on: on.idx,
-                    branches: branches
-                        .into_iter()
-                        .map(|(idx, target)| (idx, target.finalize()))
-                        .collect(),
-                    default: default.finalize(),
-                }
-            }
+            Terminator::Switch { on, branches, default } => FTerminator::Switch {
+                on: on.idx,
+                branches: branches
+                    .into_iter()
+                    .map(|(idx, target)| (idx, target.finalize()))
+                    .collect(),
+                default: default.finalize(),
+            },
             Terminator::Return(val) => FTerminator::Return(val.map(|v| v.idx)),
             Terminator::Diverge => FTerminator::Diverge,
         }

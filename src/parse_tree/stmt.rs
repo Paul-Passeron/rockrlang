@@ -54,44 +54,15 @@ pub struct AstMatchBranch {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstStmtDesc {
-    Return {
-        value: Option<AstExpr>,
-    },
-    If {
-        cond: AstExpr,
-        then: Box<AstStmt>,
-        else_: Option<Box<AstStmt>>,
-    },
-    While {
-        cond: AstExpr,
-        body: Box<AstStmt>,
-    },
-    For {
-        element: AstPattern,
-        iterator: AstExpr,
-        body: Box<AstStmt>,
-    },
-    LetDecl {
-        pat: AstPattern,
-        type_constraint: Option<AstAnyTypeExpr>,
-        value: AstExpr,
-    },
-    Block {
-        stmts: Vec<AstStmt>,
-    },
-    Assign {
-        lhs: AstExpr,
-        rhs: AstExpr,
-    },
-    CompoundAssign {
-        lhs: AstExpr,
-        op: CompoundAssignOp,
-        rhs: AstExpr,
-    },
-    Match {
-        scrutinee: AstExpr,
-        branches: Vec<AstMatchBranch>,
-    },
+    Return { value: Option<AstExpr> },
+    If { cond: AstExpr, then: Box<AstStmt>, else_: Option<Box<AstStmt>> },
+    While { cond: AstExpr, body: Box<AstStmt> },
+    For { element: AstPattern, iterator: AstExpr, body: Box<AstStmt> },
+    LetDecl { pat: AstPattern, type_constraint: Option<AstAnyTypeExpr>, value: AstExpr },
+    Block { stmts: Vec<AstStmt> },
+    Assign { lhs: AstExpr, rhs: AstExpr },
+    CompoundAssign { lhs: AstExpr, op: CompoundAssignOp, rhs: AstExpr },
+    Match { scrutinee: AstExpr, branches: Vec<AstMatchBranch> },
     Break,
     Expr(AstExpr),
     Defer(Box<AstStmt>),

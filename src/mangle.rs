@@ -66,32 +66,19 @@ pub struct MangleSig {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MangleFun {
     Extern(String), // An extern function should not be mangled
-    Method {
-        is_static: bool,
-        ty: MangleType,
-        sig: MangleSig,
-        templates: Vec<MangleType>,
-    },
-    Function {
-        path: Vec<String>,
-        sig: MangleSig,
-        templates: Vec<MangleType>,
-    },
+    Method { is_static: bool, ty: MangleType, sig: MangleSig, templates: Vec<MangleType> },
+    Function { path: Vec<String>, sig: MangleSig, templates: Vec<MangleType> },
 }
 
 #[salsa::tracked]
 fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     let fdef = *f.fdef(db);
-    let templates =
-        f.subs(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
+    let templates = f.subs(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
     let path = path_of_module(db, owning_module(db, fdef.parent(db)));
     let name = fdef.name(db).to_string(db);
     let inst: FuncInst = f.into();
-    let parameters = inst
-        .params(db)
-        .iter()
-        .map(|(_, ty)| ty_mangle(db, *ty).clone())
-        .collect_vec();
+    let parameters =
+        inst.params(db).iter().map(|(_, ty)| ty_mangle(db, *ty).clone()).collect_vec();
     let ret = ty_mangle(db, inst.ret_ty(db)).clone();
     let sig = MangleSig { name, parameters, ret };
     match function_ast(db, fdef.into()).inner(db) {
@@ -122,7 +109,6 @@ struct InternedTR {
 
 #[salsa::tracked]
 pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
-    
     match ty.tref(db) {
         TypeRef::Concrete(type_id) => mangle_type_id(db, *type_id),
         _ => MangleType::Error,
@@ -130,8 +116,7 @@ pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
 }
 
 fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
-    let args =
-        id.args(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
+    let args = id.args(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
     let (name, path) = match id.def(db) {
         TypeDefId::Builtin(id) => return mangle_builtin_id(db, id, args),
         TypeDefId::Struct(id) => {
@@ -245,8 +230,7 @@ impl MangleType {
                     .map(|s| mangle_ident(s))
                     .chain(std::iter::once(mangle_ident(name)))
                     .collect();
-                let params: String =
-                    parameters.iter().map(Self::mangle).collect();
+                let params: String = parameters.iter().map(Self::mangle).collect();
                 format!("N{idents}E{params}E")
             }
             MangleType::Never => "z".to_string(),
@@ -258,8 +242,7 @@ impl MangleType {
 impl MangleSig {
     // <name-ident> <param-types...> E <ret-type>
     pub fn mangle(&self) -> String {
-        let params: String =
-            self.parameters.iter().map(MangleType::mangle).collect();
+        let params: String = self.parameters.iter().map(MangleType::mangle).collect();
         format!("{}{}E{}", mangle_ident(&self.name), params, self.ret.mangle())
     }
 }
@@ -270,14 +253,12 @@ impl MangleFun {
             MangleFun::Extern(name) => name.clone(),
             MangleFun::Method { is_static, ty, sig, templates } => {
                 let kind = if *is_static { 's' } else { 'm' };
-                let tpls: String =
-                    templates.iter().map(MangleType::mangle).collect();
+                let tpls: String = templates.iter().map(MangleType::mangle).collect();
                 format!("_ZM{kind}{}{}G{tpls}E", ty.mangle(), sig.mangle())
             }
             MangleFun::Function { path, sig, templates } => {
                 let p: String = path.iter().map(|s| mangle_ident(s)).collect();
-                let tpls: String =
-                    templates.iter().map(MangleType::mangle).collect();
+                let tpls: String = templates.iter().map(MangleType::mangle).collect();
                 format!("_ZF{p}E{}G{tpls}E", sig.mangle())
             }
         }

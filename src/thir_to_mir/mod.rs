@@ -27,9 +27,7 @@ use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
-    compiler::{
-        Workspace, diagnostic::Diag, get_sig_of_function, workspace_packages,
-    },
+    compiler::{Workspace, diagnostic::Diag, get_sig_of_function, workspace_packages},
     hir::{Mutability, function_ast},
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
@@ -41,17 +39,16 @@ use crate::{
         },
     },
     name_resolve::{
-        core_package, file_module_id, std_package,
-        type_expr::get_templates_of_fun,
+        core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
     },
     ril::{
-        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
-        bool_id, char_id, int_id, never_id, str_def, str_id, usize_id, void_id,
+        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id,
+        char_id, int_id, never_id, str_def, str_id, usize_id, void_id,
     },
     thir::{
-        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId,
-        Projection, ScopeId, StructRef, Thir, ThirConstructorArgs,
-        ThirExprWithSetup, ThirMatchBranch,
+        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
+        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},
         thir_body,
     },
@@ -104,19 +101,14 @@ impl FuncInst {
     }
 
     pub fn from_funcref(db: &dyn Db, fref: FunctionRef) -> Self {
-        assert_eq!(
-            get_templates_of_fun(db, fref.id.interned()).len(),
-            fref.args.len()
-        );
+        assert_eq!(get_templates_of_fun(db, fref.id.interned()).len(), fref.args.len());
         MIRKey::new(db, fref.id, fref.args).into()
     }
 
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         let ret_ty = match sig.ret {
-            TypeRef::Zelf => {
-                self.fdef(db).parent(db).get_canonical_zelf(db).unwrap()
-            }
+            TypeRef::Zelf => self.fdef(db).parent(db).get_canonical_zelf(db).unwrap(),
             ret => ret,
         };
         ret_ty.with_substitution(db, self.subs(db))
@@ -174,8 +166,7 @@ impl FuncInst {
             main_pkg = Some(*pkg);
         }
         let main_pkg = main_pkg.unwrap();
-        let file_module =
-            file_module_id(db, *main_pkg.root(db), None, main_pkg);
+        let file_module = file_module_id(db, *main_pkg.root(db), None, main_pkg);
         let f_id = FunctionId::new(
             db,
             Symbol::new(db, "main"),
@@ -266,9 +257,10 @@ impl<'a> ThirToMIR<'a> {
             let ty = self.ty(local.ty);
             let mut mir = MIRLocal::new(ty, local.mutability, local.span);
             if let Some(src) = &local.source {
-                mir = mir.with_name(src.1).with_thir_src(thir_id).with_syn_src(
-                    SyntacticSource { span: local.span, id: src.0 },
-                )
+                mir = mir
+                    .with_name(src.1)
+                    .with_thir_src(thir_id)
+                    .with_syn_src(SyntacticSource { span: local.span, id: src.0 })
             }
             let mir_id = self.builder.new_local(mir);
 
@@ -337,10 +329,8 @@ impl<'a> ThirToMIR<'a> {
             }
             StmtKind::Let { local, init } => {
                 let mir_local = self.local_map[local];
-                let dest = self.place_of_local(
-                    mir_local,
-                    self.builder.locals[mir_local].span,
-                );
+                let dest =
+                    self.place_of_local(mir_local, self.builder.locals[mir_local].span);
                 let rvalue = self.build_rvalue(*init);
                 self.assign(dest, rvalue);
             }
@@ -394,11 +384,9 @@ impl<'a> ThirToMIR<'a> {
             return place;
         }
         let ty = self.ty(operand.ty(self.db));
-        let as_rvalue =
-            MIRRValue { kind: MIRRValueKind::Use(operand), ty, span };
+        let as_rvalue = MIRRValue { kind: MIRRValueKind::Use(operand), ty, span };
         let place = self.synthetic_place(ty, span);
-        self.builder
-            .emit(Stmt::Assign { dest: place.clone(), rvalue: as_rvalue });
+        self.builder.emit(Stmt::Assign { dest: place.clone(), rvalue: as_rvalue });
         place
     }
 
@@ -439,14 +427,8 @@ impl<'a> ThirToMIR<'a> {
         }
     }
 
-    fn build_projections(
-        &mut self,
-        projections: &[Projection],
-    ) -> Vec<MIRProjection> {
-        projections
-            .iter()
-            .map(|projection| self.build_projection(*projection))
-            .collect()
+    fn build_projections(&mut self, projections: &[Projection]) -> Vec<MIRProjection> {
+        projections.iter().map(|projection| self.build_projection(*projection)).collect()
     }
 
     fn build_place(&mut self, place: PlaceId) -> MIRPlace {
@@ -459,11 +441,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn move_or_copy(&self, place: MIRPlace) -> MIROperand {
-        if place.ty.is_copy(self.db) {
-            place.into_copy()
-        } else {
-            place.into_move()
-        }
+        if place.ty.is_copy(self.db) { place.into_copy() } else { place.into_move() }
     }
 
     fn struct_ref(&mut self, struct_ref: &StructRef) -> StructRef {
@@ -481,18 +459,13 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn get_str_struct_ref(&self) -> StructRef {
-        let TypeDefId::Struct(str_def) = str_def(self.db) else {
-            unreachable!()
-        };
+        let TypeDefId::Struct(str_def) = str_def(self.db) else { unreachable!() };
         StructRef { def: str_def, args: vec![] }
     }
 
     fn build_strlit(&mut self, strlit: &str, span: Span) -> MIRRValueKind {
         let data = MIROperand::Constant(
-            MIRConstant::CString {
-                contents: strlit.into(),
-                null_terminated: false,
-            },
+            MIRConstant::CString { contents: strlit.into(), null_terminated: false },
             span,
         );
         let str_ty: TypeRef = str_id(self.db).into();
@@ -502,10 +475,7 @@ impl<'a> ThirToMIR<'a> {
             .expect("str has a len field");
 
         let len = MIROperand::Constant(
-            MIRConstant::Integer {
-                value: strlit.len() as u128,
-                ty: len_field_ty,
-            },
+            MIRConstant::Integer { value: strlit.len() as u128, ty: len_field_ty },
             span,
         );
 
@@ -532,14 +502,12 @@ impl<'a> ThirToMIR<'a> {
                 let fields = self.build_fields(thir_fields);
                 MIRRValueKind::StructLit { struct_ref, fields, span }
             }
-            ExprKind::Constructor { enum_def, idx, args } => {
-                MIRRValueKind::Constructor {
-                    enum_ref: self.enum_ref(enum_def),
-                    idx: *idx,
-                    args: self.build_constructor_args(args),
-                    span,
-                }
-            }
+            ExprKind::Constructor { enum_def, idx, args } => MIRRValueKind::Constructor {
+                enum_ref: self.enum_ref(enum_def),
+                idx: *idx,
+                args: self.build_constructor_args(args),
+                span,
+            },
             ExprKind::Use(place) => {
                 let place = self.build_place(*place);
                 MIRRValueKind::Use(self.move_or_copy(place))
@@ -568,10 +536,7 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::UnaryOp(UnaryOperator::LNot, operand)
             }
             ExprKind::Tuple(exprs) => MIRRValueKind::Tuple(
-                exprs
-                    .iter()
-                    .map(|expr| self.build_operand(*expr))
-                    .collect_vec(),
+                exprs.iter().map(|expr| self.build_operand(*expr)).collect_vec(),
                 span,
             ),
             ExprKind::SizeOf(ty) => MIRRValueKind::SizeOf(self.ty(*ty)),
@@ -584,20 +549,13 @@ impl<'a> ThirToMIR<'a> {
                 let struct_ref = tref.as_struct_ref(self.db).unwrap();
 
                 let data = MIROperand::Constant(
-                    MIRConstant::CString {
-                        contents: name,
-                        null_terminated: false,
-                    },
+                    MIRConstant::CString { contents: name, null_terminated: false },
                     span,
                 );
                 let len_symb = Symbol::new(self.db, "len");
-                let len_ty =
-                    struct_ref.typeof_field(self.db, len_symb).unwrap();
+                let len_ty = struct_ref.typeof_field(self.db, len_symb).unwrap();
                 let len = MIROperand::Constant(
-                    MIRConstant::Integer {
-                        value: name_len as u128,
-                        ty: len_ty,
-                    },
+                    MIRConstant::Integer { value: name_len as u128, ty: len_ty },
                     span,
                 );
                 MIRRValueKind::StructLit {
@@ -613,9 +571,8 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             ExprKind::Cast(expr, ty) => {
-                let as_ptr_like = |ty: TypeRef| {
-                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db))
-                };
+                let as_ptr_like =
+                    |ty: TypeRef| ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db));
                 if let Some((muta, _)) = as_ptr_like(*ty) {
                     let expr_val = &self.thir.exprs[*expr];
                     let expr_ty = expr_val.ty;
@@ -640,10 +597,7 @@ impl<'a> ThirToMIR<'a> {
                 panic!("Can only produce MIR of error-less THIR")
             }
             _ => {
-                unreachable!(
-                    "Unhandled expression at {}",
-                    span.start().loc_info(self.db)
-                )
+                unreachable!("Unhandled expression at {}", span.start().loc_info(self.db))
             }
         };
         MIRRValue { kind, ty, span }
@@ -668,10 +622,7 @@ impl<'a> ThirToMIR<'a> {
     ) -> MIRConstructorArgs {
         match args {
             ThirConstructorArgs::Tuple(exprs) => MIRConstructorArgs::Tuple(
-                exprs
-                    .iter()
-                    .map(|expr| self.build_operand(*expr))
-                    .collect_vec(),
+                exprs.iter().map(|expr| self.build_operand(*expr)).collect_vec(),
             ),
             ThirConstructorArgs::Struct(fields) => {
                 MIRConstructorArgs::Struct(self.build_fields(fields))
@@ -688,13 +639,9 @@ impl<'a> ThirToMIR<'a> {
         span: Span,
     ) -> MIRLocalID {
         let called = called.concretize(self.db, self.subs);
-        assert!(!matches!(
-            called.id.parent(self.db),
-            ScopeOwnerId::Interface(_)
-        ));
+        assert!(!matches!(called.id.parent(self.db), ScopeOwnerId::Interface(_)));
         let callee = MIRCallee::Direct(called);
-        let args =
-            args.iter().map(|arg| self.build_operand(*arg)).collect_vec();
+        let args = args.iter().map(|arg| self.build_operand(*arg)).collect_vec();
         let next_bb = self.builder.new_block(None);
         let local = self.synthetic_local(ret_ty, span);
         self.build_terminator(MIRTerminator::Call {
@@ -797,29 +744,18 @@ impl<'a> ThirToMIR<'a> {
         self.switch_to(merge_bb);
     }
 
-    fn build_expr_with_setup(
-        &mut self,
-        expr: &ThirExprWithSetup,
-    ) -> MIROperand {
+    fn build_expr_with_setup(&mut self, expr: &ThirExprWithSetup) -> MIROperand {
         self.build_stmts(&expr.stmts);
         self.build_operand(expr.expr)
     }
 
-    fn build_rvalue_or_place(
-        &mut self,
-        expr: ExprId,
-    ) -> Either<MIRRValue, MIRPlace> {
+    fn build_rvalue_or_place(&mut self, expr: ExprId) -> Either<MIRRValue, MIRPlace> {
         let thir_expr = &self.thir.exprs[expr];
         match &thir_expr.kind {
             ExprKind::Use(place) => Either::Right(self.build_place(*place)),
             ExprKind::Call { called, args } => {
                 let ret_ty = self.ty(thir_expr.ty);
-                let local = self.build_call(
-                    called.clone(),
-                    args,
-                    ret_ty,
-                    thir_expr.span,
-                );
+                let local = self.build_call(called.clone(), args, ret_ty, thir_expr.span);
                 Either::Right(self.place_of_local(local, thir_expr.span))
             }
             _ => Either::Left(self.build_rvalue(expr)),
@@ -915,9 +851,7 @@ impl<'a> ThirToMIR<'a> {
         }
 
         self.builder
-            .finalize(
-                MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into(),
-            )
+            .finalize(MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into())
             .expect("Something went wrong finalizing the builder")
     }
 }

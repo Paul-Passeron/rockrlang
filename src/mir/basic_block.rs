@@ -82,10 +82,7 @@ impl MIRBasicBlock {
         Self::empty_with_terminator(name, Terminator::Diverge)
     }
 
-    pub fn empty_with_terminator(
-        name: Option<String>,
-        terminator: Terminator,
-    ) -> Self {
+    pub fn empty_with_terminator(name: Option<String>, terminator: Terminator) -> Self {
         Self { stmts: vec![], terminator, name }
     }
 }
@@ -136,9 +133,7 @@ impl MIRTerminator {
 
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => {
-                HashSet::new()
-            }
+            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => HashSet::new(),
             MIRTerminator::Call { arguments, .. } => {
                 arguments.iter().flat_map(|op| op.uses()).collect()
             }

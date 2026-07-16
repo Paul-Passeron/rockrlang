@@ -40,14 +40,8 @@ pub trait CGState<'db>: Sized {
     type Out;
 }
 
-pub struct MIRToLIRDeclare<'db, 'ctx>(
-    PhantomData<&'db ()>,
-    PhantomData<&'ctx ()>,
-);
-pub struct MIRToLIRBuild<'db, 'ctx>(
-    PhantomData<&'db ()>,
-    PhantomData<&'ctx ()>,
-);
+pub struct MIRToLIRDeclare<'db, 'ctx>(PhantomData<&'db ()>, PhantomData<&'ctx ()>);
+pub struct MIRToLIRBuild<'db, 'ctx>(PhantomData<&'db ()>, PhantomData<&'ctx ()>);
 pub struct LIRToLLVM<'db, 'ctx>(PhantomData<&'db ()>, PhantomData<&'ctx ()>);
 
 impl<'db, 'ctx> CGState<'db> for MIRToLIRDeclare<'db, 'ctx> {

@@ -68,15 +68,8 @@ pub enum ScalarKind {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Discriminant {
     None,
-    Tagged {
-        offset: Offset,
-        kind: IntWidth,
-    },
-    Niche {
-        offset: Offset,
-        variant: LayoutID,
-        valid_range: RangeInclusive<u128>,
-    },
+    Tagged { offset: Offset, kind: IntWidth },
+    Niche { offset: Offset, variant: LayoutID, valid_range: RangeInclusive<u128> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -157,19 +150,13 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
             TypeDefId::Struct(struct_id) => {
                 struct_layout(db, struct_id, type_id.args(db)).into()
             }
-            TypeDefId::Enum(enum_id) => {
-                enum_layout(db, enum_id, type_id.args(db)).into()
-            }
+            TypeDefId::Enum(enum_id) => enum_layout(db, enum_id, type_id.args(db)).into(),
         },
         _ => panic!("Expected a concrete type but got {}", ty.to_string(db)),
     }
 }
 
-fn builtin_layout(
-    db: &dyn Db,
-    builtin_id: BuiltinTypeId,
-    args: &[TypeRef],
-) -> LayoutID {
+fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> LayoutID {
     if builtin_id == BuiltinTypeId::tuple(db) {
         if args.is_empty() {
             return LayoutID::zst(db);
@@ -203,14 +190,8 @@ fn builtin_layout(
         let inner_layout = layout_of(db, args[0]);
 
         // Horrible :(
-        let length: usize = args[1]
-            .as_type_id()
-            .unwrap()
-            .def(db)
-            .name(db)
-            .to_string(db)
-            .parse()
-            .unwrap();
+        let length: usize =
+            args[1].as_type_id().unwrap().def(db).name(db).to_string(db).parse().unwrap();
 
         let align = inner_layout.align(db);
 
@@ -221,10 +202,7 @@ fn builtin_layout(
                 .into_iter()
                 .map(|i| (Offset::ZERO + element_size * i as u64, inner_layout))
                 .collect(),
-            source_to_layout: (0..length)
-                .into_iter()
-                .map(|i| i as u32)
-                .collect_vec(),
+            source_to_layout: (0..length).into_iter().map(|i| i as u32).collect_vec(),
         });
 
         LayoutID::new(db, element_size * length as u64, align, data)

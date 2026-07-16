@@ -18,8 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::HashMap, io};
 
 use codespan_reporting::diagnostic::{
-    Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle,
-    Severity as CrSeverity,
+    Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle, Severity as CrSeverity,
 };
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
@@ -51,8 +50,7 @@ pub fn _render_diagnostics<'a, W: WriteColor>(
     for diag in diags {
         let cr = build_diagnostic(db, diag, &mut files, &mut file_ids);
 
-        term::emit_to_write_style(out, &config, &files, &cr)
-            .map_err(io_error)?;
+        term::emit_to_write_style(out, &config, &files, &cr).map_err(io_error)?;
     }
 
     Ok(())
@@ -64,19 +62,12 @@ fn build_diagnostic<'db>(
     files: &mut SimpleFiles<String, &'db str>,
     file_ids: &mut HashMap<SourceFile, usize>,
 ) -> CrDiagnostic<usize> {
-    let primary = label_for(
-        db,
-        diag.primary.clone(),
-        LabelStyle::Primary,
-        files,
-        file_ids,
-    );
+    let primary =
+        label_for(db, diag.primary.clone(), LabelStyle::Primary, files, file_ids);
     let secondary: Vec<_> = diag
         .secondary
         .iter()
-        .map(|l| {
-            label_for(db, l.clone(), LabelStyle::Secondary, files, file_ids)
-        })
+        .map(|l| label_for(db, l.clone(), LabelStyle::Secondary, files, file_ids))
         .collect();
 
     let mut labels = Vec::with_capacity(1 + secondary.len());

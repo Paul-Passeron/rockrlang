@@ -74,9 +74,7 @@ impl dyn Db {
         path: PathBuf,
         text: String,
     ) -> Result<SourceFile, CompilerError> {
-        let path = path
-            .canonicalize()
-            .map_err(|_| CompilerError::NoFileFoundAt(path))?;
+        let path = path.canonicalize().map_err(|_| CompilerError::NoFileFoundAt(path))?;
         if let Some(existing) = self.get_ref_files().get(&path) {
             return Ok(*existing); // We do not change the contents here. If that's the intent use this in cunjunction with set_source_file_text.
         }

@@ -32,13 +32,10 @@ pub mod interfaces;
 pub mod type_expr;
 
 #[salsa::tracked(returns(copy))]
-pub fn module_to_file<'db>(
-    db: &'db dyn Db,
-    module: InternedModuleId<'db>,
-) -> SourceFile {
-    module.file(db).unwrap_or_else(|| {
-        module_to_file(db, module.parent(db).unwrap().interned())
-    })
+pub fn module_to_file<'db>(db: &'db dyn Db, module: InternedModuleId<'db>) -> SourceFile {
+    module
+        .file(db)
+        .unwrap_or_else(|| module_to_file(db, module.parent(db).unwrap().interned()))
 }
 
 #[salsa::tracked(returns(copy))]
@@ -81,13 +78,7 @@ pub fn root_module<'db>(
 ) -> ModuleId {
     let file = file_module.file(db);
     let full_name = if file.path(db).file_name().unwrap() == "main.rkr" {
-        file.path(db)
-            .parent()
-            .unwrap()
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
+        file.path(db).parent().unwrap().file_name().unwrap().to_string_lossy().to_string()
     } else {
         file.path(db)
             .with_extension("")
@@ -123,32 +114,27 @@ pub fn module_items<'db>(
         }
         return Some(ast.items(db).clone());
     }
-    module.parent(db).and_then(|parent| {
-        match module_items(db, parent.interned()) {
-            Some(parent_ast) => {
-                parent_ast.iter().find_map(|item| match &item.data {
-                    AstTopLevelItemDesc::Module(module_ast) => {
-                        if module_ast.data.name.data == *module.name(db) {
-                            Some(module_ast.data.items.clone())
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None,
-                })
-            }
-            None => {
-                let file = module_to_file(db, module);
-                let ast: Ast<'db> = parse_file(db, file);
-                let parse_errors: Vec<&ParseError> =
-                    parse_file::accumulated::<ParseError>(db, file);
-                for err in parse_errors {
-                    let span = Span::new(err.file, err.start, err.end);
-                    Diag::generic_error(format!("{:?}", err.kind), span)
-                        .accumulate(db);
+    module.parent(db).and_then(|parent| match module_items(db, parent.interned()) {
+        Some(parent_ast) => parent_ast.iter().find_map(|item| match &item.data {
+            AstTopLevelItemDesc::Module(module_ast) => {
+                if module_ast.data.name.data == *module.name(db) {
+                    Some(module_ast.data.items.clone())
+                } else {
+                    None
                 }
-                Some(ast.items(db).clone())
             }
+            _ => None,
+        }),
+        None => {
+            let file = module_to_file(db, module);
+            let ast: Ast<'db> = parse_file(db, file);
+            let parse_errors: Vec<&ParseError> =
+                parse_file::accumulated::<ParseError>(db, file);
+            for err in parse_errors {
+                let span = Span::new(err.file, err.start, err.end);
+                Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
+            }
+            Some(ast.items(db).clone())
         }
     })
 }
@@ -232,31 +218,16 @@ fn collect_modules_in_items<'db>(
                 Some(package),
             );
             set.insert(child_id);
-            collect_modules_in_items(
-                db,
-                &module_ast.data.items,
-                child_id,
-                package,
-                set,
-            );
+            collect_modules_in_items(db, &module_ast.data.items, child_id, package, set);
         }
     }
 }
 
 #[salsa::tracked]
-pub fn modules_in_package<'db>(
-    db: &'db dyn Db,
-    package: Package<'db>,
-) -> Set<ModuleId> {
+pub fn modules_in_package<'db>(db: &'db dyn Db, package: Package<'db>) -> Set<ModuleId> {
     let root_id = file_module_id(db, *package.root(db), None, package);
 
     let mut set = Set::new();
-    collect_modules_in_file_module(
-        db,
-        *package.root(db),
-        root_id,
-        package,
-        &mut set,
-    );
+    collect_modules_in_file_module(db, *package.root(db), root_id, package, &mut set);
     set
 }

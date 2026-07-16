@@ -58,8 +58,7 @@ fn _type_match(
                 return false;
             }
             a_args.iter().zip(b_args).all(|(a, b)| {
-                a.as_type_id()
-                    .is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
+                a.as_type_id().is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
             })
         }
         TypeRef::Param(id) => match constraints.get(&id.0) {
@@ -130,19 +129,13 @@ pub fn candidate_impls_for(db: &dyn Db, ty: TypeId) -> &[CandidateImpl] {
     _candidate_impls_for(db, ty.into())
 }
 
-fn impl_bounds_hold(
-    db: &dyn Db,
-    id: ImplId,
-    subs: &[TypeId],
-    zelf: TypeId,
-) -> bool {
+fn impl_bounds_hold(db: &dyn Db, id: ImplId, subs: &[TypeId], zelf: TypeId) -> bool {
     let templs = id.templates(db);
     debug_assert_eq!(subs.len(), templs.len());
     let sub_refs = subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
     templs.iter().zip(subs).all(|(interfaces, ty)| {
         interfaces.iter().all(|interface| {
-            let bound =
-                iref_sub(db, *interface, &sub_refs, TypeRef::Concrete(zelf));
+            let bound = iref_sub(db, *interface, &sub_refs, TypeRef::Concrete(zelf));
             type_implements(db, *ty, bound).is_some()
         })
     })
@@ -214,10 +207,7 @@ pub fn type_implements(
 ) -> Option<ImplId> {
     debug_assert!(
         type_id_is_concrete(db, ty)
-            && interface
-                .args(db)
-                .iter()
-                .all(|arg| type_ref_is_concrete(db, *arg)),
+            && interface.args(db).iter().all(|arg| type_ref_is_concrete(db, *arg)),
         "type_implements called with a non-concrete key"
     );
     _type_implements(db, ty.into(), interface.into())
@@ -243,28 +233,26 @@ fn _method_impl_for<'db>(
             }
         }
 
-        let subs: Option<Vec<TypeId>> =
-            candidate.subs.iter().copied().collect();
+        let subs: Option<Vec<TypeId>> = candidate.subs.iter().copied().collect();
         let subs = subs?;
         if !impl_bounds_hold(db, id, &subs, self_ty) {
             return None;
         }
-        let fid =
-            impl_items(db, id.into()).iter().find_map(|item| match item {
-                AstImplItem::Fundef(ast) => {
-                    if ast.data.name.data != method {
-                        return None;
-                    }
-                    if ast.data.receiver.is_static() != is_static {
-                        return None;
-                    }
-                    if ast.data.args.len() != arity {
-                        return None;
-                    }
-                    Some(FunctionId::new(db, method, ScopeOwnerId::Impl(id)))
+        let fid = impl_items(db, id.into()).iter().find_map(|item| match item {
+            AstImplItem::Fundef(ast) => {
+                if ast.data.name.data != method {
+                    return None;
                 }
-                _ => None,
-            })?;
+                if ast.data.receiver.is_static() != is_static {
+                    return None;
+                }
+                if ast.data.args.len() != arity {
+                    return None;
+                }
+                Some(FunctionId::new(db, method, ScopeOwnerId::Impl(id)))
+            }
+            _ => None,
+        })?;
         Some(MethodImpl { impl_id: id, method_id: fid, subs })
     })
 }
@@ -288,8 +276,7 @@ pub fn method_impl_for(
         type_id_is_concrete(db, ty),
         "method_impl_for called with a non-concrete key"
     );
-    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint)
-        .as_ref()
+    _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint).as_ref()
 }
 
 fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
@@ -297,11 +284,7 @@ fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
         TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
             db,
             type_id.def(db),
-            type_id
-                .args(db)
-                .iter()
-                .map(|ty| sub(db, *ty, subs, zelf))
-                .collect(),
+            type_id.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
         )),
         TypeRef::Param(id) => subs[id.0],
         TypeRef::Associated(_) => todo!(),

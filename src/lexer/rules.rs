@@ -103,10 +103,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
             |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
-                    kind: TokenKind::Hashed(Symbol::new(
-                        db,
-                        String::from(&lexeme[1..]),
-                    )),
+                    kind: TokenKind::Hashed(Symbol::new(db, String::from(&lexeme[1..]))),
                 })
             },
         ),
@@ -154,10 +151,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                         "true" => TokenKind::True,
                         "false" => TokenKind::False,
                         "as" => TokenKind::As,
-                        _ => TokenKind::Identifier(Symbol::new(
-                            db,
-                            String::from(lexeme),
-                        )),
+                        _ => TokenKind::Identifier(Symbol::new(db, String::from(lexeme))),
                     },
                 })
             },
@@ -175,21 +169,16 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 })
             },
         ),
-        (
-            Regex::new(r#"'(\\.|[^'\\])*'"#).unwrap(),
-            |_, lexeme: &str, location: Span| {
-                let len = lexeme.len();
-                Ok(Token {
-                    location,
-                    kind: TokenKind::CharLit(
-                        rustc_literal_escaper::unescape_char(
-                            &lexeme[1..len - 1],
-                        )
+        (Regex::new(r#"'(\\.|[^'\\])*'"#).unwrap(), |_, lexeme: &str, location: Span| {
+            let len = lexeme.len();
+            Ok(Token {
+                location,
+                kind: TokenKind::CharLit(
+                    rustc_literal_escaper::unescape_char(&lexeme[1..len - 1])
                         .map_err(|_| todo!())?,
-                    ),
-                })
-            },
-        ),
+                ),
+            })
+        }),
         (Regex::new("[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
             Ok(Token {
                 location,
