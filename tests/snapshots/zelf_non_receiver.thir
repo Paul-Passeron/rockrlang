@@ -27,7 +27,7 @@ thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&self): void {
 }
 
 examples/zelf_non_receiver.rkr:14:5
-thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(self, other: Self): Self {
+thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(self, other: zelf_non_receiver::Foo): zelf_non_receiver::Foo {
     return <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&self, &other);
 }
 
@@ -37,12 +37,12 @@ thir fun zelf_non_receiver::sum_twice<T0: zelf_non_receiver::Addable>(a: &T0): T
 }
 
 examples/zelf_non_receiver.rkr:28:5
-thir fun zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&self, other: &Self): Self {
+thir fun zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&self, other: &zelf_non_receiver::Foo): zelf_non_receiver::Foo {
     return zelf_non_receiver::Foo { x: ((*self).x + (*other).x), y: ((*self).y + (*other).y) };
 }
 
 examples/zelf_non_receiver.rkr:37:5
-thir fun zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double<T0: zelf_non_receiver::Addable>(&self): Self {
+thir fun zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double<T0: zelf_non_receiver::Addable>(&self): T0 {
     return zelf_non_receiver::sum_twice::<T0>(self);
 }
 

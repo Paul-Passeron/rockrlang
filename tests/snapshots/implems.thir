@@ -17,7 +17,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/implems.rkr:17:5
-thir fun implems::`impl implems::First`::fst(): Self {
+thir fun implems::`impl implems::First`::fst(): implems::First {
     return implems::First { x: 69 };
 }
 
@@ -51,7 +51,7 @@ thir fun implems::theStatic<T0: implems::Foo>(): void {
 }
 
 examples/implems.rkr:49:5
-thir fun implems::`impl <T0>implems::Hello<T0>`::new<T0>(x: T0): Self {
+thir fun implems::`impl <T0>implems::Hello<T0>`::new<T0>(x: T0): implems::Hello<T0> {
     return implems::Hello::<T0> { x: x };
 }
 

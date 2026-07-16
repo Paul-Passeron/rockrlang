@@ -17,7 +17,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/typestates.rkr:20:5
-thir fun typestates::`impl typestates::Foo<typestates::A>`::new(): Self {
+thir fun typestates::`impl typestates::Foo<typestates::A>`::new(): typestates::Foo<typestates::A> {
     return typestates::Foo::<typestates::A> { _phantom: typestates::PhantomData::<typestates::A> {} };
 }
 
