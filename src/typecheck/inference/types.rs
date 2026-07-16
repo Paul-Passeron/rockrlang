@@ -18,13 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
-    hir::{PartialTypeArg, PartialTypeRef},
-    name_resolve::type_expr::struct_item,
-    parse_tree::type_expr::AstTypeExprDesc,
-    ril::{BuiltinTypeId, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def},
-    typecheck::inference::{
+    Db, common::symbols::Symbol, hir::{Mutability, PartialTypeArg, PartialTypeRef}, name_resolve::type_expr::struct_item, parse_tree::type_expr::AstTypeExprDesc, ril::{BuiltinTypeId, PtrKind, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def}, typecheck::inference::{
         InferTy, InferenceCtx,
         implicit::{AsAstImplCtx, ImplicitContext},
     },
@@ -306,6 +300,24 @@ impl<'db> InferenceCtx<'db> {
             }
         } else {
             None
+        }
+    }
+}
+
+
+impl InferTy {
+    pub fn ptr_like<'db>(&self, db: &'db dyn Db) -> Option<(Mutability, &InferTy)> {
+        self.as_adt().and_then(|(def, vals)| {
+            let kind = def.is_ptr_like(db)?;
+            Some((kind.mutability(), &vals[0]))
+        })
+    }
+}
+
+impl PtrKind {
+    pub fn mutability(&self) -> Mutability {
+        match self {
+            PtrKind::Ref(m) | PtrKind::RawPtr(m) => *m,
         }
     }
 }

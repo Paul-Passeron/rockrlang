@@ -200,13 +200,9 @@ impl<'db> InferenceCtx<'db> {
                     ret_var, args, is_static,
                 ));
             }
-            match cur.as_ref(self.db) {
-                Some((_, inner)) => {
-                    cur = inner.clone();
-                    depth += 1;
-                }
-                None => return None,
-            }
+            let (_, inner) = cur.ptr_like(self.db)?;
+            cur = inner.clone();
+            depth += 1;
         }
     }
 

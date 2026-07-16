@@ -26,7 +26,7 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     ril::{EnumId, ScopeOwnerId, StructId, TypeDefId},
-    typecheck::inference::implicit::AstImplicitContext,
+    typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
 pub fn check_typedef(db: &dyn Db, typedef: TypeDefId) {

@@ -322,7 +322,11 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Pointer { mutable, pointee } => {
-                let inner = self.resolve_holed_ty(pointee, module);
+                let inner = pointee
+                    .as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    });
                 self.wrap_builtin_unary(
                     if *mutable {
                         BuiltinTypeId::mut_ptr(self.db)
@@ -334,7 +338,11 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Ref { mutable, pointee } => {
-                let inner = self.resolve_holed_ty(pointee, module);
+                let inner = pointee
+                    .as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    });
                 self.wrap_builtin_unary(
                     if *mutable {
                         BuiltinTypeId::mut_ref(self.db)
@@ -346,19 +354,24 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Slice { ty, len: _ } => {
-                let inner = self.resolve_holed_ty(ty, module);
+                let inner = ty
+                    .as_known()
+                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
+                        self.resolve_holed(&ty)
+                    });
                 self.wrap_builtin_unary(BuiltinTypeId::slice(self.db), inner)
             }
 
             AstTypeExprDesc::Tuple(tys) => {
                 if tys.len() == 1 {
-                    self.resolve_holed(&tys[0])
+                    tys[0].as_known().map_or(
+                        PartialTypeRef::Resolved(TypeRef::Unknown),
+                        |ty| self.resolve_holed(&ty),
+                    )
                 } else {
                     let partial_args: Vec<PartialTypeArg> = tys
                         .iter()
-                        .map(|ty| {
-                            self.resolve_holed_ty(ty, module).to_partial_arg()
-                        })
+                        .map(|ty| self.resolve_any_holed_arg(ty, module))
                         .collect();
 
                     let tuple_def: TypeDefId =

@@ -56,21 +56,24 @@ impl<'db> Parser<'db> {
                     false
                 };
 
-                let inner = self.parse_type_expr()?;
+                let inner = self.parse_any_type_expr()?;
                 let end = self.get_end();
                 if two {
                     Ok(Spanned::new(
                         AstTypeExprDesc::Ref {
                             // &&<mut|""> so mutable only on the inner ref
                             mutable: false,
-                            pointee: Box::new(Spanned::new(
-                                AstTypeExprDesc::Ref {
-                                    mutable,
-                                    pointee: Box::new(inner),
-                                },
-                                vec![],
-                                start.advance(1).span(end),
-                            )),
+                            pointee: Box::new(
+                                Spanned::new(
+                                    AstTypeExprDesc::Ref {
+                                        mutable,
+                                        pointee: Box::new(inner),
+                                    },
+                                    vec![],
+                                    start.advance(1).span(end),
+                                )
+                                .into(),
+                            ),
                         },
                         vec![],
                         start.span(end),
@@ -96,7 +99,7 @@ impl<'db> Parser<'db> {
 
             TokenKind::OpenSqr => {
                 self.consume();
-                let ty = self.parse_type_expr()?;
+                let ty = self.parse_any_type_expr()?;
                 let len = if self.peek_n(0).map(|t| t.kind)
                     == Some(TokenKind::Semicolon)
                 {
@@ -123,7 +126,7 @@ impl<'db> Parser<'db> {
                 while let Some(t) = self.peek_n(0)
                     && !matches!(t.kind, TokenKind::ClosePar)
                 {
-                    let t_e = self.parse_type_expr()?;
+                    let t_e = self.parse_any_type_expr()?;
                     tys.push(t_e);
                     if let Some(t) = self.peek_n(0)
                         && matches!(t.kind, TokenKind::Comma)

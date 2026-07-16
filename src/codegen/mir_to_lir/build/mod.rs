@@ -769,8 +769,16 @@ impl<'a> MTLBCtx<'a> {
                 Some(b.make_aggregate(ty, values).erase())
             }
             MIRRValueKind::Cast(op, type_ref) => {
-                if type_ref.as_ptr(self.db).is_some() {
-                    // Should not have to do anything (ptr -> ptr)
+                let as_ptr_like = |ty: TypeRef| {
+                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db))
+                };
+                if let Some((muta, _)) = as_ptr_like(*type_ref) {
+                    let operand_ty = op.ty(self.db);
+                    let (op_m, _) = as_ptr_like(operand_ty).unwrap();
+                    if muta.is_mut() && !op_m.is_mut() {
+                        // const ptr-like to mut ptr-like
+                        unreachable!()
+                    }
                     self.lower_operand(b, op, lower)
                 } else {
                     todo!()

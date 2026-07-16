@@ -138,12 +138,11 @@ pub fn resolve_type_expr_desc<'db>(
             }
         }
         AstTypeExprDesc::Pointer { mutable, pointee } => {
-            match resolve_type_expr(
-                db,
-                pointee,
-                module,
-                template_args,
-                has_zelf,
+            match pointee.as_known().map_or(
+                TypeResolution::Type(TypeRef::Unknown),
+                |ty| {
+                    resolve_type_expr(db, &ty, module, template_args, has_zelf)
+                },
             ) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
@@ -152,12 +151,11 @@ pub fn resolve_type_expr_desc<'db>(
             }
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
-            match resolve_type_expr(
-                db,
-                pointee,
-                module,
-                template_args,
-                has_zelf,
+            match pointee.as_known().map_or(
+                TypeResolution::Type(TypeRef::Unknown),
+                |ty| {
+                    resolve_type_expr(db, &ty, module, template_args, has_zelf)
+                },
             ) {
                 TypeResolution::Type(pointee) => {
                     TypeResolution::Type(ref_of(db, pointee, *mutable).into())
@@ -167,7 +165,12 @@ pub fn resolve_type_expr_desc<'db>(
         }
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
-            match resolve_type_expr(db, ty, module, template_args, has_zelf) {
+            match ty.as_known().map_or(
+                TypeResolution::Type(TypeRef::Unknown),
+                |ty| {
+                    resolve_type_expr(db, &ty, module, template_args, has_zelf)
+                },
+            ) {
                 TypeResolution::Type(elem) => {
                     TypeResolution::Type(slice_of(db, elem).into())
                 }
@@ -178,12 +181,17 @@ pub fn resolve_type_expr_desc<'db>(
             let types = tys
                 .iter()
                 .map(|ty| {
-                    match resolve_type_expr(
-                        db,
-                        ty,
-                        module,
-                        template_args,
-                        has_zelf,
+                    match ty.as_known().map_or(
+                        TypeResolution::Type(TypeRef::Unknown),
+                        |ty| {
+                            resolve_type_expr(
+                                db,
+                                &ty,
+                                module,
+                                template_args,
+                                has_zelf,
+                            )
+                        },
                     ) {
                         TypeResolution::Type(type_ref) => Some(type_ref),
                         _ => None,
@@ -337,10 +345,12 @@ fn _templates_of_owner<'db>(
             .iter()
             .next()
             .unwrap()
-            .templates(db).to_vec(),
+            .templates(db)
+            .to_vec(),
         ScopeOwnerId::Interface(interface_ref) => {
             interface_item(db, interface_ref.def(db).interned())
-                .template_args.to_vec()
+                .template_args
+                .to_vec()
         }
     }
 }

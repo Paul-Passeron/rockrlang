@@ -30,7 +30,7 @@ use crate::{
     },
     parse_tree::{
         top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
-        type_expr::{AstTypeExpr, AstTypeExprDesc},
+        type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId,
@@ -162,7 +162,7 @@ impl AstImplicitContext {
         })
     }
 
-    pub fn get_associated_type_ast(
+    fn _get_associated_type_ast(
         &self,
         db: &dyn Db,
         associated: Symbol,
@@ -180,7 +180,7 @@ impl AstImplicitContext {
         })
     }
 
-    pub fn get_associated_type(
+    fn _get_associated_type(
         &self,
         db: &dyn Db,
         associated: Symbol,
@@ -194,120 +194,6 @@ impl AstImplicitContext {
             // the associated type
             Some(TypeRef::Associated(associated))
         }
-    }
-
-    pub fn owning_module(&self, db: &dyn Db) -> ModuleId {
-        owning_module(db, self.owner)
-    }
-
-    pub fn resolve(
-        &self,
-        db: &dyn Db,
-        ty: &AstTypeExprDesc,
-    ) -> Option<TypeRef> {
-        fn _resolve(
-            this: &AstImplicitContext,
-            db: &dyn Db,
-            ty: &AstTypeExprDesc,
-            module: ModuleId,
-            can_be_template: bool,
-        ) -> Option<TypeRef> {
-            match ty {
-                AstTypeExprDesc::Named { name, args } => {
-                    if *name == Symbol::new(db, "Self")
-                        && module == this.owning_module(db)
-                    {
-                        return Some(TypeRef::Zelf);
-                    } else if can_be_template
-                        && let Some(pos) = this
-                            .template_asts
-                            .iter()
-                            .position(|temp| temp.name == *name)
-                    {
-                        if !args.is_empty() {
-                            return None;
-                        }
-                        return Some(TypeRef::Param(TypeParamId(pos)));
-                    }
-                    match resolve_in_module(db, *name, module)? {
-                        Definition::Type(type_def_id) => {
-                            let args = args
-                                .iter()
-                                .map(|arg| {
-                                    arg.as_known().and_then(|arg| {
-                                        this.resolve(db, &arg.data)
-                                    })
-                                })
-                                .collect::<Option<Vec<_>>>()?;
-                            Some(TypeRef::Concrete(TypeId::new(
-                                db,
-                                type_def_id,
-                                args,
-                            )))
-                        }
-                        _ => None,
-                    }
-                }
-                AstTypeExprDesc::NameResolved { from, to } => {
-                    if *from == Symbol::new(db, "Self")
-                        && module == this.owning_module(db)
-                    {
-                        if let AstTypeExprDesc::Named { name, args } =
-                            &to.as_ref().data
-                            && args.is_empty()
-                        {
-                            this.get_associated_type(db, *name)
-                        } else {
-                            None
-                        }
-                    } else {
-                        let new_module =
-                            match resolve_in_module(db, *from, module)? {
-                                Definition::Module(module_id) => module_id,
-                                _ => return None,
-                            };
-                        // Cannot be a template because of the form A::B, so B
-                        // here isn't a template
-                        _resolve(this, db, &to.data, new_module, false)
-                    }
-                }
-                AstTypeExprDesc::Ref { mutable, pointee } => {
-                    let pointee = this.resolve(db, &pointee.data)?;
-                    Some(if *mutable {
-                        TypeRef::Concrete(mut_ref_of(db, pointee))
-                    } else {
-                        TypeRef::Concrete(const_ref_of(db, pointee))
-                    })
-                }
-                AstTypeExprDesc::Pointer { mutable, pointee } => {
-                    let pointee = this.resolve(db, &pointee.data)?;
-                    Some(if *mutable {
-                        TypeRef::Concrete(mut_ptr_of(db, pointee))
-                    } else {
-                        TypeRef::Concrete(const_ptr_of(db, pointee))
-                    })
-                }
-                AstTypeExprDesc::Slice { ty, len } => {
-                    assert!(len.is_none(), "TODO: length in slice");
-                    let element = this.resolve(db, &ty.data)?;
-                    Some(TypeRef::Concrete(slice_of(db, element)))
-                }
-                AstTypeExprDesc::Tuple(tys) => {
-                    if tys.len() == 1 {
-                        let t = tys.iter().next()?;
-                        this.resolve(db, &t.data)
-                    } else {
-                        Some(TypeRef::Concrete(tuple_of(
-                            db,
-                            tys.iter()
-                                .map(|ty| this.resolve(db, &ty.data))
-                                .collect::<Option<_>>()?,
-                        )))
-                    }
-                }
-            }
-        }
-        _resolve(self, db, ty, self.owning_module(db), true)
     }
 
     pub fn resolve_interface(
@@ -331,11 +217,7 @@ impl AstImplicitContext {
                         Definition::Interface(def) => {
                             let args = args
                                 .iter()
-                                .map(|arg| {
-                                    arg.as_known().and_then(|arg| {
-                                        this.resolve(db, &arg.data)
-                                    })
-                                })
+                                .map(|arg| this.resolve_any(db, arg))
                                 .collect::<Option<Vec<_>>>()?;
                             Some(InterfaceRef::new(db, def, args))
                         }
@@ -399,13 +281,21 @@ pub trait AsAstImplCtx {
         &self,
         db: &dyn Db,
         associated: Symbol,
-    ) -> Option<AstTypeExpr>;
+    ) -> Option<AstTypeExpr> {
+        unused!(db);
+        unused!(associated);
+        todo!()
+    }
 
     fn get_associated_type_ast_template_arg(
         &self,
         db: &dyn Db,
         associated: Symbol,
-    ) -> Option<AstTemplateArg>;
+    ) -> Option<AstTemplateArg> {
+        unused!(db);
+        unused!(associated);
+        todo!()
+    }
 
     fn get_associated_type(
         &self,
@@ -455,10 +345,7 @@ pub trait AsAstImplCtx {
                     Definition::Type(type_def_id) => {
                         let args = args
                             .iter()
-                            .map(|arg| {
-                                arg.as_known()
-                                    .and_then(|arg| this.resolve(db, &arg.data))
-                            })
+                            .map(|arg| this.resolve_any(db, arg))
                             .collect::<Option<Vec<_>>>()?;
                         Some(TypeRef::Concrete(TypeId::new(
                             db,
@@ -491,35 +378,35 @@ pub trait AsAstImplCtx {
                 }
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
-                let pointee = this.resolve(db, &pointee.data)?;
-                Some(if *mutable {
-                    TypeRef::Concrete(mut_ref_of(db, pointee))
+                let pointee = this.resolve_any(db, pointee)?;
+                let ty = if *mutable {
+                    mut_ref_of(db, pointee)
                 } else {
-                    TypeRef::Concrete(const_ref_of(db, pointee))
-                })
+                    const_ref_of(db, pointee)
+                };
+                Some(ty.into())
             }
             AstTypeExprDesc::Pointer { mutable, pointee } => {
-                let pointee = this.resolve(db, &pointee.data)?;
-                Some(if *mutable {
-                    TypeRef::Concrete(mut_ptr_of(db, pointee))
+                let pointee = this.resolve_any(db, pointee)?;
+                let ty = if *mutable {
+                    mut_ptr_of(db, pointee)
                 } else {
-                    TypeRef::Concrete(const_ptr_of(db, pointee))
-                })
+                    const_ptr_of(db, pointee)
+                };
+                Some(ty.into())
             }
             AstTypeExprDesc::Slice { ty, len } => {
                 assert!(len.is_none(), "TODO: length in slice");
-                let element = this.resolve(db, &ty.data)?;
-                Some(TypeRef::Concrete(slice_of(db, element)))
+                Some(slice_of(db, this.resolve_any(db, ty)?).into())
             }
             AstTypeExprDesc::Tuple(tys) => {
                 if tys.len() == 1 {
-                    let t = tys.iter().next()?;
-                    this.resolve(db, &t.data)
+                    this.resolve_any(db, tys.iter().next()?)
                 } else {
                     Some(TypeRef::Concrete(tuple_of(
                         db,
                         tys.iter()
-                            .map(|ty| this.resolve(db, &ty.data))
+                            .map(|ty| this.resolve_any(db, ty))
                             .collect::<Option<_>>()?,
                     )))
                 }
@@ -529,6 +416,44 @@ pub trait AsAstImplCtx {
 
     fn resolve(&self, db: &dyn Db, ty: &AstTypeExprDesc) -> Option<TypeRef> {
         Self::_resolve(self, db, ty, self.owning_module(db))
+    }
+
+    fn resolve_err(&self, db: &dyn Db, ty: &AstTypeExprDesc) -> TypeRef {
+        self.resolve(db, ty).unwrap_or(TypeRef::Error)
+    }
+
+    fn resolve_any(&self, db: &dyn Db, ty: &AstAnyTypeExpr) -> Option<TypeRef> {
+        ty.as_known()
+            .map_or(Some(TypeRef::Unknown), |ty| self.resolve(db, &ty.data))
+    }
+}
+
+impl AsAstImplCtx for AstImplicitContext {
+    fn get_ast_templates(&self) -> Arc<[AstTemplateArg]> {
+        self.template_asts.clone()
+    }
+
+    fn get_module(&self) -> Option<ModuleId> {
+        match self.owner {
+            ScopeOwnerId::Module(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    fn owning_module(&self, db: &dyn Db) -> ModuleId {
+        owning_module(db, self.owner)
+    }
+
+    fn owner(&self, _: &dyn Db) -> ScopeOwnerId {
+        self.owner
+    }
+
+    fn get_associated_type_ast(
+        &self,
+        db: &dyn Db,
+        associated: Symbol,
+    ) -> Option<AstTypeExpr> {
+        self._get_associated_type_ast(db, associated)
     }
 }
 
@@ -550,25 +475,5 @@ impl AsAstImplCtx for ImplicitContext {
             ScopeOwnerId::Module(module) => Some(module),
             _ => None,
         }
-    }
-
-    fn get_associated_type_ast(
-        &self,
-        db: &dyn Db,
-        associated: Symbol,
-    ) -> Option<AstTypeExpr> {
-        unused!(db);
-        unused!(associated);
-        todo!()
-    }
-
-    fn get_associated_type_ast_template_arg(
-        &self,
-        db: &dyn Db,
-        associated: Symbol,
-    ) -> Option<AstTemplateArg> {
-        unused!(db);
-        unused!(associated);
-        todo!()
     }
 }

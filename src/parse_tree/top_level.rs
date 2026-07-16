@@ -205,7 +205,10 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     f,
                     "&{}{}",
                     if *mutable { "mut " } else { "" },
-                    pointee.data.display(self.db)
+                    pointee.as_known().map_or_else(|| "_".into(), |ty| ty
+                        .data
+                        .display(self.db)
+                        .to_string())
                 )
             }
             AstTypeExprDesc::Pointer { mutable, pointee } => {
@@ -213,14 +216,20 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     f,
                     "*{}{}",
                     if *mutable { "mut " } else { "" },
-                    pointee.data.display(self.db)
+                    pointee.as_known().map_or_else(|| "_".into(), |ty| ty
+                        .data
+                        .display(self.db)
+                        .to_string())
                 )
             }
             AstTypeExprDesc::Slice { ty, len } => {
                 write!(
                     f,
                     "[{}{}]",
-                    ty.data.display(self.db),
+                    ty.as_known().map_or_else(|| "_".into(), |ty| ty
+                        .data
+                        .display(self.db)
+                        .to_string()),
                     if let Some(len) = len {
                         format!("; {len}")
                     } else {
@@ -234,7 +243,10 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                     "({})",
                     spanneds
                         .iter()
-                        .map(|ty| ty.data.display(self.db).to_string())
+                        .map(|ty| ty.as_known().map_or_else(|| "_".into(), |ty| ty
+                            .data
+                            .display(self.db)
+                            .to_string()))
                         .collect_vec()
                         .join(", ")
                 )

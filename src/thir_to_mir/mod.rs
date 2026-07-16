@@ -21,12 +21,15 @@ use std::{
 };
 
 use itertools::{Either, Itertools};
+use salsa::Accumulator;
 
 use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
-    compiler::{Workspace, get_sig_of_function, workspace_packages},
+    compiler::{
+        Workspace, diagnostic::Diag, get_sig_of_function, workspace_packages,
+    },
     hir::{Mutability, function_ast},
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
@@ -610,7 +613,22 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             ExprKind::Cast(expr, ty) => {
-                MIRRValueKind::Cast(self.build_operand(*expr), *ty)
+                let as_ptr_like = |ty: TypeRef| {
+                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db))
+                };
+                if let Some((muta, _)) = as_ptr_like(*ty) {
+                    let expr_val = &self.thir.exprs[*expr];
+                    let expr_ty = expr_val.ty;
+                    let (op_m, _) = as_ptr_like(expr_ty).unwrap();
+                    if muta.is_mut() && !op_m.is_mut() {
+                        // const ptr-like to mut ptr-like
+                        Diag::generic_error(format!("cannot cast a const pointer/reference type to a mutable pointer/reference type. ({} to {})", expr_ty.to_string(self.db), ty.to_string(self.db)), span)
+                            .accumulate(self.db);
+                    }
+                    MIRRValueKind::Cast(self.build_operand(*expr), *ty)
+                } else {
+                    todo!()
+                }
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))

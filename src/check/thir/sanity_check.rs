@@ -38,7 +38,7 @@ use crate::{
         ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
-    typecheck::inference::implicit::AstImplicitContext,
+    typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
 pub struct SanityError {
@@ -720,8 +720,7 @@ impl EnumRef {
                         .map(|field| {
                             (
                                 field.name,
-                                ctx.resolve(db, &field.ty.data)
-                                    .unwrap_or(TypeRef::Error),
+                                ctx.resolve_err(db, &field.ty.data),
                             )
                         })
                         .collect(),
@@ -738,7 +737,7 @@ impl EnumRef {
                     spanneds
                         .iter()
                         .map(|ast| {
-                            ctx.resolve(db, &ast.data).unwrap_or(TypeRef::Error)
+                            ctx.resolve_err(db, &ast.data)
                         })
                         .collect(),
                 ))
@@ -780,8 +779,7 @@ impl StructRef {
             )
             .unwrap();
             let type_ref = ctx
-                .resolve(db, &field.ty.data)
-                .unwrap_or(TypeRef::Error)
+                .resolve_err(db, &field.ty.data)
                 .with_substitution(db, &self.args);
             res.insert(field.name, type_ref);
         }
@@ -941,10 +939,15 @@ impl TypeRef {
             TypeRef::Concrete(id) => TypeRef::Concrete(TypeId::new(
                 db,
                 id.def(db),
-                id.args(db).iter().map(|t| t.instantiate(db, subs, zelf)).collect(),
+                id.args(db)
+                    .iter()
+                    .map(|t| t.instantiate(db, subs, zelf))
+                    .collect(),
             )),
             TypeRef::Param(p) => subs[p.0], // callee-space param
-            TypeRef::Zelf => zelf.expect("Zelf in signature but no self type on FunctionRef"),
+            TypeRef::Zelf => {
+                zelf.expect("Zelf in signature but no self type on FunctionRef")
+            }
             other => other,
         }
     }

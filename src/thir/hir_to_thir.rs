@@ -46,7 +46,7 @@ use crate::{
     },
     typecheck::{
         self, PatternId, TypeCheckResults,
-        inference::implicit::AstImplicitContext,
+        inference::implicit::{AsAstImplCtx, AstImplicitContext},
     },
 };
 

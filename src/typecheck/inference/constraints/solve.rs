@@ -365,7 +365,7 @@ impl<'db> InferenceCtx<'db> {
             if !blocks.is_empty() {
                 return Some((depth, blocks));
             }
-            if let Some((_, inner)) = cur.as_ref(self.db) {
+            if let Some((_, inner)) = cur.ptr_like(self.db) {
                 cur = inner.clone();
                 depth += 1;
             } else {
@@ -1025,7 +1025,7 @@ impl<'db> InferenceCtx<'db> {
 
 fn concrete_deref_target(db: &dyn Db, ty: TypeId) -> Option<TypeId> {
     let tref: TypeRef = ty.into();
-    let (_, inner) = tref.as_ref(db)?;
+    let (_, inner) = tref.as_ref(db).or_else(|| tref.as_ptr(db))?;
     inner.as_type_id()
 }
 
@@ -1048,3 +1048,9 @@ struct MethodCallInfos<'a> {
     pub templates: &'a [InferVar],
     pub depth: usize,
 }
+
+// impl TypeRef {
+//     fn ptr_like(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+//         self.as_ptr(db).or_else(|| self.as_ref(db))
+//     }
+// }

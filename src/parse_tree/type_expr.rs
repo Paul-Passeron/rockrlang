@@ -23,10 +23,10 @@ pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 pub enum AstTypeExprDesc {
     Named { name: Symbol, args: Vec<AstAnyTypeExpr> },
     NameResolved { from: Symbol, to: Box<AstTypeExpr> },
-    Ref { mutable: bool, pointee: Box<AstTypeExpr> },
-    Pointer { mutable: bool, pointee: Box<AstTypeExpr> },
-    Slice { ty: Box<AstTypeExpr>, len: Option<usize> },
-    Tuple(Vec<AstTypeExpr>),
+    Ref { mutable: bool, pointee: Box<AstAnyTypeExpr> },
+    Pointer { mutable: bool, pointee: Box<AstAnyTypeExpr> },
+    Slice { ty: Box<AstAnyTypeExpr>, len: Option<usize> },
+    Tuple(Vec<AstAnyTypeExpr>),
 }
 
 pub type AstAnyTypeExpr = Spanned<AstAnyTypeExprDesc>;

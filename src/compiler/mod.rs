@@ -32,7 +32,10 @@ use crate::{
         TypeDefId, TypeRef, ptr_of, ref_of,
     },
     thir::thir_body,
-    typecheck::inference::{InferTy, implicit::AstImplicitContext},
+    typecheck::inference::{
+        InferTy,
+        implicit::{AsAstImplCtx, AstImplicitContext},
+    },
 };
 use dashmap::DashSet;
 use inkwell::{
@@ -321,14 +324,9 @@ pub fn get_sig_of_function(
         .inner(db)
         .get_args()
         .iter()
-        .map(|arg| {
-            let ty = ctx.resolve(db, &arg.ty.data).unwrap_or(TypeRef::Error);
-            (arg.name, ty)
-        })
+        .map(|arg| (arg.name, ctx.resolve_err(db, &arg.ty.data)))
         .collect();
-    let ret = ctx
-        .resolve(db, &ast.inner(db).get_ret().data)
-        .unwrap_or(TypeRef::Error);
+    let ret = ctx.resolve_err(db, &ast.inner(db).get_ret().data);
     FunctionSignature {
         name: *function_id.name(db),
         zelf,
@@ -632,7 +630,6 @@ pub fn build_from_disk(
             CompilerError::CompiledWithErrors
         },
     )?;
-
     Ok(())
 }
 
