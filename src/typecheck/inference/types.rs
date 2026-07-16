@@ -18,7 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    Db, common::symbols::Symbol, hir::{Mutability, PartialTypeArg, PartialTypeRef}, name_resolve::type_expr::struct_item, parse_tree::type_expr::AstTypeExprDesc, ril::{BuiltinTypeId, PtrKind, ScopeOwnerId, StructId, TypeDefId, TypeRef, str_def}, typecheck::inference::{
+    Db,
+    common::symbols::Symbol,
+    hir::Mutability,
+    name_resolve::type_expr::struct_item,
+    parse_tree::type_expr::AstTypeExprDesc,
+    ril::{
+        BuiltinTypeId, PtrKind, ScopeOwnerId, StructId, TypeDefId, TypeRef, rehole,
+        str_def,
+    },
+    typecheck::inference::{
         InferTy, InferenceCtx,
         implicit::{AsAstImplCtx, ImplicitContext},
     },
@@ -171,6 +180,7 @@ impl<'db> InferenceCtx<'db> {
         type_ref: TypeRef,
         ctx: &ImplicitContext,
     ) -> InferTy {
+        let type_ref = rehole(self.db, type_ref);
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
@@ -180,14 +190,12 @@ impl<'db> InferenceCtx<'db> {
                     .map(|ty| self.allocate_type_ref(*ty, ctx))
                     .collect(),
             },
-            TypeRef::Param(type_param_id) => {
-                match ctx.get_template(type_param_id.0) {
-                    Some(res) => res.clone(),
-                    None => {
-                        todo!("Diagnostics");
-                    }
+            TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
+                Some(res) => res.clone(),
+                None => {
+                    todo!("Diagnostics");
                 }
-            }
+            },
             TypeRef::Error => panic!(),
             TypeRef::Zelf => {
                 if let Some(zelf) = ctx.zelf() {
@@ -201,40 +209,36 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn allocate_partial_type_arg(
-        &mut self,
-        arg: &PartialTypeArg,
-        ctx: &ImplicitContext,
-    ) -> InferTy {
-        match arg {
-            PartialTypeArg::Known(type_ref) => {
-                self.allocate_type_ref(*type_ref, ctx)
-            }
-            PartialTypeArg::Partial(partial_type_ref) => {
-                self.allocate_partial_type_ref(partial_type_ref, ctx)
-            }
-            PartialTypeArg::Infer => InferTy::Var(self.fresh_var()),
-        }
-    }
+    // pub fn allocate_partial_type_arg(
+    //     &mut self,
+    //     arg: &TypeRef,
+    //     ctx: &ImplicitContext,
+    // ) -> InferTy {
+    //     match arg {
+    //         PartialTypeArg::Known(type_ref) => self.allocate_type_ref(*type_ref,
+    // ctx),         PartialTypeArg::Partial(partial_type_ref) => {
+    //             self.allocate_partial_type_ref(partial_type_ref, ctx)
+    //         }
+    //         PartialTypeArg::Infer => InferTy::Var(self.fresh_var()),
+    //     }
+    // }
 
-    pub fn allocate_partial_type_ref(
-        &mut self,
-        type_ref: &PartialTypeRef,
-        ctx: &ImplicitContext,
-    ) -> InferTy {
-        match type_ref {
-            PartialTypeRef::Resolved(type_ref) => {
-                self.allocate_type_ref(*type_ref, ctx)
-            }
-            PartialTypeRef::WithHoles { def, args } => InferTy::Adt {
-                def: *def,
-                fields: args
-                    .iter()
-                    .map(|arg| self.allocate_partial_type_arg(arg, ctx))
-                    .collect(),
-            },
-        }
-    }
+    // pub fn allocate_partial_type_ref(
+    //     &mut self,
+    //     type_ref: &PartialTypeRef,
+    //     ctx: &ImplicitContext,
+    // ) -> InferTy {
+    //     match type_ref {
+    //         PartialTypeRef::Resolved(type_ref) =>
+    // self.allocate_type_ref(*type_ref, ctx),         PartialTypeRef::WithHoles
+    // { def, args } => InferTy::Adt {             def: *def,
+    //             fields: args
+    //                 .iter()
+    //                 .map(|arg| self.allocate_partial_type_arg(arg, ctx))
+    //                 .collect(),
+    //         },
+    //     }
+    // }
 
     pub fn allocate_ast_type_expr(
         &mut self,
@@ -253,20 +257,20 @@ impl<'db> InferenceCtx<'db> {
                 TypeDefId::Struct(struct_id) => {
                     let templates = fields;
                     let ast = struct_item(self.db, struct_id.interned());
-                    let templates =
-                        if templates.len() != ast.template_args.len() {
-                            ast.template_args
-                                .iter()
-                                .enumerate()
-                                .map(|(i, _)| {
-                                    templates.get(i).cloned().unwrap_or_else(
-                                        || InferTy::Var(self.fresh_var()),
-                                    )
-                                })
-                                .collect::<Arc<_>>()
-                        } else {
-                            templates.iter().cloned().collect::<Arc<_>>()
-                        };
+                    let templates = if templates.len() != ast.template_args.len() {
+                        ast.template_args
+                            .iter()
+                            .enumerate()
+                            .map(|(i, _)| {
+                                templates
+                                    .get(i)
+                                    .cloned()
+                                    .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
+                            })
+                            .collect::<Arc<_>>()
+                    } else {
+                        templates.iter().cloned().collect::<Arc<_>>()
+                    };
                     let module = struct_id.parent(self.db);
                     let ctx = ImplicitContext::new(
                         self.db,
@@ -303,7 +307,6 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 }
-
 
 impl InferTy {
     pub fn ptr_like<'db>(&self, db: &'db dyn Db) -> Option<(Mutability, &InferTy)> {

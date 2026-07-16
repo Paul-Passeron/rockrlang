@@ -24,32 +24,25 @@ use itertools::Itertools;
 use salsa::Accumulator;
 
 use crate::{
-    Db,
-    common::{
+    Db, common::{
         arena::Arena,
         ids::{IdGen, IdWrapper},
         location::Span,
         symbols::Symbol,
-    },
-    compiler::diagnostic::Diag,
-    hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
-        HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc,
-        HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
-        LocalId, LocalInfo, Mutability, PartialTypeArg, PartialTypeRef,
-    },
-    name_resolve::{
+    }, compiler::diagnostic::Diag, hir::{
+        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch,
+        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability,
+    }, name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
         interfaces::{
-            core_int_iter_struct, core_into_iterator_interface,
-            core_iter_interface,
+            core_int_iter_struct, core_into_iterator_interface, core_iter_interface,
         },
         type_expr::{
-            enum_item, get_template_param_count, get_templates_of_fun,
-            templates_of_enum,
+            enum_item, get_template_param_count, get_templates_of_fun, templates_of_enum,
+            templates_of_struct,
         },
-    },
-    parse_tree::{
+    }, parse_tree::{
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
         pattern::{
             AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc,
@@ -57,17 +50,13 @@ use crate::{
         },
         stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
         top_level::{
-            AstEnumVariantKind, AstFundef, AstFundefArg, AstMethodDef,
-            AstReceiver, AstTemplateArg,
+            AstEnumVariantKind, AstFundef, AstFundefArg, AstMethodDef, AstReceiver,
+            AstTemplateArg,
         },
-        type_expr::{
-            AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc,
-        },
-    },
-    ril::{
-        BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
-        TypeParamId, TypeRef,
-    },
+        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+    }, ril::{
+        BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef, compute_template_hints, tuple_of,
+    }, thir::EnumRef,
 };
 
 pub struct LowerFundef<'db> {
@@ -88,17 +77,6 @@ pub struct Scope {
 impl Scope {
     fn new() -> Self {
         Self { map: BTreeMap::new() }
-    }
-}
-
-impl PartialTypeRef {
-    pub fn to_partial_arg(&self) -> PartialTypeArg {
-        match self {
-            PartialTypeRef::Resolved(type_ref) => {
-                PartialTypeArg::Known(*type_ref)
-            }
-            _ => PartialTypeArg::Partial(Box::new(self.clone())),
-        }
     }
 }
 
@@ -160,15 +138,11 @@ impl<'db> LowerFundef<'db> {
                     }
                     _ => {
                         let temp = self.lower_expr(expr, scope, module);
-                        self.new_place(
-                            HirPlaceKind::Temporary(temp.boxed()),
-                            expr.span,
-                        )
+                        self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span)
                     }
                 }
             }
-            AstExprDesc::PostfixDeref(inner)
-            | AstExprDesc::PrefixDeref(inner) => {
+            AstExprDesc::PostfixDeref(inner) | AstExprDesc::PrefixDeref(inner) => {
                 let temp = self.expr_as_place(inner, scope, module);
                 self.new_place(HirPlaceKind::Deref(temp.boxed()), expr.span)
             }
@@ -183,10 +157,7 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::TupleAccess { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
                 self.new_place(
-                    HirPlaceKind::TupleField {
-                        base: base.boxed(),
-                        index: *index,
-                    },
+                    HirPlaceKind::TupleField { base: base.boxed(), index: *index },
                     expr.span,
                 )
             }
@@ -194,10 +165,7 @@ impl<'db> LowerFundef<'db> {
                 let base = self.expr_as_place(object, scope, module);
                 let index = self.lower_expr(index, scope, self.module);
                 self.new_place(
-                    HirPlaceKind::Index {
-                        base: base.boxed(),
-                        index: index.boxed(),
-                    },
+                    HirPlaceKind::Index { base: base.boxed(), index: index.boxed() },
                     expr.span,
                 )
             }
@@ -208,59 +176,40 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
-    fn instantiate_holed(&self, ty: TypeDefId) -> PartialTypeRef {
+    fn instantiate_holed(&self, ty: TypeDefId) -> TypeRef {
         let n = get_template_param_count(self.db, ty);
-        if n == 0 {
-            PartialTypeRef::Resolved(TypeRef::Concrete(TypeId::new(
-                self.db,
-                ty,
-                vec![],
-            )))
-        } else {
-            PartialTypeRef::WithHoles {
-                def: ty,
-                args: iter::repeat_n(PartialTypeArg::Infer, n).collect(),
-            }
-        }
+        TypeId::new(self.db, ty, iter::repeat_n(TypeRef::Unknown, n).collect()).into()
     }
 
     fn resolve_any_holed_arg(
         &self,
         any_ty: &AstAnyTypeExpr,
         module: ModuleId,
-    ) -> PartialTypeArg {
+    ) -> TypeRef {
         match &any_ty.data {
-            AstAnyTypeExprDesc::Any => PartialTypeArg::Infer,
-            AstAnyTypeExprDesc::Known(desc) => self
-                .resolve_holed_desc(
-                    &AstTypeExpr {
-                        annotations: Vec::new(),
-                        data: desc.clone(),
-                        span: any_ty.span,
-                    },
-                    module,
-                )
-                .to_partial_arg(),
+            AstAnyTypeExprDesc::Any => TypeRef::Unknown,
+            AstAnyTypeExprDesc::Known(desc) => self.resolve_holed_desc(
+                &AstTypeExpr {
+                    annotations: Vec::new(),
+                    data: desc.clone(),
+                    span: any_ty.span,
+                },
+                module,
+            ),
         }
     }
 
-    fn resolve_holed_desc(
-        &self,
-        desc: &AstTypeExpr,
-        module: ModuleId,
-    ) -> PartialTypeRef {
+    fn resolve_holed_desc(&self, desc: &AstTypeExpr, module: ModuleId) -> TypeRef {
         match &desc.data {
             AstTypeExprDesc::Named { name, args } => {
                 if args.is_empty() {
                     if *name == Symbol::new(self.db, "Self") {
-                        return PartialTypeRef::Resolved(TypeRef::Zelf);
+                        return TypeRef::Zelf;
                     }
                     if let Some(idx) =
                         self.template_args.iter().position(|p| p.name == *name)
                     {
-                        return PartialTypeRef::Resolved(TypeRef::Param(
-                            TypeParamId(idx),
-                        ));
+                        return TypeRef::Param(TypeParamId(idx));
                     }
                 }
                 let resolution = resolve_in_module(self.db, *name, module)
@@ -282,34 +231,12 @@ impl<'db> LowerFundef<'db> {
                     }
                 };
 
-                if args.is_empty() {
-                    return self.instantiate_holed(type_def_id);
-                }
-
-                let partial_args: Vec<PartialTypeArg> = args
+                let partial_args: Vec<_> = args
                     .iter()
                     .map(|arg| self.resolve_any_holed_arg(arg, module))
                     .collect();
 
-                let all_known: Option<Vec<TypeRef>> = partial_args
-                    .iter()
-                    .map(|a| match a {
-                        PartialTypeArg::Known(t) => Some(*t),
-                        _ => None,
-                    })
-                    .collect();
-
-                match all_known {
-                    Some(resolved) => {
-                        PartialTypeRef::Resolved(TypeRef::Concrete(
-                            TypeId::new(self.db, type_def_id, resolved),
-                        ))
-                    }
-                    None => PartialTypeRef::WithHoles {
-                        def: type_def_id,
-                        args: partial_args,
-                    },
-                }
+                TypeId::new(self.db, type_def_id, partial_args).into()
             }
 
             AstTypeExprDesc::NameResolved { from, to } => {
@@ -322,11 +249,7 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Pointer { mutable, pointee } => {
-                let inner = pointee
-                    .as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    });
+                let inner = self.resolve_any(pointee);
                 self.wrap_builtin_unary(
                     if *mutable {
                         BuiltinTypeId::mut_ptr(self.db)
@@ -338,11 +261,7 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Ref { mutable, pointee } => {
-                let inner = pointee
-                    .as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    });
+                let inner = self.resolve_any(pointee);
                 self.wrap_builtin_unary(
                     if *mutable {
                         BuiltinTypeId::mut_ref(self.db)
@@ -354,82 +273,44 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::Slice { ty, len: _ } => {
-                let inner = ty
-                    .as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    });
+                let inner = self.resolve_any(ty);
                 self.wrap_builtin_unary(BuiltinTypeId::slice(self.db), inner)
             }
 
             AstTypeExprDesc::Tuple(tys) => {
+                // TODO: Maybe ?
+                // if tys.len() == 0 {
+                //     void_id(self.db).into()
+                // }
                 if tys.len() == 1 {
-                    tys[0].as_known().map_or(
-                        PartialTypeRef::Resolved(TypeRef::Unknown),
-                        |ty| self.resolve_holed(&ty),
-                    )
+                    self.resolve_any(&tys[0])
                 } else {
-                    let partial_args: Vec<PartialTypeArg> = tys
+                    let partial_args: Vec<TypeRef> = tys
                         .iter()
                         .map(|ty| self.resolve_any_holed_arg(ty, module))
                         .collect();
 
-                    let tuple_def: TypeDefId =
-                        BuiltinTypeId::tuple(self.db).into();
-
-                    let all_known: Option<Vec<TypeRef>> = partial_args
-                        .iter()
-                        .map(|a| match a {
-                            PartialTypeArg::Known(t) => Some(*t),
-                            _ => None,
-                        })
-                        .collect();
-
-                    match all_known {
-                        Some(resolved) => {
-                            PartialTypeRef::Resolved(TypeRef::Concrete(
-                                TypeId::new(self.db, tuple_def, resolved),
-                            ))
-                        }
-                        None => PartialTypeRef::WithHoles {
-                            def: tuple_def,
-                            args: partial_args,
-                        },
-                    }
+                    tuple_of(self.db, partial_args).into()
                 }
             }
         }
     }
 
-    fn resolve_holed_ty(
-        &self,
-        ty: &AstTypeExpr,
-        module: ModuleId,
-    ) -> PartialTypeRef {
+    fn resolve_holed_ty(&self, ty: &AstTypeExpr, module: ModuleId) -> TypeRef {
         self.resolve_holed_desc(ty, module)
     }
 
-    fn resolve_holed(&self, ty: &AstTypeExpr) -> PartialTypeRef {
+    fn resolve_holed(&self, ty: &AstTypeExpr) -> TypeRef {
         self.resolve_holed_ty(ty, self.module)
     }
 
-    fn wrap_builtin_unary(
-        &self,
-        builtin: BuiltinTypeId,
-        inner: PartialTypeRef,
-    ) -> PartialTypeRef {
+    fn resolve_any(&self, ty: &AstAnyTypeExpr) -> TypeRef {
+        ty.as_known().map_or(TypeRef::Unknown, |ty| self.resolve_holed(&ty))
+    }
+
+    fn wrap_builtin_unary(&self, builtin: BuiltinTypeId, inner: TypeRef) -> TypeRef {
         let def: TypeDefId = builtin.into();
-        let arg = inner.to_partial_arg();
-        match &arg {
-            PartialTypeArg::Known(t) => PartialTypeRef::Resolved(
-                TypeRef::Concrete(TypeId::new(self.db, def, vec![*t])),
-            ),
-            PartialTypeArg::Infer => PartialTypeRef::WithHoles {
-                def,
-                args: vec![PartialTypeArg::Infer],
-            },
-            PartialTypeArg::Partial(partial) => *partial.clone(),
-        }
+        TypeId::new(self.db, def, vec![inner]).into()
     }
 
     fn lower_name(
@@ -472,38 +353,22 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         // TODO: compute once
-        let template_names =
-            get_templates_of_fun(self.db, self.function.into())
-                .iter()
-                .map(|ast| ast.name)
-                .collect_vec();
-        if let Some(pos) = template_names.iter().position(|temp| from == *temp)
-        {
+        let template_names = get_templates_of_fun(self.db, self.function.into())
+            .iter()
+            .map(|ast| ast.name)
+            .collect_vec();
+        if let Some(pos) = template_names.iter().position(|temp| from == *temp) {
             let tref = TypeRef::Param(TypeParamId(pos));
             match &to.data {
                 AstExprDesc::Call { callee, args, type_args } => {
-                    let AstExprDesc::Name(callee) = &callee.data else {
-                        todo!()
-                    };
+                    let AstExprDesc::Name(callee) = &callee.data else { todo!() };
                     let args = args
                         .iter()
                         .map(|arg| self.lower_expr(arg, scope, self.module))
                         .collect_vec();
-                    let type_args = type_args
-                        .iter()
-                        .map(|arg| {
-                            arg.as_known().map_or(
-                                PartialTypeRef::Resolved(TypeRef::Unknown),
-                                |ty| self.resolve_holed(&ty),
-                            )
-                        })
-                        .collect_vec();
-                    HirExprDesc::CallStatic {
-                        ty: PartialTypeRef::Resolved(tref),
-                        method: *callee,
-                        args,
-                        type_args,
-                    }
+                    let type_args =
+                        type_args.iter().map(|arg| self.resolve_any(arg)).collect_vec();
+                    HirExprDesc::CallStatic { ty: tref, method: *callee, args, type_args }
                 }
                 _ => todo!(),
             }
@@ -515,13 +380,12 @@ impl<'db> LowerFundef<'db> {
                 .get_canonical_zelf(self.db)
                 .expect("TODO: report that");
             match zelf {
-                TypeRef::Concrete(type_id) => self
-                    .lower_name_resolved_expr_from_type(
-                        scope,
-                        module,
-                        to,
-                        type_id.def(self.db),
-                    ),
+                TypeRef::Concrete(type_id) => self.lower_name_resolved_expr_from_type(
+                    scope,
+                    module,
+                    to,
+                    type_id.def(self.db),
+                ),
                 _ => todo!("Handle bad cases"),
             }
         } else {
@@ -530,12 +394,7 @@ impl<'db> LowerFundef<'db> {
                     self.lower_expr(to, scope, module_id).data
                 }
                 Some(Definition::Type(type_def_id)) => self
-                    .lower_name_resolved_expr_from_type(
-                        scope,
-                        module,
-                        to,
-                        type_def_id,
-                    ),
+                    .lower_name_resolved_expr_from_type(scope, module, to, type_def_id),
                 _ => todo!(
                     "error: {}, badly name-resolved item ({})",
                     to.span.start().loc_info(self.db),
@@ -555,17 +414,8 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         let ty = self.resolve_holed(ty);
-        let args =
-            args.iter().map(|a| self.lower_expr(a, scope, module)).collect();
-        let type_args = type_args
-            .iter()
-            .map(|arg| {
-                arg.as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    })
-            })
-            .collect_vec();
+        let args = args.iter().map(|a| self.lower_expr(a, scope, module)).collect();
+        let type_args = type_args.iter().map(|arg| self.resolve_any(arg)).collect_vec();
         HirExprDesc::CallStatic { ty, method, args, type_args }
     }
 
@@ -591,13 +441,10 @@ impl<'db> LowerFundef<'db> {
         let to = self.lower_expr(to, scope, self.module);
 
         let int_iter = core_int_iter_struct(self.db);
-        let type_ref = TypeRef::Concrete(TypeId::new(
-            self.db,
-            TypeDefId::Struct(int_iter),
-            vec![],
-        ));
+        let type_ref =
+            TypeRef::Concrete(TypeId::new(self.db, TypeDefId::Struct(int_iter), vec![]));
         HirExprDesc::StructLit {
-            ty: PartialTypeRef::Resolved(type_ref),
+            ty: type_ref,
             fields: vec![
                 (Symbol::new(self.db, "start"), from),
                 (Symbol::new(self.db, "end"), to),
@@ -625,27 +472,17 @@ impl<'db> LowerFundef<'db> {
                         symbol.interned().contents(self.db)
                     )
                 }
-                let args = args
-                    .iter()
-                    .map(|a| self.lower_expr(a, scope, module))
-                    .collect();
+                let args =
+                    args.iter().map(|a| self.lower_expr(a, scope, module)).collect();
 
-                let type_args = type_args
-                    .iter()
-                    .map(|arg| {
-                        arg.as_known().map_or(
-                            PartialTypeRef::Resolved(TypeRef::Unknown),
-                            |ty| self.resolve_holed(&ty),
-                        )
-                    })
-                    .collect_vec();
+                let type_args =
+                    type_args.iter().map(|arg| self.resolve_any(arg)).collect_vec();
 
                 // Module-level: must be a free function
                 match resolve_in_module(self.db, *symbol, module) {
                     Some(Definition::Function(fid)) => {
                         if !type_args.is_empty() {
-                            let temps =
-                                get_templates_of_fun(self.db, fid.into());
+                            let temps = get_templates_of_fun(self.db, fid.into());
                             if temps.len() != type_args.len() {
                                 todo!("Diag type args mismatch")
                             }
@@ -697,25 +534,38 @@ impl<'db> LowerFundef<'db> {
         scope: &Scope,
         module: ModuleId,
     ) -> HirExprDesc {
-        let type_args = type_args
-            .iter()
-            .map(|arg| {
-                arg.as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    })
-            })
-            .collect_vec();
+        let type_args = type_args.iter().map(|arg| self.resolve_any(arg)).collect_vec();
         HirExprDesc::CallMethod {
             receiver: self.lower_expr(object, scope, module).boxed(),
             method,
-            args: args
-                .iter()
-                .map(|arg| self.lower_expr(arg, scope, module))
-                .collect(),
+            args: args.iter().map(|arg| self.lower_expr(arg, scope, module)).collect(),
             interface_hint: None,
             type_args,
         }
+    }
+
+    fn as_enum_with_filled_holes(&mut self, ty: &AstTypeExpr) -> Option<EnumRef> {
+        let partial_ty = self.resolve_holed(ty).as_type_id()?;
+        let enum_def = match partial_ty.def(self.db) {
+            TypeDefId::Enum(enum_id) => Some(enum_id),
+            _ => None,
+        }?;
+        let n = templates_of_enum(self.db, enum_def.interned()).len();
+
+        let args = partial_ty.args(self.db);
+
+        if n < partial_ty.args(self.db).len() {
+            // TODO: error recovery, ignore them ?
+            // Diagnose ?
+            return None;
+        }
+
+        let template_hints = (0..n)
+            .into_iter()
+            .map(|i| args.get(i).copied().unwrap_or(TypeRef::Unknown))
+            .collect();
+
+        Some(EnumRef { def: enum_def, args: template_hints })
     }
 
     fn lower_structlit(
@@ -726,42 +576,15 @@ impl<'db> LowerFundef<'db> {
         scope: &Scope,
     ) -> HirExprDesc {
         if let Some(variant_name) = variant {
-            let partial_ty = self.resolve_holed(ty);
-            let enum_def = match &partial_ty {
-                PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => {
-                    match type_id.def(self.db) {
-                        TypeDefId::Enum(e) => e,
-                        _ => panic!("StructLit with variant on non-enum type"),
-                    }
-                }
-                PartialTypeRef::WithHoles { def, .. } => match def {
-                    TypeDefId::Enum(e) => *e,
-                    _ => panic!("StructLit with variant on non-enum type"),
-                },
-                _ => panic!(
-                    "StructLit with variant: could not resolve enum type"
-                ),
-            };
-            let template_hints = match &partial_ty {
-                PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => type_id
-                    .args(self.db)
-                    .iter()
-                    .map(|a| PartialTypeArg::Known(*a))
-                    .collect(),
-                PartialTypeRef::WithHoles { args, .. } => args.clone(),
-                _ => {
-                    let n =
-                        templates_of_enum(self.db, enum_def.interned()).len();
-                    iter::repeat_n(PartialTypeArg::Infer, n).collect()
-                }
-            };
+            let EnumRef { def: enum_def, args: template_hints } = self
+                .as_enum_with_filled_holes(ty)
+                .expect("StructLit with variant: could not resolve enum type");
+
             let lowered_fields: Vec<(Symbol, HirExpr)> = fields
                 .iter()
                 .map(|field| {
-                    (
-                        field.name,
-                        self.lower_expr(&field.value, scope, self.module),
-                    )
+                    let value = self.lower_expr(&field.value, scope, self.module);
+                    (field.name, value)
                 })
                 .collect();
             HirExprDesc::Constructor {
@@ -776,10 +599,7 @@ impl<'db> LowerFundef<'db> {
                 fields: fields
                     .iter()
                     .map(|field| {
-                        (
-                            field.name,
-                            self.lower_expr(&field.value, scope, self.module),
-                        )
+                        (field.name, self.lower_expr(&field.value, scope, self.module))
                     })
                     .collect(),
             }
@@ -791,45 +611,16 @@ impl<'db> LowerFundef<'db> {
             self.lower_expr(&exprs[0], scope, self.module).data
         } else {
             HirExprDesc::Tuple(
-                exprs
-                    .iter()
-                    .map(|e| self.lower_expr(e, scope, self.module))
-                    .collect(),
+                exprs.iter().map(|e| self.lower_expr(e, scope, self.module)).collect(),
             )
         }
     }
 
-    fn lower_qualified(
-        &mut self,
-        name: Symbol,
-        ty: &AstTypeExpr,
-    ) -> HirExprDesc {
-        let partial_ty = self.resolve_holed(ty);
-        let enum_def = match &partial_ty {
-            PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => {
-                match type_id.def(self.db) {
-                    TypeDefId::Enum(e) => e,
-                    _ => panic!("QualifiedPath on non-enum type"),
-                }
-            }
-            PartialTypeRef::WithHoles { def, .. } => match def {
-                TypeDefId::Enum(e) => *e,
-                _ => panic!("QualifiedPath on non-enum type"),
-            },
-            _ => panic!("QualifiedPath: could not resolve enum type"),
-        };
-        let template_hints = match &partial_ty {
-            PartialTypeRef::Resolved(TypeRef::Concrete(type_id)) => type_id
-                .args(self.db)
-                .iter()
-                .map(|a| PartialTypeArg::Known(*a))
-                .collect(),
-            PartialTypeRef::WithHoles { args, .. } => args.clone(),
-            _ => {
-                let n = templates_of_enum(self.db, enum_def.interned()).len();
-                iter::repeat_n(PartialTypeArg::Infer, n).collect()
-            }
-        };
+    fn lower_qualified(&mut self, name: Symbol, ty: &AstTypeExpr) -> HirExprDesc {
+        let EnumRef { def: enum_def, args: template_hints } = self
+            .as_enum_with_filled_holes(ty)
+            .expect("QualifiedPath with variant: could not resolve enum type");
+
         HirExprDesc::Constructor {
             enum_def,
             name,
@@ -847,20 +638,11 @@ impl<'db> LowerFundef<'db> {
         let place = self.expr_as_place(place, scope, self.module);
         HirExprDesc::Ref {
             place,
-            mutability: if mutable {
-                Mutability::Mutable
-            } else {
-                Mutability::Const
-            },
+            mutability: if mutable { Mutability::Mutable } else { Mutability::Const },
         }
     }
 
-    fn lower_expr(
-        &mut self,
-        expr: &AstExpr,
-        scope: &Scope,
-        module: ModuleId,
-    ) -> HirExpr {
+    fn lower_expr(&mut self, expr: &AstExpr, scope: &Scope, module: ModuleId) -> HirExpr {
         let data = match &expr.data {
             AstExprDesc::IntLit(intlit) => HirExprDesc::IntLit(*intlit),
             AstExprDesc::CharLit(c) => HirExprDesc::CharLit(*c),
@@ -873,30 +655,27 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::NameResolved { from, to } => {
                 self.lower_name_resolved(*from, to, scope, module)
             }
-            AstExprDesc::StaticCall { ty, method, args, type_args } => self
-                .lower_static_call(ty, *method, type_args, args, scope, module),
-            AstExprDesc::BinOp { lhs, op, rhs } => {
-                self.lower_binop(lhs, rhs, *op, scope)
+            AstExprDesc::StaticCall { ty, method, args, type_args } => {
+                self.lower_static_call(ty, *method, type_args, args, scope, module)
             }
-            AstExprDesc::Range { from, to } => {
-                self.lower_range(from, to, scope)
+            AstExprDesc::BinOp { lhs, op, rhs } => self.lower_binop(lhs, rhs, *op, scope),
+            AstExprDesc::Range { from, to } => self.lower_range(from, to, scope),
+            AstExprDesc::Neg(inner) => {
+                HirExprDesc::Neg(self.lower_expr(inner, scope, self.module).boxed())
             }
-            AstExprDesc::Neg(inner) => HirExprDesc::Neg(
-                self.lower_expr(inner, scope, self.module).boxed(),
-            ),
-            AstExprDesc::Not(inner) => HirExprDesc::Not(
-                self.lower_expr(inner, scope, self.module).boxed(),
-            ),
+            AstExprDesc::Not(inner) => {
+                HirExprDesc::Not(self.lower_expr(inner, scope, self.module).boxed())
+            }
             AstExprDesc::AddressOf(place) => HirExprDesc::AddressOf {
                 place: self.expr_as_place(place, scope, module),
                 mutability: Mutability::Const, // TODO: mut address-of
             },
-            AstExprDesc::Call { callee, args, type_args } => self
-                .lower_call(callee, type_args, args, scope, module, expr.span),
-            AstExprDesc::MethodCall { object, method, args, type_args } => self
-                .lower_method_call(
-                    object, *method, type_args, args, scope, module,
-                ),
+            AstExprDesc::Call { callee, args, type_args } => {
+                self.lower_call(callee, type_args, args, scope, module, expr.span)
+            }
+            AstExprDesc::MethodCall { object, method, args, type_args } => {
+                self.lower_method_call(object, *method, type_args, args, scope, module)
+            }
             AstExprDesc::StructLit { ty, variant, fields } => {
                 self.lower_structlit(ty, *variant, fields, scope)
             }
@@ -907,18 +686,10 @@ impl<'db> LowerFundef<'db> {
                     .map(|expr| self.lower_expr(expr, scope, self.module))
                     .collect(),
             ),
-            AstExprDesc::SizeOf(ty) => {
-                HirExprDesc::SizeOf(self.resolve_holed(ty))
-            }
-            AstExprDesc::TypeName(ty) => {
-                HirExprDesc::TypeName(self.resolve_holed(ty))
-            }
-            AstExprDesc::QualifiedPath { ty, name } => {
-                self.lower_qualified(*name, ty)
-            }
-            AstExprDesc::Ref(mutable, place) => {
-                self.lower_ref(place, *mutable, scope)
-            }
+            AstExprDesc::SizeOf(ty) => HirExprDesc::SizeOf(self.resolve_holed(ty)),
+            AstExprDesc::TypeName(ty) => HirExprDesc::TypeName(self.resolve_holed(ty)),
+            AstExprDesc::QualifiedPath { ty, name } => self.lower_qualified(*name, ty),
+            AstExprDesc::Ref(mutable, place) => self.lower_ref(place, *mutable, scope),
             AstExprDesc::Metadata(fat_ptr) => {
                 let expr = self.lower_expr(fat_ptr, scope, self.module);
                 HirExprDesc::Metadata(expr.boxed())
@@ -934,39 +705,11 @@ impl<'db> LowerFundef<'db> {
         self.new_expr(data, expr.span)
     }
 
-    fn compute_template_hints(
-        &mut self,
-        ty: PartialTypeRef,
-        type_args: Vec<PartialTypeRef>,
-    ) -> Vec<PartialTypeArg> {
-        if !type_args.is_empty() {
-            todo!()
-        }
-        match ty {
-            PartialTypeRef::Resolved(type_ref) => match type_ref {
-                TypeRef::Concrete(type_id) => type_id
-                    .args(self.db)
-                    .iter()
-                    .map(|arg| PartialTypeArg::Known(*arg))
-                    .collect(),
-                TypeRef::Param(_) => {
-                    unreachable!()
-                }
-                TypeRef::Unknown | TypeRef::Error => {
-                    vec![]
-                }
-                TypeRef::Zelf => todo!(),
-                TypeRef::Associated(_symbol) => todo!(),
-            },
-            PartialTypeRef::WithHoles { args, .. } => args,
-        }
-    }
-
     fn lower_constructor_or_static_call(
         &mut self,
         type_def_id: TypeDefId,
         symbol: Symbol,
-        type_args: Vec<PartialTypeRef>,
+        type_args: Vec<TypeRef>,
         args: Vec<HirExpr>,
     ) -> HirExprDesc {
         let ty = self.instantiate_holed(type_def_id);
@@ -980,7 +723,7 @@ impl<'db> LowerFundef<'db> {
                     enum_def: enum_id,
                     name: symbol,
                     args: HirConstructorArgs::TupleLike(args),
-                    template_hints: self.compute_template_hints(ty, type_args),
+                    template_hints: compute_template_hints(self.db, ty, type_args),
                 };
             }
         }
@@ -997,25 +740,9 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         let AstExprDesc::Name(method) = callee.data else { unreachable!() };
-        let args = args
-            .iter()
-            .map(|a| self.lower_expr(a, scope, module))
-            .collect_vec();
-        let type_args = type_args
-            .iter()
-            .map(|arg| {
-                arg.as_known()
-                    .map_or(PartialTypeRef::Resolved(TypeRef::Unknown), |ty| {
-                        self.resolve_holed(&ty)
-                    })
-            })
-            .collect_vec();
-        self.lower_constructor_or_static_call(
-            type_def_id,
-            method,
-            type_args,
-            args,
-        )
+        let args = args.iter().map(|a| self.lower_expr(a, scope, module)).collect_vec();
+        let type_args = type_args.iter().map(|arg| self.resolve_any(arg)).collect_vec();
+        self.lower_constructor_or_static_call(type_def_id, method, type_args, args)
     }
 
     fn lower_structlit_that_is_actually_enum_variant(
@@ -1031,11 +758,7 @@ impl<'db> LowerFundef<'db> {
                 v
             } else {
                 match &ty.data {
-                    AstTypeExprDesc::Named { name, args }
-                        if args.is_empty() =>
-                    {
-                        *name
-                    }
+                    AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
                     _ => unreachable!(
                         "NameResolved+StructLit with no variant and complex ty"
                     ),
@@ -1046,11 +769,10 @@ impl<'db> LowerFundef<'db> {
                 let expr = self.lower_expr(value, scope, self.module);
                 lowered_fields.push((*name, expr));
             }
-            let args =
-                HirConstructorArgs::StructLike { fields: lowered_fields };
+            let args = HirConstructorArgs::StructLike { fields: lowered_fields };
             let mut template_hints = vec![];
             for _ in 0..templates_of_enum(self.db, enum_def.interned()).len() {
-                template_hints.push(PartialTypeArg::Infer);
+                template_hints.push(TypeRef::Unknown);
             }
             return HirExprDesc::Constructor {
                 enum_def,
@@ -1092,10 +814,8 @@ impl<'db> LowerFundef<'db> {
                 TypeDefId::Struct(_struct_id) => todo!(),
                 TypeDefId::Enum(enum_def) => {
                     let mut template_hints = vec![];
-                    for _ in
-                        0..templates_of_enum(self.db, enum_def.interned()).len()
-                    {
-                        template_hints.push(PartialTypeArg::Infer);
+                    for _ in 0..templates_of_enum(self.db, enum_def.interned()).len() {
+                        template_hints.push(TypeRef::Unknown);
                     }
                     HirExprDesc::Constructor {
                         enum_def,
@@ -1136,11 +856,8 @@ impl<'db> LowerFundef<'db> {
         match type_def {
             TypeDefId::Struct(struct_id) => match args {
                 AstConstructFields::StructFields(struct_field_patterns) => {
-                    let expected: HashSet<Symbol> = struct_id
-                        .field_names(self.db)
-                        .iter()
-                        .copied()
-                        .collect();
+                    let expected: HashSet<Symbol> =
+                        struct_id.field_names(self.db).iter().copied().collect();
                     let bound: HashSet<Symbol> = struct_field_patterns
                         .iter()
                         .map(|pat| match pat {
@@ -1156,11 +873,7 @@ impl<'db> LowerFundef<'db> {
                     let hir_fields = struct_field_patterns
                         .iter()
                         .map(|pat| match pat {
-                            StructFieldPattern::Rebind {
-                                name,
-                                pattern,
-                                ..
-                            } => {
+                            StructFieldPattern::Rebind { name, pattern, .. } => {
                                 let (lowered, new_locals) =
                                     self.lower_pattern(pattern, scope);
                                 locals.extend(new_locals);
@@ -1179,10 +892,7 @@ impl<'db> LowerFundef<'db> {
                                     *name_span,
                                 );
                                 locals.push(local);
-                                HirStructFieldPattern::Name {
-                                    id: local,
-                                    name: *name,
-                                }
+                                HirStructFieldPattern::Name { id: local, name: *name }
                             }
                         })
                         .collect_vec();
@@ -1272,9 +982,7 @@ impl<'db> LowerFundef<'db> {
                                 );
                                 _lower(this, &inner_pat, scope, locals, id)
                             }
-                            Some(Definition::Type(TypeDefId::Enum(
-                                resolution,
-                            ))) => {
+                            Some(Definition::Type(TypeDefId::Enum(resolution))) => {
                                 let (name, fields) = this
                                     .lower_pattern_as_constructor_args(
                                         to.as_ref(),
@@ -1308,9 +1016,7 @@ impl<'db> LowerFundef<'db> {
                         data: HirPatternDesc::Tuple(
                             fields
                                 .iter()
-                                .map(|x| {
-                                    _lower(this, x, scope, locals, this.module)
-                                })
+                                .map(|x| _lower(this, x, scope, locals, this.module))
                                 .collect(),
                         ),
                         span: pat.span,
@@ -1337,16 +1043,14 @@ impl<'db> LowerFundef<'db> {
     fn lower_stmt(&mut self, stmt: &AstStmt, scope: &mut Scope) -> HirStmt {
         let kind = match &stmt.data {
             AstStmtDesc::Return { value } => {
-                let value = value
-                    .as_ref()
-                    .map(|expr| self.lower_expr(expr, scope, self.module));
+                let value =
+                    value.as_ref().map(|expr| self.lower_expr(expr, scope, self.module));
                 HirStmtKind::Return(value)
             }
             AstStmtDesc::If { cond, then, else_ } => {
                 let cond = self.lower_expr(cond, scope, self.module);
                 let then = self.lower_stmt(then, scope);
-                let else_ =
-                    else_.as_ref().map(|s| self.lower_stmt(s, scope).boxed());
+                let else_ = else_.as_ref().map(|s| self.lower_stmt(s, scope).boxed());
                 HirStmtKind::If { cond, then: then.boxed(), else_ }
             }
             AstStmtDesc::While { cond, body } => {
@@ -1370,10 +1074,7 @@ impl<'db> LowerFundef<'db> {
             AstStmtDesc::Block { stmts } => {
                 let mut block_scope = scope.clone();
                 HirStmtKind::Block(
-                    stmts
-                        .iter()
-                        .map(|s| self.lower_stmt(s, &mut block_scope))
-                        .collect(),
+                    stmts.iter().map(|s| self.lower_stmt(s, &mut block_scope)).collect(),
                 )
             }
             AstStmtDesc::Assign { lhs, rhs } => {
@@ -1385,8 +1086,7 @@ impl<'db> LowerFundef<'db> {
                 // Make sure not to lower the lhs twice !
                 let place = self.expr_as_place(lhs, scope, self.module);
                 let binop = op.to_binop();
-                let lhs_expr =
-                    self.new_expr(HirExprDesc::Use(place.clone()), lhs.span);
+                let lhs_expr = self.new_expr(HirExprDesc::Use(place.clone()), lhs.span);
                 let rhs_expr = self.lower_expr(rhs, scope, self.module);
                 let combined = self.new_expr(
                     HirExprDesc::BinOp {
@@ -1415,12 +1115,7 @@ impl<'db> LowerFundef<'db> {
                             self.lower_expr(expr, &branch_scope, self.module)
                         });
                         let body = self.lower_stmt(body, &mut branch_scope);
-                        HirMatchBranch {
-                            pattern,
-                            locals,
-                            guard,
-                            body: body.boxed(),
-                        }
+                        HirMatchBranch { pattern, locals, guard, body: body.boxed() }
                     })
                     .collect();
                 HirStmtKind::Match { scrutinee, branches }
@@ -1466,16 +1161,12 @@ impl<'db> LowerFundef<'db> {
         );
         let iterator_id = self.allocate_local(
             scope,
-            Symbol::new(
-                self.db,
-                format!("@iterator_{}", self.next_iterator_id()),
-            ),
+            Symbol::new(self.db, format!("@iterator_{}", self.next_iterator_id())),
             Mutability::Mutable,
             None,
             iterator_span,
         );
-        let let_iter =
-            self.declare_single_var(iterator_id, iterator, iterator_span);
+        let let_iter = self.declare_single_var(iterator_id, iterator, iterator_span);
         let iterator_place =
             self.new_place(HirPlaceKind::Local(iterator_id), iterator_span);
         let next_expr = self.new_expr(
@@ -1509,11 +1200,7 @@ impl<'db> LowerFundef<'db> {
         self.iterator_id.fresh()
     }
 
-    fn collect_args(
-        &mut self,
-        args: &[AstFundefArg],
-        scope: &mut Scope,
-    ) -> Vec<LocalId> {
+    fn collect_args(&mut self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {
         args.iter()
             .map(|arg| {
                 self.allocate_local(
@@ -1556,9 +1243,7 @@ impl<'db> LowerFundef<'db> {
             | AstReceiver::PtrZelf(span) => Some((Mutability::Const, span)),
             AstReceiver::MutZelf(span)
             | AstReceiver::MutRefZelf(span)
-            | AstReceiver::MutPtrZelf(span) => {
-                Some((Mutability::Mutable, span))
-            }
+            | AstReceiver::MutPtrZelf(span) => Some((Mutability::Mutable, span)),
         } {
             zelf = Some(self.allocate_local(
                 &mut s,
@@ -1599,8 +1284,7 @@ impl<'db> LowerFundef<'db> {
                     AstConstructFields::TupleFields(pats) => {
                         let mut lowered_pats = vec![];
                         for pat in pats {
-                            let (pat, new_locals) =
-                                self.lower_pattern(pat, scope);
+                            let (pat, new_locals) = self.lower_pattern(pat, scope);
                             lowered_pats.push(pat);
                             locals.extend(new_locals);
                         }
@@ -1610,11 +1294,7 @@ impl<'db> LowerFundef<'db> {
                         let mut lowered_pats = vec![];
                         for pat in pats {
                             let pat = match pat {
-                                StructFieldPattern::Rebind {
-                                    name,
-                                    pattern,
-                                    ..
-                                } => {
+                                StructFieldPattern::Rebind { name, pattern, .. } => {
                                     let (pat, new_locals) =
                                         self.lower_pattern(pattern, scope);
                                     locals.extend(new_locals);
@@ -1650,9 +1330,7 @@ impl<'db> LowerFundef<'db> {
                 unreachable!()
             }
             AstNamedPattern::Mut { .. } => unreachable!(),
-            AstNamedPattern::Bare(name) => {
-                (*name, HirPatternConstructorArgs::None)
-            }
+            AstNamedPattern::Bare(name) => (*name, HirPatternConstructorArgs::None),
         }
     }
 }
@@ -1665,9 +1343,7 @@ pub(super) fn lower_fundef_body<'db>(
     let module = match function.parent(db) {
         ScopeOwnerId::Module(m) => m,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
-        ScopeOwnerId::Interface(interface_ref) => {
-            interface_ref.def(db).parent(db)
-        }
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
     let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
@@ -1682,9 +1358,7 @@ pub(super) fn lower_method_body<'db>(
     let module = match function.parent(db) {
         ScopeOwnerId::Module(m) => m,
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
-        ScopeOwnerId::Interface(interface_ref) => {
-            interface_ref.def(db).parent(db)
-        }
+        ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
     let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);

@@ -23,10 +23,7 @@ pub mod plumbing;
 pub use plumbing::*;
 
 use crate::{
-    Db, SourceFile,
-    common::{location::Span, symbols::Symbol, unord::Set},
-    parse_tree::top_level::{AstImplItem, AstTemplateArg},
-    printer::type_printer::TypePrinter,
+    Db, SourceFile, common::{location::Span, symbols::Symbol, unord::Set}, name_resolve::type_expr::{templates_of_enum, templates_of_struct}, parse_tree::top_level::{AstImplItem, AstTemplateArg}, printer::type_printer::TypePrinter,
 };
 
 #[salsa::tracked]
@@ -45,8 +42,7 @@ impl<'db> FileModule<'db> {
             .and_then(|parent| {
                 // If this file is main.rkr, the module name is the directory
                 // name
-                if path.file_name().and_then(|n| n.to_str()) == Some("main.rkr")
-                {
+                if path.file_name().and_then(|n| n.to_str()) == Some("main.rkr") {
                     parent.file_name()
                 } else {
                     None
@@ -253,3 +249,80 @@ pub struct BuiltinTypeId(salsa::Id);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InterfaceRef(salsa::Id);
+
+pub fn templates_of_type_def(db: &dyn Db, ty: TypeDefId) -> usize {
+    match ty {
+        TypeDefId::Builtin(id) => id.template_count(db),
+        TypeDefId::Struct(id) => templates_of_struct(db, id.into()).len(),
+        TypeDefId::Enum(id) => templates_of_enum(db, id.into()).len(),
+    }
+}
+
+pub fn merge_type_ref(db: &dyn Db, a: TypeRef, b: TypeRef) -> TypeRef {
+    match (a, b) {
+        (TypeRef::Param(a), TypeRef::Param(b)) => {
+            if a != b {
+                return TypeRef::Error;
+            }
+            TypeRef::Param(a)
+        }
+        (TypeRef::Param(a), _) | (_, TypeRef::Param(a)) => TypeRef::Param(a),
+        (TypeRef::Zelf, _) | (_, TypeRef::Zelf) => TypeRef::Zelf,
+        (TypeRef::Error, other) | (other, TypeRef::Error) => other,
+        (TypeRef::Unknown, other) | (other, TypeRef::Unknown) => other,
+        (TypeRef::Associated(s), _) | (_, TypeRef::Associated(s)) => {
+            TypeRef::Associated(s)
+        }
+        (TypeRef::Concrete(a), TypeRef::Concrete(b)) => {
+            let a_def = a.def(db);
+            if a.def(db) != b.def(db) {
+                return TypeRef::Error;
+            }
+            let a_args = a.args(db);
+            let b_args = b.args(db);
+            if a_args.len() != b_args.len() {
+                return TypeRef::Error;
+            }
+
+            let args = a_args
+                .iter()
+                .zip(b_args)
+                .map(|(a, b)| merge_type_ref(db, *a, *b))
+                .collect();
+
+            TypeId::new(db, a_def, args).into()
+        }
+    }
+}
+
+pub fn rehole(db: &dyn Db, ty: TypeRef) -> TypeRef {
+    let Some(id) = ty.as_type_id() else {
+        return ty;
+    };
+    let def = id.def(db);
+    let n = templates_of_type_def(db, def);
+    let args = id.args(db);
+    let args = (0..n)
+        .into_iter()
+        .map(|i| args.get(i).copied().unwrap_or(TypeRef::Unknown))
+        .collect();
+
+    TypeId::new(db, def, args).into()
+}
+
+pub fn compute_template_hints(
+    db: &dyn Db,
+    ty: TypeRef,
+    type_args: Vec<TypeRef>,
+) -> Vec<TypeRef> {
+    let Some(reholed) = rehole(db, ty).as_type_id() else {
+        return type_args;
+    };
+
+    reholed
+        .args(db)
+        .iter()
+        .zip(type_args)
+        .map(|(a, b)| merge_type_ref(db, *a, b))
+        .collect()
+}

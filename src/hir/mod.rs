@@ -44,7 +44,7 @@ use crate::{
     ril::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId,
         InternedImplId, InternedInterfaceId, ModuleId, ScopeOwnerId, StructId,
-        TypeDefId, TypeRef,
+        TypeRef,
     },
 };
 
@@ -153,21 +153,21 @@ pub enum HirExprDesc {
         // instance
         target: FunctionId,
         args: Vec<HirExpr>,
-        type_args: Vec<PartialTypeRef>,
+        type_args: Vec<TypeRef>,
     },
 
     UnresolvedCallDirect {
         // The function id here is not valid
         target: FunctionId,
         args: Vec<HirExpr>,
-        type_args: Vec<PartialTypeRef>,
+        type_args: Vec<TypeRef>,
     },
 
     CallMethod {
         receiver: Box<HirExpr>,
         method: Symbol,
         args: Vec<HirExpr>,
-        type_args: Vec<PartialTypeRef>,
+        type_args: Vec<TypeRef>,
 
         // None: regular method call    : expr.method(...)
         // Some(Trait)                  : Trait::method(expr, ...)
@@ -175,10 +175,10 @@ pub enum HirExprDesc {
     },
 
     CallStatic {
-        ty: PartialTypeRef,
+        ty: TypeRef,
         method: Symbol,
         args: Vec<HirExpr>,
-        type_args: Vec<PartialTypeRef>,
+        type_args: Vec<TypeRef>,
     },
 
     BinOp {
@@ -188,7 +188,7 @@ pub enum HirExprDesc {
     },
 
     StructLit {
-        ty: PartialTypeRef,
+        ty: TypeRef,
         fields: Vec<(Symbol, HirExpr)>,
     },
 
@@ -196,36 +196,23 @@ pub enum HirExprDesc {
     Not(Box<HirExpr>),
     Tuple(Vec<HirExpr>),
     SliceLit(Vec<HirExpr>),
-    SizeOf(PartialTypeRef),
-    TypeName(PartialTypeRef),
+    SizeOf(TypeRef),
+    TypeName(TypeRef),
     Constructor {
         enum_def: EnumId,
         name: Symbol,
         args: HirConstructorArgs,
-        template_hints: Vec<PartialTypeArg>,
+        template_hints: Vec<TypeRef>,
     },
 
     Metadata(Box<HirExpr>),
 
     As {
         expr: Box<HirExpr>,
-        ty: PartialTypeRef,
+        ty: TypeRef,
     },
 
     Error,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PartialTypeRef {
-    Resolved(TypeRef),
-    WithHoles { def: TypeDefId, args: Vec<PartialTypeArg> },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PartialTypeArg {
-    Known(TypeRef),
-    Partial(Box<PartialTypeRef>),
-    Infer, // Hole
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
