@@ -24,10 +24,6 @@ regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
 salsa = {version = "0.28.0", features = []}
 salsa-macros = "0.28.0"
-serde = "1.0.228"
-serde_json = "1.0.149"
-tokio = {version = "1.52.3", features = ["full"] }
-tower-lsp = "0.20.0"
 unescaper = "0.1.8"
 walkdir = "2.5.0"
 
