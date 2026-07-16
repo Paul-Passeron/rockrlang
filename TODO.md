@@ -53,6 +53,7 @@ Other:
 - [ ] Remove `PartialTypeRef` and `PartialTypeArg` as TypeRef seems to do what they do (`TypeRef::Unkwown`)
 - [ ] Make sure performance of the typechecker is acceptable
 - [ ] Have like a `diagnose_solver(unresolved: &[], errors: &[])` function to create good diagnostic from solver error output
+- [ ] Make builtin types be an enum maybe, at least not runtime salsa interned structs as it is now
 
 ## Long-term
 
