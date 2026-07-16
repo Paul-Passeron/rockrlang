@@ -5,6 +5,12 @@ interface PrettyPrint {
     fun print(&self): void;
 }
 
+impl PrettyPrint for int {
+    fun print(&self): void {
+        printf(c"%d", *self);
+    }
+}
+
 struct MyStruct<T> {
     x: int;
     y: opt<T>;
@@ -24,9 +30,8 @@ impl <T: PrettyPrint> PrettyPrint for opt<T> {
     fun print(&self): void {
         match self {
             opt::Some(val) => {
-                let x: &T = val; // Necessary, seems we don't bind the inner type in this case for some reason
                 printf(c"Some("); 
-                x.print();
+                val$.print();
                 printf(c")");
             }
             _ => {
@@ -36,25 +41,26 @@ impl <T: PrettyPrint> PrettyPrint for opt<T> {
     }
 }
 
-impl PrettyPrint for int {
-    fun print(&self): void {
-        printf(c"%d", *self);
-    }
-}
+
 
 fun type_name<T>(of: &T): str {
     return @type_name(T);
 }
 
+// Prints a new-line
+fun nl(): void {
+    "".println();
+}
+
 fun main(): int {
     let x: int = 123456;
     let x = opt::Some(opt::Some(opt::Some(x)));
-    x.print(); "".println();
+    x.print(); nl();
     type_name(&x).println();
-    let wrapper: MyStruct<opt<opt<opt<int>>>> = MyStruct {
+    let wrapper = MyStruct {
         .x: 5,
         .y: opt::Some(x),
     };
-    wrapper.print(); "".println();
+    wrapper.print(); nl();
     return 0;
 }
