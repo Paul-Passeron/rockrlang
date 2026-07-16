@@ -34,7 +34,7 @@ use std::{
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{LocalId, Mutability, PartialTypeRef, function_ast},
+    hir::{LocalId, Mutability, function_ast},
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -287,7 +287,7 @@ pub enum UnificationError {
     MinTupleLengthMismatch { expected: usize, got: usize },
     ExpectedStructWithField { def: TypeDefId, field: Symbol },
     IncompleteStructLit { id: StructId, missing: Symbol },
-    NonStructForStructLit(PartialTypeRef),
+    NonStructForStructLit(TypeRef),
     TemplateDereferencing(TypeParamId),
     TemplateConstraining(TypeParamId),
     ArgCountMismatch(FunctionId, usize),

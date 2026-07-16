@@ -28,21 +28,19 @@ use crate::{
         symbols::Symbol,
     },
     hir::{
-        self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
-        HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc,
-        HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
-        LocalInfo, Mutability, PartialTypeRef,
+        self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch,
+        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     ril::{
-        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
-        ref_of,
+        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, ref_of,
+        rehole,
     },
     thir::{
-        EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId,
-        Projection, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr,
-        ThirExprWithSetup, ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace,
-        ThirScope, stmt::ThirStmt,
+        EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
+        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
+        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::{
         self, PatternId, TypeCheckResults,
@@ -124,8 +122,7 @@ impl<'db> ThirBuilder<'db> {
         tc_results: TypeCheckResults<'_>,
     ) {
         let local = ThirLocal {
-            ty: tc_results.locals(self.db)[&infos.id]
-                .unwrap_or(TypeRef::Unknown),
+            ty: tc_results.locals(self.db)[&infos.id].unwrap_or(TypeRef::Unknown),
             mutability: infos.mutability,
             span: infos.span,
             source: Some((infos.id, infos.name)),
@@ -191,11 +188,7 @@ pub struct ThirTranslator<'db> {
 }
 
 impl<'db> ThirTranslator<'db> {
-    pub fn new(
-        db: &'db dyn Db,
-        hir: HirBody<'db>,
-        tc: TypeCheckResults<'db>,
-    ) -> Self {
+    pub fn new(db: &'db dyn Db, hir: HirBody<'db>, tc: TypeCheckResults<'db>) -> Self {
         Self { db, hir, tc, scope_stack: Vec::new() }
     }
 
@@ -209,15 +202,9 @@ impl<'db> ThirTranslator<'db> {
                 TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
                     db,
                     type_id.def(db),
-                    type_id
-                        .args(db)
-                        .iter()
-                        .map(|ty| _aux(db, owner, *ty))
-                        .collect(),
+                    type_id.args(db).iter().map(|ty| _aux(db, owner, *ty)).collect(),
                 )),
-                TypeRef::Zelf => {
-                    owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error)
-                }
+                TypeRef::Zelf => owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error),
                 _ => ty, // TODO ???
             }
         }
@@ -234,9 +221,7 @@ impl<'db> ThirTranslator<'db> {
         let params = zelf
             .iter()
             .copied()
-            .chain(
-                self.hir.params(self.db).iter().map(|param| b.local_map[param]),
-            )
+            .chain(self.hir.params(self.db).iter().map(|param| b.local_map[param]))
             .collect_vec();
         let stmts = self
             .hir
@@ -267,13 +252,9 @@ impl<'db> ThirTranslator<'db> {
         stmts: &[HirStmt],
         span: Span,
     ) -> ThirStmt {
-        let (scope, stmts) =
-            self.scoped(b, span, ScopeKind::Block, |this, b| {
-                stmts
-                    .iter()
-                    .flat_map(|stmt| this.handle_stmt(b, stmt))
-                    .collect_vec()
-            });
+        let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
+            stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
+        });
         ThirStmt::block(scope, stmts, span)
     }
 
@@ -284,25 +265,17 @@ impl<'db> ThirTranslator<'db> {
         stmts: &mut Vec<ThirStmt>,
     ) -> Either<ExprId, PlaceId> {
         match &expr.data {
-            HirExprDesc::Use(place) => {
-                Either::Right(self.place(b, place, stmts))
-            }
+            HirExprDesc::Use(place) => Either::Right(self.place(b, place, stmts)),
             _ => Either::Left(self.expr(b, expr, stmts)),
         }
     }
 
-    fn handle_stmt(
-        &mut self,
-        b: &mut ThirBuilder,
-        stmt: &HirStmt,
-    ) -> Vec<ThirStmt> {
+    fn handle_stmt(&mut self, b: &mut ThirBuilder, stmt: &HirStmt) -> Vec<ThirStmt> {
         match &stmt.kind {
             HirStmtKind::Let { pattern, init, .. } => {
                 let mut res = vec![];
                 let value = self.expr_or_place(b, init, &mut res);
-                res.extend(
-                    self.destructure_pattern_init(b, pattern, value, stmt.span),
-                );
+                res.extend(self.destructure_pattern_init(b, pattern, value, stmt.span));
                 res
             }
             HirStmtKind::Match { scrutinee, branches } => {
@@ -323,8 +296,7 @@ impl<'db> ThirTranslator<'db> {
             }
             HirStmtKind::Return(hir_expr) => {
                 let mut res = vec![];
-                let expr =
-                    hir_expr.as_ref().map(|expr| self.expr(b, expr, &mut res));
+                let expr = hir_expr.as_ref().map(|expr| self.expr(b, expr, &mut res));
                 res.push(ThirStmt::ret(expr, stmt.span));
                 res
             }
@@ -391,9 +363,7 @@ impl<'db> ThirTranslator<'db> {
             None => (None, None),
         };
 
-        ThirStmt::ifte(
-            thir_cond, then_stmts, then_scope, else_stmts, else_scope, span,
-        )
+        ThirStmt::ifte(thir_cond, then_stmts, then_scope, else_stmts, else_scope, span)
     }
 
     fn handle_single_stmt(
@@ -406,10 +376,7 @@ impl<'db> ThirTranslator<'db> {
                 if stmts.len() == 1 {
                     self.handle_single_stmt(b, &stmts[0])
                 } else {
-                    stmts
-                        .iter()
-                        .flat_map(|stmt| self.handle_stmt(b, stmt))
-                        .collect()
+                    stmts.iter().flat_map(|stmt| self.handle_stmt(b, stmt)).collect()
                 }
             }
             _ => self.handle_stmt(b, stmt),
@@ -424,9 +391,8 @@ impl<'db> ThirTranslator<'db> {
         span: Span,
     ) -> ThirStmt {
         let cond = self.expr_with_setup(b, cond);
-        let (scope, body) = self.scoped(b, span, ScopeKind::Loop, |this, b| {
-            this.handle_single_stmt(b, body)
-        });
+        let (scope, body) = self
+            .scoped(b, span, ScopeKind::Loop, |this, b| this.handle_single_stmt(b, body));
         ThirStmt::whl(cond, scope, body, span)
     }
 
@@ -436,8 +402,7 @@ impl<'db> ThirTranslator<'db> {
         branch: &HirMatchBranch,
     ) -> ThirMatchBranch {
         let pattern = self.pat(b, &branch.pattern);
-        let guard =
-            branch.guard.as_ref().map(|guard| self.expr_with_setup(b, guard));
+        let guard = branch.guard.as_ref().map(|guard| self.expr_with_setup(b, guard));
         let (body_scope, body) =
             self.scoped(b, branch.body.span, ScopeKind::Block, |this, b| {
                 this.handle_single_stmt(b, &branch.body)
@@ -453,10 +418,8 @@ impl<'db> ThirTranslator<'db> {
         span: Span,
     ) -> ThirStmt {
         let scrut = self.expr_with_setup(b, scrutinee);
-        let branches = branches
-            .iter()
-            .map(|branch| self.handle_branch(b, branch))
-            .collect_vec();
+        let branches =
+            branches.iter().map(|branch| self.handle_branch(b, branch)).collect_vec();
         ThirStmt::mtch(scrut, branches, span)
     }
 
@@ -467,19 +430,12 @@ impl<'db> ThirTranslator<'db> {
         stmts: &mut Vec<ThirStmt>,
     ) -> ThirConstructorArgs<ExprId> {
         match args {
-            HirConstructorArgs::TupleLike(hir_exprs) => {
-                ThirConstructorArgs::Tuple(
-                    hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect(),
-                )
-            }
-            HirConstructorArgs::StructLike { fields } => {
-                ThirConstructorArgs::Struct(
-                    fields
-                        .iter()
-                        .map(|f| (f.0, self.expr(b, &f.1, stmts)))
-                        .collect(),
-                )
-            }
+            HirConstructorArgs::TupleLike(hir_exprs) => ThirConstructorArgs::Tuple(
+                hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect(),
+            ),
+            HirConstructorArgs::StructLike { fields } => ThirConstructorArgs::Struct(
+                fields.iter().map(|f| (f.0, self.expr(b, &f.1, stmts))).collect(),
+            ),
             HirConstructorArgs::None => ThirConstructorArgs::None,
         }
     }
@@ -491,20 +447,18 @@ impl<'db> ThirTranslator<'db> {
     ) -> ThirConstructorArgs<ThirPattern> {
         match arg {
             HirPatternConstructorArgs::None => ThirConstructorArgs::None,
-            HirPatternConstructorArgs::StructFields(pats) => {
-                ThirConstructorArgs::Struct(
-                    pats.iter()
-                        .map(|pat| match pat {
-                            HirStructFieldPattern::Name { id, name } => {
-                                (*name, self.pattern_of_local(b, *id))
-                            }
-                            HirStructFieldPattern::Rebind { name, pattern } => {
-                                (*name, self.pat(b, pattern))
-                            }
-                        })
-                        .collect(),
-                )
-            }
+            HirPatternConstructorArgs::StructFields(pats) => ThirConstructorArgs::Struct(
+                pats.iter()
+                    .map(|pat| match pat {
+                        HirStructFieldPattern::Name { id, name } => {
+                            (*name, self.pattern_of_local(b, *id))
+                        }
+                        HirStructFieldPattern::Rebind { name, pattern } => {
+                            (*name, self.pat(b, pattern))
+                        }
+                    })
+                    .collect(),
+            ),
             HirPatternConstructorArgs::TupleFields(hir_patterns) => {
                 ThirConstructorArgs::Tuple(
                     hir_patterns.iter().map(|pat| self.pat(b, pat)).collect(),
@@ -513,11 +467,7 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
-    fn pattern_of_local(
-        &mut self,
-        b: &mut ThirBuilder,
-        id: hir::LocalId,
-    ) -> ThirPattern {
+    fn pattern_of_local(&mut self, b: &mut ThirBuilder, id: hir::LocalId) -> ThirPattern {
         let local_id = b.local_map[&id];
         let local = b.get_local(local_id);
         ThirPattern {
@@ -537,17 +487,12 @@ impl<'db> ThirTranslator<'db> {
         let ty = self.canonicalize_type(ty);
         let kind = match &pat.data {
             HirPatternDesc::Bind { id, mutable, .. } => {
-                Some(ThirPatternKind::Bind {
-                    local: b.local_map[id],
-                    mutable: *mutable,
-                })
+                Some(ThirPatternKind::Bind { local: b.local_map[id], mutable: *mutable })
             }
             HirPatternDesc::Any => Some(ThirPatternKind::Any),
-            HirPatternDesc::Tuple(hir_patterns) => {
-                Some(ThirPatternKind::Tuple(
-                    hir_patterns.iter().map(|pat| self.pat(b, pat)).collect(),
-                ))
-            }
+            HirPatternDesc::Tuple(hir_patterns) => Some(ThirPatternKind::Tuple(
+                hir_patterns.iter().map(|pat| self.pat(b, pat)).collect(),
+            )),
             HirPatternDesc::DestructureBinding { fields, .. } => {
                 let def = ty.as_struct_ref(self.db);
                 let fields = fields
@@ -577,11 +522,7 @@ impl<'db> ThirTranslator<'db> {
                 let def = ty.as_enum_ref(self.db);
                 match (id, def) {
                     (Some(id), Some(def)) => {
-                        Some(ThirPatternKind::Constructor {
-                            def,
-                            idx: id,
-                            args,
-                        })
+                        Some(ThirPatternKind::Constructor { def, idx: id, args })
                     }
                     _ => None,
                 }
@@ -680,46 +621,37 @@ impl<'db> ThirTranslator<'db> {
                 let (place, ty) = match value {
                     Either::Left(expr) => {
                         let ty = self.canonicalize_type(b.get_expr(expr).ty);
-                        let fresh = b.new_synthetic_local(
-                            ty,
-                            Mutability::Const,
-                            pat.span,
-                        );
+                        let fresh =
+                            b.new_synthetic_local(ty, Mutability::Const, pat.span);
                         v.push(ThirStmt::let_(fresh, expr, span));
-                        let place =
-                            b.new_place(ThirPlace::local(fresh, b, pat.span));
+                        let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
                         (place, ty)
                     }
                     Either::Right(place) => (place, b.get_place(place).ty),
                 };
 
                 let wrapped = RefWrappedTy::from_type_ref(self.db, ty);
-                let def =
-                    wrapped.inner.as_struct_ref(self.db).unwrap_or_else(|| {
-                        todo!(
-                            "handle bad case: inner_ty = {}",
-                            wrapped.inner.to_string(self.db)
-                        )
-                    });
+                let def = wrapped.inner.as_struct_ref(self.db).unwrap_or_else(|| {
+                    todo!(
+                        "handle bad case: inner_ty = {}",
+                        wrapped.inner.to_string(self.db)
+                    )
+                });
                 for pat_field in fields {
                     let name = match pat_field {
                         HirStructFieldPattern::Name { name, .. }
                         | HirStructFieldPattern::Rebind { name, .. } => *name,
                     };
                     let field_ty = self.canonicalize_type(
-                        def.typeof_field(self.db, name)
-                            .unwrap_or(TypeRef::Error),
+                        def.typeof_field(self.db, name).unwrap_or(TypeRef::Error),
                     );
                     let mut place = place;
                     for _ in 0..wrapped.depth() {
                         let new_ty = self.canonicalize_type(
                             b.places[place].ty.as_ref(self.db).unwrap().1,
                         );
-                        place = b.with_synthetic_projection(
-                            place,
-                            Projection::Deref,
-                            new_ty,
-                        );
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, new_ty);
                     }
                     let field_place = b.with_synthetic_projection(
                         place,
@@ -730,20 +662,16 @@ impl<'db> ThirTranslator<'db> {
                     let field_value = if wrapped.depth() == 0 {
                         b.new_expr(ThirExpr::use_place(field_place, b, span))
                     } else {
-                        let mutability =
-                            if let Some(WrapKind::Ref(mutability)) =
-                                wrapped.refs.first()
-                            {
-                                *mutability
-                            } else {
-                                Mutability::Const
-                            };
+                        let mutability = if let Some(WrapKind::Ref(mutability)) =
+                            wrapped.refs.first()
+                        {
+                            *mutability
+                        } else {
+                            Mutability::Const
+                        };
                         let mut cur_ty = field_ty;
                         let mut val = b.new_expr(ThirExpr {
-                            kind: ExprKind::Ref {
-                                place: field_place,
-                                mutability,
-                            },
+                            kind: ExprKind::Ref { place: field_place, mutability },
                             ty: cur_ty.wrap_ref(self.db, mutability.is_mut()),
                             span,
                         });
@@ -752,14 +680,9 @@ impl<'db> ThirTranslator<'db> {
                             let WrapKind::Ref(mutability) = wrapped;
                             let mutable = mutability.is_mut();
                             cur_ty = cur_ty.wrap_ref(self.db, mutable);
-                            let tmp = b.new_synthetic_local(
-                                cur_ty,
-                                *mutability,
-                                span,
-                            );
+                            let tmp = b.new_synthetic_local(cur_ty, *mutability, span);
                             v.push(ThirStmt::let_(tmp, val, span));
-                            let tmp_place =
-                                b.new_place(ThirPlace::local(tmp, b, span));
+                            let tmp_place = b.new_place(ThirPlace::local(tmp, b, span));
                             val = b.new_expr(ThirExpr {
                                 kind: ExprKind::Ref {
                                     place: tmp_place,
@@ -772,9 +695,7 @@ impl<'db> ThirTranslator<'db> {
                         val
                     };
                     match pat_field {
-                        HirStructFieldPattern::Rebind {
-                            pattern: pat, ..
-                        } => {
+                        HirStructFieldPattern::Rebind { pattern: pat, .. } => {
                             self._destructure_pattern_init(
                                 b,
                                 pat,
@@ -785,11 +706,7 @@ impl<'db> ThirTranslator<'db> {
                         }
                         HirStructFieldPattern::Name { id, .. } => {
                             let thir_local = b.local_map[id];
-                            v.push(ThirStmt::let_(
-                                thir_local,
-                                field_value,
-                                span,
-                            ));
+                            v.push(ThirStmt::let_(thir_local, field_value, span));
                         }
                     }
                 }
@@ -872,24 +789,18 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Not(operand)
             }
             HirExprDesc::Tuple(hir_exprs) => {
-                let fields = hir_exprs
-                    .iter()
-                    .map(|e| self.expr(b, e, stmts))
-                    .collect_vec();
+                let fields =
+                    hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect_vec();
                 ExprKind::Tuple(fields)
             }
             HirExprDesc::SliceLit(hir_exprs) => {
-                let exprs = hir_exprs
-                    .iter()
-                    .map(|e| self.expr(b, e, stmts))
-                    .collect_vec();
+                let exprs =
+                    hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect_vec();
                 ExprKind::SliceLit(exprs)
             }
-            HirExprDesc::SizeOf(partial_type_ref) => {
-                ExprKind::SizeOf(partial_type_ref.plugged_by_unknown(self.db))
-            }
-            HirExprDesc::TypeName(partial_type_ref) => {
-                ExprKind::TypeName(partial_type_ref.plugged_by_unknown(self.db))
+            HirExprDesc::SizeOf(type_ref) => ExprKind::SizeOf(rehole(self.db, *type_ref)),
+            HirExprDesc::TypeName(type_ref) => {
+                ExprKind::TypeName(rehole(self.db, *type_ref))
             }
             HirExprDesc::Constructor { name, args, .. } => {
                 let enum_def = ty.as_enum_ref(self.db).expect("TODO");
@@ -902,10 +813,7 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Constructor { enum_def, idx, args }
             }
             HirExprDesc::CallDirect { target, args, .. } => {
-                let args = args
-                    .iter()
-                    .map(|arg| self.expr(b, arg, stmts))
-                    .collect_vec();
+                let args = args.iter().map(|arg| self.expr(b, arg, stmts)).collect_vec();
                 let call_infos =
                     &self.tc.call_infos(self.db)[&typecheck::ExprId(expr.id)];
                 let fref = FunctionRef {
@@ -917,10 +825,8 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Call { called: fref, args }
             }
             HirExprDesc::CallMethod { receiver, args, .. } => {
-                let Some(call_infos) = &self
-                    .tc
-                    .call_infos(self.db)
-                    .get(&typecheck::ExprId(expr.id))
+                let Some(call_infos) =
+                    &self.tc.call_infos(self.db).get(&typecheck::ExprId(expr.id))
                 else {
                     return b.new_expr(ThirExpr {
                         kind: ExprKind::Error,
@@ -946,19 +852,16 @@ impl<'db> ThirTranslator<'db> {
                     );
 
                     let mut thir_args = vec![thir_receiver];
-                    thir_args.extend(
-                        args.iter().map(|arg| self.expr(b, arg, stmts)),
-                    );
+                    thir_args.extend(args.iter().map(|arg| self.expr(b, arg, stmts)));
                     thir_args
                 };
 
                 let zelf_ty = call_infos.zelf_ty.clone().or_else(|| {
                     match call_infos.callee.parent(self.db) {
                         ScopeOwnerId::Impl(impl_id) => Some(
-                            impl_id.implemented(self.db).with_substitution(
-                                self.db,
-                                &call_infos.substitution,
-                            ),
+                            impl_id
+                                .implemented(self.db)
+                                .with_substitution(self.db, &call_infos.substitution),
                         ),
                         _ => None,
                     }
@@ -973,10 +876,8 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Call { called: fref, args: thir_args }
             }
             HirExprDesc::CallStatic { args, .. } => {
-                let Some(call_infos) = &self
-                    .tc
-                    .call_infos(self.db)
-                    .get(&typecheck::ExprId(expr.id))
+                let Some(call_infos) =
+                    &self.tc.call_infos(self.db).get(&typecheck::ExprId(expr.id))
                 else {
                     return b.new_expr(ThirExpr {
                         kind: ExprKind::Error,
@@ -985,10 +886,8 @@ impl<'db> ThirTranslator<'db> {
                     });
                 };
 
-                let thir_args = args
-                    .iter()
-                    .map(|arg| self.expr(b, arg, stmts))
-                    .collect_vec();
+                let thir_args =
+                    args.iter().map(|arg| self.expr(b, arg, stmts)).collect_vec();
 
                 let fref = FunctionRef {
                     id: call_infos.callee,
@@ -1052,42 +951,26 @@ impl<'db> ThirTranslator<'db> {
         match call_infos.call_kind {
             typecheck::CallKind::Method { adjustment } => match adjustment {
                 typecheck::ReceiverAdjustment::None => {
-                    let place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
-                            self.spill_to_temp(
-                                b,
-                                stmts,
-                                thir_receiver,
-                                Mutability::Const,
-                            )
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
                         });
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
                 typecheck::ReceiverAdjustment::Ref => {
-                    let place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
-                            self.spill_to_temp(
-                                b,
-                                stmts,
-                                thir_receiver,
-                                Mutability::Const,
-                            )
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
                         });
                     b.new_expr(ThirExpr {
-                        kind: ExprKind::Ref {
-                            place,
-                            mutability: Mutability::Const,
-                        },
+                        kind: ExprKind::Ref { place, mutability: Mutability::Const },
                         ty: b.get_place(place).ty.wrap_ref(self.db, false),
                         span,
                     })
                 }
                 typecheck::ReceiverAdjustment::MutRef => {
-                    let place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(
                                 b,
                                 stmts,
@@ -1096,73 +979,46 @@ impl<'db> ThirTranslator<'db> {
                             )
                         });
                     b.new_expr(ThirExpr {
-                        kind: ExprKind::Ref {
-                            place,
-                            mutability: Mutability::Mutable,
-                        },
+                        kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
                         ty: receiver_ty.wrap_ref(self.db, true),
                         span,
                     })
                 }
                 typecheck::ReceiverAdjustment::Deref(depth) => {
-                    let mut place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
-                            self.spill_to_temp(
-                                b,
-                                stmts,
-                                thir_receiver,
-                                Mutability::Const,
-                            )
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
                         });
                     let mut cur_ty = receiver_ty;
                     for _ in 0..depth {
-                        cur_ty = cur_ty
-                            .as_ref(self.db)
-                            .map_or(TypeRef::Error, |(_, ty)| ty);
-                        place = b.with_synthetic_projection(
-                            place,
-                            Projection::Deref,
-                            cur_ty,
-                        );
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
                     }
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
                 typecheck::ReceiverAdjustment::DerefThenRef(depth) => {
-                    let mut place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
-                            self.spill_to_temp(
-                                b,
-                                stmts,
-                                thir_receiver,
-                                Mutability::Const,
-                            )
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
                         });
                     let mut cur_ty = receiver_ty;
                     for _ in 0..depth {
-                        cur_ty = cur_ty
-                            .as_ref(self.db)
-                            .map_or(TypeRef::Error, |(_, ty)| ty);
-                        place = b.with_synthetic_projection(
-                            place,
-                            Projection::Deref,
-                            cur_ty,
-                        );
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
                     }
                     b.new_expr(ThirExpr {
-                        kind: ExprKind::Ref {
-                            place,
-                            mutability: Mutability::Const,
-                        },
+                        kind: ExprKind::Ref { place, mutability: Mutability::Const },
                         ty: cur_ty.wrap_ref(self.db, false),
                         span,
                     })
                 }
                 typecheck::ReceiverAdjustment::DerefThenMutRef(depth) => {
-                    let mut place = self
-                        .expr_as_place(b, thir_receiver)
-                        .unwrap_or_else(|| {
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(
                                 b,
                                 stmts,
@@ -1172,32 +1028,21 @@ impl<'db> ThirTranslator<'db> {
                         });
                     let mut cur_ty = receiver_ty;
                     for _ in 0..depth {
-                        cur_ty = cur_ty
-                            .as_ref(self.db)
-                            .map_or(TypeRef::Error, |(_, ty)| ty);
-                        place = b.with_synthetic_projection(
-                            place,
-                            Projection::Deref,
-                            cur_ty,
-                        );
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
                     }
                     b.new_expr(ThirExpr {
-                        kind: ExprKind::Ref {
-                            place,
-                            mutability: Mutability::Mutable,
-                        },
+                        kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
                         ty: cur_ty.wrap_ref(self.db, true),
                         span,
                     })
                 }
             },
             _ => {
-                let place = self.spill_to_temp(
-                    b,
-                    stmts,
-                    thir_receiver,
-                    Mutability::Const,
-                );
+                let place =
+                    self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
                 b.new_expr(ThirExpr::use_place(place, b, span))
             }
         }
@@ -1255,8 +1100,7 @@ impl<'db> ThirTranslator<'db> {
                     (place.ty, place.span)
                 };
                 let struct_ref = ty.as_struct_ref(self.db).expect("TODO");
-                let field_ty =
-                    struct_ref.typeof_field(self.db, *field).expect("TODO");
+                let field_ty = struct_ref.typeof_field(self.db, *field).expect("TODO");
                 b.with_projection(
                     place,
                     Projection::Field(*field, field_ty),
@@ -1287,9 +1131,7 @@ impl<'db> ThirTranslator<'db> {
                 let base = self.place(b, hir_place, stmts);
                 let ty = b.get_place(base).ty;
                 let type_id = ty.as_type_id().expect("TODO");
-                let TypeDefId::Builtin(builtin) = type_id.def(self.db) else {
-                    todo!()
-                };
+                let TypeDefId::Builtin(builtin) = type_id.def(self.db) else { todo!() };
                 if builtin.is_ptr_like(self.db).is_none() {
                     todo!("error diagnostic")
                 }
@@ -1308,18 +1150,10 @@ impl<'db> ThirTranslator<'db> {
                     (pl.span, pl.ty)
                 };
                 let Some(deref_ty) = ty.element_of_indexed(self.db) else {
-                    todo!(
-                        "error diagnostic, place ty = {}",
-                        ty.to_string(self.db)
-                    )
+                    todo!("error diagnostic, place ty = {}", ty.to_string(self.db))
                 };
                 let index = self.expr(b, index, stmts);
-                b.with_projection(
-                    place,
-                    Projection::Index(index),
-                    deref_ty,
-                    place_span,
-                )
+                b.with_projection(place, Projection::Index(index), deref_ty, place_span)
             }
             HirPlaceKind::Temporary(hir_expr) => {
                 let value = self.expr(b, hir_expr, stmts);
@@ -1360,10 +1194,9 @@ impl TypeRef {
     pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
-            TypeDefId::Struct(struct_id) => Some(StructRef {
-                def: struct_id,
-                args: type_id.args(db).to_vec(),
-            }),
+            TypeDefId::Struct(struct_id) => {
+                Some(StructRef { def: struct_id, args: type_id.args(db).to_vec() })
+            }
             _ => None,
         }
     }
@@ -1425,17 +1258,10 @@ impl TypeRef {
             Self::Concrete(type_id) => Self::Concrete(TypeId::new(
                 db,
                 type_id.def(db),
-                type_id
-                    .args(db)
-                    .iter()
-                    .map(|t| t.with_substitution(db, sub))
-                    .collect(),
+                type_id.args(db).iter().map(|t| t.with_substitution(db, sub)).collect(),
             )),
             Self::Param(id) => sub[id.0],
-            Self::Associated(_)
-            | Self::Zelf
-            | Self::Error
-            | TypeRef::Unknown => self,
+            Self::Associated(_) | Self::Zelf | Self::Error | TypeRef::Unknown => self,
         }
     }
 }
@@ -1452,29 +1278,6 @@ impl StructRef {
         .unwrap();
         let resolution = ctx.resolve(db, &found.ty.data)?;
         Some(resolution.with_substitution(db, &self.args))
-    }
-}
-
-impl PartialTypeRef {
-    pub fn plugged_by_unknown(&self, db: &dyn Db) -> TypeRef {
-        match self {
-            PartialTypeRef::Resolved(type_ref) => *type_ref,
-            PartialTypeRef::WithHoles { def, args } => {
-                TypeRef::Concrete(TypeId::new(
-                    db,
-                    *def,
-                    args.iter()
-                        .map(|arg| match arg {
-                            hir::PartialTypeArg::Known(type_ref) => *type_ref,
-                            hir::PartialTypeArg::Partial(partial) => {
-                                partial.plugged_by_unknown(db)
-                            }
-                            hir::PartialTypeArg::Infer => TypeRef::Unknown,
-                        })
-                        .collect(),
-                ))
-            }
-        }
     }
 }
 
