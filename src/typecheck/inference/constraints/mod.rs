@@ -394,7 +394,7 @@ impl<'db> InferenceCtx<'db> {
             }
             InferenceConstraintKind::Deref { var, target } => {
                 let adt = InferTy::Adt {
-                    def: TypeDefId::Builtin(BuiltinTypeId::ref_(self.db)),
+                    def: TypeDefId::Builtin(BuiltinTypeId::const_ref(self.db)),
                     fields: vec![target.clone()],
                 };
                 match self.unify(var.into(), adt) {

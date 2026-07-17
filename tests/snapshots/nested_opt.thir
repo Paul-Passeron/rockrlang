@@ -12,29 +12,29 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/nested_opt.rkr:3:1
-thir fun nested_opt::some_opt(): core::opt::opt<core::opt::opt<int>> {
-    return core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(8));
+thir fun nested_opt::some_opt(): core::opt::opt<core::opt::opt<i32>> {
+    return core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(8));
 }
 
 examples/nested_opt.rkr:7:1
-thir fun nested_opt::foo(): int {
+thir fun nested_opt::foo(): i32 {
     match nested_opt::some_opt() {
-        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(x)) => 's0: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's0: {
             return x;
         }
-        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#0) => 's1: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#0) => 's1: {
             return 69;
         }
-        core::opt::opt::<core::opt::opt<int>>::#0 => 's2: {
+        core::opt::opt::<core::opt::opt<i32>>::#0 => 's2: {
             return 0;
         }
     }
 }
 
 examples/nested_opt.rkr:21:1
-thir fun nested_opt::bar(): int {
+thir fun nested_opt::bar(): i32 {
     match nested_opt::some_opt() {
-        core::opt::opt::<core::opt::opt<int>>::#1(core::opt::opt::<int>::#1(x)) => 's0: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's0: {
             return x;
         }
         _ => 's1: {

@@ -12,7 +12,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/supertraits.rkr:5:1
-thir fun supertraits::main(): int {
+thir fun supertraits::main(): i32 {
     return 0;
 }
 

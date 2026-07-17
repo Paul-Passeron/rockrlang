@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -148,6 +148,6 @@ mir {
     _9 = call receivers::`impl receivers::Foo`::mut_ref_self(move _8) -> bb4
 
   bb4:
-    return 0_int
+    return 0_i32
 }
 

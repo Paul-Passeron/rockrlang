@@ -13,7 +13,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 
 examples/auto_deref_field.rkr:5:1
 thir fun auto_deref_field::foo(f: &auto_deref_field::Foo): void {
-    let y: int = (*f).x;
-    let z: &int = &(*f).x;
+    let y: i32 = (*f).x;
+    let z: &i32 = &(*f).x;
 }
 

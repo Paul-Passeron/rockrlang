@@ -53,7 +53,7 @@ thir fun zelf_non_receiver::nl(): void {
 }
 
 examples/zelf_non_receiver.rkr:46:1
-thir fun zelf_non_receiver::main(): int {
+thir fun zelf_non_receiver::main(): i32 {
     let f1: zelf_non_receiver::Foo = zelf_non_receiver::Foo { x: 123, y: 456 };
     let f2: zelf_non_receiver::Foo = zelf_non_receiver::Foo { x: 321, y: 654 };
     let f3: zelf_non_receiver::Foo = <zelf_non_receiver::Foo>::zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(&f1, &f2);

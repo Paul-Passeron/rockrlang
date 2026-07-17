@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -68,7 +68,7 @@ mir {
     _0 = call core::io::printf(c"Hello from true !\n\0") -> bb5
 
   bb2 (if-merge):
-    return 0_int
+    return 0_i32
 
   bb3 (if-else):
     _1 = call core::io::printf(c"How did you get there ?\n\0") -> bb4

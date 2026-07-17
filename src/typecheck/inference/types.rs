@@ -24,8 +24,8 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     ril::{
-        BuiltinTypeId, PtrKind, ScopeOwnerId, StructId, TypeDefId, TypeRef, rehole,
-        str_def,
+        BuiltinTypeId, BuiltinTypeKind, PtrKind, ScopeOwnerId, StructId, TypeDefId,
+        TypeRef, rehole, str_def,
     },
     typecheck::inference::{
         InferTy, InferenceCtx,
@@ -74,10 +74,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn ptr_of(&self, ty: InferTy) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::ptr(self.db)),
-            fields: vec![ty],
-        }
+        InferTy::Adt { def: BuiltinTypeId::const_ptr(self.db).into(), fields: vec![ty] }
     }
 
     pub fn slice_of(&self, ty: InferTy) -> InferTy {
@@ -109,18 +106,27 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
+    pub fn as_builtin<'ty>(
+        &self,
+        ty: &'ty InferTy,
+    ) -> Option<(BuiltinTypeId, &'ty [InferTy])> {
+        let InferTy::Adt { def, fields } = ty else {
+            return None;
+        };
+        let TypeDefId::Builtin(builtin) = def else {
+            return None;
+        };
+        Some((*builtin, fields))
+    }
+
     pub fn is_ref(&self, ty: &InferTy) -> Option<InferTy> {
-        if let InferTy::Adt { def, fields } = &ty {
-            if *def == TypeDefId::Builtin(BuiltinTypeId::ref_(self.db))
-                || *def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(self.db))
-            {
+        let (builtin, fields) = self.as_builtin(ty)?;
+        match builtin.kind(self.db) {
+            BuiltinTypeKind::Ref { .. } => {
                 assert_eq!(fields.len(), 1);
                 Some(fields[0].clone())
-            } else {
-                None
             }
-        } else {
-            None
+            _ => None,
         }
     }
 
@@ -129,17 +135,13 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_ptr(&self, ty: &InferTy) -> Option<InferTy> {
-        if let InferTy::Adt { def, fields } = &ty {
-            if *def == TypeDefId::Builtin(BuiltinTypeId::ptr(self.db))
-                || *def == TypeDefId::Builtin(BuiltinTypeId::mut_ptr(self.db))
-            {
+        let (builtin, fields) = self.as_builtin(ty)?;
+        match builtin.kind(self.db) {
+            BuiltinTypeKind::Ptr { .. } => {
                 assert_eq!(fields.len(), 1);
                 Some(fields[0].clone())
-            } else {
-                None
             }
-        } else {
-            None
+            _ => None,
         }
     }
 
@@ -291,9 +293,7 @@ impl<'db> InferenceCtx<'db> {
                         .map(|fields| (struct_id, fields))
                 }
                 TypeDefId::Builtin(id) => {
-                    if id == BuiltinTypeId::mut_ref(self.db)
-                        || id == BuiltinTypeId::ref_(self.db)
-                    {
+                    if matches!(id.kind(self.db), BuiltinTypeKind::Ref { .. }) {
                         // Auto-deref for ref to struct
                         self.is_struct(&fields[0])
                     } else {

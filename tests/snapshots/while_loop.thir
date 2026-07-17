@@ -12,8 +12,8 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/while_loop.rkr:2:1
-thir fun while_loop::main(): int {
-    let mut i: int = 0;
+thir fun while_loop::main(): i32 {
+    let mut i: i32 = 0;
     's0: while true {
         core::io::printf(c"%d\n\0", i);
         i = (i + 1);

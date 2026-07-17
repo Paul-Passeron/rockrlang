@@ -22,8 +22,9 @@ use itertools::Itertools;
 use crate::{
     Db,
     hir::{FunctionLikeAst, function_ast, owning_module},
+    layout::{IntWidth, Size},
     name_resolve::builtin_module,
-    ril::{BuiltinTypeId, ModuleId, TypeDefId, TypeId, TypeRef},
+    ril::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeId, TypeRef},
     thir_to_mir::{FuncInst, MIRKey},
 };
 
@@ -32,6 +33,7 @@ pub enum MangleType {
     Ptr(Box<Self>),
     Tuple(Vec<Self>),
     Array(Box<Self>),
+    Bool,
     Int(IntKind), // width in bytes
     #[allow(unused)]
     Float(FloatKind), // width in bytes
@@ -48,12 +50,9 @@ pub enum MangleType {
 pub enum FloatKind {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum IntKind {
-    Bool,
-    Int,
-    Usize,
-    Char,
-    // ...
+pub struct IntKind {
+    pub width: IntWidth,
+    pub signed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -154,20 +153,18 @@ fn mangle_builtin_id(
     id: BuiltinTypeId,
     mut args: Vec<MangleType>,
 ) -> MangleType {
-    if id.is_ptr_like(db).is_some() {
-        MangleType::Ptr(Box::new(args.remove(0)))
-    } else if let Some(int_kind) = id.as_int_kind(db) {
-        MangleType::Int(int_kind)
-    } else if id == BuiltinTypeId::slice(db) {
-        MangleType::Array(Box::new(args.remove(0)))
-    } else if id == BuiltinTypeId::tuple(db) {
-        MangleType::Tuple(args)
-    } else if id == BuiltinTypeId::never(db) {
-        MangleType::Never
-    } else if id == BuiltinTypeId::void(db) {
-        MangleType::Tuple(vec![])
-    } else {
-        todo!("mangle {}", id.name(db).to_string(db))
+    match id.kind(db) {
+        BuiltinTypeKind::Void => MangleType::Tuple(vec![]),
+        BuiltinTypeKind::Never => MangleType::Never,
+        BuiltinTypeKind::Bool => MangleType::Bool,
+        BuiltinTypeKind::Int { width, signed } => {
+            MangleType::Int(IntKind { width, signed })
+        }
+        BuiltinTypeKind::Ref { .. } | BuiltinTypeKind::Ptr { .. } => {
+            MangleType::Ptr(Box::new(args.remove(0)))
+        }
+        BuiltinTypeKind::Slice => MangleType::Array(Box::new(args.remove(0))),
+        BuiltinTypeKind::Tuple => MangleType::Tuple(args),
     }
 }
 
@@ -175,35 +172,16 @@ pub fn ty_mangle(db: &dyn Db, tref: TypeRef) -> &MangleType {
     _ty_mangle(db, InternedTR::new(db, tref))
 }
 
-impl BuiltinTypeId {
-    fn as_int_kind(self, db: &dyn Db) -> Option<IntKind> {
-        if self == BuiltinTypeId::int(db) {
-            Some(IntKind::Int)
-        } else if self == BuiltinTypeId::bool(db) {
-            Some(IntKind::Bool)
-        } else if self == BuiltinTypeId::char(db) {
-            Some(IntKind::Char)
-        } else if self == BuiltinTypeId::usize(db) {
-            Some(IntKind::Usize)
-        } else {
-            None
-        }
-    }
-}
-
 pub fn mangle_ident(s: &str) -> String {
     format!("{}{}", s.len(), s)
 }
 
 impl IntKind {
-    pub fn mangle(&self) -> &'static str {
-        match self {
-            IntKind::Bool => "ib",
-            IntKind::Int => "ii",
-            IntKind::Usize => "iu",
-            IntKind::Char => "ic",
-            // ...
-        }
+    pub fn mangle(&self) -> String {
+        format!("{}{}", if self.signed { "i" } else { "u" }, {
+            let s: Size = self.width.into();
+            s.bytes()
+        })
     }
 }
 
@@ -222,7 +200,7 @@ impl MangleType {
                 let inner: String = ts.iter().map(Self::mangle).collect();
                 format!("T{inner}E")
             }
-            MangleType::Int(k) => k.mangle().to_string(),
+            MangleType::Int(k) => k.mangle(),
             MangleType::Float(k) => format!("f{}", k.mangle()),
             MangleType::Adt { path, name, parameters } => {
                 let idents: String = path
@@ -235,6 +213,7 @@ impl MangleType {
             }
             MangleType::Never => "z".to_string(),
             MangleType::Error => "X".to_string(),
+            MangleType::Bool => "b".to_string(),
         }
     }
 }

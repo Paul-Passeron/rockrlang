@@ -63,7 +63,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -80,7 +80,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = First {x: 69_int}
+    _0 = First {x: 69_i32}
     return move _0
 }
 
@@ -116,7 +116,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = str {data: c"Hey from theStatic (First)", len: 26_int}
+    _0 = str {data: c"Hey from theStatic (First)", len: 26_i32}
     _1 = &_0
     _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
 
@@ -191,7 +191,7 @@ mir {
     _0 = call implems::`impl implems::Foo for implems::First`::theStatic() -> bb1
 
   bb1:
-    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_int}
+    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_i32}
     _2 = &_1
     _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
 
@@ -216,7 +216,7 @@ mir {
     _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::First>() -> bb1
 
   bb1:
-    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_int}
+    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_i32}
     _2 = &_1
     _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
 
@@ -309,6 +309,6 @@ mir {
     _6 = call implems::theStatic::<implems::Hello<implems::Hello<implems::First>>>() -> bb5
 
   bb5:
-    return 0_int
+    return 0_i32
 }
 

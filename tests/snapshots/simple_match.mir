@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -53,7 +53,7 @@ mir {
 simple_match::some_opt
 mir {
   locals:
-    _0: core::opt::opt<int>
+    _0: core::opt::opt<i32>
 
   params: [
   ]
@@ -61,16 +61,16 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = opt::#1(8_int)
+    _0 = opt::#1(8_i32)
     return move _0
 }
 
 simple_match::foo
 mir {
   locals:
-    _0: core::opt::opt<int>
-    _1: char
-    _2: x :int
+    _0: core::opt::opt<i32>
+    _1: u8
+    _2: x :i32
 
   params: [
   ]
@@ -88,7 +88,7 @@ mir {
     diverge
 
   bb3 (match-branch-1):
-    return 0_int
+    return 0_i32
 
   bb4 (match-branch-0):
     _2 = copy _0.downcast#1.0

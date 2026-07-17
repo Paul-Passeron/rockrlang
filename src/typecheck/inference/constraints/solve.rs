@@ -22,7 +22,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{FunctionLikeAst, Mutability, function_ast, impl_items},
+    hir::{FunctionLikeAst, function_ast, impl_items},
     layout::{LIRTy, ScalarKind, layout_of},
     parse_tree::{
         expr::BinaryOperator,
@@ -91,10 +91,7 @@ impl<'db> InferenceCtx<'db> {
             let to_unify =
                 if let Some(PtrKind::Ref(mutability)) = def.is_ptr_like(self.db) {
                     InferTy::Adt {
-                        def: TypeDefId::Builtin(match mutability {
-                            Mutability::Const => BuiltinTypeId::ref_(self.db),
-                            Mutability::Mutable => BuiltinTypeId::mut_ref(self.db),
-                        }),
+                        def: BuiltinTypeId::ref_(self.db, mutability).into(),
                         fields: vec![inner.clone()],
                     }
                 } else {

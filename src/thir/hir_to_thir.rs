@@ -36,8 +36,8 @@ use crate::{
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     ril::{
-        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, ref_of,
-        rehole,
+        BuiltinTypeId, FunctionId, PtrKind, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
+        ref_of, rehole,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
@@ -1269,26 +1269,26 @@ impl TypeRef {
 
     pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
         let type_id = self.as_type_id()?;
-        let def = type_id.def(db);
-        if def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)) {
-            Some((Mutability::Mutable, *type_id.args(db).first()?))
-        } else if def == TypeDefId::Builtin(BuiltinTypeId::ref_(db)) {
-            Some((Mutability::Const, *type_id.args(db).first()?))
-        } else {
-            None
+        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
+        match ptr_kind {
+            PtrKind::Ref(mutability) => Some((mutability, type_id.args(db)[0])),
+            _ => None,
         }
     }
 
     pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
         let type_id = self.as_type_id()?;
-        let def = type_id.def(db);
-        if def == TypeDefId::Builtin(BuiltinTypeId::mut_ptr(db)) {
-            Some((Mutability::Mutable, *type_id.args(db).first()?))
-        } else if def == TypeDefId::Builtin(BuiltinTypeId::ptr(db)) {
-            Some((Mutability::Const, *type_id.args(db).first()?))
-        } else {
-            None
+        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
+        match ptr_kind {
+            PtrKind::RawPtr(mutability) => Some((mutability, type_id.args(db)[0])),
+            _ => None,
         }
+    }
+
+    pub fn as_ptr_like(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+        let type_id = self.as_type_id()?;
+        let mutability = type_id.def(db).is_ptr_like(db)?.mutability();
+        Some((mutability, type_id.args(db)[0]))
     }
 }
 

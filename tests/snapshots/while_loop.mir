@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -53,7 +53,7 @@ mir {
 while_loop::main
 mir {
   locals:
-    _0: mut i :int
+    _0: mut i :i32
     _1: void
 
   params: [
@@ -62,7 +62,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = 0_int
+    _0 = 0_i32
     goto bb1
 
   bb1 (while-condition):
@@ -72,10 +72,10 @@ mir {
     _1 = call core::io::printf(c"%d\n\0", copy _0) -> bb4
 
   bb3 (while-merge):
-    return 0_int
+    return 0_i32
 
   bb4:
-    _0 = copy _0 + 1_int
+    _0 = copy _0 + 1_i32
     goto bb1
 }
 

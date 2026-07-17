@@ -12,7 +12,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/if.rkr:3:1
-thir fun if::main(): int {
+thir fun if::main(): i32 {
     if true 's0: {
         core::io::printf(c"Hello from true !\n\0");
     } else 's1: {

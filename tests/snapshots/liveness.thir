@@ -12,23 +12,23 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/liveness.rkr:3:1
-thir fun liveness::simple_dead(): int {
-    let x: int = 1;
-    let y: int = 2;
+thir fun liveness::simple_dead(): i32 {
+    let x: i32 = 1;
+    let y: i32 = 2;
     return x;
 }
 
 examples/liveness.rkr:9:1
-thir fun liveness::simple_live(): int {
-    let x: int = 1;
-    let y: int = 2;
+thir fun liveness::simple_live(): i32 {
+    let x: i32 = 1;
+    let y: i32 = 2;
     return (x + y);
 }
 
 examples/liveness.rkr:15:1
-thir fun liveness::conditional_use(cond: bool): int {
-    let x: int = 1;
-    let y: int = 2;
+thir fun liveness::conditional_use(cond: bool): i32 {
+    let x: i32 = 1;
+    let y: i32 = 2;
     if cond 's0: {
         return x;
     }
@@ -36,16 +36,16 @@ thir fun liveness::conditional_use(cond: bool): int {
 }
 
 examples/liveness.rkr:24:1
-thir fun liveness::reassigned_before_use(): int {
-    let mut x: int = 1;
+thir fun liveness::reassigned_before_use(): i32 {
+    let mut x: i32 = 1;
     x = 2;
     return x;
 }
 
 examples/liveness.rkr:30:1
-thir fun liveness::loop_carried(n: int): int {
-    let mut acc: int = 0;
-    let mut i: int = 0;
+thir fun liveness::loop_carried(n: i32): i32 {
+    let mut acc: i32 = 0;
+    let mut i: i32 = 0;
     's0: while (i < n) {
         acc = (acc + i);
         i = (i + 1);
@@ -54,18 +54,18 @@ thir fun liveness::loop_carried(n: int): int {
 }
 
 examples/liveness.rkr:40:1
-thir fun liveness::dead_after_loop(n: int): int {
-    let mut i: int = 0;
+thir fun liveness::dead_after_loop(n: i32): i32 {
+    let mut i: i32 = 0;
     's0: while (i < n) {
         i = (i + 1);
     }
-    let unused: int = 42;
+    let unused: i32 = 42;
     return i;
 }
 
 examples/liveness.rkr:49:1
-thir fun liveness::overwritten_in_branch(cond: bool): int {
-    let mut x: int = 1;
+thir fun liveness::overwritten_in_branch(cond: bool): i32 {
+    let mut x: i32 = 1;
     if cond 's0: {
         x = 2;
     } else 's1: {
@@ -75,31 +75,31 @@ thir fun liveness::overwritten_in_branch(cond: bool): int {
 }
 
 examples/liveness.rkr:59:1
-thir fun liveness::live_across_branch(cond: bool): int {
-    let x: int = 10;
+thir fun liveness::live_across_branch(cond: bool): i32 {
+    let x: i32 = 10;
     if cond 's0: {
-        let y: int = 1;
+        let y: i32 = 1;
     } else 's1: {
-        let y: int = 2;
+        let y: i32 = 2;
     }
     return x;
 }
 
 examples/liveness.rkr:69:1
-thir fun liveness::match_arm_liveness(o: core::opt::opt<int>): int {
-    let fallback: int = 99;
+thir fun liveness::match_arm_liveness(o: core::opt::opt<i32>): i32 {
+    let fallback: i32 = 99;
     match o {
-        core::opt::opt::<int>::#1(x) => 's0: {
+        core::opt::opt::<i32>::#1(x) => 's0: {
             return x;
         }
-        core::opt::opt::<int>::#0 => 's1: {
+        core::opt::opt::<i32>::#0 => 's1: {
             return fallback;
         }
     }
 }
 
 examples/liveness.rkr:81:1
-thir fun liveness::param_liveness(a: int, b: int): int {
+thir fun liveness::param_liveness(a: i32, b: i32): i32 {
     return a;
 }
 

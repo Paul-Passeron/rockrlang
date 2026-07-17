@@ -25,6 +25,8 @@ pub use plumbing::*;
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
+    hir::Mutability,
+    layout::IntWidth,
     name_resolve::type_expr::{templates_of_enum, templates_of_struct},
     parse_tree::top_level::{AstImplItem, AstTemplateArg},
     printer::type_printer::TypePrinter,
@@ -146,8 +148,23 @@ pub struct InternedTypeId {
 }
 
 #[salsa::interned]
-pub struct InternedBuiltinTypeId {
-    pub name: Symbol,
+pub struct BuiltinTypeDef {
+    pub kind: BuiltinTypeKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BuiltinTypeKind {
+    Void,
+    Never,
+
+    Bool,
+    Int { width: IntWidth, signed: bool },
+
+    Ref { mutability: Mutability },
+    Ptr { mutability: Mutability },
+
+    Slice,
+    Tuple,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

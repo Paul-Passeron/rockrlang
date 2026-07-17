@@ -20,6 +20,7 @@ use std::marker::PhantomData;
 
 use crate::{
     hir::Mutability,
+    layout::Size,
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
@@ -256,89 +257,225 @@ impl From<TypeId> for TypeRef {
     }
 }
 
+impl<'a> From<BuiltinTypeDef<'a>> for BuiltinTypeId {
+    fn from(value: BuiltinTypeDef) -> Self {
+        Self(value.0)
+    }
+}
+
+impl<'db> BuiltinTypeDef<'db> {
+    fn name(self, db: &dyn Db) -> Symbol {
+        let as_str = match *self.kind(db) {
+            BuiltinTypeKind::Void => "void".into(),
+            BuiltinTypeKind::Never => "never".into(),
+            BuiltinTypeKind::Bool => "bool".into(),
+            BuiltinTypeKind::Int { width, signed } => {
+                format!("{}{}", if signed { "i" } else { "u" }, {
+                    let s: Size = width.into();
+                    s.bytes() * 8
+                })
+            }
+            BuiltinTypeKind::Ref { mutability } => {
+                format!("&{}", if mutability.is_mut() { "mut" } else { "" })
+            }
+            BuiltinTypeKind::Ptr { mutability } => {
+                format!("*{}", if mutability.is_mut() { "mut" } else { "" })
+            }
+            BuiltinTypeKind::Slice => "[]".into(),
+            BuiltinTypeKind::Tuple => "()".into(),
+        };
+        Symbol::new(db, as_str)
+    }
+}
+
 impl BuiltinTypeId {
-    pub fn new(db: &dyn crate::Db, name: Symbol) -> Self {
-        Self(InternedBuiltinTypeId::new(db, name).0)
+    pub fn name(self, db: &dyn Db) -> Symbol {
+        self.interned().name(db)
+    }
+}
+
+impl BuiltinTypeId {
+    pub fn interned<'a>(self) -> BuiltinTypeDef<'a> {
+        BuiltinTypeDef(self.0, PhantomData)
     }
 
-    pub fn interned(self) -> InternedBuiltinTypeId<'static> {
-        InternedBuiltinTypeId(self.0, PhantomData)
+    pub fn ptr(db: &dyn crate::Db, mutability: Mutability) -> Self {
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Ptr { mutability }).into()
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
-        *self.interned().name(db)
-    }
-
-    pub fn ptr(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "*"))
+    pub fn const_ptr(db: &dyn crate::Db) -> Self {
+        Self::ptr(db, Mutability::Const)
     }
     pub fn mut_ptr(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "*mut"))
+        Self::ptr(db, Mutability::Mutable)
     }
 
-    pub fn ref_(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "&"))
+    pub fn ref_(db: &dyn crate::Db, mutability: Mutability) -> Self {
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Ref { mutability }).into()
+    }
+    pub fn const_ref(db: &dyn crate::Db) -> Self {
+        Self::ref_(db, Mutability::Const)
     }
     pub fn mut_ref(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "&mut"))
+        Self::ref_(db, Mutability::Mutable)
     }
 
     pub fn tuple(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "()"))
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Tuple).into()
     }
 
     pub fn slice(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "[]"))
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Slice).into()
+    }
+
+    pub fn i8(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I8, signed: true },
+        )
+        .into()
+    }
+
+    pub fn i16(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I16, signed: true },
+        )
+        .into()
+    }
+
+    pub fn i32(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I32, signed: true },
+        )
+        .into()
+    }
+
+    pub fn i64(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
+        )
+        .into()
+    }
+
+    pub fn i128(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
+        )
+        .into()
+    }
+
+    pub fn u8(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I8, signed: false },
+        )
+        .into()
+    }
+
+    pub fn u16(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I16, signed: false },
+        )
+        .into()
+    }
+
+    pub fn u32(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I32, signed: false },
+        )
+        .into()
+    }
+
+    pub fn u64(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
+        )
+        .into()
+    }
+
+    pub fn u128(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
+        )
+        .into()
     }
 
     pub fn int(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "int"))
+        Self::i32(db)
     }
 
     pub fn usize(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "usize"))
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: db.target_width(), signed: false },
+        )
+        .into()
+    }
+
+    pub fn isize(db: &dyn crate::Db) -> Self {
+        BuiltinTypeDef::new(
+            db,
+            BuiltinTypeKind::Int { width: db.target_width(), signed: true },
+        )
+        .into()
     }
 
     pub fn bool(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "bool"))
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Bool).into()
     }
 
     pub fn char(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "char"))
+        Self::u8(db)
     }
 
     pub fn void(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "void"))
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Void).into()
     }
 
     pub fn never(db: &dyn crate::Db) -> Self {
-        Self::new(db, Symbol::new(db, "never"))
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Never).into()
+    }
+
+    pub fn kind(&self, db: &dyn crate::Db) -> BuiltinTypeKind {
+        *self.interned().kind(db)
     }
 
     pub fn template_count(&self, db: &dyn crate::Db) -> usize {
-        match self.name(db).interned().contents(db).as_str() {
-            "*mut" | "*" | "&" | "&mut" | "[]" => 1,
-            _ => 0,
+        match self.kind(db) {
+            BuiltinTypeKind::Void
+            | BuiltinTypeKind::Never
+            | BuiltinTypeKind::Bool
+            | BuiltinTypeKind::Int { .. } => 0,
+            BuiltinTypeKind::Ref { .. }
+            | BuiltinTypeKind::Ptr { .. }
+            | BuiltinTypeKind::Slice => 1,
+            BuiltinTypeKind::Tuple => 0,
         }
     }
 
     pub fn is_ptr_like(self, db: &dyn crate::Db) -> Option<PtrKind> {
-        match self.name(db).interned().contents(db).as_str() {
-            "*mut" => Some(PtrKind::RawPtr(Mutability::Mutable)),
-            "*" => Some(PtrKind::RawPtr(Mutability::Const)),
-            "&mut" => Some(PtrKind::Ref(Mutability::Mutable)),
-            "&" => Some(PtrKind::Ref(Mutability::Const)),
+        match self.kind(db) {
+            BuiltinTypeKind::Ref { mutability } => Some(PtrKind::Ref(mutability)),
+            BuiltinTypeKind::Ptr { mutability } => Some(PtrKind::RawPtr(mutability)),
             _ => None,
         }
     }
 
     pub fn is_int_like(self, db: &dyn Db) -> Option<Self> {
-        (self == BuiltinTypeId::int(db)
-            || self == BuiltinTypeId::usize(db)
-            || self == BuiltinTypeId::char(db)
-            || self == BuiltinTypeId::mut_ptr(db)
-            || self == BuiltinTypeId::ptr(db))
-        .then_some(self)
+        match self.kind(db) {
+            BuiltinTypeKind::Bool
+            | BuiltinTypeKind::Int { .. }
+            | BuiltinTypeKind::Ptr { .. } => Some(self),
+            _ => None,
+        }
     }
 }
 
@@ -351,6 +488,7 @@ impl TypeDefId {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PtrKind {
     Ref(Mutability),
     RawPtr(Mutability),
@@ -361,7 +499,7 @@ pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
 }
 
 pub fn const_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::ptr(db).into(), vec![ty])
+    TypeId::new(db, BuiltinTypeId::const_ptr(db).into(), vec![ty])
 }
 
 pub fn mut_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
@@ -369,7 +507,7 @@ pub fn mut_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
 }
 
 pub fn const_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::ref_(db).into(), vec![ty])
+    TypeId::new(db, BuiltinTypeId::const_ref(db).into(), vec![ty])
 }
 
 pub fn mut_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {

@@ -12,33 +12,33 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/loans.rkr:1:1
-thir fun loans::simple_borrow(): int {
-    let x: int = 5;
-    let r: &int = &x;
+thir fun loans::simple_borrow(): i32 {
+    let x: i32 = 5;
+    let r: &i32 = &x;
     return (*r);
 }
 
 examples/loans.rkr:7:1
-thir fun loans::two_disjoint_borrows(): int {
-    let x: int = 1;
-    let y: int = 2;
-    let rx: &int = &x;
-    let ry: &int = &y;
+thir fun loans::two_disjoint_borrows(): i32 {
+    let x: i32 = 1;
+    let y: i32 = 2;
+    let rx: &i32 = &x;
+    let ry: &i32 = &y;
     return ((*rx) + (*ry));
 }
 
 examples/loans.rkr:15:1
-thir fun loans::borrow_dead_before_use(): int {
-    let x: int = 5;
-    let r: &int = &x;
-    let y: int = 10;
+thir fun loans::borrow_dead_before_use(): i32 {
+    let x: i32 = 5;
+    let r: &i32 = &x;
+    let y: i32 = 10;
     return y;
 }
 
 examples/loans.rkr:22:1
-thir fun loans::borrow_across_branch(cond: bool): int {
-    let x: int = 5;
-    let r: &int = &x;
+thir fun loans::borrow_across_branch(cond: bool): i32 {
+    let x: i32 = 5;
+    let r: &i32 = &x;
     if cond 's0: {
         return (*r);
     }
@@ -46,21 +46,21 @@ thir fun loans::borrow_across_branch(cond: bool): int {
 }
 
 examples/loans.rkr:31:1
-thir fun loans::reassigned_borrow(): int {
-    let a: int = 1;
-    let b: int = 2;
-    let mut r: &int = &a;
+thir fun loans::reassigned_borrow(): i32 {
+    let a: i32 = 1;
+    let b: i32 = 2;
+    let mut r: &i32 = &a;
     r = &b;
     return (*r);
 }
 
 examples/loans.rkr:39:1
-thir fun loans::borrow_in_loop(n: int): int {
-    let x: int = 5;
-    let mut i: int = 0;
-    let mut acc: int = 0;
+thir fun loans::borrow_in_loop(n: i32): i32 {
+    let x: i32 = 5;
+    let mut i: i32 = 0;
+    let mut acc: i32 = 0;
     's0: while (i < n) {
-        let r: &int = &x;
+        let r: &i32 = &x;
         acc = (acc + (*r));
         i = (i + 1);
     }

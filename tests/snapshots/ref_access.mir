@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -55,10 +55,10 @@ mir {
   locals:
     _0: a :&ref_access::Foo
     _1: b :&mut ref_access::Foo
-    _2: int
-    _3: int
+    _2: i32
+    _3: i32
     _4: c :&&ref_access::Foo
-    _5: int
+    _5: i32
 
   params: [
     _0,

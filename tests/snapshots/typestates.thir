@@ -42,7 +42,7 @@ thir fun typestates::type_name<T0>(of: &T0): core::io::str {
 }
 
 examples/typestates.rkr:45:1
-thir fun typestates::main(): int {
+thir fun typestates::main(): i32 {
     let a: typestates::A = typestates::A {};
     let f: typestates::Foo<typestates::A> = <typestates::Foo<typestates::A>>::typestates::`impl typestates::Foo<typestates::A>`::new();
     let _5: core::io::str = typestates::type_name::<typestates::Foo<typestates::A>>(&f);

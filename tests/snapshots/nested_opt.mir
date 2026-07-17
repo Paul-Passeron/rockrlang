@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -53,8 +53,8 @@ mir {
 nested_opt::some_opt
 mir {
   locals:
-    _0: core::opt::opt<int>
-    _1: core::opt::opt<core::opt::opt<int>>
+    _0: core::opt::opt<i32>
+    _1: core::opt::opt<core::opt::opt<i32>>
 
   params: [
   ]
@@ -62,7 +62,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = opt::#1(8_int)
+    _0 = opt::#1(8_i32)
     _1 = opt::#1(move _0)
     return move _1
 }
@@ -70,10 +70,10 @@ mir {
 nested_opt::foo
 mir {
   locals:
-    _0: core::opt::opt<core::opt::opt<int>>
-    _1: char
-    _2: char
-    _3: x :int
+    _0: core::opt::opt<core::opt::opt<i32>>
+    _1: u8
+    _2: u8
+    _3: x :i32
 
   params: [
   ]
@@ -91,14 +91,14 @@ mir {
     diverge
 
   bb3 (match-branch-2):
-    return 0_int
+    return 0_i32
 
   bb4:
     _2 = discriminant(_0.downcast#1.0)
     switch move _2 { 0 => bb5, 1 => bb6, _ => bb2 }
 
   bb5 (match-branch-1):
-    return 69_int
+    return 69_i32
 
   bb6 (match-branch-0):
     _3 = copy _0.downcast#1.0.downcast#1.0
@@ -108,10 +108,10 @@ mir {
 nested_opt::bar
 mir {
   locals:
-    _0: core::opt::opt<core::opt::opt<int>>
-    _1: char
-    _2: char
-    _3: x :int
+    _0: core::opt::opt<core::opt::opt<i32>>
+    _1: u8
+    _2: u8
+    _3: x :i32
 
   params: [
   ]
@@ -126,7 +126,7 @@ mir {
     switch move _1 { 1 => bb3, _ => bb6 }
 
   bb2 (match-branch-1):
-    return 0_int
+    return 0_i32
 
   bb3:
     _2 = discriminant(_0.downcast#1.0)

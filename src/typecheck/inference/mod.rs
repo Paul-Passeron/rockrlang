@@ -493,13 +493,7 @@ impl InferTy {
 
     pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
         let (def, args) = self.as_adt()?;
-        let mutability = if def == TypeDefId::Builtin(BuiltinTypeId::ref_(db)) {
-            Some(Mutability::Const)
-        } else if def == TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)) {
-            Some(Mutability::Mutable)
-        } else {
-            None
-        }?;
+        let mutability = def.is_ptr_like(db)?.mutability();
         assert_eq!(args.len(), 1);
         Some((mutability, &args[0]))
     }

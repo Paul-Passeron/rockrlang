@@ -28,7 +28,7 @@ thir fun receivers::`impl receivers::Foo`::mut_ref_self(&mut self): void {
 }
 
 examples/receivers.rkr:10:1
-thir fun receivers::main(): int {
+thir fun receivers::main(): i32 {
     let _0: receivers::Foo = receivers::Foo {};
     <receivers::Foo>::receivers::`impl receivers::Foo`::mut_self(_0);
     let _1: receivers::Foo = receivers::Foo {};

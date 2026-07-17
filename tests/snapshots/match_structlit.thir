@@ -17,7 +17,7 @@ thir fun match_structlit::getIt(): match_structlit::LooksLikeAStruct {
 }
 
 examples/match_structlit.rkr:11:1
-thir fun match_structlit::main(): int {
+thir fun match_structlit::main(): i32 {
     let it: match_structlit::LooksLikeAStruct = match_structlit::getIt();
     match it {
         match_structlit::LooksLikeAStruct::#0 { x: x, y: y } => 's0: {

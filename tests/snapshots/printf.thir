@@ -12,7 +12,7 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/printf.rkr:3:1
-thir fun printf::main(): int {
+thir fun printf::main(): i32 {
     core::io::printf(c"Hello, World !\0");
     return 0;
 }

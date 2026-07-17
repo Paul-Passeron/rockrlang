@@ -63,16 +63,16 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-pretty_print::`impl pretty_print::PrettyPrint for int`::print
+pretty_print::`impl pretty_print::PrettyPrint for i32`::print
 mir {
   locals:
-    _0: self :&int
+    _0: self :&i32
     _1: void
 
   params: [
@@ -91,13 +91,13 @@ mir {
 pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print
 mir {
   locals:
-    _0: self :&pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
+    _0: self :&pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
     _1: void
     _2: core::io::str
     _3: &core::io::str
     _4: void
     _5: void
-    _6: &core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
+    _6: &core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
     _7: void
     _8: void
 
@@ -111,7 +111,7 @@ mir {
     _1 = call core::io::printf(c"MyStruct<\0") -> bb1
 
   bb1:
-    _2 = str {data: c"core::opt::opt<core::opt::opt<core::opt::opt<int>>>", len: 51_int}
+    _2 = str {data: c"core::opt::opt<core::opt::opt<core::opt::opt<i32>>>", len: 51_i32}
     _3 = &_2
     _4 = call core::io::`impl core::io::str`::print(move _3) -> bb2
 
@@ -132,13 +132,13 @@ mir {
 pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print
 mir {
   locals:
-    _0: self :&core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
-    _1: &core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
-    _2: char
-    _3: val :&core::opt::opt<core::opt::opt<core::opt::opt<int>>>
+    _0: self :&core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
+    _1: &core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
+    _2: u8
+    _3: val :&core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
     _4: void
     _5: void
-    _6: &core::opt::opt<core::opt::opt<core::opt::opt<int>>>
+    _6: &core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
     _7: void
     _8: void
 
@@ -165,7 +165,7 @@ mir {
 
   bb4:
     _6 = &_3.*
-    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<int>>>(move _6) -> bb5
+    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<i32>>>(move _6) -> bb5
 
   bb5:
     _8 = call core::io::printf(c")\0") -> bb6
@@ -180,13 +180,13 @@ mir {
 pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print
 mir {
   locals:
-    _0: self :&core::opt::opt<core::opt::opt<core::opt::opt<int>>>
-    _1: &core::opt::opt<core::opt::opt<core::opt::opt<int>>>
-    _2: char
-    _3: val :&core::opt::opt<core::opt::opt<int>>
+    _0: self :&core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
+    _1: &core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
+    _2: u8
+    _3: val :&core::opt::opt<core::opt::opt<i32>>
     _4: void
     _5: void
-    _6: &core::opt::opt<core::opt::opt<int>>
+    _6: &core::opt::opt<core::opt::opt<i32>>
     _7: void
     _8: void
 
@@ -213,7 +213,7 @@ mir {
 
   bb4:
     _6 = &_3.*
-    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<int>>(move _6) -> bb5
+    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<i32>>(move _6) -> bb5
 
   bb5:
     _8 = call core::io::printf(c")\0") -> bb6
@@ -228,13 +228,13 @@ mir {
 pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print
 mir {
   locals:
-    _0: self :&core::opt::opt<core::opt::opt<int>>
-    _1: &core::opt::opt<core::opt::opt<int>>
-    _2: char
-    _3: val :&core::opt::opt<int>
+    _0: self :&core::opt::opt<core::opt::opt<i32>>
+    _1: &core::opt::opt<core::opt::opt<i32>>
+    _2: u8
+    _3: val :&core::opt::opt<i32>
     _4: void
     _5: void
-    _6: &core::opt::opt<int>
+    _6: &core::opt::opt<i32>
     _7: void
     _8: void
 
@@ -261,7 +261,7 @@ mir {
 
   bb4:
     _6 = &_3.*
-    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<int>(move _6) -> bb5
+    _7 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<i32>(move _6) -> bb5
 
   bb5:
     _8 = call core::io::printf(c")\0") -> bb6
@@ -276,13 +276,13 @@ mir {
 pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print
 mir {
   locals:
-    _0: self :&core::opt::opt<int>
-    _1: &core::opt::opt<int>
-    _2: char
-    _3: val :&int
+    _0: self :&core::opt::opt<i32>
+    _1: &core::opt::opt<i32>
+    _2: u8
+    _3: val :&i32
     _4: void
     _5: void
-    _6: &int
+    _6: &i32
     _7: void
     _8: void
 
@@ -309,7 +309,7 @@ mir {
 
   bb4:
     _6 = &_3.*
-    _7 = call pretty_print::`impl pretty_print::PrettyPrint for int`::print(move _6) -> bb5
+    _7 = call pretty_print::`impl pretty_print::PrettyPrint for i32`::print(move _6) -> bb5
 
   bb5:
     _8 = call core::io::printf(c")\0") -> bb6
@@ -324,7 +324,7 @@ mir {
 pretty_print::type_name
 mir {
   locals:
-    _0: of :&core::opt::opt<core::opt::opt<core::opt::opt<int>>>
+    _0: of :&core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
     _1: core::io::str
 
   params: [
@@ -334,7 +334,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"core::opt::opt<core::opt::opt<core::opt::opt<int>>>", len: 51_int}
+    _1 = str {data: c"core::opt::opt<core::opt::opt<core::opt::opt<i32>>>", len: 51_i32}
     return move _1
 }
 
@@ -351,7 +351,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = str {data: c"", len: 0_int}
+    _0 = str {data: c"", len: 0_i32}
     _1 = &_0
     _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
 
@@ -362,21 +362,21 @@ mir {
 pretty_print::main
 mir {
   locals:
-    _0: x :int
-    _1: core::opt::opt<int>
-    _2: core::opt::opt<core::opt::opt<int>>
-    _3: x :core::opt::opt<core::opt::opt<core::opt::opt<int>>>
-    _4: &core::opt::opt<core::opt::opt<core::opt::opt<int>>>
+    _0: x :i32
+    _1: core::opt::opt<i32>
+    _2: core::opt::opt<core::opt::opt<i32>>
+    _3: x :core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
+    _4: &core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
     _5: void
     _6: void
-    _7: &core::opt::opt<core::opt::opt<core::opt::opt<int>>>
+    _7: &core::opt::opt<core::opt::opt<core::opt::opt<i32>>>
     _8: core::io::str
     _9: core::io::str
     _10: &core::io::str
     _11: void
-    _12: core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
-    _13: wrapper :pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
-    _14: &pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>
+    _12: core::opt::opt<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
+    _13: wrapper :pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
+    _14: &pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>
     _15: void
     _16: void
 
@@ -386,19 +386,19 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = 123456_int
+    _0 = 123456_i32
     _1 = opt::#1(copy _0)
     _2 = opt::#1(move _1)
     _3 = opt::#1(move _2)
     _4 = &_3
-    _5 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<int>>>(move _4) -> bb1
+    _5 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<i32>>>(move _4) -> bb1
 
   bb1:
     _6 = call pretty_print::nl() -> bb2
 
   bb2:
     _7 = &_3
-    _8 = call pretty_print::type_name::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>(move _7) -> bb3
+    _8 = call pretty_print::type_name::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>(move _7) -> bb3
 
   bb3:
     _9 = move _8
@@ -407,14 +407,14 @@ mir {
 
   bb4:
     _12 = opt::#1(move _3)
-    _13 = MyStruct {x: 5_int, y: move _12}
+    _13 = MyStruct {x: 5_i32, y: move _12}
     _14 = &_13
-    _15 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print::<core::opt::opt<core::opt::opt<core::opt::opt<int>>>>(move _14) -> bb5
+    _15 = call pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>(move _14) -> bb5
 
   bb5:
     _16 = call pretty_print::nl() -> bb6
 
   bb6:
-    return 0_int
+    return 0_i32
 }
 

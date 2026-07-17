@@ -13,9 +13,9 @@ thir fun core::panic::panic(message: core::io::str): never {
 
 examples/destructure.rkr:6:1
 thir fun destructure::bar(foo: &destructure::Foo): void {
-    let x: &int = &(*foo).x;
+    let x: &i32 = &(*foo).x;
     let y: &core::io::str = &(*foo).y;
-    let x: &int = x;
+    let x: &i32 = x;
     let y: &core::io::str = y;
 }
 

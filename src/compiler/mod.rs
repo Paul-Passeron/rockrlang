@@ -174,32 +174,14 @@ impl ZelfArg {
     pub fn get_zelf_type_for(&self, db: &dyn Db, ty: InferTy) -> InferTy {
         match self.kind {
             ZelfKind::Zelf => ty,
-            ZelfKind::RefZelf => {
-                if self.mutability.is_mut() {
-                    InferTy::Adt {
-                        def: TypeDefId::Builtin(BuiltinTypeId::mut_ref(db)),
-                        fields: vec![ty],
-                    }
-                } else {
-                    InferTy::Adt {
-                        def: TypeDefId::Builtin(BuiltinTypeId::ref_(db)),
-                        fields: vec![ty],
-                    }
-                }
-            }
-            ZelfKind::PtrZelf => {
-                if self.mutability.is_mut() {
-                    InferTy::Adt {
-                        def: TypeDefId::Builtin(BuiltinTypeId::mut_ptr(db)),
-                        fields: vec![ty],
-                    }
-                } else {
-                    InferTy::Adt {
-                        def: TypeDefId::Builtin(BuiltinTypeId::ptr(db)),
-                        fields: vec![ty],
-                    }
-                }
-            }
+            ZelfKind::RefZelf => InferTy::Adt {
+                def: TypeDefId::Builtin(BuiltinTypeId::ref_(db, self.mutability)),
+                fields: vec![ty],
+            },
+            ZelfKind::PtrZelf => InferTy::Adt {
+                def: TypeDefId::Builtin(BuiltinTypeId::ptr(db, self.mutability)),
+                fields: vec![ty],
+            },
         }
     }
 

@@ -12,17 +12,17 @@ thir fun core::panic::panic(message: core::io::str): never {
 }
 
 examples/simple_match.rkr:3:1
-thir fun simple_match::some_opt(): core::opt::opt<int> {
-    return core::opt::opt::<int>::#1(8);
+thir fun simple_match::some_opt(): core::opt::opt<i32> {
+    return core::opt::opt::<i32>::#1(8);
 }
 
 examples/simple_match.rkr:7:1
-thir fun simple_match::foo(): int {
+thir fun simple_match::foo(): i32 {
     match simple_match::some_opt() {
-        core::opt::opt::<int>::#1(x) => 's0: {
+        core::opt::opt::<i32>::#1(x) => 's0: {
             return x;
         }
-        core::opt::opt::<int>::#0 => 's1: {
+        core::opt::opt::<i32>::#0 => 's1: {
             return 0;
         }
     }

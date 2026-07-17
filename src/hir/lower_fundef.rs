@@ -261,7 +261,7 @@ impl<'db> LowerFundef<'db> {
                     if *mutable {
                         BuiltinTypeId::mut_ptr(self.db)
                     } else {
-                        BuiltinTypeId::ptr(self.db)
+                        BuiltinTypeId::const_ptr(self.db)
                     },
                     inner,
                 )
@@ -273,7 +273,7 @@ impl<'db> LowerFundef<'db> {
                     if *mutable {
                         BuiltinTypeId::mut_ref(self.db)
                     } else {
-                        BuiltinTypeId::ref_(self.db)
+                        BuiltinTypeId::const_ref(self.db)
                     },
                     inner,
                 )

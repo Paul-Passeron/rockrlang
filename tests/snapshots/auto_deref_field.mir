@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -54,8 +54,8 @@ auto_deref_field::foo
 mir {
   locals:
     _0: f :&auto_deref_field::Foo
-    _1: y :int
-    _2: z :&int
+    _1: y :i32
+    _2: z :&i32
 
   params: [
     _0,

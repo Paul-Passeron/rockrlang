@@ -63,7 +63,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -156,7 +156,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::A>", len: 30_int}
+    _1 = str {data: c"typestates::Foo<typestates::A>", len: 30_i32}
     return move _1
 }
 
@@ -173,7 +173,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::B>", len: 30_int}
+    _1 = str {data: c"typestates::Foo<typestates::B>", len: 30_i32}
     return move _1
 }
 
@@ -190,7 +190,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::C>", len: 30_int}
+    _1 = str {data: c"typestates::Foo<typestates::C>", len: 30_i32}
     return move _1
 }
 
@@ -207,7 +207,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::Last>", len: 33_int}
+    _1 = str {data: c"typestates::Foo<typestates::Last>", len: 33_i32}
     return move _1
 }
 
@@ -303,6 +303,6 @@ mir {
     _28 = call core::io::`impl core::io::str`::println(move _27) -> bb12
 
   bb12:
-    return 0_int
+    return 0_i32
 }
 

@@ -63,7 +63,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -89,7 +89,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"Foo {", len: 5_int}
+    _1 = str {data: c"Foo {", len: 5_i32}
     _2 = &_1
     _3 = call core::io::`impl core::io::str`::println(move _2) -> bb1
 
@@ -100,7 +100,7 @@ mir {
     _5 = call core::io::printf(c"  .y = %d,\n\0", copy _0.*.y) -> bb3
 
   bb3:
-    _6 = str {data: c"}", len: 1_int}
+    _6 = str {data: c"}", len: 1_i32}
     _7 = &_6
     _8 = call core::io::`impl core::io::str`::println(move _7) -> bb4
 
@@ -159,8 +159,8 @@ mir {
   locals:
     _0: self :&zelf_non_receiver::Foo
     _1: other :&zelf_non_receiver::Foo
-    _2: int
-    _3: int
+    _2: i32
+    _3: i32
     _4: zelf_non_receiver::Foo
 
   params: [
@@ -209,7 +209,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = str {data: c"", len: 0_int}
+    _0 = str {data: c"", len: 0_i32}
     _1 = &_0
     _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
 
@@ -253,8 +253,8 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = Foo {x: 123_int, y: 456_int}
-    _1 = Foo {x: 321_int, y: 654_int}
+    _0 = Foo {x: 123_i32, y: 456_i32}
+    _1 = Foo {x: 321_i32, y: 654_i32}
     _2 = &_0
     _3 = &_1
     _4 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _2, move _3) -> bb1
@@ -305,6 +305,6 @@ mir {
     _25 = call zelf_non_receiver::nl() -> bb13
 
   bb13:
-    return 0_int
+    return 0_i32
 }
 

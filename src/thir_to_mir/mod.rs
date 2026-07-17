@@ -42,8 +42,8 @@ use crate::{
         core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
     },
     ril::{
-        BuiltinTypeId, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id,
-        char_id, int_id, never_id, str_def, str_id, usize_id, void_id,
+        BuiltinTypeKind, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, char_id,
+        never_id, str_def, str_id, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -868,30 +868,21 @@ impl TypeRef {
 
 impl TypeId {
     pub fn is_copy(self, db: &dyn Db) -> bool {
-        if self == int_id(db) {
-            return true;
+        if let TypeDefId::Builtin(b) = self.def(db) {
+            match b.kind(db) {
+                BuiltinTypeKind::Void
+                | BuiltinTypeKind::Never
+                | BuiltinTypeKind::Bool
+                | BuiltinTypeKind::Ptr { .. }
+                | BuiltinTypeKind::Int { .. } => true,
+                BuiltinTypeKind::Ref { mutability } => !mutability.is_mut(),
+                BuiltinTypeKind::Slice => false,
+                // TODO: allow copy if all elements are copy
+                BuiltinTypeKind::Tuple => false,
+            }
+        } else {
+            false
         }
-        if self == bool_id(db) {
-            return true;
-        }
-        if self == char_id(db) {
-            return true;
-        }
-        if self == usize_id(db) {
-            return true;
-        }
-        let def = self.def(db);
-        if def == BuiltinTypeId::ref_(db).into() {
-            return true;
-        }
-        if def == BuiltinTypeId::mut_ptr(db).into() {
-            return true;
-        }
-        if def == BuiltinTypeId::ptr(db).into() {
-            return true;
-        }
-
-        false
     }
 }
 

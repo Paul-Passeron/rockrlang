@@ -44,7 +44,7 @@ mir {
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_int) -> bb4
+    _5 = call core::sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
@@ -54,9 +54,9 @@ destructure::bar
 mir {
   locals:
     _0: foo :&destructure::Foo
-    _1: x :&int
+    _1: x :&i32
     _2: y :&core::io::str
-    _3: x :&int
+    _3: x :&i32
     _4: y :&core::io::str
 
   params: [

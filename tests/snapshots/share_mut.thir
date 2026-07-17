@@ -13,6 +13,6 @@ thir fun core::panic::panic(message: core::io::str): never {
 
 examples/share_mut.rkr:96:1
 thir fun share_mut::destructure(p: &mut share_mut::Foo): void {
-    let x: &mut int = &mut (*p).x;
+    let x: &mut i32 = &mut (*p).x;
 }
 

@@ -26,7 +26,7 @@ use crate::{
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
     },
-    ril::{BuiltinTypeId, TypeDefId, TypeRef},
+    ril::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
 };
 
 pub mod aggregate;
@@ -157,57 +157,20 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
 }
 
 fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> LayoutID {
-    if builtin_id == BuiltinTypeId::tuple(db) {
-        if args.is_empty() {
-            return LayoutID::zst(db);
+    match builtin_id.kind(db) {
+        BuiltinTypeKind::Void => LayoutID::zst(db),
+        BuiltinTypeKind::Never => LayoutID::zst(db),
+        BuiltinTypeKind::Bool => LayoutID::int(db, IntWidth::I8),
+        BuiltinTypeKind::Int { width, .. } => LayoutID::int(db, width),
+        BuiltinTypeKind::Ref { .. } | BuiltinTypeKind::Ptr { .. } => LayoutID::ptr(db),
+        BuiltinTypeKind::Tuple => {
+            if args.is_empty() {
+                return LayoutID::zst(db);
+            }
+            let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
+            finish_aggregate(db, layouts)
         }
-        let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
-        finish_aggregate(db, layouts)
-    } else if builtin_id == BuiltinTypeId::bool(db)
-        || builtin_id == BuiltinTypeId::char(db)
-    {
-        LayoutID::int(db, IntWidth::I8)
-    } else if builtin_id == BuiltinTypeId::never(db)
-        || builtin_id == BuiltinTypeId::void(db)
-    {
-        LayoutID::zst(db)
-    } else if builtin_id == BuiltinTypeId::int(db) {
-        LayoutID::int(db, IntWidth::I32)
-    } else if builtin_id == BuiltinTypeId::ref_(db)
-        || builtin_id == BuiltinTypeId::mut_ref(db)
-        || builtin_id == BuiltinTypeId::ptr(db)
-        || builtin_id == BuiltinTypeId::mut_ptr(db)
-    {
-        LayoutID::ptr(db)
-    } else if builtin_id == BuiltinTypeId::usize(db) {
-        LayoutID::int(db, db.target_width())
-    } else if builtin_id == BuiltinTypeId::slice(db) {
-        // This should have a length but it does not yet.
-        // Let's assume (even that it's false for the moment) that the secnd
-        // argument here is a dummy type whose type's name is the length (pretty
-        // bad, I know :|)
-
-        let inner_layout = layout_of(db, args[0]);
-
-        // Horrible :(
-        let length: usize =
-            args[1].as_type_id().unwrap().def(db).name(db).to_string(db).parse().unwrap();
-
-        let align = inner_layout.align(db);
-
-        let element_size = inner_layout.size(db).align_to(align);
-
-        let data = LayoutData::Aggregate(AggregateLayout {
-            fields: (0..length)
-                .into_iter()
-                .map(|i| (Offset::ZERO + element_size * i as u64, inner_layout))
-                .collect(),
-            source_to_layout: (0..length).into_iter().map(|i| i as u32).collect_vec(),
-        });
-
-        LayoutID::new(db, element_size * length as u64, align, data)
-    } else {
-        unreachable!()
+        BuiltinTypeKind::Slice => todo!(),
     }
 }
 
