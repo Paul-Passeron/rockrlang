@@ -399,9 +399,9 @@ impl<'db> Parser<'db> {
                     // where `a::b::c` has already been built up as a
                     // NameResolved expr.
                     let start = expr.span.start();
-                    if let Some(static_call) = self.try_parse_static_call(&expr, start) {
+                    if let Ok(static_call) = self.try_parse_static_call(&expr, start) {
                         expr = static_call;
-                    } else if let Some(qualified_cons) =
+                    } else if let Ok(qualified_cons) =
                         self.try_parse_qualified_cons(&expr, start)
                     {
                         expr = qualified_cons;
@@ -746,13 +746,8 @@ impl<'db> Parser<'db> {
         &mut self,
         lhs: &AstExpr,
         start: location::Location,
-    ) -> Option<AstExpr> {
-        let saved = self.position;
-        if let Ok(res) = self.parse_static_call(lhs.clone(), start) {
-            return Some(res);
-        }
-        self.position = saved;
-        None
+    ) -> Result<AstExpr, ParseError> {
+        self.speculate(|p| p.parse_static_call(lhs.clone(), start))
     }
 
     fn parse_qualified_cons(
@@ -928,13 +923,8 @@ impl<'db> Parser<'db> {
         &mut self,
         lhs: &AstExpr,
         start: location::Location,
-    ) -> Option<AstExpr> {
-        let saved = self.position;
-        if let Ok(expr) = self.parse_qualified_cons(lhs.clone(), start) {
-            return Some(expr);
-        }
-        self.position = saved;
-        None
+    ) -> Result<AstExpr, ParseError> {
+        self.speculate(|p| p.parse_qualified_cons(lhs.clone(), start))
     }
 
     /// Given a base type expression and newly parsed type args, produce the

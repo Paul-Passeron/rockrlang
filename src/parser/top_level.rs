@@ -34,7 +34,11 @@ use crate::{
             AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
-    parser::{ParseError, ParseErrorKind, Parser},
+    parser::{
+        ParseError,
+        ParseErrorKind::{self, UnexpectedEOF},
+        Parser,
+    },
 };
 
 impl<'db> Parser<'db> {
@@ -180,71 +184,71 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_receiver(&mut self) -> AstReceiver {
-        let position = self.position;
-        if let Some(r) = self.parse_receiver_aux() {
-            r
-        } else {
-            self.position = position;
-            AstReceiver::None
-        }
+        self.speculate(|p| p.parse_receiver_aux()).unwrap_or(AstReceiver::None)
     }
 
-    fn expect_self(&mut self) -> Option<()> {
-        if let Some(t) = self.peek_n(0)
-            && matches!(t.kind, TokenKind::Identifier(symbol) if symbol == Symbol::new(self.db, "self"))
-        {
-            self.consume();
-            Some(())
-        } else {
-            None
+    fn expect_self(&mut self) -> Result<(), ParseError> {
+        let zelf = Symbol::new(self.db, "self");
+        let t = self
+            .peek_n(0)
+            .map(|t| t.kind)
+            .ok_or_else(|| self.parse_error(UnexpectedEOF))?;
+        if !matches!(t, TokenKind::Identifier(symbol) if symbol == zelf) {
+            return Err(self.parse_error(ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Identifier(zelf),
+                found: t,
+            }));
         }
+        self.consume();
+        Ok(())
     }
 
-    fn parse_receiver_aux(&mut self) -> Option<AstReceiver> {
+    fn parse_receiver_aux(&mut self) -> Result<AstReceiver, ParseError> {
         let start = self.get_start();
-        if let Some(t) = self.peek_n(0) {
-            match t.kind {
-                TokenKind::Mut => {
-                    self.consume();
-                    self.expect_self()?;
-                    Some(AstReceiver::MutZelf(start.span(self.get_end())))
-                }
-                TokenKind::Identifier(symbol)
-                    if symbol == Symbol::new(self.db, "self") =>
+        let zelf = Symbol::new(self.db, "self");
+        let Some(t) = self.peek_n(0) else {
+            return Err(self.parse_error(ParseErrorKind::UnexpectedEOF));
+        };
+        match t.kind {
+            TokenKind::Mut => {
+                self.consume();
+                self.expect_self()?;
+                Ok(AstReceiver::MutZelf(start.span(self.get_end())))
+            }
+            TokenKind::Identifier(symbol) if symbol == zelf => {
+                self.consume();
+                Ok(AstReceiver::Zelf(start.span(self.get_end())))
+            }
+            TokenKind::BitAnd => {
+                self.consume();
+                if let Some(t) = self.peek_n(0)
+                    && matches!(t.kind, TokenKind::Mut)
                 {
                     self.consume();
-                    Some(AstReceiver::Zelf(start.span(self.get_end())))
+                    self.expect_self()?;
+                    Ok(AstReceiver::MutRefZelf(start.span(self.get_end())))
+                } else {
+                    self.expect_self()?;
+                    Ok(AstReceiver::RefZelf(start.span(self.get_end())))
                 }
-                TokenKind::BitAnd => {
-                    self.consume();
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Mut)
-                    {
-                        self.consume();
-                        self.expect_self()?;
-                        Some(AstReceiver::MutRefZelf(start.span(self.get_end())))
-                    } else {
-                        self.expect_self()?;
-                        Some(AstReceiver::RefZelf(start.span(self.get_end())))
-                    }
-                }
-                TokenKind::Mult => {
-                    self.consume();
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Mut)
-                    {
-                        self.consume();
-                        self.expect_self()?;
-                        Some(AstReceiver::MutPtrZelf(start.span(self.get_end())))
-                    } else {
-                        self.expect_self()?;
-                        Some(AstReceiver::PtrZelf(start.span(self.get_end())))
-                    }
-                }
-                _ => None,
             }
-        } else {
-            None
+            TokenKind::Mult => {
+                self.consume();
+                if let Some(t) = self.peek_n(0)
+                    && matches!(t.kind, TokenKind::Mut)
+                {
+                    self.consume();
+                    self.expect_self()?;
+                    Ok(AstReceiver::MutPtrZelf(start.span(self.get_end())))
+                } else {
+                    self.expect_self()?;
+                    Ok(AstReceiver::PtrZelf(start.span(self.get_end())))
+                }
+            }
+            _ => Err(self.parse_error(ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Identifier(zelf),
+                found: t.kind,
+            })),
         }
     }
 

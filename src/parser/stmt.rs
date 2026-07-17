@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     lexer::TokenKind,
     parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
-    parser::{ParseError, Parser},
+    parser::{ParseError, ParseErrorKind, Parser},
 };
 
 impl<'db> Parser<'db> {
@@ -122,22 +122,17 @@ impl<'db> Parser<'db> {
         ))
     }
 
-    fn try_parse_assign(&mut self) -> Option<AstStmt> {
-        let saved_pos = self.position;
+    fn parse_assign(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
 
         // Parse the LHS as an expression — postfix/field/index chains are valid
         // LHS
-        let lhs = match self.parse_expr() {
-            Ok(e) => e,
-            Err(_) => {
-                self.position = saved_pos;
-                return None;
-            }
-        };
+        let lhs = self.parse_expr()?;
+
+        let t = self.peek_n(0).map(|t| t.kind);
 
         // Match directly on the dedicated compound-assign tokens or plain `=`
-        let compound_op: Option<CompoundAssignOp> = match self.peek_n(0).map(|t| t.kind) {
+        let compound_op: Option<CompoundAssignOp> = match t {
             Some(TokenKind::PlusEq) => Some(CompoundAssignOp::Plus),
             Some(TokenKind::MinusEq) => Some(CompoundAssignOp::Minus),
             Some(TokenKind::MultEq) => Some(CompoundAssignOp::Times),
@@ -146,27 +141,21 @@ impl<'db> Parser<'db> {
             _ => None,
         };
 
-        let is_plain_assign = self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Eq);
+        let is_plain_assign = t == Some(TokenKind::Eq);
 
         if compound_op.is_none() && !is_plain_assign {
-            self.position = saved_pos;
-            return None;
+            return Err(self.parse_error(
+                t.map_or(ParseErrorKind::UnexpectedEOF, |found| {
+                    ParseErrorKind::ExpectedToken { expected: TokenKind::Eq, found }
+                }),
+            ));
         }
 
         self.consume(); // consume = or +=/-=/*=//=/%=
 
-        let rhs = match self.parse_expr() {
-            Ok(e) => e,
-            Err(_) => {
-                self.position = saved_pos;
-                return None;
-            }
-        };
+        let rhs = self.parse_expr()?;
 
-        if self.expect(TokenKind::Semicolon).is_err() {
-            self.position = saved_pos;
-            return None;
-        }
+        self.expect(TokenKind::Semicolon)?;
         self.consume();
 
         let end = self.get_end();
@@ -175,7 +164,11 @@ impl<'db> Parser<'db> {
         } else {
             AstStmtDesc::Assign { lhs, rhs }
         };
-        Some(AstStmt::new(desc, vec![], start.span(end)))
+        Ok(AstStmt::new(desc, vec![], start.span(end)))
+    }
+
+    fn try_parse_assign(&mut self) -> Result<AstStmt, ParseError> {
+        self.speculate(Self::parse_assign)
     }
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, ParseError> {
@@ -256,17 +249,13 @@ impl<'db> Parser<'db> {
                 let span = start.span(stmt.span.end());
                 Ok(AstStmt::new(AstStmtDesc::Defer(Box::new(stmt)), vec![], span))
             }
-            _ => {
-                if let Some(assignement) = self.try_parse_assign() {
-                    Ok(assignement)
-                } else {
-                    let expr = self.parse_expr()?;
-                    self.expect(TokenKind::Semicolon)?;
-                    self.consume();
-                    let span = expr.span;
-                    Ok(AstStmt::new(AstStmtDesc::Expr(expr), vec![], span))
-                }
-            }
+            _ => self.try_parse_assign().or_else(|_| {
+                let expr = self.parse_expr()?;
+                self.expect(TokenKind::Semicolon)?;
+                self.consume();
+                let span = expr.span;
+                Ok(AstStmt::new(AstStmtDesc::Expr(expr), vec![], span))
+            }),
         }
     }
 }

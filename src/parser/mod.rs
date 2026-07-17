@@ -161,6 +161,14 @@ impl<'db> Parser<'db> {
     pub fn peek_n(&self, n: usize) -> Option<&Token> {
         self.tokens.get(self.position + n)
     }
+
+    pub fn speculate<T>(
+        &mut self,
+        f: impl Fn(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.position;
+        f(self).inspect_err(|_| self.position = saved)
+    }
 }
 
 #[salsa::tracked(returns(copy))]
