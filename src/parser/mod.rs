@@ -64,6 +64,7 @@ pub enum ParseErrorKind {
     ExpectedToken { expected: TokenKind, found: TokenKind },
     TopLevelLetDecl,
     ExpectedIntLit(TokenKind),
+    ExpectedTypeName,
 }
 
 impl<'db> Parser<'db> {
@@ -168,6 +169,23 @@ impl<'db> Parser<'db> {
     ) -> Result<T, ParseError> {
         let saved = self.position;
         f(self).inspect_err(|_| self.position = saved)
+    }
+
+    pub fn parse_list<T>(
+        &mut self,
+        mut elem: impl FnMut(&mut Self) -> Result<T, ParseError>,
+        sep: TokenKind,
+        mut is_end: impl FnMut(&mut Self) -> bool,
+    ) -> Result<Vec<T>, ParseError> {
+        let mut res = vec![];
+        while !is_end(self) {
+            res.push(elem(self)?);
+            if self.peek_n(0).is_none_or(|t| t.kind != sep) {
+                break;
+            }
+            self.consume();
+        }
+        Ok(res)
     }
 }
 

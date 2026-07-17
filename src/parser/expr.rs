@@ -306,26 +306,13 @@ impl<'db> Parser<'db> {
                         continue;
                     }
                     let field = self.parse_symbol()?;
-                    let mut type_args = vec![];
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Access) {
-                        self.consume();
-                        self.expect(TokenKind::Lt)?;
-                        self.consume();
-
-                        while self.peek_n(0).map(|t| &t.kind) != Some(&TokenKind::Gt) {
-                            let arg = self.parse_any_type_expr()?;
-                            type_args.push(arg);
-                            if self.peek_n(0).map(|t| &t.kind) != Some(&TokenKind::Comma)
-                            {
-                                break;
-                            }
-                            self.expect(TokenKind::Comma)?;
+                    let type_args =
+                        if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Access) {
                             self.consume();
-                        }
-
-                        self.expect(TokenKind::Gt)?;
-                        self.consume();
-                    }
+                            self.parse_turbofish_args()?
+                        } else {
+                            vec![]
+                        };
                     if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::OpenPar) {
                         self.consume();
                         let args = self.parse_expr_args()?;
@@ -537,34 +524,18 @@ impl<'db> Parser<'db> {
             }
             TokenKind::OpenBra => {
                 self.consume();
-                let mut exprs = vec![];
-                while let Some(t) = self.peek_n(0)
-                    && !matches!(t.kind, TokenKind::CloseBra)
-                {
-                    exprs.push(self.parse_expr()?);
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
+                let exprs = self.parse_list(Self::parse_expr, TokenKind::Comma, |p| {
+                    p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra)
+                })?;
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
                 Ok(Spanned::new(AstExprDesc::SliceLit(exprs), vec![], tok.location))
             }
             TokenKind::OpenPar => {
                 self.consume();
-                let mut exprs = vec![];
-                while let Some(t) = self.peek_n(0)
-                    && !matches!(t.kind, TokenKind::ClosePar)
-                {
-                    exprs.push(self.parse_expr()?);
-                    if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::Comma) {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
+                let exprs = self.parse_list(Self::parse_expr, TokenKind::Comma, |p| {
+                    p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
+                })?;
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
@@ -572,17 +543,12 @@ impl<'db> Parser<'db> {
             }
             TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
                 self.consume();
-
                 self.expect(TokenKind::OpenPar)?;
                 self.consume();
-
                 let ty = self.parse_type_expr()?;
-
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
-
                 let end = self.get_end();
-
                 Ok(AstExpr::new(AstExprDesc::SizeOf(ty), vec![], start.span(end)))
             }
 
@@ -830,21 +796,10 @@ impl<'db> Parser<'db> {
     fn parse_turbofish_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
         self.expect(TokenKind::Lt)?;
         self.consume();
-
-        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
-        while let Some(t) = self.peek_n(0)
-            && t.kind != TokenKind::Gt
-        {
-            type_args.push(self.parse_any_type_expr()?);
-            if let Some(t) = self.peek_n(0)
-                && t.kind == TokenKind::Comma
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-
+        let type_args =
+            self.parse_list(Self::parse_any_type_expr, TokenKind::Comma, |p| {
+                p.peek_n(0).is_none_or(|t| t.kind == TokenKind::Gt)
+            })?;
         self.expect(TokenKind::Gt)?;
         self.consume();
         Ok(type_args)
@@ -940,52 +895,29 @@ impl<'db> Parser<'db> {
             AstTypeExprDesc::Named { name, args: _ } => {
                 Ok(Spanned::new(AstTypeExprDesc::Named { name, args }, vec![], span))
             }
-            _ => {
-                Err(self
-                    .parse_error(ParseErrorKind::ExpectedSymbol("type name".to_string())))
-            }
+            _ => Err(self.parse_error(ParseErrorKind::ExpectedTypeName)),
         }
     }
 
     fn parse_struct_fields(&mut self) -> Result<Vec<AstStructField>, ParseError> {
-        let mut fields = vec![];
-        loop {
-            match self.peek_n(0).map(|t| t.kind) {
-                Some(TokenKind::CloseBra) | None => break,
-                Some(TokenKind::Dot) => {
-                    self.consume(); // consume '.'
-                    let name = self.parse_symbol()?;
-                    self.expect(TokenKind::Colon)?;
-                    self.consume(); // consume ':'
-                    let value = self.parse_expr()?;
-                    fields.push(AstStructField { name: name.data, value });
-                    match self.peek_n(0).map(|t| t.kind) {
-                        Some(TokenKind::Comma) => {
-                            self.consume();
-                        }
-                        _ => break,
-                    }
-                }
-                _ => break,
-            }
-        }
-        Ok(fields)
+        self.parse_list(
+            |p| {
+                p.expect(TokenKind::Dot)?;
+                p.consume();
+                let name = p.parse_symbol()?;
+                p.expect(TokenKind::Colon)?;
+                p.consume();
+                let value = p.parse_expr()?;
+                Ok(AstStructField { name: name.data, value })
+            },
+            TokenKind::Comma,
+            |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
+        )
     }
 
     fn parse_expr_args(&mut self) -> Result<Vec<AstExpr>, ParseError> {
-        let mut args = vec![];
-        while let Some(t) = self.peek_n(0)
-            && !matches!(t.kind, TokenKind::ClosePar)
-        {
-            args.push(self.parse_expr()?);
-            if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Comma)
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-        Ok(args)
+        self.parse_list(Self::parse_expr, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
+        })
     }
 }
