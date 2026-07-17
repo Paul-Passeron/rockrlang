@@ -702,10 +702,6 @@ impl<'db> Parser<'db> {
                     start.span(self.get_end()),
                 ))
             }
-            TokenKind::Meta => {
-                self.consume();
-                todo!()
-            }
             TokenKind::Directive(s) if *s == Symbol::new(self.db, "extern") => {
                 let start = self.get_start();
                 self.consume();

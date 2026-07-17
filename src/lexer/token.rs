@@ -58,7 +58,6 @@ pub enum TokenKind {
     Static,
     True,
     False,
-    Meta,
     As,
     // Operators
     Plus,
@@ -203,7 +202,6 @@ impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
             TokenKind::Static => write!(f, "static"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
-            TokenKind::Meta => write!(f, "meta"),
             TokenKind::As => write!(f, "as"),
         }
     }

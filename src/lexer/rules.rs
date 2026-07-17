@@ -141,7 +141,6 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                         "defer" => TokenKind::Defer,
                         "struct" => TokenKind::Struct,
                         "enum" => TokenKind::Enum,
-                        "meta" => TokenKind::Meta,
                         "interface" => TokenKind::Interface,
                         "in" => TokenKind::In,
                         "for" => TokenKind::For,
