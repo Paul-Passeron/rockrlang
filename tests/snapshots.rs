@@ -35,8 +35,7 @@ fn run_snapshot_with_args(name: &str, folder: &str, args: &[&str]) {
     let actual = String::from_utf8(output.stdout)
         .unwrap_or_else(|e| panic!("non-utf8 output for {example}: {e}"));
 
-    let snapshot_path =
-        Path::new(format!("tests/snapshots/").as_str()).join(format!("{name}.{folder}"));
+    let snapshot_path = Path::new("tests/snapshots/").join(format!("{name}.{folder}"));
 
     if std::env::var_os("ROCKR_UPDATE_SNAPSHOTS").is_some() {
         std::fs::create_dir_all(snapshot_path.parent().unwrap()).unwrap();

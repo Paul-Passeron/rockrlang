@@ -430,7 +430,7 @@ mod tests {
         let ref_ptr: *const i32 = frozen.get(0).unwrap();
 
         for i in 0..150 {
-            frozen.push(i * 31 + 85 % 256);
+            frozen.push((i * 31 + 85) % 256);
         }
 
         let new_ref_ptr: *const i32 = frozen.get(0).unwrap();
