@@ -11,7 +11,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call core::io::printf(c"%.*s\n\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
@@ -30,7 +30,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
@@ -53,14 +53,14 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
     _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
     _5 = call core::sys::exit(1_int) -> bb4
@@ -97,7 +97,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Hello from first, x = %d\n", copy _0.*.x) -> bb1
+    _1 = call core::io::printf(c"Hello from first, x = %d\n\0", copy _0.*.x) -> bb1
 
   bb1:
     return
@@ -116,7 +116,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = str {data: "Hey from theStatic (First)", len: 26_int}
+    _0 = str {data: c"Hey from theStatic (First)", len: 26_int}
     _1 = &_0
     _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
 
@@ -143,7 +143,7 @@ mir {
     _2 = call implems::`impl implems::Foo for implems::First`::foo(move _1) -> bb1
 
   bb1:
-    _3 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+    _3 = call core::io::printf(c"Hello from Hello !\n\0") -> bb2
 
   bb2:
     return
@@ -168,7 +168,7 @@ mir {
     _2 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::First>(move _1) -> bb1
 
   bb1:
-    _3 = call core::io::printf(c"Hello from Hello !\n") -> bb2
+    _3 = call core::io::printf(c"Hello from Hello !\n\0") -> bb2
 
   bb2:
     return
@@ -191,7 +191,7 @@ mir {
     _0 = call implems::`impl implems::Foo for implems::First`::theStatic() -> bb1
 
   bb1:
-    _1 = str {data: "Hey from theStatic (Hello)", len: 26_int}
+    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_int}
     _2 = &_1
     _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
 
@@ -216,7 +216,7 @@ mir {
     _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::First>() -> bb1
 
   bb1:
-    _1 = str {data: "Hey from theStatic (Hello)", len: 26_int}
+    _1 = str {data: c"Hey from theStatic (Hello)", len: 26_int}
     _2 = &_1
     _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
 

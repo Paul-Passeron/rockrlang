@@ -196,8 +196,12 @@ impl<'a> ThirPrinter<'a> {
         match &expr.kind {
             ExprKind::IntLit(n) => n.to_string(),
             ExprKind::Charlit(c) => format!("{c:?}"),
-            ExprKind::StrLit(s) => s.display(self.db),
-            ExprKind::CStrLit(s) => format!("c{}", s.display(self.db)),
+            ExprKind::StrLit(s) => {
+                format!("\"{}\"", s.display(self.db))
+            }
+            ExprKind::CStrLit(s) => {
+                format!("c\"{}\\0\"", s.display(self.db))
+            }
             ExprKind::BoolLit(b) => b.to_string(),
 
             ExprKind::Use(p) => self.render_place(*p),

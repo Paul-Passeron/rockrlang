@@ -153,9 +153,9 @@ pub fn fmt_constant<W: MIRWrite>(
         MIRConstant::Bool(b) => mwrite!(w, "{b}"),
         MIRConstant::CString { contents, null_terminated } => {
             if *null_terminated {
-                mwrite!(w, "c\"{contents}\"")
+                mwrite!(w, "c\"{contents}\\0\"")
             } else {
-                mwrite!(w, "\"{contents}\"")
+                mwrite!(w, "c\"{contents}\"")
             }
         }
     }

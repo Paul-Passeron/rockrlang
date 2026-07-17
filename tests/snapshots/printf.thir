@@ -1,19 +1,19 @@
 core/io.rkr:30:5
 thir fun core::io::`impl core::io::str`::print(&self): void {
-    core::io::printf(c%.*s, (*self).len, (*self).data);
+    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
     <core::io::str>::core::io::`impl core::io::str`::print(&message);
-    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::io::printf(c"\'\n\nExitting with code 1...\n\0");
     core::sys::exit(1);
 }
 
 examples/printf.rkr:3:1
 thir fun printf::main(): int {
-    core::io::printf(cHello, World !);
+    core::io::printf(c"Hello, World !\0");
     return 0;
 }
 

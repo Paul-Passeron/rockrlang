@@ -1,28 +1,28 @@
 core/io.rkr:26:5
 thir fun core::io::`impl core::io::str`::println(&self): void {
-    core::io::printf(c%.*s\n, (*self).len, (*self).data);
+    core::io::printf(c"%.*s\n\0", (*self).len, (*self).data);
 }
 
 core/io.rkr:30:5
 thir fun core::io::`impl core::io::str`::print(&self): void {
-    core::io::printf(c%.*s, (*self).len, (*self).data);
+    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
     <core::io::str>::core::io::`impl core::io::str`::print(&message);
-    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::io::printf(c"\'\n\nExitting with code 1...\n\0");
     core::sys::exit(1);
 }
 
 examples/zelf_non_receiver.rkr:7:5
 thir fun zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(&self): void {
-    let _1: core::io::str = Foo {;
+    let _1: core::io::str = "Foo {";
     <core::io::str>::core::io::`impl core::io::str`::println(&_1);
-    core::io::printf(c  .x = %d,\n, (*self).x);
-    core::io::printf(c  .y = %d,\n, (*self).y);
-    let _2: core::io::str = };
+    core::io::printf(c"  .x = %d,\n\0", (*self).x);
+    core::io::printf(c"  .y = %d,\n\0", (*self).y);
+    let _2: core::io::str = "}";
     <core::io::str>::core::io::`impl core::io::str`::println(&_2);
 }
 
@@ -48,7 +48,7 @@ thir fun zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double<T0
 
 examples/zelf_non_receiver.rkr:42:1
 thir fun zelf_non_receiver::nl(): void {
-    let _0: core::io::str = ;
+    let _0: core::io::str = "";
     <core::io::str>::core::io::`impl core::io::str`::println(&_0);
 }
 

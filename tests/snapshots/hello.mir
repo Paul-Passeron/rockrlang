@@ -11,7 +11,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\n", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call core::io::printf(c"%.*s\n\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
@@ -30,7 +30,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
@@ -53,14 +53,14 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'") -> bb1
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
     _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n") -> bb3
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
 
   bb3:
     _5 = call core::sys::exit(1_int) -> bb4
@@ -82,7 +82,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = str {data: "Hello, World !", len: 14_int}
+    _0 = str {data: c"Hello, World !", len: 14_int}
     _1 = &_0
     _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
 
