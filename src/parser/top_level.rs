@@ -204,9 +204,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
         if let Some(t) = self.peek_n(0) {
             match t.kind {
-                TokenKind::Identifier(symbol)
-                    if symbol == Symbol::new(self.db, "mut") =>
-                {
+                TokenKind::Mut => {
                     self.consume();
                     self.expect_self()?;
                     Some(AstReceiver::MutZelf(start.span(self.get_end())))

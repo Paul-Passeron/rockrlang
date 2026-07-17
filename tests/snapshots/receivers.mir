@@ -1,0 +1,153 @@
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+
+  bb1:
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+
+  bb2:
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
+
+  bb3:
+    _5 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+receivers::`impl receivers::Foo`::mut_self
+mir {
+  locals:
+    _0: mut self :receivers::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return
+}
+
+receivers::`impl receivers::Foo`::just_self
+mir {
+  locals:
+    _0: self :receivers::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return
+}
+
+receivers::`impl receivers::Foo`::ref_self
+mir {
+  locals:
+    _0: self :&receivers::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return
+}
+
+receivers::`impl receivers::Foo`::mut_ref_self
+mir {
+  locals:
+    _0: mut self :&mut receivers::Foo
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return
+}
+
+receivers::main
+mir {
+  locals:
+    _0: receivers::Foo
+    _1: void
+    _2: receivers::Foo
+    _3: void
+    _4: receivers::Foo
+    _5: &receivers::Foo
+    _6: void
+    _7: mut receivers::Foo
+    _8: &mut receivers::Foo
+    _9: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = Foo {}
+    _1 = call receivers::`impl receivers::Foo`::mut_self(move _0) -> bb1
+
+  bb1:
+    _2 = Foo {}
+    _3 = call receivers::`impl receivers::Foo`::just_self(move _2) -> bb2
+
+  bb2:
+    _4 = Foo {}
+    _5 = &_4
+    _6 = call receivers::`impl receivers::Foo`::ref_self(move _5) -> bb3
+
+  bb3:
+    _7 = Foo {}
+    _8 = &mut _7
+    _9 = call receivers::`impl receivers::Foo`::mut_ref_self(move _8) -> bb4
+
+  bb4:
+    return 0_int
+}
+

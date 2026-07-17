@@ -1,0 +1,16 @@
+struct Foo {}
+
+impl Foo {
+    fun mut_self(mut self): void {}
+    fun just_self(self): void {}
+    fun ref_self(&self): void {}
+    fun mut_ref_self(&mut self): void {}
+}
+
+fun main(): int {
+    Foo {}.mut_self();
+    Foo {}.just_self();
+    Foo {}.ref_self();
+    Foo {}.mut_ref_self();
+    return 0;
+}

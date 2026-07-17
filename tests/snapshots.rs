@@ -102,6 +102,7 @@ mod thir {
     thir_snapshot_test!(pretty_print, "pretty_print");
     thir_snapshot_test!(match_structlit, "match_structlit");
     thir_snapshot_test!(supertraits, "supertraits");
+    thir_snapshot_test!(receivers, "receivers");
 }
 
 mod mir {
@@ -128,4 +129,5 @@ mod mir {
     mir_snapshot_test!(pretty_print, "pretty_print");
     mir_snapshot_test!(match_structlit, "match_structlit");
     mir_snapshot_test!(supertraits, "supertraits");
+    mir_snapshot_test!(receivers, "receivers");
 }
