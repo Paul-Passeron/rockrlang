@@ -184,6 +184,25 @@ impl<'db> Parser<'db> {
         }
         Ok(res)
     }
+
+    fn synchronize(&mut self, is_sync_point: impl Fn(&TokenKind) -> bool) {
+        let mut depth = 0;
+        while let Some(t) = self.peek_n(0) {
+            match &t.kind {
+                _ if depth == 0 && is_sync_point(&t.kind) => break,
+                TokenKind::OpenBra | TokenKind::OpenPar | TokenKind::OpenSqr => {
+                    depth += 1
+                }
+                TokenKind::CloseBra | TokenKind::ClosePar | TokenKind::CloseSqr
+                    if depth > 0 =>
+                {
+                    depth -= 1
+                }
+                _ => {}
+            }
+            self.consume();
+        }
+    }
 }
 
 #[salsa::tracked(returns(copy))]

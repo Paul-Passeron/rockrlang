@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use salsa::Accumulator;
+
 use crate::{
     lexer::TokenKind,
     parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
@@ -31,7 +33,27 @@ impl<'db> Parser<'db> {
         while let Some(t) = self.peek_n(0)
             && !matches!(t.kind, TokenKind::CloseBra)
         {
-            res.push(self.parse_stmt()?);
+            let start = self.get_start();
+            match self.parse_stmt() {
+                Ok(stmt) => {
+                    res.push(stmt);
+                }
+                Err(err) => {
+                    err.clone().accumulate(self.db);
+                    self.synchronize(|k| k == &TokenKind::Semicolon);
+                    if matches!(
+                        self.peek_n(0).map(|t| t.kind),
+                        Some(TokenKind::Semicolon)
+                    ) {
+                        self.consume();
+                    }
+                    res.push(AstStmt::new(
+                        AstStmtDesc::Error(err),
+                        vec![],
+                        start.span(self.get_end()),
+                    ));
+                }
+            }
         }
 
         self.expect(TokenKind::CloseBra)?;
