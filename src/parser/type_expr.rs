@@ -109,23 +109,7 @@ impl<'db> Parser<'db> {
 
             TokenKind::OpenPar => {
                 self.consume();
-
-                let mut tys = vec![];
-
-                while let Some(t) = self.peek_n(0)
-                    && !matches!(t.kind, TokenKind::ClosePar)
-                {
-                    let t_e = self.parse_any_type_expr()?;
-                    tys.push(t_e);
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Comma)
-                    {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
-
+                let tys = self.parse_any_type_args()?;
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
@@ -197,22 +181,9 @@ impl<'db> Parser<'db> {
         Ok(Spanned::new(AstAnyTypeExprDesc::Known(ty.data), vec![], span))
     }
 
-    fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
-        let mut args = vec![];
-
-        while let Some(t) = self.peek_n(0) {
-            if matches!(t.kind, TokenKind::Gt) {
-                break;
-            }
-            args.push(self.parse_any_type_expr()?);
-            match self.peek_n(0) {
-                Some(t) if matches!(t.kind, TokenKind::Comma) => {
-                    self.consume();
-                }
-                _ => break,
-            }
-        }
-
-        Ok(args)
+   pub fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
+        self.parse_list(Self::parse_any_type_expr, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
+        })
     }
 }

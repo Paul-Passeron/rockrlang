@@ -533,9 +533,7 @@ impl<'db> Parser<'db> {
             }
             TokenKind::OpenPar => {
                 self.consume();
-                let exprs = self.parse_list(Self::parse_expr, TokenKind::Comma, |p| {
-                    p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
-                })?;
+                let exprs = self.parse_expr_args()?;
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
@@ -796,10 +794,7 @@ impl<'db> Parser<'db> {
     fn parse_turbofish_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
         self.expect(TokenKind::Lt)?;
         self.consume();
-        let type_args =
-            self.parse_list(Self::parse_any_type_expr, TokenKind::Comma, |p| {
-                p.peek_n(0).is_none_or(|t| t.kind == TokenKind::Gt)
-            })?;
+        let type_args = self.parse_any_type_args()?;
         self.expect(TokenKind::Gt)?;
         self.consume();
         Ok(type_args)

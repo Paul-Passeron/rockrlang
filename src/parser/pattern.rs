@@ -103,33 +103,11 @@ impl<'db> Parser<'db> {
 
             Some(TokenKind::OpenBra) => {
                 self.consume();
-                let mut fields = vec![];
-
-                while let Some(t) = self.peek_n(0)
-                    && !matches!(t.kind, TokenKind::CloseBra)
-                {
-                    let name = self.parse_symbol()?;
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Colon)
-                    {
-                        self.consume();
-                        let associated = self.parse_pattern()?;
-                        fields.push(StructFieldPattern::Rebind {
-                            name: name.data,
-                            name_span: name.span,
-                            pattern: associated,
-                        })
-                    } else {
-                        fields.push(StructFieldPattern::Name(name.data, name.span));
-                    }
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Comma)
-                    {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
+                let fields = self.parse_list(
+                    Self::parse_struct_field_pattern,
+                    TokenKind::Comma,
+                    |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
+                )?;
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
 
@@ -142,28 +120,29 @@ impl<'db> Parser<'db> {
         }
     }
 
+    fn parse_struct_field_pattern(&mut self) -> Result<StructFieldPattern, ParseError> {
+        let name = self.parse_symbol()?;
+        if let Some(t) = self.peek_n(0)
+            && matches!(t.kind, TokenKind::Colon)
+        {
+            self.consume();
+            let associated = self.parse_pattern()?;
+            Ok(StructFieldPattern::Rebind {
+                name: name.data,
+                name_span: name.span,
+                pattern: associated,
+            })
+        } else {
+            Ok(StructFieldPattern::Name(name.data, name.span))
+        }
+    }
+
     fn parse_pattern_list(
         &mut self,
         end_tok: TokenKind,
     ) -> Result<Vec<AstPattern>, ParseError> {
-        let mut pats = vec![];
-
-        loop {
-            match self.peek_n(0).map(|t| t.kind) {
-                Some(ref k) if *k == end_tok => break,
-                None => break,
-                _ => {
-                    pats.push(self.parse_pattern()?);
-                    match self.peek_n(0).map(|t| t.kind) {
-                        Some(TokenKind::Comma) => {
-                            self.consume();
-                        }
-                        _ => break,
-                    }
-                }
-            }
-        }
-
-        Ok(pats)
+        self.parse_list(Self::parse_pattern, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == end_tok)
+        })
     }
 }

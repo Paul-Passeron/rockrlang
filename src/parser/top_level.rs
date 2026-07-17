@@ -109,27 +109,11 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_fundef_args(&mut self) -> Result<Vec<AstFundefArg>, ParseError> {
-        let mut args = vec![];
-
-        while let Some(t) = self.peek_n(0)
-            && !matches!(t.kind, TokenKind::ClosePar)
-        {
-            args.push(self.parse_fundef_arg()?);
-            if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Comma)
-            {
-                self.consume();
-                if let Some(t) = self.peek_n(0)
-                    && matches!(t.kind, TokenKind::Plus)
-                {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        Ok(args)
+        self.parse_list(Self::parse_fundef_arg, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| {
+                t.kind == TokenKind::ClosePar || t.kind == TokenKind::Plus // For variadics
+            })
+        })
     }
 
     fn parse_fundef_arg(&mut self) -> Result<AstFundefArg, ParseError> {
@@ -150,14 +134,13 @@ impl<'db> Parser<'db> {
             && matches!(t.kind, TokenKind::Colon)
         {
             self.consume();
-            let mut cs = vec![self.parse_type_expr()?];
-            while let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Plus)
-            {
-                self.consume();
-                cs.push(self.parse_type_expr()?);
+            let args = self.parse_list(Self::parse_type_expr, TokenKind::Plus, |p| {
+                p.peek_n(0).is_none()
+            })?;
+            if args.is_empty() {
+                self.parse_type_expr()?; // Should bail early if we have no supertraits
             }
-            cs
+            args
         } else {
             vec![]
         };
@@ -165,22 +148,9 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_template_args(&mut self) -> Result<Vec<AstTemplateArg>, ParseError> {
-        let mut args = vec![];
-
-        while let Some(t) = self.peek_n(0)
-            && !matches!(t.kind, TokenKind::Gt)
-        {
-            args.push(self.parse_template_arg()?);
-            if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Comma)
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-
-        Ok(args)
+        self.parse_list(Self::parse_template_arg, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == TokenKind::Gt)
+        })
     }
 
     fn parse_receiver(&mut self) -> AstReceiver {
@@ -407,52 +377,32 @@ impl<'db> Parser<'db> {
         ))
     }
 
+    pub fn parse_annotation_item(&mut self) -> Result<AstAnnotationItem, ParseError> {
+        let name = self.parse_symbol()?.data;
+        // Check if this is a Call form: `name(arg1, arg2, ...)`
+        if self.peek_n(0).is_none_or(|t| t.kind != TokenKind::OpenPar) {
+            return Ok(AstAnnotationItem::Flag(name));
+        };
+        self.consume(); // consume `(`
+        let args = self.parse_list(
+            |p| p.parse_type_expr().map(AstAnnotationArg::Type),
+            TokenKind::Comma,
+            |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar),
+        )?;
+        self.expect(TokenKind::ClosePar)?;
+        self.consume();
+        Ok(AstAnnotationItem::Call { name, args })
+    }
+
     pub fn parse_annotation(&mut self) -> Result<AstAnnotation, ParseError> {
         self.expect(TokenKind::AddressOf)?;
         self.consume();
         self.expect(TokenKind::OpenSqr)?;
         self.consume();
-        let mut items = vec![];
-        while let Some(t) = self.peek_n(0)
-            && !matches!(t.kind, TokenKind::CloseSqr)
-        {
-            let name = self.parse_symbol()?.data;
-            // Check if this is a Call form: `name(arg1, arg2, ...)`
-            let item = if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::OpenPar)
-            {
-                self.consume(); // consume `(`
-                let mut args = vec![];
-                while let Some(t) = self.peek_n(0)
-                    && !matches!(t.kind, TokenKind::ClosePar)
-                {
-                    // Try to parse as a type expression; fall back to bare
-                    // symbol
-                    let arg = self.parse_type_expr().map(AstAnnotationArg::Type)?;
-                    args.push(arg);
-                    if let Some(t) = self.peek_n(0)
-                        && matches!(t.kind, TokenKind::Comma)
-                    {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
-                AstAnnotationItem::Call { name, args }
-            } else {
-                AstAnnotationItem::Flag(name)
-            };
-            items.push(item);
-            if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Comma)
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
+        let items =
+            self.parse_list(Self::parse_annotation_item, TokenKind::Comma, |p| {
+                p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseSqr)
+            })?;
         self.expect(TokenKind::CloseSqr)?;
         self.consume();
         Ok(AstAnnotation { items })
@@ -587,15 +537,11 @@ impl<'db> Parser<'db> {
             }
             Some(TokenKind::OpenPar) => {
                 self.consume();
-                let mut fields = Vec::new();
-                while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::ClosePar) {
-                    fields.push(self.parse_type_expr()?);
-                    if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
+                let fields =
+                    self.parse_list(Self::parse_type_expr, TokenKind::Comma, |p| {
+                        p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
+                    })?;
+
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 AstEnumVariantKind::TupleLike(fields)
@@ -607,18 +553,9 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_enum_variants(&mut self) -> Result<Vec<AstEnumVariant>, ParseError> {
-        let mut variants = vec![];
-        while self.peek_n(0).map(|t| t.kind) != Some(TokenKind::CloseBra) {
-            let variant = self.parse_enum_variant()?;
-            let is_struct = matches!(variant.kind, AstEnumVariantKind::StructLike(_));
-            variants.push(variant);
-            if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Comma) {
-                self.consume();
-            } else if !is_struct {
-                break;
-            }
-        }
-        Ok(variants)
+        self.parse_list(Self::parse_enum_variant, TokenKind::Comma, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra)
+        })
     }
 
     fn parse_enum_def(&mut self) -> Result<AstEnumDef, ParseError> {
