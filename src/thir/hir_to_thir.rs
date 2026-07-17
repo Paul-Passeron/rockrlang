@@ -36,8 +36,8 @@ use crate::{
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     ril::{
-        BuiltinTypeId, FunctionId, PtrKind, ScopeOwnerId, TypeDefId, TypeId, TypeRef,
-        ref_of, rehole,
+        BuiltinTypeId, BuiltinTypeKind, FunctionId, PtrKind, ScopeOwnerId, TypeDefId,
+        TypeId, TypeRef, ref_of, rehole,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
@@ -1231,9 +1231,17 @@ impl<'db> ThirTranslator<'db> {
 }
 
 impl TypeRef {
-    pub fn as_type_id(&self) -> Option<TypeId> {
+    pub fn as_type_id(self) -> Option<TypeId> {
         match self {
-            TypeRef::Concrete(type_id) => Some(*type_id),
+            TypeRef::Concrete(type_id) => Some(type_id),
+            _ => None,
+        }
+    }
+
+    pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[TypeRef])> {
+        let id = self.as_type_id()?;
+        match id.def(db) {
+            TypeDefId::Builtin(bid) => Some((bid, id.args(db))),
             _ => None,
         }
     }
@@ -1259,12 +1267,8 @@ impl TypeRef {
     }
 
     pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
-        let type_id = self.as_type_id()?;
-        if type_id.def(db) == TypeDefId::Builtin(BuiltinTypeId::tuple(db)) {
-            Some(type_id.args(db).to_vec())
-        } else {
-            None
-        }
+        let (b, args) = self.as_builtin(db)?;
+        matches!(b.kind(db), BuiltinTypeKind::Tuple).then(|| args.to_vec())
     }
 
     pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {

@@ -28,7 +28,7 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     ril::{
-        BuiltinTypeId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
+        BuiltinTypeKind, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
         void_id,
     },
@@ -338,15 +338,10 @@ impl<'db> SanityChecker<'db> {
             }
             ExprKind::SliceLit(items) => {
                 if items.is_empty() {
-                    match infos.ty {
-                        TypeRef::Concrete(type_id)
-                            if type_id.def(self.db)
-                                == TypeDefId::Builtin(BuiltinTypeId::slice(self.db)) => {}
-                        _ => {
-                            let mock_expected =
-                                TypeRef::Concrete(slice_of(self.db, TypeRef::Unknown));
-                            self.check_types(mock_expected, infos.ty, infos.span);
-                        }
+                    if infos.ty.as_slice(self.db).is_none() {
+                        let mock_expected =
+                            TypeRef::Concrete(slice_of(self.db, TypeRef::Unknown));
+                        self.check_types(mock_expected, infos.ty, infos.span);
                     }
                 } else {
                     let tys = items
@@ -742,13 +737,10 @@ impl FunctionRef {
 
 impl TypeRef {
     pub fn as_slice(self, db: &dyn Db) -> Option<Self> {
-        let ty = self.as_type_id()?;
-        if ty.def(db) == TypeDefId::Builtin(BuiltinTypeId::slice(db)) {
-            let args = ty.args(db);
-            assert_eq!(args.len(), 1);
-            Some(args[0])
-        } else {
-            None
+        let (b, args) = self.as_builtin(db)?;
+        match b.kind(db) {
+            BuiltinTypeKind::Slice => Some(args[0]),
+            _ => None,
         }
     }
 

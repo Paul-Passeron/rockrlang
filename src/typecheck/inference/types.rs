@@ -95,17 +95,6 @@ impl<'db> InferenceCtx<'db> {
         self.ptr_of(self.char_ty())
     }
 
-    pub fn is_slice(&self, ty: &InferTy) -> Option<InferTy> {
-        if let InferTy::Adt { def, fields } = ty
-            && *def == TypeDefId::Builtin(BuiltinTypeId::slice(self.db))
-        {
-            assert_eq!(fields.len(), 1);
-            Some(fields[0].clone())
-        } else {
-            None
-        }
-    }
-
     pub fn as_builtin<'ty>(
         &self,
         ty: &'ty InferTy,
@@ -117,6 +106,14 @@ impl<'db> InferenceCtx<'db> {
             return None;
         };
         Some((*builtin, fields))
+    }
+
+    pub fn is_slice(&self, ty: &InferTy) -> Option<InferTy> {
+        let (builtin, fields) = self.as_builtin(ty)?;
+        match builtin.kind(self.db) {
+            BuiltinTypeKind::Slice => Some(fields[0].clone()),
+            _ => None,
+        }
     }
 
     pub fn is_ref(&self, ty: &InferTy) -> Option<InferTy> {
@@ -146,12 +143,10 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_tuple<'a>(&self, ty: &'a InferTy) -> Option<&'a [InferTy]> {
-        if let InferTy::Adt { def, fields } = &ty
-            && *def == TypeDefId::Builtin(BuiltinTypeId::tuple(self.db))
-        {
-            Some(fields)
-        } else {
-            None
+        let (builtin, fields) = self.as_builtin(ty)?;
+        match builtin.kind(self.db) {
+            BuiltinTypeKind::Tuple => Some(fields),
+            _ => None,
         }
     }
 
@@ -210,37 +205,6 @@ impl<'db> InferenceCtx<'db> {
             TypeRef::Unknown => InferTy::Var(self.fresh_var()),
         }
     }
-
-    // pub fn allocate_partial_type_arg(
-    //     &mut self,
-    //     arg: &TypeRef,
-    //     ctx: &ImplicitContext,
-    // ) -> InferTy {
-    //     match arg {
-    //         PartialTypeArg::Known(type_ref) => self.allocate_type_ref(*type_ref,
-    // ctx),         PartialTypeArg::Partial(partial_type_ref) => {
-    //             self.allocate_partial_type_ref(partial_type_ref, ctx)
-    //         }
-    //         PartialTypeArg::Infer => InferTy::Var(self.fresh_var()),
-    //     }
-    // }
-
-    // pub fn allocate_partial_type_ref(
-    //     &mut self,
-    //     type_ref: &PartialTypeRef,
-    //     ctx: &ImplicitContext,
-    // ) -> InferTy {
-    //     match type_ref {
-    //         PartialTypeRef::Resolved(type_ref) =>
-    // self.allocate_type_ref(*type_ref, ctx),         PartialTypeRef::WithHoles
-    // { def, args } => InferTy::Adt {             def: *def,
-    //             fields: args
-    //                 .iter()
-    //                 .map(|arg| self.allocate_partial_type_arg(arg, ctx))
-    //                 .collect(),
-    //         },
-    //     }
-    // }
 
     pub fn allocate_ast_type_expr(
         &mut self,

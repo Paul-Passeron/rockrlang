@@ -41,7 +41,7 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    ril::{BuiltinTypeId, TypeRef, bool_id},
+    ril::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id},
     thir_to_mir::FuncInst,
 };
 
@@ -754,16 +754,9 @@ impl<'a> MTLBCtx<'a> {
 
 impl BuiltinTypeId {
     fn is_signed(self, db: &dyn Db) -> bool {
-        if self == BuiltinTypeId::int(db) {
-            return false;
+        match self.kind(db) {
+            BuiltinTypeKind::Int { signed, .. } => signed,
+            _ => false,
         }
-        if self == BuiltinTypeId::char(db) {
-            return false;
-        }
-        if self == BuiltinTypeId::usize(db) {
-            return false;
-        }
-
-        false
     }
 }

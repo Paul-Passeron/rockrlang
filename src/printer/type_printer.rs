@@ -22,10 +22,11 @@ use std::fmt::Write;
 use crate::{
     Db,
     compiler::{FunctionSignature, get_sig_of_function},
+    hir::Mutability,
     name_resolve::{builtin_module, definition::Definition},
     ril::{
-        BuiltinTypeId, FunctionId, ImplId, InterfaceId, InterfaceRef, ModuleId, PtrKind,
-        ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
+        ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },
     typecheck::inference::{InferTy, InferenceCtx},
 };
@@ -61,25 +62,24 @@ impl TypePrinter {
         db: &dyn Db,
         def: BuiltinTypeId,
     ) -> Option<(String, String)> {
-        if let Some(ptrkid) = def.is_ptr_like(db) {
-            let muta = match ptrkid {
-                PtrKind::Ref(mutability) | PtrKind::RawPtr(mutability) => mutability,
-            };
-            let muta_suffix = match muta {
-                crate::hir::Mutability::Const => "",
-                crate::hir::Mutability::Mutable => "mut ",
-            };
-            let prefix = match ptrkid {
-                PtrKind::Ref(_) => "&",
-                PtrKind::RawPtr(_) => "*",
-            };
-            Some((format!("{prefix}{muta_suffix}"), String::new()))
-        } else if def == BuiltinTypeId::slice(db) {
-            Some((String::from("["), String::from("]")))
-        } else if def == BuiltinTypeId::tuple(db) {
-            Some((String::from("("), String::from(")")))
-        } else {
-            None
+        match def.kind(db) {
+            BuiltinTypeKind::Ref { mutability } => {
+                let muta_suffix = match mutability {
+                    Mutability::Const => "",
+                    Mutability::Mutable => "mut ",
+                };
+                Some((format!("&{muta_suffix}"), String::new()))
+            }
+            BuiltinTypeKind::Ptr { mutability } => {
+                let muta_suffix = match mutability {
+                    Mutability::Const => "",
+                    Mutability::Mutable => "mut ",
+                };
+                Some((format!("*{muta_suffix}"), String::new()))
+            }
+            BuiltinTypeKind::Tuple => Some(("(".into(), ")".into())),
+            BuiltinTypeKind::Slice => Some(("[".into(), "]".into())),
+            _ => None,
         }
     }
 

@@ -46,8 +46,8 @@ use crate::{
     parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
     ril::{
-        BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::Display,
+        BuiltinTypeId, BuiltinTypeKind, FunctionId, InterfaceId, Package, StructId,
+        TypeDefId, TypeId, TypeParamId, TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -491,6 +491,13 @@ impl InferTy {
         }
     }
 
+    pub fn as_builtin(&self) -> Option<(BuiltinTypeId, &[InferTy])> {
+        match self {
+            InferTy::Adt { def: TypeDefId::Builtin(def), fields } => Some((*def, fields)),
+            _ => None,
+        }
+    }
+
     pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
         let (def, args) = self.as_adt()?;
         let mutability = def.is_ptr_like(db)?.mutability();
@@ -505,12 +512,10 @@ impl InferTy {
     }
 
     pub fn as_slice<'a>(&'a self, db: &dyn Db) -> Option<&'a InferTy> {
-        let (def, args) = self.as_adt()?;
-        if def == TypeDefId::Builtin(BuiltinTypeId::slice(db)) {
-            assert_eq!(args.len(), 1);
-            Some(&args[0])
-        } else {
-            None
+        let (def, args) = self.as_builtin()?;
+        match def.kind(db) {
+            BuiltinTypeKind::Slice => Some(&args[0]),
+            _ => None,
         }
     }
 
