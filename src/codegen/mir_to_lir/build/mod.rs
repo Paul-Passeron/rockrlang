@@ -277,11 +277,11 @@ impl<'a> MTLBCtx<'a> {
                     }
                 };
                 let value = b.call(f, args);
-                if let Some(v) = value {
-                    if !lower.value_map[dest].is_zst() {
-                        let ptr = lower.value_map[dest].ptr();
-                        b.store(ptr, v);
-                    }
+                if let Some(v) = value
+                    && !lower.value_map[dest].is_zst()
+                {
+                    let ptr = lower.value_map[dest].ptr();
+                    b.store(ptr, v);
                 }
                 b.terminate(Terminator::Goto(next))
             }

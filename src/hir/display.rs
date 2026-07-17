@@ -332,7 +332,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
         }
         HirExprDesc::UnresolvedCallDirect { target, args, type_args } => {
             write!(f, "#<unresolved>{}", target.name(db).to_string(db))?;
-            if type_args.len() > 0 {
+            if !type_args.is_empty() {
                 write!(f, "::<")?;
                 for (i, arg) in type_args.iter().enumerate() {
                     if i > 0 {
@@ -354,7 +354,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
 
         HirExprDesc::CallDirect { target, args, type_args } => {
             write!(f, "{}", target.called_to_string(db))?;
-            if type_args.len() > 0 {
+            if !type_args.is_empty() {
                 write!(f, "::<")?;
                 for (i, arg) in type_args.iter().enumerate() {
                     if i > 0 {
@@ -377,7 +377,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             match interface_hint {
                 Some(id) => {
                     write!(f, "{}::{}", id.to_string(db), method.display(db))?;
-                    if type_args.len() > 0 {
+                    if !type_args.is_empty() {
                         write!(f, "::<")?;
                         for (i, arg) in type_args.iter().enumerate() {
                             if i > 0 {
@@ -412,7 +412,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
         HirExprDesc::CallStatic { ty, method, args, type_args } => {
             write!(f, "{}", ty.to_string(db))?;
             write!(f, "::{}", method.display(db))?;
-            if type_args.len() > 0 {
+            if !type_args.is_empty() {
                 write!(f, "::<")?;
                 for (i, arg) in type_args.iter().enumerate() {
                     if i > 0 {

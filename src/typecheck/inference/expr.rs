@@ -302,7 +302,7 @@ impl<'db> InferenceCtx<'db> {
 
             Ok(as_struct)
         } else {
-            Err(UnificationError::NonStructForStructLit(ty.clone()))
+            Err(UnificationError::NonStructForStructLit(*ty))
         }
     }
 

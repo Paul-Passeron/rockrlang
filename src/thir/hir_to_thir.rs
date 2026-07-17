@@ -884,7 +884,7 @@ impl<'db> ThirTranslator<'db> {
                     thir_args
                 };
 
-                let zelf_ty = call_infos.zelf_ty.clone().or_else(|| {
+                let zelf_ty = call_infos.zelf_ty.or_else(|| {
                     match call_infos.callee.parent(self.db) {
                         ScopeOwnerId::Impl(impl_id) => Some(
                             impl_id
@@ -963,8 +963,7 @@ impl<'db> ThirTranslator<'db> {
         let span = b.exprs[expr].span;
         let local = b.new_synthetic_local(ty, mutability, span);
         stmts.push(ThirStmt::let_(local, expr, span));
-        let place = b.new_place(ThirPlace::local(local, b, span));
-        place
+        b.new_place(ThirPlace::local(local, b, span))
     }
 
     fn compute_receiver(

@@ -146,7 +146,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         BasicTypeEnum::try_from(self.lower_layout(*ty)).ok()
                     })
                     .collect_vec();
-                self.ctx.struct_type(&field_types, false).into()
+                self.ctx.struct_type(field_types, false).into()
             }
             LayoutData::Union(_) => {
                 self.ctx.i8_type().array_type(layout.size(self.db).bytes() as u32).into()
@@ -422,7 +422,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             {
                                 continue;
                             }
-                            let value = ctx.values[&fields_in_src_order[i as usize]];
+                            let value = ctx.values[&fields_in_src_order[i]];
                             res = self
                                 .b
                                 .build_insert_value(res, value, *to_layout, "")

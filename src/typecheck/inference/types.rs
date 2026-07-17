@@ -273,7 +273,7 @@ impl<'db> InferenceCtx<'db> {
 }
 
 impl InferTy {
-    pub fn ptr_like<'db>(&self, db: &'db dyn Db) -> Option<(Mutability, &InferTy)> {
+    pub fn ptr_like(&self, db: &dyn Db) -> Option<(Mutability, &InferTy)> {
         self.as_adt().and_then(|(def, vals)| {
             let kind = def.is_ptr_like(db)?;
             Some((kind.mutability(), &vals[0]))

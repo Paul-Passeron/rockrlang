@@ -785,12 +785,7 @@ impl<'db> LowerFundef<'db> {
         }
         let args = HirConstructorArgs::StructLike { fields: lowered_fields };
 
-        return HirExprDesc::Constructor {
-            enum_def,
-            name: variant_name,
-            args,
-            template_hints,
-        };
+        HirExprDesc::Constructor { enum_def, name: variant_name, args, template_hints }
     }
 
     fn lower_name_resolved_expr_from_type(
