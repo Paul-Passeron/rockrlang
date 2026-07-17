@@ -33,7 +33,7 @@ use crate::{
     parse_tree::{
         Spanned,
         annotation::AstAnnotation,
-        top_level::{Ast, AstAnyTopLevelItemDesc},
+        top_level::{Ast, AstAnyTopLevelItemDesc, AstTopLevelItemDesc},
     },
 };
 
@@ -229,6 +229,7 @@ pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
     let mut includes = vec![];
 
     while parser.position < tokens.len() {
+        let start = parser.get_start();
         let item = parser.parse_any_toplevel_item();
         match item {
             Ok(item) => match item.data {
@@ -239,9 +240,14 @@ pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
                     items.push(Spanned::new(*x, item.annotations, item.span));
                 }
             },
-            Err(parse_error) => {
-                parse_error.accumulate(db);
-                break;
+            Err(err) => {
+                err.clone().accumulate(db);
+                parser.synchronize(Parser::is_top_level_sync_point);
+                items.push(Spanned::new(
+                    AstTopLevelItemDesc::Error(err),
+                    vec![],
+                    start.span(parser.get_end()),
+                ));
             }
         }
     }

@@ -239,11 +239,12 @@ pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
 }
 
 impl AstIncludePathDesc {
-    pub fn to_segments(&self) -> NonEmpty<Symbol> {
+    pub fn to_segments(&self) -> Option<NonEmpty<Symbol>> {
         let (hd, tl) = match self {
-            AstIncludePathDesc::Symbol(symbol) => (*symbol, None),
-            AstIncludePathDesc::NameResolved { from, to } => (*from, Some(to)),
-        };
+            AstIncludePathDesc::Symbol(symbol) => Some((*symbol, None)),
+            AstIncludePathDesc::NameResolved { from, to } => Some((*from, Some(to))),
+            AstIncludePathDesc::Error => None,
+        }?;
         fn _to_segments(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
             match this {
                 AstIncludePathDesc::Symbol(symbol) => {
@@ -253,13 +254,14 @@ impl AstIncludePathDesc {
                     v.push(*from);
                     _to_segments(&to.data, v);
                 }
+                AstIncludePathDesc::Error => unreachable!(),
             }
         }
         let mut res = NonEmpty::singleton(hd);
         if let Some(rest) = tl {
             _to_segments(&rest.data, &mut res);
         }
-        res
+        Some(res)
     }
 }
 
@@ -305,7 +307,9 @@ pub fn module_includes<'db>(
     let ast = parse_file(db, *file);
     ast.includes(db)
         .iter()
-        .map(|include| Segments::new(db, include.data.to_segments()))
+        .filter_map(|include| {
+            include.data.to_segments().map(|segs| Segments::new(db, segs))
+        })
         .collect()
 }
 

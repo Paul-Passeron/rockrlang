@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::sync::Arc;
 
 use nonempty::nonempty;
+use salsa::Accumulator;
 
 use crate::{
     common::symbols::Symbol,
@@ -28,8 +29,8 @@ use crate::{
         top_level::{
             AstAnyTopLevelItem, AstAnyTopLevelItemDesc, AstEnumDef, AstEnumVariant,
             AstEnumVariantKind, AstFundef, AstFundefArg, AstFundefDesc, AstFunsig,
-            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstInterface,
-            AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig,
+            AstFunsigDesc, AstImplBlock, AstImplItem, AstIncludePath, AstIncludePathDesc,
+            AstInterface, AstInterfaceItem, AstMethodDef, AstMethodDefDesc, AstMethodsig,
             AstMethodsigDesc, AstModule, AstModuleDesc, AstReceiver, AstStructDef,
             AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
         },
@@ -76,6 +77,17 @@ impl<'db> Parser<'db> {
         }
     }
 
+    pub fn is_top_level_sync_point(k: &TokenKind) -> bool {
+        matches!(
+            k,
+            TokenKind::Fun
+                | TokenKind::Module
+                | TokenKind::Directive(_)
+                | TokenKind::Type
+                | TokenKind::Interface
+        )
+    }
+
     pub fn parse_module(&mut self) -> Result<AstModule, ParseError> {
         let annotations = self.annotations();
         let start = self.get_start();
@@ -91,11 +103,35 @@ impl<'db> Parser<'db> {
                 && s.interned().contents(self.db) == "include"
             {
                 self.consume();
-                let include = self.parse_include_path()?;
-                includes.push(include);
+                let start = self.get_start();
+                match self.parse_include_path() {
+                    Ok(include) => includes.push(include),
+                    Err(err) => {
+                        self.synchronize(Self::is_top_level_sync_point);
+                        err.clone().accumulate(self.db);
+                        includes.push(AstIncludePath::new(
+                            AstIncludePathDesc::Error,
+                            vec![],
+                            start.span(self.get_end()),
+                        ));
+                    }
+                }
             } else {
-                let item = self.parse_toplevel_item()?;
-                items.push(item);
+                let item = self.parse_toplevel_item();
+                match item {
+                    Ok(item) => {
+                        items.push(item);
+                    }
+                    Err(err) => {
+                        self.synchronize(Self::is_top_level_sync_point);
+                        err.clone().accumulate(self.db);
+                        items.push(AstTopLevelItem::new(
+                            AstTopLevelItemDesc::Error(err),
+                            vec![],
+                            start.span(self.get_end()),
+                        ));
+                    }
+                }
             }
         }
         self.expect(TokenKind::CloseBra)?;
@@ -607,16 +643,26 @@ impl<'db> Parser<'db> {
     pub fn parse_toplevel_item(&mut self) -> Result<AstTopLevelItem, ParseError> {
         self.collect_annotations()?;
         let annotations = self.annotations();
+        let start = self.get_start();
         match &self.current_token()?.kind {
-            TokenKind::Module => {
-                let module = self.parse_module()?;
-                let span = module.span;
-                Ok(AstTopLevelItem::new(
-                    AstTopLevelItemDesc::Module(module),
-                    annotations,
-                    span,
-                ))
-            }
+            TokenKind::Module => match self.parse_module() {
+                Ok(module) => {
+                    let span = module.span;
+                    Ok(AstTopLevelItem::new(
+                        AstTopLevelItemDesc::Module(module),
+                        annotations,
+                        span,
+                    ))
+                }
+                Err(err) => {
+                    err.clone().accumulate(self.db);
+                    Ok(AstTopLevelItem::new(
+                        AstTopLevelItemDesc::Error(err),
+                        annotations,
+                        start.span(self.get_end()),
+                    ))
+                }
+            },
             TokenKind::Fun => {
                 let fdef = self.parse_fundef()?;
                 let span = fdef.span;

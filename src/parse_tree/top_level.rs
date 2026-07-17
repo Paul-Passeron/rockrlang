@@ -299,6 +299,7 @@ pub type AstIncludePath = Spanned<AstIncludePathDesc>;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstIncludePathDesc {
+    Error,
     Symbol(Symbol),
     NameResolved { from: Symbol, to: Box<AstIncludePath> },
 }
