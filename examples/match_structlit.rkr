@@ -1,0 +1,25 @@
+enum LooksLikeAStruct {
+    A { x: int; y: int },
+    B { z: int; foo: int },
+    None,
+}
+
+fun getIt(): LooksLikeAStruct {
+    return LooksLikeAStruct::A {.x: 4, .y: 59};
+}
+
+fun main(): int {
+    let it = getIt();
+    match it {
+        LooksLikeAStruct::A { x, y } => {
+            core::io::printf(c"Got A, x = %d and y = %d\n", x, y);
+        }
+        LooksLikeAStruct::B { z, foo } => {
+            core::io::printf(c"Got B, z = %d and foo = %d\n", z ,foo);
+        }
+        LooksLikeAStruct::None => {
+            core::io::printf(c"None\n");
+        }
+    }
+    return 0;
+}

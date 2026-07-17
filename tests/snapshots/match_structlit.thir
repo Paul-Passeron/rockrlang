@@ -1,0 +1,35 @@
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c%.*s, (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(cOh no, a panic has occurred!\nmsg: \');
+    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    core::io::printf(c\'\n\nExitting with code 1...\n);
+    core::sys::exit(1);
+}
+
+examples/match_structlit.rkr:7:1
+thir fun match_structlit::getIt(): match_structlit::LooksLikeAStruct {
+    return match_structlit::LooksLikeAStruct::#0 { x: 4, y: 59 };
+}
+
+examples/match_structlit.rkr:11:1
+thir fun match_structlit::main(): int {
+    let it: match_structlit::LooksLikeAStruct = match_structlit::getIt();
+    match it {
+        match_structlit::LooksLikeAStruct::#0 { x: x, y: y } => 's0: {
+            core::io::printf(cGot A, x = %d and y = %d\n, x, y);
+        }
+        match_structlit::LooksLikeAStruct::#1 { z: z, foo: foo } => 's1: {
+            core::io::printf(cGot B, z = %d and foo = %d\n, z, foo);
+        }
+        match_structlit::LooksLikeAStruct::#2 => 's2: {
+            core::io::printf(cNone\n);
+        }
+    }
+    return 0;
+}
+

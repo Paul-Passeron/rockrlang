@@ -100,6 +100,7 @@ mod thir {
     thir_snapshot_test!(zelf_non_receiver, "zelf_non_receiver");
     thir_snapshot_test!(typestates, "typestates");
     thir_snapshot_test!(pretty_print, "pretty_print");
+    thir_snapshot_test!(match_structlit, "match_structlit");
 }
 
 mod mir {
@@ -124,4 +125,5 @@ mod mir {
     mir_snapshot_test!(zelf_non_receiver, "zelf_non_receiver");
     mir_snapshot_test!(typestates, "typestates");
     mir_snapshot_test!(pretty_print, "pretty_print");
+    mir_snapshot_test!(match_structlit, "match_structlit");
 }
