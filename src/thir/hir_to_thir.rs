@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
+use salsa::Accumulator;
 
 use crate::{
     Db,
@@ -27,6 +28,7 @@ use crate::{
         location::Span,
         symbols::Symbol,
     },
+    compiler::diagnostic::Diag,
     hir::{
         self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
@@ -205,7 +207,7 @@ impl<'db> ThirTranslator<'db> {
                     type_id.args(db).iter().map(|ty| _aux(db, owner, *ty)).collect(),
                 )),
                 TypeRef::Zelf => owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error),
-                _ => ty, // TODO ???
+                _ => ty,
             }
         }
         _aux(self.db, self.scope_owner(), ty)
@@ -316,7 +318,12 @@ impl<'db> ThirTranslator<'db> {
                 vec![self.handle_block(b, hir_stmts, stmt.span)]
             }
             HirStmtKind::Defer(_) => {
-                todo!("error diagnostic for unimplemented defer stmts")
+                Diag::generic_error(
+                    "`defer` statements are not implemented yet".into(),
+                    stmt.span,
+                )
+                .accumulate(self.db);
+                vec![ThirStmt::error(stmt.span)]
             }
             HirStmtKind::Break => vec![self.handle_break(b, stmt.span)],
         }
@@ -513,18 +520,17 @@ impl<'db> ThirTranslator<'db> {
                     .variants
                     .iter()
                     .position(|variant| variant.name == *name);
-                if id.is_none() {
-                    todo!(
-                        "Error diagnostic for bad variant name in constructor patt()ern"
-                    )
-                }
                 let args = self.pat_args(b, fields);
                 let def = ty.as_enum_ref(self.db);
                 match (id, def) {
                     (Some(id), Some(def)) => {
                         Some(ThirPatternKind::Constructor { def, idx: id, args })
                     }
-                    _ => None,
+                    _ => {
+                        Diag::generic_error("Bad enum variant".into(), pat.span)
+                            .accumulate(self.db);
+                        None
+                    }
                 }
             }
             HirPatternDesc::IntLit(lit) => Some(ThirPatternKind::IntLit(*lit)),
@@ -631,12 +637,14 @@ impl<'db> ThirTranslator<'db> {
                 };
 
                 let wrapped = RefWrappedTy::from_type_ref(self.db, ty);
-                let def = wrapped.inner.as_struct_ref(self.db).unwrap_or_else(|| {
-                    todo!(
-                        "handle bad case: inner_ty = {}",
-                        wrapped.inner.to_string(self.db)
+                let Some(def) = wrapped.inner.as_struct_ref(self.db) else {
+                    Diag::generic_error(
+                        "Expected a struct type to destructure".into(),
+                        span,
                     )
-                });
+                    .accumulate(self.db);
+                    return;
+                };
                 for pat_field in fields {
                     let name = match pat_field {
                         HirStructFieldPattern::Name { name, .. }
@@ -711,9 +719,9 @@ impl<'db> ThirTranslator<'db> {
                     }
                 }
             }
-            HirPatternDesc::Constructor { .. } => todo!("Invalid lhs pattern"),
-            HirPatternDesc::IntLit(_) => todo!("Invalid lhs pattern"),
-            HirPatternDesc::Error => {
+            HirPatternDesc::Constructor { .. }
+            | HirPatternDesc::IntLit(_)
+            | HirPatternDesc::Error => {
                 // Do nothing: This should have been reported earlier.
             }
         }
@@ -773,12 +781,17 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::BinOp { op: *op, lhs, rhs }
             }
             HirExprDesc::StructLit { fields, .. } => {
-                let struct_def = ty.as_struct_ref(self.db).expect("TODO");
                 let fields = fields
                     .iter()
                     .map(|field| (field.0, self.expr(b, &field.1, stmts)))
                     .collect_vec();
-                ExprKind::StructLit { struct_def, fields }
+                if let Some(struct_def) = ty.as_struct_ref(self.db) {
+                    ExprKind::StructLit { struct_def, fields }
+                } else {
+                    Diag::generic_error("Expected a struct.".into(), expr.span)
+                        .accumulate(self.db);
+                    ExprKind::Error
+                }
             }
             HirExprDesc::Neg(hir_expr) => {
                 let operand = self.expr(b, hir_expr, stmts);
@@ -803,14 +816,29 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::TypeName(rehole(self.db, *type_ref))
             }
             HirExprDesc::Constructor { name, args, .. } => {
-                let enum_def = ty.as_enum_ref(self.db).expect("TODO");
-                let idx = enum_item(self.db, enum_def.def.interned())
-                    .variants
-                    .iter()
-                    .position(|v| v.name == *name)
-                    .expect("TODO");
                 let args = self.expr_args(b, args, stmts);
-                ExprKind::Constructor { enum_def, idx, args }
+                ty.as_enum_ref(self.db).map_or_else(
+                    || {
+                        Diag::generic_error("Expected an enum.".into(), expr.span)
+                            .accumulate(self.db);
+                        ExprKind::Error
+                    },
+                    |enum_def| {
+                        let Some(idx) = enum_item(self.db, enum_def.def.interned())
+                            .variants
+                            .iter()
+                            .position(|v| v.name == *name)
+                        else {
+                            Diag::generic_error(
+                                "Could not find variant in enum.".into(),
+                                expr.span,
+                            )
+                            .accumulate(self.db);
+                            return ExprKind::Error;
+                        };
+                        ExprKind::Constructor { enum_def, idx, args }
+                    },
+                )
             }
             HirExprDesc::CallDirect { target, args, .. } => {
                 let args = args.iter().map(|arg| self.expr(b, arg, stmts)).collect_vec();
@@ -1099,8 +1127,13 @@ impl<'db> ThirTranslator<'db> {
                     let place = b.get_place(place);
                     (place.ty, place.span)
                 };
-                let struct_ref = ty.as_struct_ref(self.db).expect("TODO");
-                let field_ty = struct_ref.typeof_field(self.db, *field).expect("TODO");
+                let field_ty = if let Some(struct_ref) = ty.as_struct_ref(self.db) {
+                    struct_ref.typeof_field(self.db, *field).unwrap_or(TypeRef::Error)
+                } else {
+                    Diag::generic_error("expected an enum here.".into(), span)
+                        .accumulate(self.db);
+                    TypeRef::Error
+                };
                 b.with_projection(
                     place,
                     Projection::Field(*field, field_ty),
@@ -1115,11 +1148,18 @@ impl<'db> ThirTranslator<'db> {
                     let place = b.get_place(place);
                     (place.ty, place.span)
                 };
-                let mut tuple_ref = ty.as_tuple_ref(self.db).expect("TODO");
-                if tuple_ref.len() <= *index as usize {
-                    todo!("Problem !")
-                }
-                let idx_ty = tuple_ref.remove(*index as usize);
+                let idx_ty = if let Some(tuple_ref) = ty.as_tuple_ref(self.db) {
+                    tuple_ref.get(*index as usize).copied().unwrap_or_else(|| {
+                        Diag::generic_error(
+                            "expected a sufficiently long tuple here.".into(),
+                            span,
+                        )
+                        .accumulate(self.db);
+                        TypeRef::Error
+                    })
+                } else {
+                    TypeRef::Error
+                };
                 b.with_projection(
                     place,
                     Projection::TupleField(*index, idx_ty),
@@ -1130,16 +1170,18 @@ impl<'db> ThirTranslator<'db> {
             HirPlaceKind::Deref(hir_place) => {
                 let base = self.place(b, hir_place, stmts);
                 let ty = b.get_place(base).ty;
-                let type_id = ty.as_type_id().expect("TODO");
-                let TypeDefId::Builtin(builtin) = type_id.def(self.db) else { todo!() };
-                if builtin.is_ptr_like(self.db).is_none() {
-                    todo!("error diagnostic")
-                }
-                let args = type_id.args(self.db);
-                if args.is_empty() {
-                    todo!("Problem")
-                }
-                let deref_ty = args[0];
+                let deref_ty =
+                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db)).map_or_else(
+                        || {
+                            Diag::generic_error(
+                                "expected a ptr here.".into(),
+                                place.span,
+                            )
+                            .accumulate(self.db);
+                            TypeRef::Error
+                        },
+                        |(_, inner)| inner,
+                    );
                 b.with_projection(base, Projection::Deref, deref_ty, place.span)
             }
             HirPlaceKind::Index { base, index } => {
@@ -1149,9 +1191,14 @@ impl<'db> ThirTranslator<'db> {
                     let pl = b.get_place(place);
                     (pl.span, pl.ty)
                 };
-                let Some(deref_ty) = ty.element_of_indexed(self.db) else {
-                    todo!("error diagnostic, place ty = {}", ty.to_string(self.db))
-                };
+                let deref_ty = ty.element_of_indexed(self.db).unwrap_or_else(|| {
+                    Diag::generic_error(
+                        "expected an element of indexed here.".into(),
+                        place_span,
+                    )
+                    .accumulate(self.db);
+                    TypeRef::Error
+                });
                 let index = self.expr(b, index, stmts);
                 b.with_projection(place, Projection::Index(index), deref_ty, place_span)
             }

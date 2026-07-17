@@ -348,7 +348,18 @@ impl<'db> TyCtx<'db> {
                             .emit_is_inner_constraint(pattern_ty, init_ty.clone());
                     }
                     HirPatternDesc::Constructor { .. } => {
-                        todo!("Not allowed here")
+                        Diag::generic_error(
+                            "Invalid lhs pattern: Constructor not allowed here".into(),
+                            pattern.span,
+                        )
+                        .accumulate(self.db);
+                    }
+                    HirPatternDesc::IntLit(_) => {
+                        Diag::generic_error(
+                            "Invalid lhs pattern: int literal not allowed here".into(),
+                            pattern.span,
+                        )
+                        .accumulate(self.db);
                     }
                     _ => {
                         self.inf_ctx.unify(init_ty.clone(), pattern_ty).expect("TODO");

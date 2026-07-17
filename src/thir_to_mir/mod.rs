@@ -359,9 +359,8 @@ impl<'a> ThirToMIR<'a> {
                 let rval = self.build_rvalue(*idx);
                 self.spill_rvalue_if_needed(rval, stmt.span);
             }
-            StmtKind::Error => {
-                panic!("Can only produce MIR of error-less THIR")
-            }
+            StmtKind::Error => {} /* Don't crash so the user can still see errors
+                                   * afterwards */
         }
     }
 
