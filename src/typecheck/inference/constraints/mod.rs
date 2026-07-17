@@ -131,27 +131,20 @@ impl<'db> InferenceCtx<'db> {
 
     fn try_resolve_via_known_impl(
         &mut self,
-        expr_id: ExprId,
-        ret_var: InferVar,
-        receiver: &InferTy,
-        method: Symbol,
-        args: &[InferTy],
-        interface_hint: Option<InterfaceId>,
-        is_static: bool,
+        method_constraint: &MethodConstraint,
     ) -> Option<ConstraintSolveResult> {
-        let mut cur = self.find(receiver);
+        let mut cur = self.find(&method_constraint.ty);
         let mut depth = 0;
         loop {
-            if let Some((iface_id, implem, sig)) = self.find_known_impl_method(
-                &cur,
-                method,
-                interface_hint,
-                args.len(),
-                is_static,
-            ) {
+            if let Some((iface_id, implem, sig)) =
+                self.find_known_impl_method(&cur, method_constraint)
+            {
                 return Some(self.apply_interface_method(
-                    expr_id, receiver, depth, iface_id, implem, method, &sig, ret_var,
-                    args, is_static,
+                    method_constraint,
+                    depth,
+                    iface_id,
+                    implem,
+                    &sig,
                 ));
             }
             let (_, inner) = cur.ptr_like(self.db)?;
@@ -163,11 +156,10 @@ impl<'db> InferenceCtx<'db> {
     fn find_known_impl_method(
         &mut self,
         cur: &InferTy,
-        method: Symbol,
-        interface_hint: Option<InterfaceId>,
-        arity: usize,
-        is_static: bool,
+        method_constraint: &MethodConstraint,
     ) -> Option<(InterfaceId, InterfaceImplem, AstMethodsig)> {
+        let MethodConstraint { method, interface_hint, args, is_static, .. } =
+            method_constraint;
         let candidates = self
             .implements
             .iter()
@@ -186,9 +178,9 @@ impl<'db> InferenceCtx<'db> {
                 interface_items(self.db, iface_id.interned()).iter().find_map(|item| {
                     match item {
                         AstInterfaceItem::Sig(sig)
-                            if sig.data.name.data == method
-                                && sig.data.receiver.is_static() == is_static
-                                && sig.data.args.len() == arity =>
+                            if sig.data.name.data == *method
+                                && sig.data.receiver.is_static() == *is_static
+                                && sig.data.args.len() == args.len() =>
                         {
                             Some(sig.clone())
                         }
@@ -206,18 +198,22 @@ impl<'db> InferenceCtx<'db> {
 
     fn apply_interface_method(
         &mut self,
-        expr_id: ExprId,
-        receiver: &InferTy,
+        method_constraint: &MethodConstraint,
         depth: usize,
         iface_id: InterfaceId,
         implem: InterfaceImplem,
-        method: Symbol,
         sig: &AstMethodsig,
-        ret_var: InferVar,
-        args: &[InferTy],
-        is_static: bool,
     ) -> ConstraintSolveResult {
-        assert!(sig.data.receiver.is_static() == is_static);
+        let MethodConstraint {
+            ret_var,
+            ty: receiver,
+            id: expr_id,
+            method,
+            args,
+            is_static,
+            ..
+        } = method_constraint;
+        assert!(sig.data.receiver.is_static() == *is_static);
         let ref_args =
             implem.templates.iter().map(|a| self.infer_to_ref(a)).collect::<Vec<_>>();
         if ref_args.iter().any(|a| matches!(a, TypeRef::Error)) {
@@ -232,7 +228,7 @@ impl<'db> InferenceCtx<'db> {
         }
 
         let method_id =
-            FunctionId::new(self.db, method, ScopeOwnerId::Interface(iface_ref));
+            FunctionId::new(self.db, *method, ScopeOwnerId::Interface(iface_ref));
 
         let method_templates = implem
             .templates
@@ -269,10 +265,10 @@ impl<'db> InferenceCtx<'db> {
         }
 
         let call_infos = InferCallInfos {
-            expr_id,
+            expr_id: *expr_id,
             callee: method_id,
             substitution: method_templates.iter().cloned().collect_vec(),
-            call_kind: if is_static {
+            call_kind: if *is_static {
                 CallKind::Static
             } else {
                 CallKind::Method {
@@ -282,7 +278,7 @@ impl<'db> InferenceCtx<'db> {
             zelf_ty: Some(zelf_ty),
         };
 
-        self.call_infos.insert(expr_id, call_infos);
+        self.call_infos.insert(*expr_id, call_infos);
         ConstraintSolveResult::Solved
     }
 

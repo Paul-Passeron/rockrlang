@@ -529,15 +529,7 @@ impl<'db> InferenceCtx<'db> {
             }
         }
 
-        if let Some(result) = self.try_resolve_via_known_impl(
-            *id,
-            *ret_var,
-            receiver,
-            *method,
-            args,
-            *interface_hint,
-            *is_static,
-        ) {
+        if let Some(result) = self.try_resolve_via_known_impl(method_constraint) {
             return result;
         }
 
