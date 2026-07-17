@@ -45,9 +45,8 @@ pub struct Parser<'db> {
     pub annotations: Vec<AstAnnotation>,
 }
 
-#[allow(dead_code)]
 #[salsa::accumulator]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ParseError {
     pub kind: ParseErrorKind,
     pub file: SourceFile,
@@ -55,14 +54,12 @@ pub struct ParseError {
     pub end: usize,
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ParseErrorKind {
     LexError(LexError),
     UnexpectedEOF,
     ExpectedSymbol(String),
     ExpectedToken { expected: TokenKind, found: TokenKind },
-    TopLevelLetDecl,
     ExpectedIntLit(TokenKind),
     ExpectedTypeName,
 }

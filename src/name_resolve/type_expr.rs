@@ -174,6 +174,7 @@ pub fn resolve_type_expr_desc<'db>(
                 None => TypeResolution::Error,
             }
         }
+        AstTypeExprDesc::Error(_) => TypeResolution::Error,
     }
 }
 

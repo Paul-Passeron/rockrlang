@@ -15,11 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::parse_tree::{
-    Spanned,
-    expr::{AstExpr, BinaryOperator},
-    pattern::AstPattern,
-    type_expr::AstAnyTypeExpr,
+use crate::{
+    parse_tree::{
+        Spanned,
+        expr::{AstExpr, BinaryOperator},
+        pattern::AstPattern,
+        type_expr::AstAnyTypeExpr,
+    },
+    parser::ParseError,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -66,4 +69,5 @@ pub enum AstStmtDesc {
     Break,
     Expr(AstExpr),
     Defer(Box<AstStmt>),
+    Error(ParseError),
 }

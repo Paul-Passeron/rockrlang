@@ -578,6 +578,7 @@ impl<'db> TyCtx<'db> {
             }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
             HirStmtKind::Break => (),
+            HirStmtKind::Error => (),
         }
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
             Diag::generic_error(

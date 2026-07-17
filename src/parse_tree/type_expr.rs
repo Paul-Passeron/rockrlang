@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{common::symbols::Symbol, parse_tree::Spanned};
+use crate::{common::symbols::Symbol, parse_tree::Spanned, parser::ParseError};
 
 pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 
@@ -27,6 +27,7 @@ pub enum AstTypeExprDesc {
     Pointer { mutable: bool, pointee: Box<AstAnyTypeExpr> },
     Slice { ty: Box<AstAnyTypeExpr>, len: Option<usize> },
     Tuple(Vec<AstAnyTypeExpr>),
+    Error(ParseError),
 }
 
 pub type AstAnyTypeExpr = Spanned<AstAnyTypeExprDesc>;

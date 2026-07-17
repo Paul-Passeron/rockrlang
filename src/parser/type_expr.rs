@@ -181,7 +181,7 @@ impl<'db> Parser<'db> {
         Ok(Spanned::new(AstAnyTypeExprDesc::Known(ty.data), vec![], span))
     }
 
-   pub fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
+    pub fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
         self.parse_list(Self::parse_any_type_expr, TokenKind::Comma, |p| {
             p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
         })

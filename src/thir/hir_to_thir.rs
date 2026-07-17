@@ -326,6 +326,7 @@ impl<'db> ThirTranslator<'db> {
                 vec![ThirStmt::error(stmt.span)]
             }
             HirStmtKind::Break => vec![self.handle_break(b, stmt.span)],
+            HirStmtKind::Error => vec![ThirStmt::error(stmt.span)],
         }
     }
 

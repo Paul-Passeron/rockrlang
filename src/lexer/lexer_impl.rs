@@ -30,7 +30,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LexError {
     pub message: String,
     pub file: SourceFile,

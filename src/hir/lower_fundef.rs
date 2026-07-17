@@ -300,6 +300,7 @@ impl<'db> LowerFundef<'db> {
                     tuple_of(self.db, partial_args).into()
                 }
             }
+            AstTypeExprDesc::Error(_) => TypeRef::Error,
         }
     }
 
@@ -1036,6 +1037,11 @@ impl<'db> LowerFundef<'db> {
                     data: HirPatternDesc::IntLit(*x),
                     span: pat.span,
                 },
+                AstPatternDesc::Error(_) => HirPattern {
+                    id: this.alloc.fresh(),
+                    data: HirPatternDesc::Error,
+                    span: pat.span,
+                },
             }
         }
 
@@ -1128,6 +1134,7 @@ impl<'db> LowerFundef<'db> {
                 HirStmtKind::Defer(self.lower_stmt(stmt, scope).boxed())
             }
             AstStmtDesc::Break => HirStmtKind::Break,
+            AstStmtDesc::Error(_) => HirStmtKind::Error,
         };
         self.new_stmt(kind, stmt.span)
     }

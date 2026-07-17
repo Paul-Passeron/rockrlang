@@ -30,6 +30,7 @@ use crate::{
         stmt::AstStmt,
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
+    parser::ParseError,
     ril::display::Display,
 };
 
@@ -52,6 +53,7 @@ pub enum AstTopLevelItemDesc {
     StructDef(AstStructDef),
     EnumDef(AstEnumDef),
     ExternDef(AstFunsig, bool), // true means variadic
+    Error(ParseError),
 }
 
 pub type AstModule = Spanned<AstModuleDesc>;
@@ -242,6 +244,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                         .join(", ")
                 )
             }
+            AstTypeExprDesc::Error(_) => write!(f, "<error>"),
         }
     }
 }

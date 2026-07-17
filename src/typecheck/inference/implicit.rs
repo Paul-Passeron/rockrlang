@@ -222,6 +222,7 @@ impl AstImplicitContext {
                 | AstTypeExprDesc::Slice { .. }
                 | AstTypeExprDesc::Pointer { .. }
                 | AstTypeExprDesc::Ref { .. } => None,
+                AstTypeExprDesc::Error(_) => None,
             }
         }
         _resolve(self, db, ty, self.owning_module(db))
@@ -378,6 +379,7 @@ pub trait AsAstImplCtx {
                     )))
                 }
             }
+            AstTypeExprDesc::Error(_) => None,
         }
     }
 

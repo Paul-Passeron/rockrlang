@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     common::{location::Span, symbols::Symbol},
     parse_tree::Spanned,
+    parser::ParseError,
 };
 
 pub type AstPattern = Spanned<AstPatternDesc>;
@@ -50,4 +51,5 @@ pub enum AstPatternDesc {
     Named(AstNamedPattern),
     IntLiteral(i64),
     Any,
+    Error(ParseError),
 }

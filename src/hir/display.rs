@@ -206,6 +206,7 @@ fn write_stmt(
         HirStmtKind::Break => {
             writeln!(f, "break;")
         }
+        HirStmtKind::Error => writeln!(f, "<error stmt>"),
     }
 }
 

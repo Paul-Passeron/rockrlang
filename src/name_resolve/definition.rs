@@ -200,6 +200,7 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::ExternDef(funsig, _) => Some(Definition::Function(
             FunctionId::new(db, funsig.data.name.data, ScopeOwnerId::Module(m_id)),
         )),
+        AstTopLevelItemDesc::Error(_) => None,
     }
 }
 
