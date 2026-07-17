@@ -1,0 +1,5 @@
+interface Foo: Bar {}
+interface Bar: Foo {}
+interface FooBar: Foo + Bar {}
+
+fun main(): int { return 0; }

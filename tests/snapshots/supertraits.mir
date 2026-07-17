@@ -1,0 +1,65 @@
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+
+  bb1:
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+
+  bb2:
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
+
+  bb3:
+    _5 = call core::sys::exit(1_int) -> bb4
+
+  bb4:
+    diverge
+}
+
+supertraits::main
+mir {
+  locals:
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return 0_int
+}
+

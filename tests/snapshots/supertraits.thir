@@ -1,0 +1,18 @@
+core/io.rkr:30:5
+thir fun core::io::`impl core::io::str`::print(&self): void {
+    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
+}
+
+core/panic.rkr:1:1
+thir fun core::panic::panic(message: core::io::str): never {
+    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
+    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    core::io::printf(c"\'\n\nExitting with code 1...\n\0");
+    core::sys::exit(1);
+}
+
+examples/supertraits.rkr:5:1
+thir fun supertraits::main(): int {
+    return 0;
+}
+

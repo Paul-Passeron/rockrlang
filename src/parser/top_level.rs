@@ -740,6 +740,7 @@ impl<'db> Parser<'db> {
                 let supers = if let Some(t) = self.peek_n(0)
                     && t.kind == TokenKind::Colon
                 {
+                    self.consume(); // ':'
                     let mut supers = vec![self.parse_type_expr()?];
                     while let Some(t) = self.peek_n(0)
                         && t.kind == TokenKind::Plus
@@ -747,8 +748,6 @@ impl<'db> Parser<'db> {
                         self.consume();
                         supers.push(self.parse_type_expr()?);
                     }
-                    self.expect(TokenKind::CloseBra)?;
-                    self.consume();
                     supers
                 } else {
                     vec![]
