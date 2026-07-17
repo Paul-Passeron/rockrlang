@@ -44,7 +44,6 @@ use crate::{
         },
         type_expr::{
             enum_item, get_template_param_count, get_templates_of_fun, templates_of_enum,
-            templates_of_struct,
         },
     },
     parse_tree::{
@@ -62,7 +61,7 @@ use crate::{
     },
     ril::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, compute_template_hints, tuple_of,
+        TypeParamId, TypeRef, compute_template_hints, rehole, tuple_of,
     },
     thir::EnumRef,
 };
@@ -761,35 +760,37 @@ impl<'db> LowerFundef<'db> {
         fields: &[AstStructField],
         scope: &Scope,
     ) -> HirExprDesc {
-        if let TypeDefId::Enum(enum_def) = type_def_id {
-            let variant_name = if let Some(v) = variant {
-                v
-            } else {
-                match &ty.data {
-                    AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
-                    _ => unreachable!(
-                        "NameResolved+StructLit with no variant and complex ty"
-                    ),
-                }
-            };
-            let mut lowered_fields = vec![];
-            for AstStructField { name, value } in fields {
-                let expr = self.lower_expr(value, scope, self.module);
-                lowered_fields.push((*name, expr));
+        let Some(EnumRef { def: enum_def, args: template_hints }) =
+            rehole(self.db, TypeRef::Concrete(TypeId::new(self.db, type_def_id, vec![])))
+                .as_enum_ref(self.db)
+        else {
+            todo!("Push diagnostic for bad type here")
+        };
+
+        let variant_name = if let Some(v) = variant {
+            v
+        } else {
+            match &ty.data {
+                AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
+                _ => unreachable!(
+                    "NameResolved+StructLit with no variant and complex
+        ty"
+                ),
             }
-            let args = HirConstructorArgs::StructLike { fields: lowered_fields };
-            let mut template_hints = vec![];
-            for _ in 0..templates_of_enum(self.db, enum_def.interned()).len() {
-                template_hints.push(TypeRef::Unknown);
-            }
-            return HirExprDesc::Constructor {
-                enum_def,
-                name: variant_name,
-                args,
-                template_hints,
-            };
+        };
+        let mut lowered_fields = vec![];
+        for AstStructField { name, value } in fields {
+            let expr = self.lower_expr(value, scope, self.module);
+            lowered_fields.push((*name, expr));
         }
-        todo!("Push diagnostic for bad type here")
+        let args = HirConstructorArgs::StructLike { fields: lowered_fields };
+
+        return HirExprDesc::Constructor {
+            enum_def,
+            name: variant_name,
+            args,
+            template_hints,
+        };
     }
 
     fn lower_name_resolved_expr_from_type(

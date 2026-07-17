@@ -21,6 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
+    check::thir::sanity_check::ConstructorType,
     codegen::{Codegen, LIRToLLVM, MIRToLIRBuild},
     common::symbols::Symbol,
     layout::{IntWidth, LIRTy, LayoutData, LayoutID, layout_of},
@@ -403,11 +404,29 @@ impl<'a> MTLBCtx<'a> {
                 (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
             }
             ProjKind::DowncastThen { next, variant } => {
-                let _enum_ref = ty.as_enum_ref(self.db).unwrap_or_else(|| {
+                let enum_ref = ty.as_enum_ref(self.db).unwrap_or_else(|| {
                     panic!("Expected an enum but got {}", ty.to_string(self.db))
                 });
                 match next {
-                    MIRProjection::Field { .. } => todo!(),
+                    MIRProjection::Field { name, resulting_ty } => {
+                        let layout = layout_of(self.db, ty);
+                        let lir_ty = LIRTy { layout, origin: Some(ty) };
+                        assert!(lir_ty.is_union(self.db));
+                        let vlayout = lir_ty.union_layout(self.db).unwrap();
+                        let variant_layout = vlayout.variants[variant as usize];
+                        let variant_ty = LIRTy { layout: variant_layout, origin: None };
+                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, variant);
+                        let Some(ConstructorType::Struct(fields)) =
+                            enum_ref.get_cons(self.db, variant as usize)
+                        else {
+                            unreachable!()
+                        };
+                        let source_index =
+                            fields.iter().position(|(s, _)| s == name).unwrap();
+                        let field_ptr =
+                            b.field_ptr(payload_ptr, variant_ty, source_index as u32);
+                        (field_ptr, *resulting_ty)
+                    }
                     MIRProjection::TupleField { index, resulting_ty } => {
                         let layout = layout_of(self.db, ty);
                         let lir_ty = LIRTy { layout, origin: Some(ty) };
@@ -525,7 +544,31 @@ impl<'a> MTLBCtx<'a> {
                                 b.store(payload_ptr, operand);
                             }
                         } else {
-                            todo!()
+                            // args in source order
+                            let cons_ty = enum_ref.get_cons(self.db, *idx).unwrap();
+                            let args: Vec<&MIROperand> = match (args, cons_ty) {
+                                (
+                                    MIRConstructorArgs::Tuple(ops),
+                                    ConstructorType::Tuple(_),
+                                ) => ops.iter().collect(),
+                                (
+                                    MIRConstructorArgs::Struct(vals),
+                                    ConstructorType::Struct(src_order),
+                                ) => src_order.iter().map(|(s, _)| &vals[s]).collect(),
+                                _ => unreachable!(),
+                            };
+                            let operands = args
+                                .into_iter()
+                                .filter_map(|arg| self.lower_operand(b, arg, lower))
+                                .collect_vec();
+
+                            if !operands.is_empty() {
+                                let aggr = b.make_aggregate(
+                                    LIRTy { layout: variant_layout, origin: None },
+                                    operands,
+                                );
+                                b.store(payload_ptr, aggr.erase());
+                            }
                         }
                     }
                     LayoutData::ZeroSized => (),
