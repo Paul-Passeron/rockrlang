@@ -328,6 +328,7 @@ impl<'db> TyCtx<'db> {
         ty_annotation: Option<&AstAnyTypeExpr>,
         init: &HirExpr,
     ) {
+        let whole_span = pattern.span.start().span(init.span.end());
         let init_ty = match self.inf_ctx.infer_expr(init) {
             Ok(ty) => ty,
             Err(err) => {
@@ -361,8 +362,22 @@ impl<'db> TyCtx<'db> {
                         )
                         .accumulate(self.db);
                     }
+                    HirPatternDesc::Error => {
+                        // Pass-through (Should have already been reported)
+                    }
                     _ => {
-                        self.inf_ctx.unify(init_ty.clone(), pattern_ty).expect("TODO");
+                        self.inf_ctx.unify(init_ty.clone(), pattern_ty).unwrap_or_else(
+                            |err| {
+                                Diag::generic_error(
+                                    format!(
+                                        "Could not typecheck pattern: {}",
+                                        err.display(self.db)
+                                    ),
+                                    whole_span,
+                                )
+                                .accumulate(self.db)
+                            },
+                        );
                     }
                 }
                 if let Some(annotation) = ty_annotation
