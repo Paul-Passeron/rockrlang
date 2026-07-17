@@ -41,7 +41,7 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    ril::{TypeRef, bool_id},
+    ril::{BuiltinTypeId, TypeRef, bool_id},
     thir_to_mir::FuncInst,
 };
 
@@ -596,10 +596,14 @@ impl<'a> MTLBCtx<'a> {
                     None
                 }
             }
-            MIRRValueKind::BinOp(op, lhs, rhs) => {
-                let lhs = self.lower_operand(b, lhs, lower).unwrap();
-                let rhs = self.lower_operand(b, rhs, lower).unwrap();
-                let is_signed = true; // todo !!!
+            MIRRValueKind::BinOp(op, mir_lhs, mir_rhs) => {
+                let lhs = self.lower_operand(b, mir_lhs, lower).unwrap();
+                let rhs = self.lower_operand(b, mir_rhs, lower).unwrap();
+                let ty = mir_lhs.ty(self.db);
+                let is_signed = ty
+                    .as_type_id()
+                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                    .is_some_and(|int_like| int_like.is_signed(self.db));
                 Some(match op {
                     BinaryOperator::Plus => b.arith(
                         if is_signed { ArithBinop::SAdd } else { ArithBinop::UAdd },
@@ -745,5 +749,21 @@ impl<'a> MTLBCtx<'a> {
                 }
             }
         }
+    }
+}
+
+impl BuiltinTypeId {
+    fn is_signed(self, db: &dyn Db) -> bool {
+        if self == BuiltinTypeId::int(db) {
+            return false;
+        }
+        if self == BuiltinTypeId::char(db) {
+            return false;
+        }
+        if self == BuiltinTypeId::usize(db) {
+            return false;
+        }
+
+        false
     }
 }
