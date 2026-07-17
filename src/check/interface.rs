@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
-use crate::{Db, check::Diag, ril::InterfaceId};
+use crate::{Db, ril::InterfaceId, unused};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
-    let span = interface.name_span(db);
-    Diag::todo(format!("Implement check_interface ({}:{})", file!(), line!()), span)
-        .accumulate(db);
+    unused!(db);
+    unused!(interface);
+    // TODO
 }
