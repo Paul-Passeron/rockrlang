@@ -507,20 +507,9 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_struct_def_fields(&mut self) -> Result<Vec<AstStructDefField>, ParseError> {
-        let mut fields = Vec::new();
-        while let Some(t) = self.peek_n(0)
-            && matches!(t.kind, TokenKind::Identifier(_))
-        {
-            fields.push(self.parse_struct_def_field()?);
-            if let Some(t) = self.peek_n(0)
-                && matches!(t.kind, TokenKind::Semicolon)
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-        Ok(fields)
+        self.parse_list(Self::parse_struct_def_field, TokenKind::Semicolon, |p| {
+            p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra)
+        })
     }
 
     fn parse_enum_variant(&mut self) -> Result<AstEnumVariant, ParseError> {

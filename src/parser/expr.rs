@@ -650,34 +650,7 @@ impl<'db> Parser<'db> {
     ) -> Result<AstExpr, ParseError> {
         let lhs_ty = self.reinterpret_expr_as_ty(lhs)?;
 
-        self.consume(); // consume `<`
-
-        let mut type_args =
-            if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::Access))
-                && self.peek_n(1).map(|t| &t.kind) == Some(&TokenKind::Lt)
-            {
-                self.consume(); // `::`
-                self.parse_turbofish_args()?
-            } else {
-                vec![]
-            };
-
-        while let Some(t) = self.peek_n(0)
-            && t.kind != TokenKind::Gt
-        {
-            type_args.push(self.parse_any_type_expr()?);
-
-            if let Some(t) = self.peek_n(0)
-                && t.kind == TokenKind::Comma
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-
-        self.expect(TokenKind::Gt)?;
-        self.consume();
+        let type_args = self.parse_turbofish_args()?;
 
         self.expect(TokenKind::Access)?;
         self.consume();
@@ -721,25 +694,7 @@ impl<'db> Parser<'db> {
     ) -> Result<AstExpr, ParseError> {
         let lhs_ty = self.reinterpret_expr_as_ty(lhs)?;
 
-        self.consume(); // consume `<`
-
-        let mut type_args: Vec<AstAnyTypeExpr> = vec![];
-
-        while let Some(t) = self.peek_n(0)
-            && t.kind != TokenKind::Gt
-        {
-            type_args.push(self.parse_any_type_expr()?);
-            if let Some(t) = self.peek_n(0)
-                && t.kind == TokenKind::Comma
-            {
-                self.consume();
-            } else {
-                break;
-            }
-        }
-
-        self.expect(TokenKind::Gt)?;
-        self.consume();
+        let type_args = self.parse_turbofish_args()?;
 
         self.expect(TokenKind::Access)?;
         self.consume();
