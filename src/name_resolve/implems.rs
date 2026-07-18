@@ -15,13 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use itertools::Itertools;
+use salsa::Accumulator;
+
 use crate::{
     Db,
     common::unord::Set,
+    compiler::diagnostic::Diag,
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items, modules_in_package,
-        type_expr::{TypeResolution, resolve_any_type_expr, resolve_type_expr},
+        type_expr::{resolve_any_type_expr, resolve_type_expr},
     },
     parse_tree::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
@@ -50,19 +54,16 @@ pub fn resolve_type_expr_as_interface<'db>(
                     let resolved_args = args
                         .iter()
                         .map(|arg| {
-                            match resolve_any_type_expr(
+                            resolve_any_type_expr(
                                 db,
                                 arg,
                                 module.interned(),
                                 template_args,
                                 has_zelf,
-                            ) {
-                                TypeResolution::Type(type_ref) => Some(type_ref),
-                                _ => None,
-                            }
+                            )
                         })
-                        .collect::<Option<Vec<_>>>();
-                    resolved_args.map(|args| InterfaceRef::new(db, interface_id, args))
+                        .collect_vec();
+                    Some(InterfaceRef::new(db, interface_id, resolved_args))
                 } else {
                     None
                 }
@@ -109,64 +110,61 @@ pub fn module_impls<'db>(
                 }
                 templates.push(constraints);
             }
-            if let TypeResolution::Type(implemented) = resolve_type_expr(
+            let implemented = resolve_type_expr(
                 db,
                 &item.implemented,
                 module,
                 &item.template_args,
                 false,
-            )
+            );
             // Zelf types are not allowed here
-            {
-                match item.interface.as_ref().map(|interface| {
-                    resolve_type_expr_as_interface(
+            match item.interface.as_ref().map(|interface| {
+                resolve_type_expr_as_interface(
+                    db,
+                    interface,
+                    module.into(),
+                    &item.template_args,
+                    false,
+                )
+            }) {
+                Some(Some(value)) => {
+                    let impl_id = ImplId::new(
                         db,
-                        interface,
                         module.into(),
-                        &item.template_args,
-                        false,
-                    )
-                }) {
-                    Some(Some(value)) => {
-                        let impl_id = ImplId::new(
-                            db,
-                            module.into(),
-                            implemented,
-                            Some(value),
-                            templates,
-                        );
-                        let src = ImplSource::new(
-                            db,
-                            impl_id,
-                            module.into(),
-                            item.template_args.clone(),
-                            item.items.clone(),
-                            item.span,
-                        );
-                        res.push(src);
-                    }
-                    None => {
-                        let impl_id =
-                            ImplId::new(db, module.into(), implemented, None, templates);
-                        let src = ImplSource::new(
-                            db,
-                            impl_id,
-                            module.into(),
-                            item.template_args.clone(),
-                            item.items.clone(),
-                            item.span,
-                        );
-                        res.push(src);
-                    }
-                    Some(None) => {
-                        // TODO: report error
-                        println!(
-                            "Error: Could not resolve implementation because of interface"
-                        );
-                    }
+                        implemented,
+                        Some(value),
+                        templates,
+                    );
+                    let src = ImplSource::new(
+                        db,
+                        impl_id,
+                        module.into(),
+                        item.template_args.clone(),
+                        item.items.clone(),
+                        item.span,
+                    );
+                    res.push(src);
                 }
-            } else {
-                println!("Error: Type could not resolve !");
+                None => {
+                    let impl_id =
+                        ImplId::new(db, module.into(), implemented, None, templates);
+                    let src = ImplSource::new(
+                        db,
+                        impl_id,
+                        module.into(),
+                        item.template_args.clone(),
+                        item.items.clone(),
+                        item.span,
+                    );
+                    res.push(src);
+                }
+                Some(None) => {
+                    Diag::generic_error(
+                        format!("Cannot implement for an unknown interface"),
+                        item.interface.as_ref().unwrap().span,
+                    )
+                    .accumulate(db);
+                }
             }
         }
     }

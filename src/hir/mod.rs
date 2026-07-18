@@ -509,20 +509,7 @@ impl FunctionId {
             FunctionLikeAst::Method(spanned) => (&spanned.data.return_type, true),
             FunctionLikeAst::TraitMethod(spanned) => (&spanned.data.return_type, true),
         };
-        match resolve_type_expr(
-            db,
-            type_expr,
-            owning_module.interned(),
-            templates,
-            has_zelf,
-        ) {
-            crate::name_resolve::type_expr::TypeResolution::Type(type_ref) => type_ref,
-            _ => panic!(
-                "{}: Unresolved type in function {}",
-                type_expr.span.start().loc_info(db),
-                self.name(db).display(db)
-            ),
-        }
+        resolve_type_expr(db, type_expr, owning_module.interned(), templates, has_zelf)
     }
 
     pub fn args<'db>(&'db self, db: &'db dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {

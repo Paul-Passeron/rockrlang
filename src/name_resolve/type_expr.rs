@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::sync::Arc;
 
+use itertools::Itertools;
+
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -37,25 +39,15 @@ use crate::{
     },
 };
 
-// TODO: See if we can't use AstImplicitCtx here instead
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
-pub enum TypeResolution {
-    Error,
-    Infer,
-    Type(TypeRef),
-}
-
 pub fn resolve_any_type_expr<'db>(
     db: &'db dyn Db,
     any_type_expr: &'db AstAnyTypeExpr,
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
     has_zelf: bool,
-) -> TypeResolution {
+) -> TypeRef {
     match &any_type_expr.data {
-        AstAnyTypeExprDesc::Any => TypeResolution::Infer,
+        AstAnyTypeExprDesc::Any => TypeRef::Unknown,
         AstAnyTypeExprDesc::Known(desc) => {
             resolve_type_expr_desc(db, desc, module, template_args, has_zelf)
         }
@@ -68,48 +60,37 @@ pub fn resolve_type_expr_desc<'db>(
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
     has_zelf: bool,
-) -> TypeResolution {
+) -> TypeRef {
     match type_expr {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty() {
                 if *name == Symbol::new(db, "Self") {
-                    return TypeResolution::Type(TypeRef::Zelf);
+                    return TypeRef::Zelf;
                 }
                 if let Some(idx) = template_args.iter().position(|p| p.name == *name) {
-                    return TypeResolution::Type(TypeRef::Param(TypeParamId(idx)));
+                    return TypeRef::Param(TypeParamId(idx));
                 }
             }
 
-            resolve_in_module(db, *name, module.into()).map_or(
-                TypeResolution::Error,
-                |def| {
-                    if let Definition::Type(type_def_id) = def {
-                        let resolved_args = args
-                            .iter()
-                            .map(|arg| {
-                                match resolve_any_type_expr(
-                                    db,
-                                    arg,
-                                    module,
-                                    template_args,
-                                    has_zelf,
-                                ) {
-                                    TypeResolution::Type(type_ref) => Some(type_ref),
-                                    _ => None,
-                                }
-                            })
-                            .collect::<Option<Vec<_>>>();
-                        match resolved_args {
-                            Some(resolved_args) => TypeResolution::Type(
-                                TypeId::new(db, type_def_id, resolved_args).into(),
-                            ),
-                            None => TypeResolution::Error,
-                        }
-                    } else {
-                        TypeResolution::Error
-                    }
-                },
-            )
+            resolve_in_module(db, *name, module.into()).map_or(TypeRef::Error, |def| {
+                if let Definition::Type(type_def_id) = def {
+                    let resolved_args = args
+                        .iter()
+                        .map(|arg| {
+                            resolve_any_type_expr(
+                                db,
+                                arg,
+                                module,
+                                template_args,
+                                has_zelf,
+                            )
+                        })
+                        .collect_vec();
+                    TypeId::new(db, type_def_id, resolved_args).into()
+                } else {
+                    TypeRef::Error
+                }
+            })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) =
@@ -117,64 +98,40 @@ pub fn resolve_type_expr_desc<'db>(
             {
                 resolve_type_expr(db, to, module.interned(), template_args, has_zelf)
             } else {
-                TypeResolution::Error
+                TypeRef::Error
             }
         }
         AstTypeExprDesc::Pointer { mutable, pointee } => {
-            match pointee
-                .as_known()
-                .map_or(TypeResolution::Type(TypeRef::Unknown), |ty| {
-                    resolve_type_expr(db, &ty, module, template_args, has_zelf)
-                }) {
-                TypeResolution::Type(pointee) => {
-                    TypeResolution::Type(ptr_of(db, pointee, *mutable).into())
-                }
-                _ => TypeResolution::Error,
-            }
+            let pointee = pointee.as_known().map_or(TypeRef::Unknown, |ty| {
+                resolve_type_expr(db, &ty, module, template_args, has_zelf)
+            });
+            ptr_of(db, pointee, *mutable).into()
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
-            match pointee
-                .as_known()
-                .map_or(TypeResolution::Type(TypeRef::Unknown), |ty| {
-                    resolve_type_expr(db, &ty, module, template_args, has_zelf)
-                }) {
-                TypeResolution::Type(pointee) => {
-                    TypeResolution::Type(ref_of(db, pointee, *mutable).into())
-                }
-                _ => TypeResolution::Error,
-            }
+            let pointee = pointee.as_known().map_or(TypeRef::Unknown, |ty| {
+                resolve_type_expr(db, &ty, module, template_args, has_zelf)
+            });
+            ref_of(db, pointee, *mutable).into()
         }
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
-            match ty.as_known().map_or(TypeResolution::Type(TypeRef::Unknown), |ty| {
+            let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
-            }) {
-                TypeResolution::Type(elem) => {
-                    TypeResolution::Type(slice_of(db, elem).into())
-                }
-                _ => TypeResolution::Infer,
-            }
+            });
+            slice_of(db, elem.into()).into()
         }
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys
                 .iter()
                 .map(|ty| {
-                    match ty
-                        .as_known()
-                        .map_or(TypeResolution::Type(TypeRef::Unknown), |ty| {
-                            resolve_type_expr(db, &ty, module, template_args, has_zelf)
-                        }) {
-                        TypeResolution::Type(type_ref) => Some(type_ref),
-                        _ => None,
-                    }
+                    ty.as_known().map_or(TypeRef::Unknown, |ty| {
+                        resolve_type_expr(db, &ty, module, template_args, has_zelf)
+                    })
                 })
-                .collect::<Option<_>>();
-            match types {
-                Some(tys) => TypeResolution::Type(tuple_of(db, tys).into()),
-                None => TypeResolution::Error,
-            }
+                .collect_vec();
+            tuple_of(db, types).into()
         }
-        AstTypeExprDesc::Error(_) => TypeResolution::Error,
+        AstTypeExprDesc::Error(_) => TypeRef::Error,
     }
 }
 
@@ -185,7 +142,7 @@ pub fn resolve_type_expr<'db>(
     module: InternedModuleId<'db>,
     template_args: &'db [AstTemplateArg], // From the enclosing item
     has_zelf: bool,
-) -> TypeResolution {
+) -> TypeRef {
     resolve_type_expr_desc(db, &type_expr.data, module, template_args, has_zelf)
 }
 
