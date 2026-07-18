@@ -476,7 +476,7 @@ impl<'db> Parser<'db> {
                 let to = self.reinterpret_expr_as_ty(*to)?;
                 AstTypeExprDesc::NameResolved { from: from.data, to: Box::new(to) }
             }
-            _ => unreachable!(),
+            _ => return Err(self.parse_error(ParseErrorKind::ExpectedTypeName)),
         };
 
         Ok(Spanned::new(data, annotations, span))

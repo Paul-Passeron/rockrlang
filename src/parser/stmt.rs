@@ -33,6 +33,15 @@ impl<'db> Parser<'db> {
         while let Some(t) = self.peek_n(0)
             && !matches!(t.kind, TokenKind::CloseBra)
         {
+            while let Some(t) = self.peek_n(0)
+                && matches!(t.kind, TokenKind::Semicolon)
+            {
+                self.consume();
+                continue;
+            }
+            if self.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra) {
+                break;
+            }
             let start = self.get_start();
             match self.parse_stmt() {
                 Ok(stmt) => {
@@ -63,7 +72,7 @@ impl<'db> Parser<'db> {
     }
 
     pub(super) fn parse_block_as_stmt(&mut self) -> Result<AstStmt, ParseError> {
-        let start = self.get_end();
+        let start = self.get_start();
         let stmts = self.parse_block()?;
         let end = self.get_end();
         Ok(AstStmt::new(AstStmtDesc::Block { stmts }, vec![], start.span(end)))
