@@ -18,13 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 use lsp_server::{Connection, Message, Notification, Request};
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, InitializeParams, Position, PublishDiagnosticsParams,
-    Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
-    notification::{Notification as _, PublishDiagnostics},
+    Diagnostic, DiagnosticSeverity, DidChangeConfigurationParams, DidChangeTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri, notification::{
+        DidChangeConfiguration, DidChangeTextDocument, DidOpenTextDocument, Notification as INotification, PublishDiagnostics,
+    },
 };
 use rockr::{
     RockrDb, SourceFile,
-    check::check,
     compiler::{
         Config, Workspace, compute_all_files_from_roots, compute_package_roots,
         diagnostic::{Diag, Severity},
@@ -56,62 +55,6 @@ impl<'a> Lsp<'a> {
         params: InitializeParams,
     ) -> Self {
         Self { db, connection, params }
-    }
-}
-
-#[allow(unused)]
-struct DidOpen<'a> {
-    language_id: &'a str,
-    text: &'a str,
-    uri: &'a str,
-    version: usize,
-}
-
-#[allow(unused)]
-struct DidChange<'a> {
-    content_changes: Vec<&'a str>,
-    text_document_uri: &'a str,
-    text_document_version: usize,
-}
-
-fn parse_did_open_notif(n: &Notification) -> Option<DidOpen<'_>> {
-    if n.method != "textDocument/didOpen" {
-        return None;
-    }
-    match &n.params {
-        serde_json::Value::Object(map) => {
-            let doc = map["textDocument"].as_object()?;
-            let uri = doc["uri"].as_str()?;
-            let language_id = doc["languageId"].as_str()?;
-            let text = doc["text"].as_str()?;
-            let version = doc["version"].as_i64()? as usize;
-            Some(DidOpen { language_id, text, uri, version })
-        }
-        _ => None,
-    }
-}
-
-fn parse_did_change(n: &Notification) -> Option<DidChange<'_>> {
-    if n.method != "textDocument/didChange" {
-        return None;
-    }
-    match &n.params {
-        serde_json::Value::Object(map) => {
-            let changes = map["contentChanges"]
-                .as_array()?
-                .iter()
-                .map(|v| v.as_object()?["text"].as_str())
-                .collect::<Option<Vec<_>>>()?;
-            let doc = map["textDocument"].as_object()?;
-            let uri = doc["uri"].as_str()?;
-            let version = doc["version"].as_i64()? as usize;
-            Some(DidChange {
-                content_changes: changes,
-                text_document_uri: uri,
-                text_document_version: version,
-            })
-        }
-        _ => None,
     }
 }
 
@@ -168,30 +111,44 @@ impl<'a> Lsp<'a> {
     }
 
     fn handle_notif(&mut self, notif: Notification) {
-        log(format!(
-            "Trying to handle notif {}. Currently {} files in RockrDb.",
-            notif.method,
-            self.db.files.len()
-        ));
         match notif.method.as_str() {
-            "textDocument/didOpen" => self.handle_did_open(notif),
-            "textDocument/didChange" => self.handle_did_change(notif),
+            "textDocument/didOpen" => {
+                self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open)
+            }
+            "textDocument/didChange" => {
+                self.dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change)
+            }
             "workspace/didChangeConfiguration" => {
-                self.handle_did_change_configuration(notif)
+                self.dispatch_notification::<DidChangeConfiguration>(notif, Self::handle_did_change_configuration)
             }
             method => log(format!("Unhandled notification method {method}")),
         }
     }
 
-    fn recheck(&mut self) {
-        let now = SystemTime::now();
-        let ws = Workspace::get(&self.db);
-        log("Starting check...");
-        check(&self.db, ws);
-        log(format!(
-            "Finished checking, took {} ms.",
-            now.elapsed().unwrap().as_secs_f64() * 1000f64,
-        ));
+    fn diag(&self, diag: &Diag) -> Diagnostic {
+        let span = diag.primary.span;
+        let start_info = span.start().loc_info(&self.db);
+        let end_info = span.end().loc_info(&self.db);
+        Diagnostic::new(
+            Range::new(
+                Position::new(start_info.line as u32 - 1, start_info.column as u32 - 1),
+                Position::new(end_info.line as u32 - 1, end_info.column as u32 - 1),
+            ),
+            Some(match diag.severity {
+                Severity::Error => DiagnosticSeverity::ERROR,
+                Severity::Warning => DiagnosticSeverity::WARNING,
+                Severity::Note => DiagnosticSeverity::INFORMATION,
+                Severity::Help => DiagnosticSeverity::HINT,
+            }),
+            None,
+            diag.primary.message.clone(),
+            diag.message.clone(),
+            None,
+            None,
+        )
+    }
+
+    fn recheck(&self) {
         let (_, diags) = program_has_errors(&self.db);
         let mut diags_per_file: HashMap<SourceFile, Vec<&Diag>> = HashMap::new();
         for diag in diags {
@@ -204,49 +161,43 @@ impl<'a> Lsp<'a> {
                 format!("file://{}", file.path(&self.db).display()).as_str(),
             )
             .unwrap();
-            let lsp_diags = diags
-                .iter()
-                .map(|diag| {
-                    let span = diag.primary.span;
-                    let start_info = span.start().loc_info(&self.db);
-                    let end_info = span.end().loc_info(&self.db);
-                    Diagnostic::new(
-                        Range::new(
-                            Position::new(
-                                start_info.line as u32 - 1,
-                                start_info.column as u32 - 1,
-                            ),
-                            Position::new(
-                                end_info.line as u32 - 1,
-                                end_info.column as u32 - 1,
-                            ),
-                        ),
-                        Some(match diag.severity {
-                            Severity::Error => DiagnosticSeverity::ERROR,
-                            Severity::Warning => DiagnosticSeverity::WARNING,
-                            Severity::Note => DiagnosticSeverity::INFORMATION,
-                            Severity::Help => DiagnosticSeverity::HINT,
-                        }),
-                        None,
-                        diag.primary.message.clone(),
-                        diag.message.clone(),
-                        None,
-                        None,
-                    )
-                })
-                .collect_vec();
-            let n = Notification::new(
-                PublishDiagnostics::METHOD.into(),
-                PublishDiagnosticsParams::new(uri, lsp_diags, None),
-            );
-            self.connection.sender.send(Message::Notification(n)).unwrap();
+            let lsp_diags = diags.iter().map(|diag| self.diag(diag)).collect_vec();
+            self.send_diagnostics(uri, lsp_diags);
         }
     }
 
-    fn handle_did_open(&mut self, notif: Notification) {
-        let did_open = parse_did_open_notif(&notif).unwrap();
-        let uri = Uri::from_str(did_open.uri).unwrap();
-        let path = PathBuf::from(uri.path().as_str()).canonicalize().unwrap();
+    fn send_diagnostics(&self, uri: Uri, lsp_diags: Vec<Diagnostic>) {
+        let n = Notification::new(
+            PublishDiagnostics::METHOD.into(),
+            PublishDiagnosticsParams::new(uri, lsp_diags, None),
+        );
+        self.connection.sender.send(Message::Notification(n)).unwrap();
+    }
+
+    fn path_of_uri(&self, uri: Uri) -> Option<PathBuf> {
+        PathBuf::from(uri.path().as_str()).canonicalize().ok()
+    }
+
+    fn sf_of_uri(&self, uri: Uri) -> Option<SourceFile> {
+        let path = self.path_of_uri(uri)?;
+        let sf = *self.db.files.get(&path)?.value();
+        Some(sf)
+    }
+
+    fn dispatch_notification<N: INotification>(
+        &mut self,
+        n: Notification,
+        mut handler: impl FnMut(&mut Self, N::Params),
+    ) {
+        if n.method != N::METHOD {
+            panic!("Tried to handle method `{}` using `{}` handler", n.method, N::METHOD)
+        }
+        let parsed = serde_json::from_value::<N::Params>(n.params).unwrap();
+        handler(self, parsed);
+    }
+
+    fn did_open(&mut self, params: DidOpenTextDocumentParams) {
+        let path = self.path_of_uri(params.text_document.uri).unwrap();
         if !self.db.files.contains_key(&path) {
             compute_package_roots(&mut self.db, path)
                 .unwrap_or_else(|err| panic!("{err}"));
@@ -256,19 +207,17 @@ impl<'a> Lsp<'a> {
         time(Some("recheck didOpen"), || self.recheck());
     }
 
-    fn handle_did_change(&mut self, notif: Notification) {
-        let did_change = parse_did_change(&notif).unwrap();
-        let uri = Uri::from_str(did_change.text_document_uri).unwrap();
-        let path = PathBuf::from(uri.path().as_str()).canonicalize().unwrap();
-        let sf = *self.db.files.get(&path).unwrap().value();
+    fn did_change(&mut self, did_change: DidChangeTextDocumentParams) {
         if did_change.content_changes.is_empty() {
             return;
         }
-        sf.set_content(&mut self.db).to(did_change.content_changes[0].into());
+        let sf = self.sf_of_uri(did_change.text_document.uri).unwrap();
+        sf.set_content(&mut self.db)
+            .to(did_change.content_changes[0].text.as_str().into());
         time(Some("recheck didChange"), || self.recheck());
     }
 
-    fn handle_did_change_configuration(&mut self, _: Notification) {
+    fn handle_did_change_configuration(&mut self, _: DidChangeConfigurationParams) {
         log(format!("{}:{}: TODO: handle didChangeConfiguration", file!(), line!()))
     }
 
