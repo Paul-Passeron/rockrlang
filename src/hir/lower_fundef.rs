@@ -878,7 +878,7 @@ impl<'db> LowerFundef<'db> {
                     let hir_fields = struct_field_patterns
                         .iter()
                         .map(|pat| match pat {
-                            StructFieldPattern::Rebind { name, pattern, .. } => {
+                            StructFieldPattern::Rebind { name, pattern, name_span } => {
                                 let (lowered, new_locals) =
                                     self.lower_pattern(pattern, scope);
                                 locals.extend(new_locals);
@@ -886,6 +886,7 @@ impl<'db> LowerFundef<'db> {
                                 HirStructFieldPattern::Rebind {
                                     name: *name,
                                     pattern: lowered,
+                                    name_span: *name_span,
                                 }
                             }
                             StructFieldPattern::Name(name, name_span) => {
@@ -897,7 +898,11 @@ impl<'db> LowerFundef<'db> {
                                     *name_span,
                                 );
                                 locals.push(local);
-                                HirStructFieldPattern::Name { id: local, name: *name }
+                                HirStructFieldPattern::Name {
+                                    id: local,
+                                    name: *name,
+                                    span: *name_span,
+                                }
                             }
                         })
                         .collect_vec();
@@ -1305,16 +1310,21 @@ impl<'db> LowerFundef<'db> {
                         let mut lowered_pats = vec![];
                         for pat in pats {
                             let pat = match pat {
-                                StructFieldPattern::Rebind { name, pattern, .. } => {
+                                StructFieldPattern::Rebind {
+                                    name,
+                                    pattern,
+                                    name_span,
+                                } => {
                                     let (pat, new_locals) =
                                         self.lower_pattern(pattern, scope);
                                     locals.extend(new_locals);
                                     HirStructFieldPattern::Rebind {
                                         name: *name,
                                         pattern: pat,
+                                        name_span: *name_span,
                                     }
                                 }
-                                StructFieldPattern::Name(symbol, _) => {
+                                StructFieldPattern::Name(symbol, name_span) => {
                                     let new_local = self.allocate_local(
                                         scope,
                                         *symbol,
@@ -1326,6 +1336,7 @@ impl<'db> LowerFundef<'db> {
                                     HirStructFieldPattern::Name {
                                         name: *symbol,
                                         id: new_local,
+                                        span: *name_span,
                                     }
                                 }
                             };

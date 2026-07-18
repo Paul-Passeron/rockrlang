@@ -16,8 +16,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use itertools::EitherOrBoth;
+use salsa::Accumulator;
 
 use crate::{
+    common::location::Span,
+    compiler::diagnostic::Diag,
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
@@ -62,21 +65,23 @@ impl<'a> InferenceCtx<'a> {
             HirPatternDesc::DestructureBinding { resolution: struct_id, fields } => {
                 self._infer_destructure_binding(binds_like, struct_id, fields)
             }
-            HirPatternDesc::Constructor { resolution, name, fields } => {
-                self._infer_constructor(*resolution, *name, fields, binds_like)
-            }
+            HirPatternDesc::Constructor { resolution, name, fields } => self
+                ._infer_constructor(*resolution, *name, fields, binds_like, pattern.span),
         }
     }
 
-    fn get_unit_type_or_diagnose(&mut self, enum_id: EnumId, name: Symbol) {
-        let item = enum_item(self.db, enum_id.interned());
-        let Some(variant) = item.variants.iter().find(|variant| variant.name == name)
-        else {
-            todo!()
-        };
-        match &variant.kind {
-            AstEnumVariantKind::Unit => (),
-            _ => todo!(),
+    fn get_unit_type_or_diagnose(&mut self, enum_id: EnumId, name: Symbol, span: Span) {
+        match self.get_enum_variant(enum_id, name).as_ref().map(|v| &v.kind) {
+            Some(AstEnumVariantKind::Unit) => (),
+            _ => Diag::generic_error(
+                format!(
+                    "Expected variant `{}` to be unit for enum `{}`",
+                    name.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db),
         }
     }
 
@@ -111,10 +116,11 @@ impl<'a> InferenceCtx<'a> {
         enum_id: EnumId,
         name: Symbol,
         template_tys: &[InferTy],
+        span: Span,
     ) -> Vec<InferTy> {
-        let Some(variant) = self.get_enum_variant(enum_id, name) else { todo!() };
-        match &variant.kind {
-            AstEnumVariantKind::TupleLike(tys) => {
+        let variant = self.get_enum_variant(enum_id, name);
+        match variant.as_ref().map(|v| &v.kind) {
+            Some(AstEnumVariantKind::TupleLike(tys)) => {
                 let ctx = self.get_ctx_for_enum(enum_id, template_tys);
                 tys.iter()
                     .map(|ty| {
@@ -123,7 +129,18 @@ impl<'a> InferenceCtx<'a> {
                     })
                     .collect()
             }
-            _ => todo!(),
+            _ => {
+                Diag::generic_error(
+                    format!(
+                        "Expected variant `{}` to be tuple for enum `{}`",
+                        name.to_string(self.db),
+                        enum_id.name(self.db).to_string(self.db)
+                    ),
+                    span,
+                )
+                .accumulate(self.db);
+                vec![]
+            }
         }
     }
 
@@ -132,11 +149,12 @@ impl<'a> InferenceCtx<'a> {
         enum_id: EnumId,
         name: Symbol,
         template_tys: &[InferTy],
+        span: Span,
     ) -> HashMap<Symbol, InferTy> {
-        let Some(variant) = self.get_enum_variant(enum_id, name) else { todo!() };
         let ctx = self.get_ctx_for_enum(enum_id, template_tys);
-        match &variant.kind {
-            AstEnumVariantKind::StructLike(fields) => fields
+        let variant = self.get_enum_variant(enum_id, name);
+        match variant.as_ref().map(|v| &v.kind) {
+            Some(AstEnumVariantKind::StructLike(fields)) => fields
                 .iter()
                 .map(|field| {
                     (
@@ -146,7 +164,18 @@ impl<'a> InferenceCtx<'a> {
                     )
                 })
                 .collect(),
-            _ => todo!(),
+            _ => {
+                Diag::generic_error(
+                    format!(
+                        "Expected variant `{}` to be struct-like for enum `{}`",
+                        name.to_string(self.db),
+                        enum_id.name(self.db).to_string(self.db)
+                    ),
+                    span,
+                )
+                .accumulate(self.db);
+                HashMap::new()
+            }
         }
     }
 
@@ -157,9 +186,14 @@ impl<'a> InferenceCtx<'a> {
         fields: &[HirStructFieldPattern],
         template_tys: &[InferTy],
         binds_like: Option<InferTy>,
+        span: Span,
     ) {
-        let field_types =
-            self.get_field_types_of_variant_or_diagnose(enum_id, name, template_tys);
+        let field_types = self.get_field_types_of_variant_or_diagnose(
+            enum_id,
+            name,
+            template_tys,
+            span,
+        );
         self._infer_fields(fields, &field_types, binds_like);
     }
 
@@ -169,13 +203,14 @@ impl<'a> InferenceCtx<'a> {
         name: Symbol,
         fields: &HirPatternConstructorArgs,
         binds_like: Option<InferTy>,
+        span: Span,
     ) -> Result<InferTy, UnificationError> {
         let template_tys =
             self.get_templates_for(Definition::Type(TypeDefId::Enum(enum_id)));
 
         match fields {
             HirPatternConstructorArgs::None => {
-                self.get_unit_type_or_diagnose(enum_id, name);
+                self.get_unit_type_or_diagnose(enum_id, name, span);
             }
             HirPatternConstructorArgs::StructFields(fields) => {
                 self._infer_fields_variants(
@@ -184,6 +219,7 @@ impl<'a> InferenceCtx<'a> {
                     fields,
                     &template_tys,
                     binds_like,
+                    span,
                 );
             }
             HirPatternConstructorArgs::TupleFields(hir_patterns) => {
@@ -193,6 +229,7 @@ impl<'a> InferenceCtx<'a> {
                     hir_patterns,
                     &template_tys,
                     binds_like,
+                    span,
                 );
             }
         }
@@ -216,9 +253,10 @@ impl<'a> InferenceCtx<'a> {
         hir_patterns: &[HirPattern],
         template_tys: &[InferTy],
         binds_like: Option<InferTy>,
+        span: Span,
     ) {
         let variant_tys =
-            self.get_tuple_fields_or_diagnose(enum_id, name, template_tys.as_ref());
+            self.get_tuple_fields_or_diagnose(enum_id, name, template_tys.as_ref(), span);
 
         let tys: Box<_> = hir_patterns
             .iter()
@@ -229,7 +267,17 @@ impl<'a> InferenceCtx<'a> {
             .collect();
 
         if variant_tys.len() != tys.len() {
-            todo!("Emit diag here")
+            Diag::generic_error(
+                format!(
+                    "Mismatched length in tuple variant `{}` for enum `{}`, expected {} but got {}",
+                    name.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db),
+                    variant_tys.len(),
+                    tys.len()
+                ),
+                span,
+            )
+            .accumulate(self.db);
         }
 
         variant_tys
@@ -263,7 +311,14 @@ impl<'a> InferenceCtx<'a> {
         match data {
             Some(HirPatternDesc::Any | HirPatternDesc::Bind { .. }) => {
                 let adjusted = self.apply_binds_like(binds_like, inner_ty);
-                self.unify(adjusted.clone(), pot_ref_ty.clone()).expect("TODO");
+                if let Err(err) = self.unify(adjusted.clone(), pot_ref_ty.clone()) {
+                    let span = pattern.as_ref().unwrap().span;
+                    Diag::generic_error(
+                        format!("Unification error: {}", err.display(self.db)),
+                        span,
+                    )
+                    .accumulate(self.db);
+                }
             }
             _ => {
                 self.emit_is_inner_constraint(inner_ty, pot_ref_ty);
@@ -325,28 +380,47 @@ impl<'a> InferenceCtx<'a> {
     ) {
         for field in fields {
             match field {
-                HirStructFieldPattern::Rebind { name, pattern } => {
-                    let inferred =
-                        self.infer_pattern(pattern, binds_like.clone()).expect("TODO");
-                    let field_ty = field_types
-                        .get(name)
-                        .cloned()
-                        .unwrap_or_else(|| self.fresh_var().into());
-                    self.unify_pattern_depending_on_kind(
-                        binds_like.as_ref(),
-                        field_ty,
-                        inferred,
-                        Some(pattern),
-                    );
+                HirStructFieldPattern::Rebind { name, pattern, .. } => {
+                    match self.infer_pattern(pattern, binds_like.clone()) {
+                        Ok(inferred) => {
+                            let field_ty = field_types
+                                .get(name)
+                                .cloned()
+                                .unwrap_or_else(|| self.fresh_var().into());
+                            self.unify_pattern_depending_on_kind(
+                                binds_like.as_ref(),
+                                field_ty,
+                                inferred,
+                                Some(pattern),
+                            );
+                        }
+                        Err(err) => {
+                            let span = field.span();
+                            Diag::generic_error(format!("Unification error in field `{}` of struct pattern: {}",
+                                field.name().to_string(self.db),
+                                err.display(self.db),
+                            ), span)
+                                .accumulate(self.db)
+                        }
+                    }
                 }
-                HirStructFieldPattern::Name { id, name } => {
+                HirStructFieldPattern::Name { id, name, span } => {
                     let local_ty = self.infer_local(*id);
                     let field_ty = field_types
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
                     let adjusted = self.apply_binds_like(binds_like.as_ref(), field_ty);
-                    self.unify(adjusted, local_ty).expect("TODO");
+                    if let Err(err) = self.unify(adjusted, local_ty) {
+                        Diag::generic_error(
+                            format!(
+                                "Unification error in field pattern: {}",
+                                err.display(self.db)
+                            ),
+                            *span,
+                        )
+                        .accumulate(self.db);
+                    }
                 }
             }
         }

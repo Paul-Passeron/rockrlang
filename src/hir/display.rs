@@ -248,11 +248,11 @@ fn write_pattern(
                     for p in hir_struct_field_patterns.iter() {
                         write_indent(f, depth + 2)?;
                         match p {
-                            HirStructFieldPattern::Rebind { name, pattern } => {
+                            HirStructFieldPattern::Rebind { name, pattern, .. } => {
                                 write!(f, "{}: ", name.display(db))?;
                                 write_pattern(f, pattern, db, depth + 2)?;
                             }
-                            HirStructFieldPattern::Name { id, name } => {
+                            HirStructFieldPattern::Name { id, name, .. } => {
                                 write!(f, "{}/*_{}*/", name.display(db), id.raw())?;
                             }
                         }

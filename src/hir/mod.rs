@@ -289,8 +289,40 @@ pub enum HirPatternConstructorArgs {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum HirStructFieldPattern {
-    Rebind { name: Symbol, pattern: HirPattern },
-    Name { id: LocalId, name: Symbol },
+    Rebind { name: Symbol, pattern: HirPattern, name_span: Span },
+    Name { id: LocalId, name: Symbol, span: Span },
+}
+
+impl HirStructFieldPattern {
+    pub fn span(&self) -> Span {
+        match self {
+            HirStructFieldPattern::Rebind { pattern, name_span, .. } => {
+                name_span.start().span(pattern.span.end())
+            }
+            HirStructFieldPattern::Name { span, .. } => *span,
+        }
+    }
+
+    pub fn name_span(&self) -> Span {
+        match self {
+            HirStructFieldPattern::Rebind { name_span, .. } => *name_span,
+            HirStructFieldPattern::Name { span, .. } => *span,
+        }
+    }
+
+    pub fn pat_span(&self) -> Span {
+        match self {
+            HirStructFieldPattern::Rebind { pattern, .. } => pattern.span,
+            HirStructFieldPattern::Name { span, .. } => *span,
+        }
+    }
+
+    pub fn name(&self) -> Symbol {
+        match self {
+            HirStructFieldPattern::Rebind { name, .. }
+            | HirStructFieldPattern::Name { name, .. } => *name,
+        }
+    }
 }
 
 #[salsa::tracked]

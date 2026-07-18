@@ -458,10 +458,10 @@ impl<'db> ThirTranslator<'db> {
             HirPatternConstructorArgs::StructFields(pats) => ThirConstructorArgs::Struct(
                 pats.iter()
                     .map(|pat| match pat {
-                        HirStructFieldPattern::Name { id, name } => {
+                        HirStructFieldPattern::Name { id, name, .. } => {
                             (*name, self.pattern_of_local(b, *id))
                         }
-                        HirStructFieldPattern::Rebind { name, pattern } => {
+                        HirStructFieldPattern::Rebind { name, pattern, .. } => {
                             (*name, self.pat(b, pattern))
                         }
                     })
@@ -506,10 +506,10 @@ impl<'db> ThirTranslator<'db> {
                 let fields = fields
                     .iter()
                     .map(|field_pat| match field_pat {
-                        HirStructFieldPattern::Rebind { name, pattern } => {
+                        HirStructFieldPattern::Rebind { name, pattern, .. } => {
                             (*name, self.pat(b, pattern))
                         }
-                        HirStructFieldPattern::Name { id, name } => {
+                        HirStructFieldPattern::Name { id, name, .. } => {
                             (*name, self.pattern_of_local(b, *id))
                         }
                     })
