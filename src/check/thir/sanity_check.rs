@@ -170,9 +170,10 @@ impl<'db> SanityChecker<'db> {
                 ));
                 self.check_types(enum_ty, pat.ty, pat.span);
                 if let Some(cty) = def.get_cons(self.db, *idx) {
-                    self.check_constructor_pat(&cty, args, &peeled);
+                    self.check_constructor_pat(&cty, args, &peeled, pat.span);
                 } else {
-                    todo!()
+                    Diag::generic_error("Unknown constructor for enum".into(), pat.span)
+                        .accumulate(self.db);
                 }
             }
             ThirPatternKind::IntLit(_) => {
@@ -260,6 +261,8 @@ impl<'db> SanityChecker<'db> {
             ExprKind::BinOp { op, lhs, rhs } => {
                 let lhs_ty = self.check_expr(*lhs);
                 let rhs_ty = self.check_expr(*rhs);
+                let lhs_span = self.thir.exprs[*lhs].span;
+                let rhs_span = self.thir.exprs[*rhs].span;
                 match op {
                     BinaryOperator::Plus
                     | BinaryOperator::Minus
@@ -301,11 +304,18 @@ impl<'db> SanityChecker<'db> {
                         self.check_types(lhs_ty, rhs_ty, infos.span);
                         self.check_types(bool_id(self.db).into(), infos.ty, infos.span);
                     }
-                    BinaryOperator::And => todo!(),
-                    BinaryOperator::Or => todo!(),
-                    BinaryOperator::BitAnd => todo!(),
-                    BinaryOperator::BitOr => todo!(),
-                    BinaryOperator::BitXor => todo!(),
+                    BinaryOperator::And | BinaryOperator::Or => {
+                        let bool_id = bool_id(self.db).into();
+                        self.check_types(bool_id, lhs_ty, lhs_span);
+                        self.check_types(bool_id, rhs_ty, rhs_span);
+                        self.check_types(bool_id, infos.ty, infos.span);
+                    }
+                    BinaryOperator::BitAnd
+                    | BinaryOperator::BitOr
+                    | BinaryOperator::BitXor => {
+                        Diag::todo("Handle bit manipulation ops".into(), infos.span)
+                            .accumulate(self.db);
+                    }
                 }
             }
             ExprKind::Neg(operand) => {
@@ -415,7 +425,6 @@ impl<'db> SanityChecker<'db> {
             ExprKind::Cast(expr, type_ref) => {
                 self.check_expr(*expr);
                 self.check_types(*type_ref, infos.ty, infos.span);
-                // TODO: check that infos.ty and type_ref are cast-compatible
             }
         };
         infos.ty
@@ -439,7 +448,11 @@ impl<'db> SanityChecker<'db> {
         if let Some(ty) = self.compute_type_after_projection(before, projection, span) {
             self.check_types(expected, ty, span);
         } else {
-            todo!()
+            Diag::generic_error(
+                "Could not compute the type after projection".into(),
+                span,
+            )
+            .accumulate(self.db);
         }
     }
 
@@ -554,12 +567,23 @@ impl<'db> SanityChecker<'db> {
                     self.check_types(field.1, field_ty, span);
                 }
             }
-            (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
-                let _ = tys;
-                let _ = pats;
-                Diag::todo("Check tuple pat here".into(), span).accumulate(self.db);
+            (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(exprs)) => {
+                if tys.len() != exprs.len() {
+                    Diag::generic_error(
+                        "Wrong number of args for the tuple variant constructor".into(),
+                        span,
+                    )
+                    .accumulate(self.db);
+                }
+                // Make sure we see all exprs even if mismatch
+                let expr_tys =
+                    exprs.iter().map(|expr| self.check_expr(*expr)).collect_vec();
+                for (ty, expr_ty) in tys.iter().zip(expr_tys) {
+                    self.check_types(*ty, expr_ty, span);
+                }
             }
-            _ => todo!(),
+            _ => Diag::generic_error("Mismatched constructor kinds in expr".into(), span)
+                .accumulate(self.db),
         }
     }
 
@@ -568,6 +592,7 @@ impl<'db> SanityChecker<'db> {
         ty: &ConstructorType,
         pat: &ThirConstructorArgs<ThirPattern>,
         peeled: &RefWrappedTy,
+        span: Span,
     ) {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
@@ -584,7 +609,11 @@ impl<'db> SanityChecker<'db> {
                     self.check_pattern(peeled.wrap_like(self.db, *ty), pat);
                 });
             }
-            _ => todo!(),
+            _ => Diag::generic_error(
+                "Mismatched constructor kinds in pattern".into(),
+                span,
+            )
+            .accumulate(self.db),
         }
     }
 
@@ -752,7 +781,6 @@ impl TypeRef {
         } else if let Some(inner) = self.as_ref(db).and_then(|t| t.1.as_slice(db)) {
             Some(inner)
         } else {
-            println!("TODO: Cannot index into {}. Is this right ?", self.to_string(db));
             None
         }
     }
