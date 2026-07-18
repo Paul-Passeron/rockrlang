@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::Db;
-use std::{fmt::Display, path::PathBuf, slice::SliceIndex, sync::Arc};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
 #[salsa::input]
 #[derive(Debug, PartialOrd, Ord)]

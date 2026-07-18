@@ -30,3 +30,6 @@ walkdir = "2.5.0"
 [[bin]]
 name = "rockrc"
 path = "src/compiler/rockrc.rs"
+
+[workspace]
+members = ["rockr-lsp"]
