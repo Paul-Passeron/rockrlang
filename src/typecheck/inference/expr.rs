@@ -24,6 +24,7 @@ use itertools::Itertools;
 use salsa::Accumulator;
 
 use crate::{
+    Db,
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{
@@ -36,16 +37,17 @@ use crate::{
     },
     parse_tree::{
         expr::BinaryOperator,
-        top_level::{AstEnumVariantKind, AstStructDef, AstStructDefField},
+        top_level::{AstEnumVariantKind, AstStructDefField},
     },
     ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
-        inference::{implicit::ImplicitContext, var::InferVar},
+        inference::{
+            InferTy, InferenceCtx, UnificationError, implicit::ImplicitContext,
+            var::InferVar,
+        },
     },
 };
-
-use super::{InferTy, InferenceCtx, UnificationError};
 
 impl<'db> InferenceCtx<'db> {
     fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
@@ -270,7 +272,14 @@ impl<'db> InferenceCtx<'db> {
                 .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
-            self.diagnose_bad_struct_fields(span, ast, &inferred_fields, struct_id)?;
+            if !diagnose_bad_struct_fields(
+                self.db,
+                span,
+                struct_id,
+                &inferred_fields.keys().copied().collect(),
+            ) {
+                return Err(UnificationError::AlreadyDiagnosed);
+            }
 
             let module = struct_id.parent(self.db);
             let zelf = self.fresh_var();
@@ -308,48 +317,6 @@ impl<'db> InferenceCtx<'db> {
             Ok(as_struct)
         } else {
             Err(UnificationError::NonStructForStructLit(*ty))
-        }
-    }
-
-    fn diagnose_bad_struct_fields(
-        &mut self,
-        span: Span,
-        ast: &AstStructDef,
-        inferred_fields: &HashMap<Symbol, InferTy>,
-        struct_id: StructId,
-    ) -> Result<(), UnificationError> {
-        let field_sets = (
-            inferred_fields.keys().copied().collect::<HashSet<_>>(),
-            ast.fields.iter().map(|f| f.name).collect::<HashSet<_>>(),
-        );
-        if field_sets.0 != field_sets.1 {
-            // For ast fields not in inferred fields
-            for field in field_sets.1.difference(&field_sets.0) {
-                Diag::generic_error(
-                    format!(
-                        "Missing field `{}` in struct lit for type `{}`",
-                        field.to_string(self.db),
-                        struct_id.name(self.db).to_string(self.db)
-                    ),
-                    span,
-                )
-                .accumulate(self.db);
-            }
-            // For inferred fields not in ast fields
-            for field in field_sets.0.difference(&field_sets.1) {
-                Diag::generic_error(
-                    format!(
-                        "Invalid field `{}` in struct lit for type `{}`",
-                        field.to_string(self.db),
-                        struct_id.name(self.db).to_string(self.db)
-                    ),
-                    span,
-                )
-                .accumulate(self.db);
-            }
-            Err(UnificationError::AlreadyDiagnosed)
-        } else {
-            Ok(())
         }
     }
 
@@ -682,4 +649,45 @@ impl<'db> InferenceCtx<'db> {
         let res = self.emit_binop_constraint(lhs_ty, rhs_ty, op);
         Ok(InferTy::Var(res))
     }
+}
+
+pub fn diagnose_bad_struct_fields(
+    db: &dyn Db,
+    span: Span,
+    struct_id: StructId,
+    inferred_fields: &HashSet<Symbol>,
+) -> bool {
+    let ast = struct_item(db, struct_id.into());
+    let field_sets = (
+        inferred_fields.iter().copied().collect::<HashSet<_>>(),
+        ast.fields.iter().map(|f| f.name).collect::<HashSet<_>>(),
+    );
+    if field_sets.0 == field_sets.1 {
+        return true;
+    }
+    // For ast fields not in inferred fields
+    for field in field_sets.1.difference(&field_sets.0) {
+        Diag::generic_error(
+            format!(
+                "Missing field `{}` in struct lit for type `{}`",
+                field.to_string(db),
+                struct_id.name(db).to_string(db)
+            ),
+            span,
+        )
+        .accumulate(db);
+    }
+    // For inferred fields not in ast fields
+    for field in field_sets.0.difference(&field_sets.1) {
+        Diag::generic_error(
+            format!(
+                "Invalid field `{}` in struct lit for type `{}`",
+                field.to_string(db),
+                struct_id.name(db).to_string(db)
+            ),
+            span,
+        )
+        .accumulate(db);
+    }
+    false
 }
