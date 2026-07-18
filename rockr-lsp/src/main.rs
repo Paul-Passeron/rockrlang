@@ -52,6 +52,13 @@ fn log(msg: impl AsRef<str>) {
         OpenOptions::new().create(true).append(true).open("/tmp/rockr-lsp.log").unwrap();
     let _ = writeln!(f, "{}", msg.as_ref());
 }
+
+macro_rules! log {
+    ($($arg:tt)*) => {
+        log(format!($($arg)*))
+    };
+}
+
 #[allow(unused)]
 struct Lsp<'a> {
     pub db: RockrDb,
@@ -133,7 +140,7 @@ impl<'a> Lsp<'a> {
                     notif,
                     Self::handle_did_change_configuration,
                 ),
-            method => log(format!("Unhandled notification method {method}")),
+            method => log!("Unhandled notification method {method}"),
         }
     }
 
@@ -237,20 +244,20 @@ impl<'a> Lsp<'a> {
     }
 
     fn handle_did_change_configuration(&mut self, _: DidChangeConfigurationParams) {
-        log(format!("{}:{}: TODO: handle didChangeConfiguration", file!(), line!()))
+        log!("{}:{}: TODO: handle didChangeConfiguration", file!(), line!())
     }
 
     fn handle_request(&mut self, _req: Request) {
-        log("TOOD: Need to handle request !");
+        log!("TOOD: Need to handle request !");
     }
 }
 
 fn time<T, S: Display>(name: Option<S>, mut f: impl FnMut() -> T) -> T {
     let prefix = name.map_or("operation".into(), |x| format!("`{x}`"));
     let start = SystemTime::now();
-    log(format!("Starting operation {prefix}"));
+    log!("Starting operation {prefix}");
     let res = f();
     let elapsed = start.elapsed().unwrap();
-    log(format!("{prefix} took {} ms", elapsed.as_secs_f64() * 1000f64));
+    log!("{prefix} took {} ms", elapsed.as_secs_f64() * 1000f64);
     res
 }
