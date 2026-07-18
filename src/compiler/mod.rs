@@ -328,7 +328,10 @@ fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
     })
 }
 
-pub fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
+pub fn compute_package_roots(
+    db: &mut dyn Db,
+    root: PathBuf,
+) -> Result<(), CompilerError> {
     add_package_root_from_disk(db, root)?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {

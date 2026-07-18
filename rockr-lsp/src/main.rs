@@ -272,7 +272,7 @@ impl<'a> Lsp<'a> {
         log(format!("{}:{}: TODO: handle didChangeConfiguration", file!(), line!()))
     }
 
-    fn handle_request(&mut self, req: Request) {
+    fn handle_request(&mut self, _req: Request) {
         log("TOOD: Need to handle request !");
     }
 }

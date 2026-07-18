@@ -19,7 +19,10 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    check::{mir::check_mir, thir::{checked_thir_body, thir_is_valid}},
+    check::{
+        mir::check_mir,
+        thir::{checked_thir_body, thir_is_valid},
+    },
     hir::function_ast,
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, ScopeOwnerId, TypeRef},

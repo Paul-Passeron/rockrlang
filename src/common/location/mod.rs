@@ -123,7 +123,6 @@ pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usiz
     offset.min(length)
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LocationInfo {
     pub file: PathBuf,
