@@ -139,7 +139,7 @@ impl<'db> LowerFundef<'db> {
                 }
             }
             AstExprDesc::NameResolved { from, to } => {
-                match resolve_in_module(self.db, *from, module) {
+                match resolve_in_module(self.db, from.data, module) {
                     Some(Definition::Module(inner)) => {
                         self.expr_as_place(to, scope, inner)
                     }
@@ -219,31 +219,39 @@ impl<'db> LowerFundef<'db> {
                         return TypeRef::Param(TypeParamId(idx));
                     }
                 }
-                let resolution = resolve_in_module(self.db, *name, module)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "{}: Could not resolve name {} in scope",
-                            desc.span.start().loc_info(self.db),
-                            name.display(self.db),
+
+                match resolve_in_module(self.db, *name, module) {
+                    Some(resolution) => {
+                        let type_def_id = match resolution {
+                            Definition::Type(type_def_id) => type_def_id,
+                            Definition::Interface(id) => {
+                                todo!("Interface {} here", id.to_string(self.db))
+                            }
+                            other_def => {
+                                todo!("{}", other_def.to_string(self.db))
+                            }
+                        };
+
+                        let partial_args: Vec<_> = args
+                            .iter()
+                            .map(|arg| self.resolve_any_holed_arg(arg, module))
+                            .collect();
+
+                        TypeId::new(self.db, type_def_id, partial_args).into()
+                    }
+                    None => {
+                        Diag::generic_error(
+                            format!(
+                                "{}: Could not resolve name {} in scope",
+                                desc.span.start().loc_info(self.db),
+                                name.display(self.db),
+                            ),
+                            desc.span,
                         )
-                    });
-
-                let type_def_id = match resolution {
-                    Definition::Type(type_def_id) => type_def_id,
-                    Definition::Interface(id) => {
-                        todo!("Interface {} here", id.to_string(self.db))
+                        .accumulate(self.db);
+                        TypeRef::Error
                     }
-                    other_def => {
-                        todo!("{}", other_def.to_string(self.db))
-                    }
-                };
-
-                let partial_args: Vec<_> = args
-                    .iter()
-                    .map(|arg| self.resolve_any_holed_arg(arg, module))
-                    .collect();
-
-                TypeId::new(self.db, type_def_id, partial_args).into()
+                }
             }
 
             AstTypeExprDesc::NameResolved { from, to } => {
@@ -356,6 +364,7 @@ impl<'db> LowerFundef<'db> {
     fn lower_name_resolved(
         &mut self,
         from: Symbol,
+        from_span: Span,
         to: &AstExpr,
         scope: &Scope,
         module: ModuleId,
@@ -403,11 +412,17 @@ impl<'db> LowerFundef<'db> {
                 }
                 Some(Definition::Type(type_def_id)) => self
                     .lower_name_resolved_expr_from_type(scope, module, to, type_def_id),
-                _ => todo!(
-                    "error: {}, badly name-resolved item ({})",
-                    to.span.start().loc_info(self.db),
-                    from.interned().contents(self.db)
-                ),
+                _ => {
+                    Diag::generic_error(
+                        format!(
+                            "badly name-resolved item ({})",
+                            from.interned().contents(self.db)
+                        ),
+                        from_span,
+                    )
+                    .accumulate(self.db);
+                    HirExprDesc::Error
+                }
             }
         }
     }
@@ -511,7 +526,7 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::NameResolved { from, to } => {
                 let resolved_call = AstExpr::new(
                     AstExprDesc::NameResolved {
-                        from: *from,
+                        from: from.clone(),
                         to: Box::new(AstExpr::new(
                             AstExprDesc::Call {
                                 callee: to.clone(),
@@ -661,7 +676,7 @@ impl<'db> LowerFundef<'db> {
                 self.lower_name(*symbol, expr.span, scope, module)
             }
             AstExprDesc::NameResolved { from, to } => {
-                self.lower_name_resolved(*from, to, scope, module)
+                self.lower_name_resolved(from.data, from.span, to, scope, module)
             }
             AstExprDesc::StaticCall { ty, method, args, type_args } => {
                 self.lower_static_call(ty, *method, type_args, args, scope, module)

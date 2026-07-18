@@ -328,7 +328,7 @@ fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
     })
 }
 
-fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
+pub fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerError> {
     add_package_root_from_disk(db, root)?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {
@@ -337,7 +337,7 @@ fn compute_package_roots(db: &mut dyn Db, root: PathBuf) -> Result<(), CompilerE
     Ok(())
 }
 
-fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
+pub fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
     fn walk(db: &mut dyn Db, p: PathBuf) -> Result<(), CompilerError> {
         if p.is_dir() {
             WalkDir::new(p.clone())
@@ -379,7 +379,7 @@ fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
     Ok(())
 }
 
-fn load_workspace_from_disk(
+pub fn load_workspace_from_disk(
     root: PathBuf,
     config: Config,
 ) -> Result<RockrDb, CompilerError> {
@@ -390,7 +390,7 @@ fn load_workspace_from_disk(
     Ok(db)
 }
 
-fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
+pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
     let ws = Workspace::get(db);
     let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
     let has_errors = raw_diags.iter().any(|d| d.severity == Severity::Error);

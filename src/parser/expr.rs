@@ -436,7 +436,7 @@ impl<'db> Parser<'db> {
                                     unreachable!()
                                 };
                                 let base_expr = AstExpr::new(
-                                    AstExprDesc::Name(from),
+                                    AstExprDesc::Name(from.data),
                                     vec![],
                                     expr.span,
                                 );
@@ -474,7 +474,7 @@ impl<'db> Parser<'db> {
             }
             AstExprDesc::NameResolved { from, to } => {
                 let to = self.reinterpret_expr_as_ty(*to)?;
-                AstTypeExprDesc::NameResolved { from, to: Box::new(to) }
+                AstTypeExprDesc::NameResolved { from: from.data, to: Box::new(to) }
             }
             _ => unreachable!(),
         };
@@ -597,7 +597,10 @@ impl<'db> Parser<'db> {
                         let rhs = self.parse_postfix_inner(true)?;
                         let end = self.get_end();
                         Ok(Spanned::new(
-                            AstExprDesc::NameResolved { from: name, to: Box::new(rhs) },
+                            AstExprDesc::NameResolved {
+                                from: Spanned::new(name, vec![], tok.location),
+                                to: Box::new(rhs),
+                            },
                             vec![],
                             start.span(end),
                         ))

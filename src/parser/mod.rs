@@ -62,6 +62,7 @@ pub enum ParseErrorKind {
     ExpectedToken { expected: TokenKind, found: TokenKind },
     ExpectedIntLit(TokenKind),
     ExpectedTypeName,
+    NotATopLevelItem,
 }
 
 impl<'db> Parser<'db> {

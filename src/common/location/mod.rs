@@ -109,7 +109,7 @@ fn _loc_info(db: &dyn Db, loc: Location) -> &LocationInfo {
 }
 
 #[salsa::tracked(returns(copy))]
-fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
+pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
     let lines = line_starts(db, file);
     let length = file.content(db).len();
     if lines.len() >= line {
@@ -122,6 +122,7 @@ fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
     }
     offset.min(length)
 }
+
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LocationInfo {
