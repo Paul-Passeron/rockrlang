@@ -18,12 +18,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 use lsp_server::{Connection, Message, Notification, Request};
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DidChangeConfigurationParams, DidChangeTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, Position, PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri, notification::{
-        DidChangeConfiguration, DidChangeTextDocument, DidOpenTextDocument, Notification as INotification, PublishDiagnostics,
+    Diagnostic, DiagnosticSeverity, DidChangeConfigurationParams,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, Position,
+    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind, Uri,
+    notification::{
+        DidChangeConfiguration, DidChangeTextDocument, DidOpenTextDocument,
+        Notification as INotification, PublishDiagnostics,
     },
 };
 use rockr::{
     RockrDb, SourceFile,
+    common::location::{Location, Span},
     compiler::{
         Config, Workspace, compute_all_files_from_roots, compute_package_roots,
         diagnostic::{Diag, Severity},
@@ -32,8 +38,13 @@ use rockr::{
 };
 use salsa::Setter;
 use std::{
-    collections::HashMap, fmt::Display, fs::OpenOptions, io::Write, path::PathBuf,
-    str::FromStr, time::SystemTime,
+    collections::HashMap,
+    fmt::Display,
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::SystemTime,
 };
 
 fn log(msg: impl AsRef<str>) {
@@ -115,31 +126,39 @@ impl<'a> Lsp<'a> {
             "textDocument/didOpen" => {
                 self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open)
             }
-            "textDocument/didChange" => {
-                self.dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change)
-            }
-            "workspace/didChangeConfiguration" => {
-                self.dispatch_notification::<DidChangeConfiguration>(notif, Self::handle_did_change_configuration)
-            }
+            "textDocument/didChange" => self
+                .dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change),
+            "workspace/didChangeConfiguration" => self
+                .dispatch_notification::<DidChangeConfiguration>(
+                    notif,
+                    Self::handle_did_change_configuration,
+                ),
             method => log(format!("Unhandled notification method {method}")),
         }
     }
 
+    fn loc(&self, loc: Location) -> Position {
+        let infos = loc.loc_info(&self.db);
+        Position::new(infos.line as u32 - 1, infos.column as u32 - 1)
+    }
+
+    fn span(&self, span: Span) -> Range {
+        Range::new(self.loc(span.start()), self.loc(span.end()))
+    }
+
+    fn sev(&self, severity: Severity) -> DiagnosticSeverity {
+        match severity {
+            Severity::Error => DiagnosticSeverity::ERROR,
+            Severity::Warning => DiagnosticSeverity::WARNING,
+            Severity::Note => DiagnosticSeverity::INFORMATION,
+            Severity::Help => DiagnosticSeverity::HINT,
+        }
+    }
+
     fn diag(&self, diag: &Diag) -> Diagnostic {
-        let span = diag.primary.span;
-        let start_info = span.start().loc_info(&self.db);
-        let end_info = span.end().loc_info(&self.db);
         Diagnostic::new(
-            Range::new(
-                Position::new(start_info.line as u32 - 1, start_info.column as u32 - 1),
-                Position::new(end_info.line as u32 - 1, end_info.column as u32 - 1),
-            ),
-            Some(match diag.severity {
-                Severity::Error => DiagnosticSeverity::ERROR,
-                Severity::Warning => DiagnosticSeverity::WARNING,
-                Severity::Note => DiagnosticSeverity::INFORMATION,
-                Severity::Help => DiagnosticSeverity::HINT,
-            }),
+            self.span(diag.primary.span),
+            Some(self.sev(diag.severity)),
             None,
             diag.primary.message.clone(),
             diag.message.clone(),
@@ -155,12 +174,8 @@ impl<'a> Lsp<'a> {
             diags_per_file.entry(diag.primary.span.file).or_default().push(diag);
         }
         for file in self.db.files.iter() {
-            let file = *file.value();
-            let diags = diags_per_file.remove(&file).unwrap_or_default();
-            let uri = Uri::from_str(
-                format!("file://{}", file.path(&self.db).display()).as_str(),
-            )
-            .unwrap();
+            let diags = diags_per_file.remove(file.value()).unwrap_or_default();
+            let uri = self.uri_of_path(file.path(&self.db));
             let lsp_diags = diags.iter().map(|diag| self.diag(diag)).collect_vec();
             self.send_diagnostics(uri, lsp_diags);
         }
@@ -176,6 +191,10 @@ impl<'a> Lsp<'a> {
 
     fn path_of_uri(&self, uri: Uri) -> Option<PathBuf> {
         PathBuf::from(uri.path().as_str()).canonicalize().ok()
+    }
+
+    fn uri_of_path(&self, p: impl AsRef<Path>) -> Uri {
+        Uri::from_str(format!("file://{}", p.as_ref().display()).as_str()).unwrap()
     }
 
     fn sf_of_uri(&self, uri: Uri) -> Option<SourceFile> {
