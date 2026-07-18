@@ -75,7 +75,7 @@ impl Location {
         Span { file, start_offset, end_offset }
     }
 
-    pub fn loc_info(self, db: &dyn Db) -> LocationInfo {
+    pub fn loc_info(self, db: &dyn Db) -> &LocationInfo {
         _loc_info(db, self)
     }
 
@@ -84,27 +84,26 @@ impl Location {
     }
 }
 
-fn _loc_info(db: &dyn Db, loc: Location) -> LocationInfo {
+#[salsa::tracked]
+fn line_starts(db: &dyn Db, file: SourceFile) -> Vec<usize> {
+    let content = file.content(db);
+    let mut starts = vec![0];
+    starts.extend(content.match_indices('\n').map(|(i, _)| i + 1));
+    starts
+}
+
+fn _loc_info(db: &dyn Db, loc: Location) -> &LocationInfo {
     #[salsa::interned]
     struct Interned {
         inner: Location,
     }
-    #[salsa::tracked(returns(clone))]
+    #[salsa::tracked]
     fn _tracked<'a>(db: &'a dyn Db, loc: Interned<'a>) -> LocationInfo {
         let loc = loc.inner(db);
-        let mut line = 1;
-        let mut column = 1;
-        let offset = loc.offset;
-        let contents = &loc.file.content(db)[..offset];
-        for c in contents.chars() {
-            if c == '\n' {
-                line += 1;
-                column = 1;
-            } else {
-                column += 1;
-            }
-        }
-        LocationInfo { file: loc.file.path(db).clone(), line, column, offset }
+        let lines = line_starts(db, loc.file);
+        let line = lines.partition_point(|&start| start <= loc.offset);
+        let column = loc.offset - lines[line - 1] + 1;
+        LocationInfo { file: loc.file.path(db).clone(), line, column, offset: loc.offset }
     }
     _tracked(db, Interned::new(db, loc))
 }

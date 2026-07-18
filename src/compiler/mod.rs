@@ -403,7 +403,7 @@ pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     check(&db, ws);
     let (has_errors, raw_diags) = program_has_errors(&db);
 
-    let mut diags: Vec<(LocationInfo, &Diag)> = raw_diags
+    let mut diags: Vec<(&LocationInfo, &Diag)> = raw_diags
         .into_iter()
         .map(|d| (d.primary.span.start().loc_info(&db), d))
         .collect();
@@ -450,7 +450,7 @@ pub fn build<'db, 'ctx>(
     let mut frefs = frefs;
     if db.config().display_mir {
         frefs.sort_by_key(|fref| FrefSortKey {
-            info: fref.fdef(db).name_span(db).start().loc_info(db),
+            info: fref.fdef(db).name_span(db).start().loc_info(db).clone(),
             subs: fref.subs(db).iter().map(|ty| ty.to_string(db)).collect(),
         });
     }
@@ -528,7 +528,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     check(&db, ws);
     let (has_errors, raw_diags) = program_has_errors(&db);
 
-    let mut diags: Vec<(LocationInfo, &Diag)> = raw_diags
+    let mut diags: Vec<(&LocationInfo, &Diag)> = raw_diags
         .into_iter()
         .map(|d| (d.primary.span.start().loc_info(&db), d))
         .collect();
