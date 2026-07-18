@@ -190,7 +190,7 @@ impl<'a> Lsp<'a> {
         check(&self.db, ws);
         log(format!(
             "Finished checking, took {} ms.",
-            now.elapsed().unwrap().as_secs_f64() / 1000f64,
+            now.elapsed().unwrap().as_secs_f64() * 1000f64,
         ));
         let (_, diags) = program_has_errors(&self.db);
         let mut diags_per_file: HashMap<SourceFile, Vec<&Diag>> = HashMap::new();

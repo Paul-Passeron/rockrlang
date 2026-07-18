@@ -64,6 +64,7 @@ use crate::{
         TypeParamId, TypeRef, compute_template_hints, rehole, tuple_of,
     },
     thir::EnumRef,
+    typecheck::inference::expr::diagnose_bad_struct_fields,
 };
 
 pub struct LowerFundef<'db> {
@@ -863,12 +864,16 @@ impl<'db> LowerFundef<'db> {
         args: &AstConstructFields,
     ) -> HirPattern {
         let Some(resolution) = resolve_in_module(self.db, *name, module) else {
-            println!(
-                "UNRESOLVED name {} in module {}",
-                name.to_string(self.db),
-                get_module_pretty_name(self.db, module.interned())
-            );
-            todo!()
+            Diag::generic_error(
+                format!(
+                    "Unresolved name {} in module {}",
+                    name.to_string(self.db),
+                    get_module_pretty_name(self.db, module.interned())
+                ),
+                pat.span,
+            )
+            .accumulate(self.db);
+            return self.new_pattern(HirPatternDesc::Error, pat.span);
         };
 
         let Definition::Type(type_def) = resolution else { todo!() };
@@ -887,7 +892,9 @@ impl<'db> LowerFundef<'db> {
                         .collect();
 
                     if expected != bound {
-                        todo!()
+                        let _ = diagnose_bad_struct_fields(
+                            self.db, pat.span, struct_id, &bound,
+                        );
                     }
 
                     let hir_fields = struct_field_patterns
