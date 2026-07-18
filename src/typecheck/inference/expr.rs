@@ -77,9 +77,14 @@ impl<'db> InferenceCtx<'db> {
                 args,
                 *interface_hint,
             ),
-            HirExprDesc::CallStatic { ty, method, args, type_args } => {
-                self.infer_static(ExprId(expr.id), ty, *method, type_args, args)
-            }
+            HirExprDesc::CallStatic { ty, method, args, type_args } => self.infer_static(
+                ExprId(expr.id),
+                ty,
+                *method,
+                type_args,
+                args,
+                expr.span,
+            ),
             HirExprDesc::BinOp { lhs, op, rhs } => self.infer_binop(lhs, *op, rhs),
             HirExprDesc::StructLit { ty, fields } => {
                 self.infer_struct_lit(ty, fields, expr.span)
@@ -110,7 +115,7 @@ impl<'db> InferenceCtx<'db> {
             HirExprDesc::SizeOf(_) => Ok(self.usize_ty()),
             HirExprDesc::TypeName(_) => Ok(self.str_ty()),
             HirExprDesc::Constructor { enum_def, name, args, template_hints } => {
-                self.infer_constructor(*enum_def, *name, args, template_hints)
+                self.infer_constructor(*enum_def, *name, args, template_hints, expr.span)
             }
             HirExprDesc::UnresolvedCallDirect { args, .. } => {
                 args.iter().for_each(|arg| {
@@ -121,7 +126,7 @@ impl<'db> InferenceCtx<'db> {
                     expr.span,
                 )
                 .accumulate(self.db);
-                Ok(InferTy::Var(self.fresh_var()))
+                Ok(self.fresh_var().into())
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
             HirExprDesc::Metadata(hir_expr) => {
@@ -137,7 +142,13 @@ impl<'db> InferenceCtx<'db> {
                 let pointee = self.fresh_var();
                 let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
                 let expr_ty = self.infer_expr(expr)?;
-                self.unify(expr_ptr_ty.into(), expr_ty).unwrap();
+                if let Err(err) = self.unify(expr_ptr_ty.into(), expr_ty) {
+                    Diag::generic_error(
+                        format!("Unification error in as expr: {}", err.display(self.db)),
+                        expr.span,
+                    )
+                    .accumulate(self.db);
+                }
 
                 let actual_ty = self.allocate_type_ref(*ty, &self.implicit_ctx());
 
@@ -241,7 +252,6 @@ impl<'db> InferenceCtx<'db> {
                 }
                 _ => None,
             },
-            // TODO
             _ => None,
         }
     }
@@ -259,13 +269,7 @@ impl<'db> InferenceCtx<'db> {
                 .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
-            self.diagnose_bad_struct_fields(
-                fields,
-                span,
-                ast,
-                &inferred_fields,
-                struct_id,
-            )?;
+            self.diagnose_bad_struct_fields(span, ast, &inferred_fields, struct_id)?;
 
             let module = struct_id.parent(self.db);
             let zelf = self.fresh_var();
@@ -308,11 +312,10 @@ impl<'db> InferenceCtx<'db> {
 
     fn diagnose_bad_struct_fields(
         &mut self,
-        _fields: &[(Symbol, HirExpr)],
-        _span: Span,
+        span: Span,
         ast: &AstStructDef,
         inferred_fields: &HashMap<Symbol, InferTy>,
-        _struct_id: StructId,
+        struct_id: StructId,
     ) -> Result<(), UnificationError> {
         let field_sets = (
             inferred_fields.keys().copied().collect::<HashSet<_>>(),
@@ -320,46 +323,28 @@ impl<'db> InferenceCtx<'db> {
         );
         if field_sets.0 != field_sets.1 {
             // For ast fields not in inferred fields
-            for _field in field_sets.1.difference(&field_sets.0) {
-                // self.diagnostics.push(Diagnostic {
-                //     kind: DiagnosticKind::UniError {
-                //         err: UnificationError::IncompleteStructLit {
-                //             id: struct_id,
-                //             missing: *field,
-                //         },
-                //         message: format!("Missing field in struct lit"),
-                //     },
-                //     span: span,
-                // });
-                // println!(
-                //     "[Info]: Missing field in struct lit: {}",
-                //     field.display(self.db)
-                // );
-                todo!("Diagnostics")
+            for field in field_sets.1.difference(&field_sets.0) {
+                Diag::generic_error(
+                    format!(
+                        "Missing field `{}` in struct lit for type `{}`",
+                        field.to_string(self.db),
+                        struct_id.name(self.db).to_string(self.db)
+                    ),
+                    span,
+                )
+                .accumulate(self.db);
             }
             // For inferred fields not in ast fields
-            for _field in field_sets.0.difference(&field_sets.1) {
-                todo!("Diagnostics");
-                // self.diagnostics.push(Diagnostic {
-                //     kind: DiagnosticKind::UniError {
-                //         err: UnificationError::InvalidStructField {
-                //             id: struct_id,
-                //             invalid: *field,
-                //         },
-                //         message: format!("Invalid field in struct lit"),
-                //     },
-                //     span: fields
-                //         .iter()
-                //         .find(|(name, _)| name == field)
-                //         .expect("field should be in fields")
-                //         .1
-                //         .span
-                //         .clone(),
-                // });
-                // println!(
-                //     "[Info]: Invalid field in struct lit: {}",
-                //     field.display(self.db)
-                // );
+            for field in field_sets.0.difference(&field_sets.1) {
+                Diag::generic_error(
+                    format!(
+                        "Invalid field `{}` in struct lit for type `{}`",
+                        field.to_string(self.db),
+                        struct_id.name(self.db).to_string(self.db)
+                    ),
+                    span,
+                )
+                .accumulate(self.db);
             }
             Err(UnificationError::AlreadyDiagnosed)
         } else {
@@ -369,14 +354,39 @@ impl<'db> InferenceCtx<'db> {
 
     fn diagnose_field_mismatches(
         &mut self,
+        enum_id: EnumId,
+        variant: Symbol,
         fields: &[(Symbol, HirExpr)],
         ast_fields: &[AstStructDefField],
+        span: Span,
     ) {
         let expected_fields: HashSet<Symbol> =
             HashSet::from_iter(ast_fields.iter().map(|f| f.name));
         let got_fields: HashSet<Symbol> = HashSet::from_iter(fields.iter().map(|f| f.0));
-        if expected_fields != got_fields {
-            todo!()
+        for field in got_fields.difference(&expected_fields) {
+            Diag::generic_error(
+                format!(
+                    "Missing field `{}` in struct lit variant `{}` for type `{}`",
+                    field.to_string(self.db),
+                    variant.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
+        }
+        // For inferred fields not in ast fields
+        for field in expected_fields.difference(&got_fields) {
+            Diag::generic_error(
+                format!(
+                    "Invalid field `{}` in struct lit variant `{}` for type `{}`",
+                    field.to_string(self.db),
+                    variant.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
         }
     }
 
@@ -386,14 +396,19 @@ impl<'db> InferenceCtx<'db> {
         name: Symbol,
         args: &HirConstructorArgs,
         template_hints: &[TypeRef],
+        span: Span,
     ) -> Result<InferTy, UnificationError> {
         let variants = &enum_item(self.db, enum_def.interned()).variants;
         let Some(variant) = variants.iter().find(|variant| variant.name == name) else {
-            todo!(
-                "report unknown variant `{}` in type `{}`",
-                name.display(self.db),
-                enum_def.name(self.db).display(self.db)
-            )
+            Diag::generic_error(
+                format!(
+                    "Unknown variant `{}` in type `{}`",
+                    name.display(self.db),
+                    enum_def.name(self.db).display(self.db)
+                ),
+                span,
+            );
+            return Err(UnificationError::AlreadyDiagnosed);
         };
 
         let enum_templates = templates_of_enum(self.db, enum_def.interned());
@@ -439,26 +454,43 @@ impl<'db> InferenceCtx<'db> {
                 HirConstructorArgs::StructLike { fields },
                 AstEnumVariantKind::StructLike(ast_fields),
             ) => {
-                let mut errors = vec![];
-                self.diagnose_field_mismatches(fields, ast_fields);
+                self.diagnose_field_mismatches(
+                    enum_def,
+                    variant.name,
+                    fields,
+                    ast_fields,
+                    span,
+                );
                 for field in fields {
                     let ast = ast_fields.iter().find(|ast| ast.name == field.0);
                     let field_ty = ast
                         .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
                         .unwrap_or_else(|| self.fresh_var().into());
-                    match self.infer_expr(&field.1) {
+                    let err = match self.infer_expr(&field.1) {
                         Ok(expr_ty) => {
                             if let Err(err) = self.unify(expr_ty, field_ty) {
-                                errors.push(err);
+                                Some(err)
+                            } else {
+                                None
                             }
                         }
-                        Err(err) => errors.push(err),
+                        Err(err) => Some(err),
+                    };
+                    if let Some(err) = err {
+                        Diag::generic_error(
+                            format!(
+                                "Unification error in expr: {}",
+                                err.display(self.db)
+                            ),
+                            field.1.span,
+                        )
+                        .accumulate(self.db);
                     }
                 }
-                assert!(errors.is_empty());
             }
             (HirConstructorArgs::None, AstEnumVariantKind::Unit) => (),
-            _ => todo!("handle constructor kind mismatch between decl and use"),
+            _ => Diag::generic_error("Constructor kind mismatch in expr".into(), span)
+                .accumulate(self.db),
         }
 
         let as_enum = InferTy::Adt {
@@ -476,9 +508,11 @@ impl<'db> InferenceCtx<'db> {
         method: Symbol,
         type_args: &[TypeRef],
         args: &[HirExpr],
+        span: Span,
     ) -> Result<InferTy, UnificationError> {
         if !type_args.is_empty() {
-            todo!()
+            Diag::todo(format!("Turbofish on method call is not supported yet."), span)
+                .accumulate(self.db);
         }
         let receiver_ty = self.allocate_type_ref(*ty, self.implicit_ctx().as_ref());
         let inferred_args = args
