@@ -285,17 +285,17 @@ impl<'db> InferenceCtx<'db> {
                 templates.iter().cloned().collect(),
                 Some(InferTy::Var(zelf)),
             )
-            .inspect_err(|err| {
-                let loc_info = span.start().loc_info(self.db);
-                println!("{loc_info}: {err:#?}")
-            })
             .unwrap();
 
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
-                    let ty = inferred_fields.get(&ast.name).unwrap().clone();
-                    let resolved =
-                        this.allocate_ast_type_expr(&ast.ty.data, &ctx).unwrap();
+                    let ty = inferred_fields
+                        .get(&ast.name)
+                        .cloned()
+                        .unwrap_or_else(|| this.fresh_var().into());
+                    let resolved = this
+                        .allocate_ast_type_expr(&ast.ty.data, &ctx)
+                        .unwrap_or_else(|| this.fresh_var().into());
                     this.unify(ty, resolved)
                 })
             })?;
@@ -447,7 +447,9 @@ impl<'db> InferenceCtx<'db> {
                 assert_eq!(hir_exprs.len(), spanneds.len());
                 for (hir, ast) in hir_exprs.iter().zip(spanneds) {
                     let hir_ty = self.infer_expr(hir)?;
-                    let in_ctx = self.allocate_ast_type_expr(&ast.data, &ctx).unwrap();
+                    let in_ctx = self
+                        .allocate_ast_type_expr(&ast.data, &ctx)
+                        .unwrap_or_else(|| self.fresh_var().into());
                     self.unify(hir_ty, in_ctx)?;
                 }
             }
@@ -605,7 +607,8 @@ impl<'db> InferenceCtx<'db> {
         )
         .unwrap();
 
-        self.allocate_ast_type_expr(&ast_ret_ty.data, &ctx).unwrap()
+        self.allocate_ast_type_expr(&ast_ret_ty.data, &ctx)
+            .unwrap_or_else(|| self.fresh_var().into())
     }
 
     fn infer_direct(
@@ -640,7 +643,10 @@ impl<'db> InferenceCtx<'db> {
 
         let inferred_ast_args = ast_args
             .iter()
-            .map(|arg| self.allocate_ast_type_expr(&arg.ty.data, &ctx).unwrap())
+            .map(|arg| {
+                self.allocate_ast_type_expr(&arg.ty.data, &ctx)
+                    .unwrap_or_else(|| self.fresh_var().into())
+            })
             .collect::<Box<[_]>>();
         let inferred_args = args
             .iter()
@@ -662,11 +668,7 @@ impl<'db> InferenceCtx<'db> {
             },
         );
 
-        Ok(self.get_ret_ty(
-            target,
-            &inferred_templates,
-            None,
-        ))
+        Ok(self.get_ret_ty(target, &inferred_templates, None))
     }
 
     fn infer_binop(
