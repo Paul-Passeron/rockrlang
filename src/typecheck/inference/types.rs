@@ -189,11 +189,9 @@ impl<'db> InferenceCtx<'db> {
             },
             TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
                 Some(res) => res.clone(),
-                None => {
-                    todo!("Diagnostics");
-                }
+                None => self.fresh_var().into(),
             },
-            TypeRef::Error => panic!(),
+            TypeRef::Error => self.fresh_var().into(),
             TypeRef::Zelf => {
                 if let Some(zelf) = ctx.zelf() {
                     zelf.clone()
@@ -201,8 +199,11 @@ impl<'db> InferenceCtx<'db> {
                     unreachable!()
                 }
             }
-            TypeRef::Associated(_symbol) => todo!(),
-            TypeRef::Unknown => InferTy::Var(self.fresh_var()),
+            TypeRef::Associated(_symbol) => {
+                // TODO
+                self.fresh_var().into()
+            }
+            TypeRef::Unknown => self.fresh_var().into(),
         }
     }
 
