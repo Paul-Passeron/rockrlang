@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::Db;
-use std::{fmt::Display, path::PathBuf, slice::SliceIndex, sync::Arc};
+use std::{fmt::Display, path::PathBuf, sync::Arc};
 
 #[salsa::input]
 #[derive(Debug, PartialOrd, Ord)]
@@ -109,7 +109,7 @@ fn _loc_info(db: &dyn Db, loc: Location) -> &LocationInfo {
 }
 
 #[salsa::tracked(returns(copy))]
-fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
+pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
     let lines = line_starts(db, file);
     let length = file.content(db).len();
     if lines.len() >= line {

@@ -18,7 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
-    thir::Thir,
+    compiler::diagnostic::{Diag, Severity},
+    ril::{FunctionId, InternedFunctionId},
+    thir::{Thir, thir_body},
 };
 
 pub mod return_check;
@@ -27,4 +29,17 @@ pub mod sanity_check;
 pub fn validate_thir(db: &dyn Db, thir: &Thir) {
     check_return(db, thir);
     sanity_check(db, thir);
+}
+
+#[salsa::tracked]
+pub fn checked_thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>) {
+    if let Some(thir) = thir_body(db, function.into()) {
+        validate_thir(db, thir);
+    }
+}
+
+pub fn thir_is_valid(db: &dyn Db, function: FunctionId) -> bool {
+    checked_thir_body::accumulated::<Diag>(db, function.interned())
+        .iter()
+        .all(|diag| diag.severity != Severity::Error)
 }

@@ -19,23 +19,23 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    check::{mir::check_mir, thir::validate_thir},
+    check::{
+        mir::check_mir,
+        thir::{checked_thir_body, thir_is_valid},
+    },
     hir::function_ast,
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, ScopeOwnerId, TypeRef},
-    thir::thir_body,
     thir_to_mir::{MIRKey, mir},
     typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
-    if let Some(thir) = thir_body(db, fdef) {
-        validate_thir(db, thir);
-    }
+    checked_thir_body(db, fdef.interned());
 
     for (fdef, subs) in reachable_mir_instances(db, fdef) {
-        if fdef.has_body(db) {
+        if fdef.has_body(db) && thir_is_valid(db, fdef) {
             let the_mir = mir(db, fdef, subs);
             check_mir(db, the_mir);
         }

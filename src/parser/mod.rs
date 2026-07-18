@@ -43,6 +43,7 @@ pub struct Parser<'db> {
     pub tokens: &'db [Token],
     pub db: &'db dyn Db,
     pub annotations: Vec<AstAnnotation>,
+    pub restrict_struct_lit: bool,
 }
 
 #[salsa::accumulator]
@@ -62,11 +63,31 @@ pub enum ParseErrorKind {
     ExpectedToken { expected: TokenKind, found: TokenKind },
     ExpectedIntLit(TokenKind),
     ExpectedTypeName,
+    NotATopLevelItem,
 }
 
 impl<'db> Parser<'db> {
     pub fn new(db: &'db dyn Db, tokens: &'db [Token], file: SourceFile) -> Self {
-        Self { position: 0, tokens, db, file, annotations: Vec::new() }
+        Self {
+            position: 0,
+            tokens,
+            db,
+            file,
+            annotations: Vec::new(),
+            restrict_struct_lit: false,
+        }
+    }
+
+    pub(super) fn with_struct_lit_restriction<T>(
+        &mut self,
+        restricted: bool,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.restrict_struct_lit;
+        self.restrict_struct_lit = restricted;
+        let result = f(self);
+        self.restrict_struct_lit = saved;
+        result
     }
 
     pub fn annotations(&mut self) -> Vec<AstAnnotation> {

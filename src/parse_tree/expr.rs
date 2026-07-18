@@ -37,7 +37,7 @@ pub enum AstExprDesc {
     // Names and resolution
     Name(Symbol),
     NameResolved {
-        from: Symbol,
+        from: Spanned<Symbol>,
         to: Box<AstExpr>,
     },
     StaticCall {

@@ -33,6 +33,15 @@ impl<'db> Parser<'db> {
         while let Some(t) = self.peek_n(0)
             && !matches!(t.kind, TokenKind::CloseBra)
         {
+            while let Some(t) = self.peek_n(0)
+                && matches!(t.kind, TokenKind::Semicolon)
+            {
+                self.consume();
+                continue;
+            }
+            if self.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra) {
+                break;
+            }
             let start = self.get_start();
             match self.parse_stmt() {
                 Ok(stmt) => {
@@ -63,7 +72,7 @@ impl<'db> Parser<'db> {
     }
 
     pub(super) fn parse_block_as_stmt(&mut self) -> Result<AstStmt, ParseError> {
-        let start = self.get_end();
+        let start = self.get_start();
         let stmts = self.parse_block()?;
         let end = self.get_end();
         Ok(AstStmt::new(AstStmtDesc::Block { stmts }, vec![], start.span(end)))
@@ -102,7 +111,8 @@ impl<'db> Parser<'db> {
         let element = self.parse_pattern()?;
         self.expect(TokenKind::In)?;
         self.consume();
-        let iterator = self.parse_expr()?;
+        let iterator =
+            self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
         Ok(AstStmt::new(
@@ -134,7 +144,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
         self.expect(TokenKind::While)?;
         self.consume();
-        let cond = self.parse_expr()?;
+        let cond = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
         Ok(AstStmt::new(
@@ -197,7 +207,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
         self.expect(TokenKind::Match)?;
         self.consume();
-        let scrutinee = self.parse_expr()?;
+        let scrutinee = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         self.expect(TokenKind::OpenBra)?;
         self.consume();
         let mut branches = Vec::new();
@@ -229,7 +239,7 @@ impl<'db> Parser<'db> {
         let start = self.get_start();
         self.expect(TokenKind::If)?;
         self.consume();
-        let cond = self.parse_expr()?;
+        let cond = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let then = self.parse_block_as_stmt()?;
         let else_ = if let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Else)

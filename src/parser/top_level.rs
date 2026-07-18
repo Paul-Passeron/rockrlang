@@ -770,7 +770,7 @@ impl<'db> Parser<'db> {
                     start.span(end),
                 ))
             }
-            x => todo!("{}: {}", self.get_start().loc_info(self.db), x.display(self.db)),
+            _ => Err(self.parse_error(ParseErrorKind::NotATopLevelItem)),
         }
     }
 }
