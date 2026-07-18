@@ -76,6 +76,7 @@ impl<'db> InferenceCtx<'db> {
                 type_args,
                 args,
                 *interface_hint,
+                expr.span,
             ),
             HirExprDesc::CallStatic { ty, method, args, type_args } => self.infer_static(
                 ExprId(expr.id),
@@ -511,8 +512,11 @@ impl<'db> InferenceCtx<'db> {
         span: Span,
     ) -> Result<InferTy, UnificationError> {
         if !type_args.is_empty() {
-            Diag::todo(format!("Turbofish on method call is not supported yet."), span)
-                .accumulate(self.db);
+            Diag::todo(
+                format!("Turbofish on static method call is not supported yet."),
+                span,
+            )
+            .accumulate(self.db);
         }
         let receiver_ty = self.allocate_type_ref(*ty, self.implicit_ctx().as_ref());
         let inferred_args = args
@@ -538,9 +542,11 @@ impl<'db> InferenceCtx<'db> {
         type_args: &[TypeRef],
         args: &[HirExpr],
         interface_hint: Option<InterfaceId>,
+        span: Span,
     ) -> Result<InferTy, UnificationError> {
         if !type_args.is_empty() {
-            todo!()
+            Diag::todo(format!("Turbofish on method call is not supported yet."), span)
+                .accumulate(self.db);
         }
         let receiver_ty = self.infer_expr(receiver)?;
         let inferred_args = args
@@ -659,7 +665,7 @@ impl<'db> InferenceCtx<'db> {
         Ok(self.get_ret_ty(
             target,
             &inferred_templates,
-            None, // TODO: Same
+            None,
         ))
     }
 
