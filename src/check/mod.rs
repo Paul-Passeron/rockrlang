@@ -26,6 +26,7 @@ use crate::{
         fundef::{check_fundef, reachable_mir_instances},
         implem::check_implem,
         interface::check_interface,
+        thir::thir_is_valid,
         types::check_typedef,
     },
     common::symbols::Symbol,
@@ -143,6 +144,9 @@ pub fn reachable_frefs<'db>(db: &'db dyn Db, pkg: Package<'db>) -> Vec<FuncInst>
                 continue;
             }
             if fdef.has_body(db) {
+                if !thir_is_valid(db, fdef) {
+                    continue;
+                }
                 let the_mir = mir(db, fdef, subs);
                 frefs.push(the_mir.func);
             } else {
