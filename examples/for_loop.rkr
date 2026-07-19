@@ -1,0 +1,6 @@
+fun main(): int {
+    for i in 0..1000 {
+        core::io::printf(c"%d\n", i);
+    }
+    return 0;
+}

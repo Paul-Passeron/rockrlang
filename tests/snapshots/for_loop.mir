@@ -1,0 +1,147 @@
+core::io::`impl core::io::str`::print
+mir {
+  locals:
+    _0: self :&core::io::str
+    _1: void
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+
+  bb1:
+    return
+}
+
+core::iter::`impl core::iter::Iter for core::iter::IntIter`::next
+mir {
+  locals:
+    _0: mut self :&mut core::iter::IntIter
+    _1: bool
+    _2: core::opt::opt<i32>
+    _3: res :i32
+    _4: core::opt::opt<i32>
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = copy _0.*.start >= copy _0.*.end
+    branch move _1 ? bb1 : bb2
+
+  bb1 (if-then):
+    _2 = opt::#0()
+    return move _2
+
+  bb2 (if-merge):
+    _3 = copy _0.*.start
+    _0.*.start = copy _0.*.start + 1_i32
+    _4 = opt::#1(copy _3)
+    return move _4
+}
+
+core::iter::`impl core::iter::IntoIterator for core::iter::IntIter`::into_iter
+mir {
+  locals:
+    _0: self :core::iter::IntIter
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    return move _0
+}
+
+core::panic::panic
+mir {
+  locals:
+    _0: message :core::io::str
+    _1: void
+    _2: &core::io::str
+    _3: void
+    _4: void
+    _5: never
+
+  params: [
+    _0,
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+
+  bb1:
+    _2 = &_0
+    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+
+  bb2:
+    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
+
+  bb3:
+    _5 = call core::sys::exit(1_i32) -> bb4
+
+  bb4:
+    diverge
+}
+
+for_loop::main
+mir {
+  locals:
+    _0: core::iter::IntIter
+    _1: core::iter::IntIter
+    _2: mut @iterator_0 :core::iter::IntIter
+    _3: &mut core::iter::IntIter
+    _4: core::opt::opt<i32>
+    _5: u8
+    _6: i :i32
+    _7: void
+
+  params: [
+  ]
+
+  entry: bb0
+
+  bb0 (entry):
+    _0 = IntIter {start: 0_i32, end: 1000_i32}
+    _1 = call core::iter::`impl core::iter::IntoIterator for core::iter::IntIter`::into_iter(move _0) -> bb1
+
+  bb1:
+    _2 = move _1
+    goto bb2
+
+  bb2 (while-condition):
+    branch true ? bb3 : bb4
+
+  bb3 (while-body):
+    _3 = &mut _2
+    _4 = call core::iter::`impl core::iter::Iter for core::iter::IntIter`::next(move _3) -> bb5
+
+  bb4 (while-merge):
+    return 0_i32
+
+  bb5:
+    _5 = discriminant(_4)
+    switch move _5 { 1 => bb6, _ => bb7 }
+
+  bb6 (match-branch-0):
+    _6 = copy _4.downcast#1.0
+    _7 = call core::io::printf(c"%d\n\0", copy _6) -> bb8
+
+  bb7 (match-branch-1):
+    goto bb4
+
+  bb8 (switch-merge):
+    goto bb2
+}
+
