@@ -234,7 +234,7 @@ impl<'a> Lsp<'a> {
                 })
                 .join(", ");
 
-            format!("`{function_name}`\n\n{template_string}\n")
+            format!("`{function_name}`\n\n--------\n{template_string}\n")
         };
         self.hover_span_response(hover_string, span)
     }
