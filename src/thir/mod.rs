@@ -166,6 +166,7 @@ pub struct ThirPattern {
     pub kind: ThirPatternKind,
     pub ty: TypeRef,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 pub enum ThirPatternKind {

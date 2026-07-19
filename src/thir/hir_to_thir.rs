@@ -505,6 +505,7 @@ impl<'db> ThirTranslator<'db> {
             kind: ThirPatternKind::Bind { local: local_id, mutable: false },
             ty: self.canonicalize_type(local.ty),
             span: local.span,
+            is_synthetic: local.is_synthetic,
         }
     }
 
@@ -561,7 +562,7 @@ impl<'db> ThirTranslator<'db> {
             HirPatternDesc::Error => Some(ThirPatternKind::Error),
         };
         let kind = kind.unwrap_or(ThirPatternKind::Error);
-        ThirPattern { kind, ty, span: pat.span }
+        ThirPattern { kind, ty, span: pat.span, is_synthetic: pat.is_synthetic }
     }
 
     fn innermost_loop_scope(&self, b: &ThirBuilder) -> Option<ScopeId> {
