@@ -162,7 +162,7 @@ impl<'a> Lsp<'a> {
         match &expr.kind {
             ExprKind::Use(idx) => Some(self.hover_place(thir, *idx)),
             ExprKind::Call { called, .. } => {
-                let function_name = called.id.called_to_string(&self.db);
+                let function_name = called.id.sig_to_string(&self.db);
                 let hover_string = if called.args.is_empty() {
                     format!("`{function_name}`\n")
                 } else {

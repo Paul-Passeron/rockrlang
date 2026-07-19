@@ -168,49 +168,13 @@ impl TypePrinter {
     }
 
     pub fn impl_id_to_string(&self, db: &dyn Db, id: ImplId) -> String {
-        let mut res = self.module_to_string(db, id.parent(db));
-        if !res.is_empty() {
-            res.push_str("::");
+        let implemented = id.implemented(db).to_string(db);
+        match id.interface(db) {
+            Some(inter) => {
+                format!("<{implemented} as {}>", self.interface_ref_to_string(db, inter))
+            }
+            None => implemented,
         }
-        res.push_str("`impl ");
-
-        let templates = id.templates(db);
-        let templates = templates
-            .iter()
-            .enumerate()
-            .map(|(i, s)| {
-                format!(
-                    "T{i}{}",
-                    if s.is_empty() {
-                        String::new()
-                    } else {
-                        format!(
-                            ": {}",
-                            s.iter()
-                                .map(|interface| self
-                                    .interface_ref_to_string(db, *interface))
-                                .collect_vec()
-                                .join(" + ")
-                        )
-                    }
-                )
-            })
-            .collect_vec()
-            .join(", ");
-
-        if !templates.is_empty() {
-            res.push('<');
-            res.push_str(&templates);
-            res.push('>');
-        }
-
-        if let Some(inter) = id.interface(db) {
-            res.push_str(&self.interface_ref_to_string(db, inter));
-            res.push_str(" for ");
-        }
-        res.push_str(&id.implemented(db).to_string(db));
-        res.push('`');
-        res
     }
 
     pub fn interface_ref_to_string(
