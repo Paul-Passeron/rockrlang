@@ -145,6 +145,7 @@ pub struct AstMethodsigDesc {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstTemplateArg {
     pub name: Symbol,
+    pub name_span: Span,
     pub constraints: Vec<AstTypeExpr>,
     pub span: Span,
 }
@@ -152,6 +153,7 @@ pub struct AstTemplateArg {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFundefArg {
     pub name: Symbol,
+    pub name_span: Span,
     pub ty: AstTypeExpr,
     pub span: Span,
 }

@@ -29,6 +29,7 @@ use crate::{
 };
 
 pub mod thir;
+pub mod sig;
 
 fn file_module_of<'db>(
     db: &'db dyn Db,

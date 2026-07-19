@@ -51,7 +51,12 @@ impl<'a> Lsp<'a> {
         }
     }
 
-    fn hover_type_span_response(&self, func: FunctionId, ty: TypeRef, span: Span) -> Hover {
+    fn hover_type_span_response(
+        &self,
+        func: FunctionId,
+        ty: TypeRef,
+        span: Span,
+    ) -> Hover {
         let ty_str = format!("`{}`", type_ref_to_named_string_in(&self.db, func, ty));
         self.hover_span_response(ty_str, span)
     }
@@ -86,7 +91,6 @@ impl<'a> Lsp<'a> {
         }
         let thir = thir_body(db, func)?;
         let node = thir.node_at(&self.db, loc)?;
-        log!("Found a node !");
         match node {
             ThirNode::Expr { id, setup } => self.hover_expr(func, thir, id, setup),
             ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
@@ -99,28 +103,16 @@ impl<'a> Lsp<'a> {
                     let ty = struct_ref.clone().as_type_ref(&self.db);
                     Some(self.hover_type_span_response(func, ty, stmt.span))
                 }
-                StmtKind::Block {
-                    semantic_infos: Some(BlockSemanticInfo::ForLoop),
-                    ..
-                } => {
-                    log!("{}: for-loop", stmt.span.start().loc_info(&self.db),);
-                    None
-                }
                 _ => {
-                    log!("Stmt: {}", stmt.span.start().loc_info(&self.db));
+                    // Nothing to say here
                     None
                 }
             },
             ThirNode::Pattern(pat) => {
                 Some(self.hover_type_span_response(func, pat.ty, pat.span))
             }
-            ThirNode::MatchBranch(br) => {
-                log!(
-                    "Match branch: {}",
-                    br.get_whole_span(thir).start().loc_info(&self.db)
-                );
-                None
-            }
+            // Nothing to say here
+            ThirNode::MatchBranch(_) => None,
         }
     }
 
