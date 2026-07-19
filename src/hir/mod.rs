@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #![allow(dead_code)]
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use crate::{
     Db,
@@ -115,6 +115,15 @@ pub enum Mutability {
 impl Mutability {
     pub fn is_mut(&self) -> bool {
         matches!(self, Self::Mutable)
+    }
+}
+
+impl fmt::Display for Mutability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Mutability::Const => Ok(()),
+            Mutability::Mutable => write!(f, "mut "),
+        }
     }
 }
 
