@@ -363,7 +363,7 @@ impl<'db> ThirTranslator<'db> {
         let (else_stmts, else_scope) = match else_ {
             Some(stmt) => {
                 let (else_scope, else_stmts) =
-                    self.scoped(b, then.span, ScopeKind::Block, |this, b| {
+                    self.scoped(b, stmt.span, ScopeKind::Block, |this, b| {
                         this.handle_single_stmt(b, stmt)
                     });
                 (Some(else_stmts), Some(else_scope))
