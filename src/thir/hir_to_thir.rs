@@ -45,7 +45,7 @@ use crate::{
         ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::{
-        self, PatternId, TypeCheckResults,
+        self, PatternId, ReceiverAdjustment, TypeCheckResults,
         inference::implicit::{AsAstImplCtx, AstImplicitContext},
     },
 };
@@ -128,6 +128,7 @@ impl<'db> ThirBuilder<'db> {
             mutability: infos.mutability,
             span: infos.span,
             source: Some((infos.id, infos.name)),
+            is_synthetic: infos.is_synthetic,
         };
         let res = self.new_local(local);
         self.local_map.insert(infos.id, res);
@@ -169,7 +170,8 @@ impl<'db> ThirBuilder<'db> {
             ty,
             mutability,
             span,
-            source: None, // Synthetic local
+            source: None,
+            is_synthetic: true,
         })
     }
 }
@@ -583,7 +585,12 @@ impl<'db> ThirTranslator<'db> {
                     (infos.ty, infos.span)
                 };
 
-                b.new_expr(ThirExpr { kind: ExprKind::Use(place), ty, span })
+                b.new_expr(ThirExpr {
+                    kind: ExprKind::Use(place),
+                    ty,
+                    span,
+                    is_synthetic: b.places[place].is_synthetic,
+                })
             }
         }
     }
@@ -705,6 +712,7 @@ impl<'db> ThirTranslator<'db> {
                             kind: ExprKind::Ref { place: field_place, mutability },
                             ty: cur_ty.wrap_ref(self.db, mutability.is_mut()),
                             span,
+                            is_synthetic: true,
                         });
                         let depth = wrapped.depth();
                         for wrapped in wrapped.refs[0..depth - 1].iter().rev() {
@@ -721,6 +729,7 @@ impl<'db> ThirTranslator<'db> {
                                 },
                                 ty: cur_ty.wrap_ref(self.db, mutable),
                                 span,
+                                is_synthetic: true,
                             });
                         }
                         val
@@ -883,6 +892,7 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Error,
                         ty,
                         span: expr.span,
+                        is_synthetic: expr.is_synthetic,
                     });
                 };
 
@@ -934,6 +944,7 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Error,
                         ty,
                         span: expr.span,
+                        is_synthetic: expr.is_synthetic,
                     });
                 };
 
@@ -961,7 +972,12 @@ impl<'db> ThirTranslator<'db> {
                 ExprKind::Cast(expr, ty)
             }
         };
-        b.new_expr(ThirExpr { kind, ty, span: expr.span })
+        b.new_expr(ThirExpr {
+            kind,
+            ty,
+            span: expr.span,
+            is_synthetic: expr.is_synthetic,
+        })
     }
 
     fn expr_as_place(
@@ -1000,14 +1016,14 @@ impl<'db> ThirTranslator<'db> {
     ) -> Idx<ThirExpr> {
         match call_infos.call_kind {
             typecheck::CallKind::Method { adjustment } => match adjustment {
-                typecheck::ReceiverAdjustment::None => {
+                ReceiverAdjustment::None => {
                     let place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
                         });
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
-                typecheck::ReceiverAdjustment::Ref => {
+                ReceiverAdjustment::Ref => {
                     let place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
@@ -1016,9 +1032,10 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Ref { place, mutability: Mutability::Const },
                         ty: b.get_place(place).ty.wrap_ref(self.db, false),
                         span,
+                        is_synthetic: true,
                     })
                 }
-                typecheck::ReceiverAdjustment::MutRef => {
+                ReceiverAdjustment::MutRef => {
                     let place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(
@@ -1032,9 +1049,10 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
                         ty: receiver_ty.wrap_ref(self.db, true),
                         span,
+                        is_synthetic: true,
                     })
                 }
-                typecheck::ReceiverAdjustment::Deref(depth) => {
+                ReceiverAdjustment::Deref(depth) => {
                     let mut place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
@@ -1048,7 +1066,7 @@ impl<'db> ThirTranslator<'db> {
                     }
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
-                typecheck::ReceiverAdjustment::DerefThenRef(depth) => {
+                ReceiverAdjustment::DerefThenRef(depth) => {
                     let mut place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
@@ -1064,9 +1082,10 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Ref { place, mutability: Mutability::Const },
                         ty: cur_ty.wrap_ref(self.db, false),
                         span,
+                        is_synthetic: true,
                     })
                 }
-                typecheck::ReceiverAdjustment::DerefThenMutRef(depth) => {
+                ReceiverAdjustment::DerefThenMutRef(depth) => {
                     let mut place =
                         self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
                             self.spill_to_temp(
@@ -1087,6 +1106,7 @@ impl<'db> ThirTranslator<'db> {
                         kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
                         ty: cur_ty.wrap_ref(self.db, true),
                         span,
+                        is_synthetic: true,
                     })
                 }
             },
@@ -1320,8 +1340,14 @@ impl TypeRef {
 
 impl ThirPlace {
     pub fn local(local: LocalId, b: &ThirBuilder, span: Span) -> Self {
-        let ty = b.get_local(local).ty;
-        Self { base: PlaceBase::Local(local), projections: vec![], ty, span }
+        let l = b.get_local(local);
+        Self {
+            base: PlaceBase::Local(local),
+            projections: vec![],
+            ty: l.ty,
+            span,
+            is_synthetic: l.is_synthetic,
+        }
     }
 }
 

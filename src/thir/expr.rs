@@ -22,6 +22,11 @@ use crate::{
 
 impl ThirExpr {
     pub fn use_place(place: PlaceId, b: &ThirBuilder, span: Span) -> Self {
-        Self { kind: ExprKind::Use(place), ty: b.get_place(place).ty, span }
+        Self {
+            kind: ExprKind::Use(place),
+            ty: b.get_place(place).ty,
+            span,
+            is_synthetic: b.get_place(place).is_synthetic,
+        }
     }
 }

@@ -55,6 +55,7 @@ pub struct ThirLocal {
     pub mutability: Mutability,
     pub span: Span,
     pub source: Option<(hir::LocalId, Symbol)>,
+    pub is_synthetic: bool,
 }
 
 #[derive(Copy, Clone)]
@@ -68,6 +69,7 @@ pub struct ThirPlace {
     pub projections: Vec<Projection>,
     pub ty: TypeRef,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -82,6 +84,7 @@ pub struct ThirExpr {
     pub kind: ExprKind,
     pub ty: TypeRef,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 // TODO: figure out the right way to do this
