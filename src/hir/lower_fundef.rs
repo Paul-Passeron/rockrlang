@@ -113,9 +113,10 @@ impl<'db> LowerFundef<'db> {
         mutability: Mutability,
         ty_annotation: Option<AstAnyTypeExpr>,
         span: Span,
+        is_synthetic: bool,
     ) -> LocalId {
         let id = self.locals.next_id();
-        let info = LocalInfo { id, name, mutability, ty_annotation, span };
+        let info = LocalInfo { id, name, mutability, ty_annotation, span, is_synthetic };
         let new_id = self.locals.insert(info);
         debug_assert_eq!(id, new_id);
         scope.map.insert(name, id);
@@ -131,7 +132,7 @@ impl<'db> LowerFundef<'db> {
         match &expr.data {
             AstExprDesc::Name(symbol) => {
                 if let Some(id) = scope.map.get(symbol) {
-                    self.new_place(HirPlaceKind::Local(*id), expr.span)
+                    self.new_place(HirPlaceKind::Local(*id), expr.span, false)
                 } else {
                     todo!(
                         "expr_as_place: Name `{}` not found in local scope",
@@ -146,13 +147,17 @@ impl<'db> LowerFundef<'db> {
                     }
                     _ => {
                         let temp = self.lower_expr(expr, scope, module);
-                        self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span)
+                        self.new_place(
+                            HirPlaceKind::Temporary(temp.boxed()),
+                            expr.span,
+                            false,
+                        )
                     }
                 }
             }
             AstExprDesc::PostfixDeref(inner) | AstExprDesc::PrefixDeref(inner) => {
                 let temp = self.expr_as_place(inner, scope, module);
-                self.new_place(HirPlaceKind::Deref(temp.boxed()), expr.span)
+                self.new_place(HirPlaceKind::Deref(temp.boxed()), expr.span, false)
             }
 
             AstExprDesc::FieldAccess { object, field } => {
@@ -160,6 +165,7 @@ impl<'db> LowerFundef<'db> {
                 self.new_place(
                     HirPlaceKind::Field { base: base.boxed(), field: *field },
                     expr.span,
+                    false,
                 )
             }
             AstExprDesc::TupleAccess { object, index } => {
@@ -167,6 +173,7 @@ impl<'db> LowerFundef<'db> {
                 self.new_place(
                     HirPlaceKind::TupleField { base: base.boxed(), index: *index },
                     expr.span,
+                    false,
                 )
             }
             AstExprDesc::Index { object, index } => {
@@ -175,11 +182,12 @@ impl<'db> LowerFundef<'db> {
                 self.new_place(
                     HirPlaceKind::Index { base: base.boxed(), index: index.boxed() },
                     expr.span,
+                    false,
                 )
             }
             _ => {
                 let temp = self.lower_expr(expr, scope, module);
-                self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span)
+                self.new_place(HirPlaceKind::Temporary(temp.boxed()), expr.span, false)
             }
         }
     }
@@ -338,7 +346,7 @@ impl<'db> LowerFundef<'db> {
         module: ModuleId,
     ) -> HirExprDesc {
         if let Some(id) = scope.map.get(&symbol) {
-            HirExprDesc::Use(self.new_place(HirPlaceKind::Local(*id), span))
+            HirExprDesc::Use(self.new_place(HirPlaceKind::Local(*id), span, false))
         } else {
             match resolve_in_module(self.db, symbol, module) {
                 Some(Definition::Function(_)) => {
@@ -726,7 +734,7 @@ impl<'db> LowerFundef<'db> {
             _ => HirExprDesc::Use(self.expr_as_place(expr, scope, module)),
         };
 
-        self.new_expr(data, expr.span)
+        self.new_expr(data, expr.span, false)
     }
 
     fn lower_constructor_or_static_call(
@@ -873,7 +881,7 @@ impl<'db> LowerFundef<'db> {
                 pat.span,
             )
             .accumulate(self.db);
-            return self.new_pattern(HirPatternDesc::Error, pat.span);
+            return self.new_pattern(HirPatternDesc::Error, pat.span, false);
         };
 
         let Definition::Type(type_def) = resolution else { todo!() };
@@ -918,6 +926,7 @@ impl<'db> LowerFundef<'db> {
                                     Mutability::Const,
                                     None,
                                     *name_span,
+                                    false,
                                 );
                                 locals.push(local);
                                 HirStructFieldPattern::Name {
@@ -934,6 +943,7 @@ impl<'db> LowerFundef<'db> {
                             fields: hir_fields,
                         },
                         pat.span,
+                        false,
                     )
                 }
                 _ => todo!(),
@@ -969,6 +979,7 @@ impl<'db> LowerFundef<'db> {
                             Mutability::Mutable,
                             None,
                             pat.span,
+                            false,
                         );
                         locals.push(local_id);
                         HirPattern {
@@ -979,6 +990,7 @@ impl<'db> LowerFundef<'db> {
                                 mutable: true,
                             },
                             span: pat.span,
+                            is_synthetic: false,
                         }
                     }
                     AstNamedPattern::Bare(name) => {
@@ -988,6 +1000,7 @@ impl<'db> LowerFundef<'db> {
                             Mutability::Const,
                             None,
                             pat.span,
+                            false,
                         );
                         locals.push(local_id);
                         HirPattern {
@@ -998,6 +1011,7 @@ impl<'db> LowerFundef<'db> {
                                 mutable: false,
                             },
                             span: pat.span,
+                            is_synthetic: false,
                         }
                     }
                     AstNamedPattern::Constructor { name, args } => this
@@ -1031,6 +1045,7 @@ impl<'db> LowerFundef<'db> {
                                         fields,
                                     },
                                     span: pat.span,
+                                    is_synthetic: false,
                                 }
                             }
                             Some(_) => todo!(
@@ -1052,22 +1067,26 @@ impl<'db> LowerFundef<'db> {
                                 .collect(),
                         ),
                         span: pat.span,
+                        is_synthetic: false,
                     },
                 },
                 AstPatternDesc::Any => HirPattern {
                     id: this.alloc.fresh(),
                     data: HirPatternDesc::Any,
                     span: pat.span,
+                    is_synthetic: false,
                 },
                 AstPatternDesc::IntLiteral(x) => HirPattern {
                     id: this.alloc.fresh(),
                     data: HirPatternDesc::IntLit(*x),
                     span: pat.span,
+                    is_synthetic: false,
                 },
                 AstPatternDesc::Error(_) => HirPattern {
                     id: this.alloc.fresh(),
                     data: HirPatternDesc::Error,
                     span: pat.span,
+                    is_synthetic: false,
                 },
             }
         }
@@ -1123,7 +1142,8 @@ impl<'db> LowerFundef<'db> {
                 // Make sure not to lower the lhs twice !
                 let place = self.expr_as_place(lhs, scope, self.module);
                 let binop = op.to_binop();
-                let lhs_expr = self.new_expr(HirExprDesc::Use(place.clone()), lhs.span);
+                let lhs_expr =
+                    self.new_expr(HirExprDesc::Use(place.clone()), lhs.span, true);
                 let rhs_expr = self.lower_expr(rhs, scope, self.module);
                 let combined = self.new_expr(
                     HirExprDesc::BinOp {
@@ -1132,6 +1152,7 @@ impl<'db> LowerFundef<'db> {
                         rhs: rhs_expr.boxed(),
                     },
                     stmt.span,
+                    true,
                 );
                 HirStmtKind::Assign { lhs: place, rhs: combined }
             }
@@ -1163,7 +1184,7 @@ impl<'db> LowerFundef<'db> {
             AstStmtDesc::Break => HirStmtKind::Break,
             AstStmtDesc::Error(_) => HirStmtKind::Error,
         };
-        self.new_stmt(kind, stmt.span)
+        self.new_stmt(kind, stmt.span, false)
     }
 
     fn desugar_for_loop(
@@ -1173,7 +1194,6 @@ impl<'db> LowerFundef<'db> {
         iterator: &AstExpr,
         body: &AstStmt,
     ) -> HirStmtKind {
-        // TODO: handle synthetic HIR nodes so they can be flagged as such
         // for pat in iterator {...}
         // becomes
         // let mut iterator = IntoIterator::into_iter(iterator);
@@ -1197,6 +1217,7 @@ impl<'db> LowerFundef<'db> {
                 type_args: vec![],
             },
             iterator_span,
+            true,
         );
         let iterator_id = self.allocate_local(
             scope,
@@ -1204,14 +1225,15 @@ impl<'db> LowerFundef<'db> {
             Mutability::Mutable,
             None,
             iterator_span,
+            true,
         );
         let let_iter = self.declare_single_var(iterator_id, iterator, iterator_span);
         let iterator_place =
-            self.new_place(HirPlaceKind::Local(iterator_id), iterator_span);
+            self.new_place(HirPlaceKind::Local(iterator_id), iterator_span, true);
         let next_expr = self.new_expr(
             HirExprDesc::CallMethod {
                 receiver: self
-                    .new_expr(HirExprDesc::Use(iterator_place), iterator_span)
+                    .new_expr(HirExprDesc::Use(iterator_place), iterator_span, true)
                     .boxed(),
 
                 method: Symbol::new(self.db, "next"),
@@ -1220,6 +1242,7 @@ impl<'db> LowerFundef<'db> {
                 type_args: vec![],
             },
             iterator_span,
+            true,
         );
 
         let mut iterator_scope = scope.clone();
@@ -1231,7 +1254,7 @@ impl<'db> LowerFundef<'db> {
         let while_body =
             self.match_some_do_or_break(next_expr, pat.0, pat.1, iterator_body);
 
-        let while_true_loop = self.while_true_do(while_body, iterator_span);
+        let while_true_loop = self.while_true_do(while_body, iterator_span, true);
         HirStmtKind::Block(vec![let_iter, while_true_loop])
     }
 
@@ -1248,6 +1271,7 @@ impl<'db> LowerFundef<'db> {
                     Mutability::Const, // TODO: be able to change that
                     Some(arg.ty.clone().into()),
                     arg.span,
+                    false,
                 )
             })
             .collect()
@@ -1290,6 +1314,7 @@ impl<'db> LowerFundef<'db> {
                 mutability,
                 None,
                 *span,
+                false,
             ));
         }
         let params = self.collect_args(&ast.data.args, &mut s);
@@ -1354,6 +1379,7 @@ impl<'db> LowerFundef<'db> {
                                         Mutability::Const,
                                         None,
                                         span,
+                                        false,
                                     );
                                     locals.push(new_local);
                                     HirStructFieldPattern::Name {

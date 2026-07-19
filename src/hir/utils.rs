@@ -26,20 +26,30 @@ use crate::{
 };
 
 impl LowerFundef<'_> {
-    pub fn new_expr(&self, desc: HirExprDesc, span: Span) -> HirExpr {
-        HirExpr { id: self.alloc.fresh(), data: desc, span }
+    pub fn new_expr(&self, desc: HirExprDesc, span: Span, is_synthetic: bool) -> HirExpr {
+        HirExpr { id: self.alloc.fresh(), data: desc, span, is_synthetic }
     }
 
-    pub fn new_place(&self, kind: HirPlaceKind, span: Span) -> HirPlace {
-        HirPlace { id: self.alloc.fresh(), kind, span }
+    pub fn new_place(
+        &self,
+        kind: HirPlaceKind,
+        span: Span,
+        is_synthetic: bool,
+    ) -> HirPlace {
+        HirPlace { id: self.alloc.fresh(), kind, span, is_synthetic }
     }
 
-    pub fn new_pattern(&self, desc: HirPatternDesc, span: Span) -> HirPattern {
-        HirPattern { id: self.alloc.fresh(), data: desc, span }
+    pub fn new_pattern(
+        &self,
+        desc: HirPatternDesc,
+        span: Span,
+        is_synthetic: bool,
+    ) -> HirPattern {
+        HirPattern { id: self.alloc.fresh(), data: desc, span, is_synthetic }
     }
 
-    pub fn new_stmt(&self, kind: HirStmtKind, span: Span) -> HirStmt {
-        HirStmt { id: self.alloc.fresh(), kind, span }
+    pub fn new_stmt(&self, kind: HirStmtKind, span: Span, is_synthetic: bool) -> HirStmt {
+        HirStmt { id: self.alloc.fresh(), kind, span, is_synthetic }
     }
 
     /// Returns the pattern Some(<pat>)
@@ -54,17 +64,24 @@ impl LowerFundef<'_> {
                 fields: HirPatternConstructorArgs::TupleFields(vec![pat]),
             },
             span,
+            true,
         )
     }
 
-    pub fn while_true_do(&self, stmt: HirStmt, cond_span: Span) -> HirStmt {
+    pub fn while_true_do(
+        &self,
+        stmt: HirStmt,
+        cond_span: Span,
+        is_synthetic: bool,
+    ) -> HirStmt {
         let stmt_span = stmt.span;
         self.new_stmt(
             HirStmtKind::While {
-                cond: self.new_expr(HirExprDesc::BoolLit(true), cond_span),
+                cond: self.new_expr(HirExprDesc::BoolLit(true), cond_span, true),
                 body: stmt.boxed(),
             },
             stmt_span,
+            is_synthetic,
         )
     }
 
@@ -90,14 +107,15 @@ impl LowerFundef<'_> {
                         body: stmt.boxed(),
                     },
                     HirMatchBranch {
-                        pattern: self.new_pattern(HirPatternDesc::Any, pat_span),
+                        pattern: self.new_pattern(HirPatternDesc::Any, pat_span, true),
                         locals: vec![],
                         guard: None,
-                        body: self.new_stmt(HirStmtKind::Break, pat_span).boxed(),
+                        body: self.new_stmt(HirStmtKind::Break, pat_span, true).boxed(),
                     },
                 ],
             },
             stmt_span,
+            true,
         )
     }
 
@@ -113,12 +131,14 @@ impl LowerFundef<'_> {
                 pattern: self.new_pattern(
                     HirPatternDesc::Bind { id: var_id, name: var_name, mutable: true },
                     span,
+                    true,
                 ),
                 locals: vec![var_id],
                 ty_annotation: None,
                 init,
             },
             span,
+            true,
         )
     }
 }

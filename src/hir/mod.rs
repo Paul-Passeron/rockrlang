@@ -65,6 +65,7 @@ pub struct HirPattern {
     pub id: HirId,
     pub data: HirPatternDesc,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -85,6 +86,7 @@ pub struct HirPlace {
     pub id: HirId,
     pub kind: HirPlaceKind,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -102,6 +104,7 @@ pub struct HirExpr {
     pub id: HirId,
     pub data: HirExprDesc,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -208,6 +211,7 @@ pub struct HirStmt {
     pub id: HirId,
     pub kind: HirStmtKind,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -258,6 +262,7 @@ pub struct LocalInfo {
     pub mutability: Mutability,
     pub ty_annotation: Option<AstAnyTypeExpr>,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 // #[derive(Debug, Clone, PartialEq, Eq, Hash)]
