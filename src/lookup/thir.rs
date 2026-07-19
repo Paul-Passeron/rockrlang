@@ -106,13 +106,15 @@ impl Thir {
         setup: &'a ThirExprWithSetup,
         loc: Location,
     ) -> Option<ThirNode<'a>> {
-        self.exprs[setup.expr].span.encloses(loc).then_some(())?;
-        let stmts = setup
-            .stmts
-            .iter()
-            .all(|stmt| self.stmt_at(db, stmt, loc).is_some())
-            .then_some(setup.stmts.as_slice());
-        Some(ThirNode::Expr { id: setup.expr, setup: stmts })
+        if let Some(node) = setup.stmts.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)) {
+            return Some(node);
+        }
+        Some(match self.expr_at(db, setup.expr, loc)? {
+            ThirNode::Expr { id, setup: None } if id == setup.expr => {
+                ThirNode::Expr { id, setup: Some(setup.stmts.as_slice()) }
+            }
+            other => other,
+        })
     }
 
     fn pattern_at<'a>(
