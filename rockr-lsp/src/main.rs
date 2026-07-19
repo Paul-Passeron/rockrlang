@@ -16,35 +16,22 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use itertools::Itertools;
-use lsp_server::{Connection, Message, Notification, Request, Response};
+use lsp_server::{Connection, Message, Notification};
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DidChangeConfigurationParams,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverParams,
-    HoverProviderCapability, InitializeParams, OneOf, Position, PublishDiagnosticsParams,
-    Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
-    notification::{
-        DidChangeConfiguration, DidChangeTextDocument, DidOpenTextDocument,
-        Notification as INotification, PublishDiagnostics,
-    },
-    request::{HoverRequest, Request as IRequest},
+    Diagnostic, DiagnosticSeverity, HoverProviderCapability, InitializeParams, OneOf,
+    Position, PublishDiagnosticsParams, Range, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
+    notification::{Notification as INotification, PublishDiagnostics},
 };
 use rockr::{
     RockrDb, SourceFile,
     common::location::{Location, Span, offset_at},
     compiler::{
-        Config, Workspace, compute_all_files_from_roots, compute_package_roots,
+        Config, Workspace,
         diagnostic::{Diag, Severity},
         program_has_errors,
     },
-    hir::{FunctionLikeAst, function_ast},
-    lookup::{enclosing_fun, thir::ThirNode},
-    ril::FunctionId,
-    thir::{
-        stmt::{BlockSemanticInfo, StmtKind},
-        thir_body,
-    },
 };
-use salsa::Setter;
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -55,15 +42,19 @@ use std::{
     time::SystemTime,
 };
 
+pub mod notif;
+pub mod request;
+
 fn log(msg: impl AsRef<str>) {
     let mut f =
         OpenOptions::new().create(true).append(true).open("/tmp/rockr-lsp.log").unwrap();
     let _ = writeln!(f, "{}", msg.as_ref());
 }
 
+#[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
-        log(format!($($arg)*))
+        $crate::log(format!($($arg)*))
     };
 }
 
@@ -140,22 +131,6 @@ impl<'a> Lsp<'a> {
         Ok(())
     }
 
-    fn handle_notif(&mut self, notif: Notification) {
-        match notif.method.as_str() {
-            DidOpenTextDocument::METHOD => {
-                self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open)
-            }
-            DidChangeTextDocument::METHOD => self
-                .dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change),
-            DidChangeConfiguration::METHOD => self
-                .dispatch_notification::<DidChangeConfiguration>(
-                    notif,
-                    Self::handle_did_change_configuration,
-                ),
-            method => log!("Unhandled notification method {method}"),
-        }
-    }
-
     fn loc(&self, loc: Location) -> Position {
         let infos = loc.loc_info(&self.db);
         Position::new(infos.line as u32 - 1, infos.column as u32 - 1)
@@ -222,160 +197,11 @@ impl<'a> Lsp<'a> {
         Some(sf)
     }
 
-    fn dispatch_notification<N: INotification>(
-        &mut self,
-        n: Notification,
-        mut handler: impl FnMut(&mut Self, N::Params),
-    ) {
-        if n.method != N::METHOD {
-            panic!(
-                "Tried to handle notification method `{}` using `{}` handler",
-                n.method,
-                N::METHOD
-            )
-        }
-        let parsed = serde_json::from_value::<N::Params>(n.params).unwrap();
-        handler(self, parsed);
-    }
-
-    fn dispatch_request<R: IRequest, Err: Display>(
-        &mut self,
-        r: Request,
-        mut handler: impl FnMut(&mut Self, R::Params) -> Result<R::Result, Err>,
-    ) {
-        if r.method != R::METHOD {
-            panic!(
-                "Tried to handle request method `{}` using `{}` handler",
-                r.method,
-                R::METHOD
-            )
-        }
-        let parsed = serde_json::from_value::<R::Params>(r.params).unwrap();
-        let response = match handler(self, parsed) {
-            Ok(result) => Response::new_ok(r.id, result),
-            Err(msg) => Response::new_err(r.id, 1, msg.to_string()),
-        };
-        self.connection.sender.send(Message::Response(response)).unwrap();
-    }
-
-    fn did_open(&mut self, params: DidOpenTextDocumentParams) {
-        let path = self.path_of_uri(params.text_document.uri).unwrap();
-        if !self.db.files.contains_key(&path) {
-            compute_package_roots(&mut self.db, path)
-                .unwrap_or_else(|err| panic!("{err}"));
-            compute_all_files_from_roots(&mut self.db)
-                .unwrap_or_else(|err| panic!("{err}"));
-        }
-        time(Some("recheck didOpen"), || self.recheck());
-    }
-
-    fn did_change(&mut self, did_change: DidChangeTextDocumentParams) {
-        if did_change.content_changes.is_empty() {
-            return;
-        }
-        let sf = self.sf_of_uri(did_change.text_document.uri).unwrap();
-        sf.set_content(&mut self.db)
-            .to(did_change.content_changes[0].text.as_str().into());
-        time(Some("recheck didChange"), || self.recheck());
-    }
-
-    fn handle_did_change_configuration(&mut self, _: DidChangeConfigurationParams) {
-        log!("TODO: handle didChangeConfiguration")
-    }
-
-    fn handle_request(&mut self, req: Request) {
-        match req.method.as_str() {
-            HoverRequest::METHOD => self
-                .dispatch_request::<HoverRequest, String>(req, |this, params| {
-                    Ok(this.handle_hover(params))
-                }),
-            _ => log!("TODO: Unhandled request ! {}", req.method),
-        }
-    }
-
     fn rockr_loc(&self, uri: Uri, pos: Position) -> Option<Location> {
         let sf = self.sf_of_uri(uri)?;
         let offset =
             offset_at(&self.db, sf, pos.line as usize + 1, pos.character as usize + 1);
         Some(Location { file: sf, offset })
-    }
-
-    fn handle_hover(&mut self, params: HoverParams) -> Option<Hover> {
-        let pos_params = params.text_document_position_params;
-        let uri = pos_params.text_document.uri;
-        let pos = pos_params.position;
-        let loc = self.rockr_loc(uri, pos)?;
-        if let Some(id) = enclosing_fun(&self.db, loc) {
-            self.handle_hover_in_function(id, loc)
-        } else {
-            log!(
-                "TODO: handle hover request at {} (Not inside a function)",
-                loc.loc_info(&self.db)
-            );
-            None
-        }
-    }
-
-    fn handle_hover_in_function(
-        &mut self,
-        func: FunctionId,
-        loc: Location,
-    ) -> Option<Hover> {
-        let db = &self.db;
-        let body_span = match function_ast(db, func.into()).inner(db) {
-            FunctionLikeAst::ExternDef(_, _) => None,
-            FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::Method(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::TraitMethod(_) => None,
-        }?;
-        if !body_span.encloses(loc) {
-            if loc.offset >= body_span.start_offset {
-                return None;
-            }
-            log!(
-                "TODO: handle hover request at {} (Inside function signature)",
-                loc.loc_info(&self.db)
-            );
-            return None;
-        }
-        let thir_body = thir_body(db, func)?;
-        let node = thir_body.node_at(&self.db, loc)?;
-        log!("Found a node !");
-        match node {
-            ThirNode::Expr { id, setup } => {
-                log!("Expr with id = {:?}, setup = {}", id.into_raw(), setup.is_some())
-            }
-            ThirNode::Place(idx) => log!("Place with id = {}", idx.into_raw()),
-            ThirNode::Local(idx) => log!("Local with id = {}", idx.into_raw()),
-            ThirNode::Stmt(stmt) => match &stmt.kind {
-                StmtKind::Block {
-                    semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
-                    ..
-                } => log!(
-                    "{}: Struct destructuring: {}",
-                    stmt.span.start().loc_info(&self.db),
-                    struct_ref.clone().as_type_ref(&self.db).to_string(&self.db)
-                ),
-                StmtKind::Block {
-                    semantic_infos: Some(BlockSemanticInfo::ForLoop),
-                    ..
-                } => log!(
-                    "{}: for-loop",
-                    stmt.span.start().loc_info(&self.db),
-                ),
-                _ => log!("Stmt: {}", stmt.span.start().loc_info(&self.db)),
-            },
-            ThirNode::Pattern(pat) => {
-                log!("Pattern: {}", pat.span.start().loc_info(&self.db))
-            }
-            ThirNode::MatchBranch(br) => {
-                log!(
-                    "Match branch: {}",
-                    br.get_whole_span(thir_body).start().loc_info(&self.db)
-                )
-            }
-        }
-        None
     }
 }
 
