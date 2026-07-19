@@ -39,7 +39,10 @@ use rockr::{
     hir::{FunctionLikeAst, function_ast},
     lookup::{enclosing_fun, thir::ThirNode},
     ril::FunctionId,
-    thir::thir_body,
+    thir::{
+        stmt::{BlockSemanticInfo, StmtKind},
+        thir_body,
+    },
 };
 use salsa::Setter;
 use std::{
@@ -344,9 +347,17 @@ impl<'a> Lsp<'a> {
             }
             ThirNode::Place(idx) => log!("Place with id = {}", idx.into_raw()),
             ThirNode::Local(idx) => log!("Local with id = {}", idx.into_raw()),
-            ThirNode::Stmt(stmt) => {
-                log!("Stmt: {}", stmt.span.start().loc_info(&self.db))
-            }
+            ThirNode::Stmt(stmt) => match &stmt.kind {
+                StmtKind::Block {
+                    semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
+                    ..
+                } => log!(
+                    "{}: Struct destructuring: {}",
+                    stmt.span.start().loc_info(&self.db),
+                    struct_ref.clone().as_type_ref(&self.db).to_string(&self.db)
+                ),
+                _ => log!("Stmt: {}", stmt.span.start().loc_info(&self.db)),
+            },
             ThirNode::Pattern(pat) => {
                 log!("Pattern: {}", pat.span.start().loc_info(&self.db))
             }
