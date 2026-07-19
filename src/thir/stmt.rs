@@ -17,7 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::location::Span,
-    thir::{ExprId, LocalId, PlaceId, ScopeId, ThirExprWithSetup, ThirMatchBranch},
+    thir::{
+        ExprId, LocalId, PlaceId, ScopeId, StructRef, ThirExprWithSetup, ThirMatchBranch,
+    },
 };
 
 pub struct ThirStmt {
@@ -26,10 +28,15 @@ pub struct ThirStmt {
     pub is_synthetic: bool,
 }
 
+pub enum BlockSemanticInfo {
+    StructDestructure(StructRef),
+}
+
 pub enum StmtKind {
     Block {
         scope: ScopeId,
         stmts: Vec<ThirStmt>,
+        semantic_infos: Option<BlockSemanticInfo>,
     },
     If {
         cond: ThirExprWithSetup,
@@ -119,8 +126,13 @@ impl ThirStmt {
         stmts: Vec<Self>,
         span: Span,
         is_synthetic: bool,
+        semantic_infos: Option<BlockSemanticInfo>,
     ) -> Self {
-        Self { kind: StmtKind::Block { scope, stmts }, span, is_synthetic }
+        Self {
+            kind: StmtKind::Block { scope, stmts, semantic_infos },
+            span,
+            is_synthetic,
+        }
     }
 
     pub fn assign(place: PlaceId, expr: ExprId, span: Span, is_synthetic: bool) -> Self {

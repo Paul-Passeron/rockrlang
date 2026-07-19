@@ -1255,12 +1255,12 @@ impl<'db> LowerFundef<'db> {
 
         let mut iterator_scope = scope.clone();
 
-        let pat = self.lower_pattern(element, &mut iterator_scope);
+        let (pat, locals) = self.lower_pattern(element, &mut iterator_scope);
 
         let iterator_body = self.lower_stmt(body, &mut iterator_scope);
 
         let while_body =
-            self.match_some_do_or_break(next_expr, pat.0, pat.1, iterator_body);
+            self.match_some_do_or_break(next_expr, pat, locals, iterator_body);
 
         let while_true_loop = self.while_true_do(while_body, iterator_span, true);
         HirStmtKind::Block(vec![let_iter, while_true_loop])

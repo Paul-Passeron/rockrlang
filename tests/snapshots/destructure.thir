@@ -13,8 +13,10 @@ thir fun core::panic::panic(message: core::io::str): never {
 
 examples/destructure.rkr:6:1
 thir fun destructure::bar(foo: &destructure::Foo): void {
-    let x: &i32 = &(*foo).x;
-    let y: &core::io::str = &(*foo).y;
+    's0 (Destructuring `destructure::Foo`): {
+        let x: &i32 = &(*foo).x;
+        let y: &core::io::str = &(*foo).y;
+    }
     let x: &i32 = x;
     let y: &core::io::str = y;
 }

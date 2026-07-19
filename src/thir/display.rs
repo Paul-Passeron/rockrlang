@@ -22,6 +22,7 @@ use super::{
     ThirPatternKind,
 };
 use crate::ril::TypeDefId;
+use crate::thir::stmt::BlockSemanticInfo;
 use crate::{Db, hir::Mutability, ril::TypeRef};
 
 const INDENT: &str = "    ";
@@ -66,9 +67,18 @@ impl<'a> ThirPrinter<'a> {
 
     fn print_stmt(&mut self, stmt: &'a ThirStmt) {
         match &stmt.kind {
-            StmtKind::Block { scope, stmts } => {
+            StmtKind::Block { scope, stmts, semantic_infos } => {
                 let lbl = self.scope_label(*scope);
-                self.line(&format!("{lbl}: {{"));
+                match semantic_infos {
+                    Some(BlockSemanticInfo::StructDestructure(struct_ref)) => {
+                        self.line(&format!(
+                            "{lbl} (Destructuring `{}`): {{",
+                            struct_ref.clone().as_type_ref(self.db).to_string(self.db)
+                        ))
+                    }
+
+                    None => self.line(&format!("{lbl}: {{")),
+                }
                 self.indent += 1;
                 self.print_stmts(stmts);
                 self.indent -= 1;

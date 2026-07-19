@@ -42,7 +42,8 @@ use crate::{
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, stmt::ThirStmt,
+        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope,
+        stmt::{BlockSemanticInfo, ThirStmt},
     },
     typecheck::{
         self, PatternId, ReceiverAdjustment, TypeCheckResults,
@@ -260,7 +261,7 @@ impl<'db> ThirTranslator<'db> {
         let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
             stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
         });
-        ThirStmt::block(scope, stmts, span, is_synthetic)
+        ThirStmt::block(scope, stmts, span, is_synthetic, None)
     }
 
     fn expr_or_place(
@@ -682,81 +683,112 @@ impl<'db> ThirTranslator<'db> {
                     .accumulate(self.db);
                     return;
                 };
-                for pat_field in fields {
-                    let name = match pat_field {
-                        HirStructFieldPattern::Name { name, .. }
-                        | HirStructFieldPattern::Rebind { name, .. } => *name,
-                    };
-                    let field_ty = self.canonicalize_type(
-                        def.typeof_field(self.db, name).unwrap_or(TypeRef::Error),
-                    );
-                    let mut place = place;
-                    for _ in 0..wrapped.depth() {
-                        let new_ty = self.canonicalize_type(
-                            b.places[place].ty.as_ref(self.db).unwrap().1,
-                        );
-                        place =
-                            b.with_synthetic_projection(place, Projection::Deref, new_ty);
-                    }
-                    let field_place = b.with_synthetic_projection(
-                        place,
-                        Projection::Field(name, field_ty),
-                        field_ty,
-                    );
 
-                    let field_value = if wrapped.depth() == 0 {
-                        b.new_expr(ThirExpr::use_place(field_place, b, span))
-                    } else {
-                        let mutability = if let Some(WrapKind::Ref(mutability)) =
-                            wrapped.refs.first()
-                        {
-                            *mutability
-                        } else {
-                            Mutability::Const
-                        };
-                        let mut cur_ty = field_ty;
-                        let mut val = b.new_expr(ThirExpr {
-                            kind: ExprKind::Ref { place: field_place, mutability },
-                            ty: cur_ty.wrap_ref(self.db, mutability.is_mut()),
-                            span,
-                            is_synthetic: true,
-                        });
-                        let depth = wrapped.depth();
-                        for wrapped in wrapped.refs[0..depth - 1].iter().rev() {
-                            let WrapKind::Ref(mutability) = wrapped;
-                            let mutable = mutability.is_mut();
-                            cur_ty = cur_ty.wrap_ref(self.db, mutable);
-                            let tmp = b.new_synthetic_local(cur_ty, *mutability, span);
-                            v.push(ThirStmt::let_(tmp, val, span, true));
-                            let tmp_place = b.new_place(ThirPlace::local(tmp, b, span));
-                            val = b.new_expr(ThirExpr {
-                                kind: ExprKind::Ref {
-                                    place: tmp_place,
-                                    mutability: *mutability,
-                                },
-                                ty: cur_ty.wrap_ref(self.db, mutable),
-                                span,
-                                is_synthetic: true,
-                            });
-                        }
-                        val
-                    };
-                    match pat_field {
-                        HirStructFieldPattern::Rebind { pattern: pat, .. } => {
-                            self._destructure_pattern_init(
-                                b,
-                                pat,
-                                Either::Left(field_value),
-                                span,
-                                v,
+                let is_synthetic = fields.iter().any(|f| f.span() == pat.span);
+
+                let (scope, field_stmts) =
+                    self.scoped(b, pat.span, ScopeKind::Block, |this, b| {
+                        let mut field_stmts = vec![];
+                        for pat_field in fields {
+                            let name = match pat_field {
+                                HirStructFieldPattern::Name { name, .. }
+                                | HirStructFieldPattern::Rebind { name, .. } => *name,
+                            };
+                            let field_ty = this.canonicalize_type(
+                                def.typeof_field(this.db, name).unwrap_or(TypeRef::Error),
                             );
+                            let mut place = place;
+                            for _ in 0..wrapped.depth() {
+                                let new_ty = this.canonicalize_type(
+                                    b.places[place].ty.as_ref(this.db).unwrap().1,
+                                );
+                                place = b.with_synthetic_projection(
+                                    place,
+                                    Projection::Deref,
+                                    new_ty,
+                                );
+                            }
+                            let field_place = b.with_synthetic_projection(
+                                place,
+                                Projection::Field(name, field_ty),
+                                field_ty,
+                            );
+
+                            let field_value = if wrapped.depth() == 0 {
+                                b.new_expr(ThirExpr::use_place(field_place, b, span))
+                            } else {
+                                let mutability = if let Some(WrapKind::Ref(mutability)) =
+                                    wrapped.refs.first()
+                                {
+                                    *mutability
+                                } else {
+                                    Mutability::Const
+                                };
+                                let mut cur_ty = field_ty;
+                                let mut val = b.new_expr(ThirExpr {
+                                    kind: ExprKind::Ref {
+                                        place: field_place,
+                                        mutability,
+                                    },
+                                    ty: cur_ty.wrap_ref(this.db, mutability.is_mut()),
+                                    span,
+                                    is_synthetic: true,
+                                });
+                                let depth = wrapped.depth();
+                                for wrapped in wrapped.refs[0..depth - 1].iter().rev() {
+                                    let WrapKind::Ref(mutability) = wrapped;
+                                    let mutable = mutability.is_mut();
+                                    cur_ty = cur_ty.wrap_ref(this.db, mutable);
+                                    let tmp =
+                                        b.new_synthetic_local(cur_ty, *mutability, span);
+                                    field_stmts
+                                        .push(ThirStmt::let_(tmp, val, span, true));
+                                    let tmp_place =
+                                        b.new_place(ThirPlace::local(tmp, b, span));
+                                    val = b.new_expr(ThirExpr {
+                                        kind: ExprKind::Ref {
+                                            place: tmp_place,
+                                            mutability: *mutability,
+                                        },
+                                        ty: cur_ty.wrap_ref(this.db, mutable),
+                                        span,
+                                        is_synthetic: true,
+                                    });
+                                }
+                                val
+                            };
+                            match pat_field {
+                                HirStructFieldPattern::Rebind {
+                                    pattern: pat, ..
+                                } => {
+                                    this._destructure_pattern_init(
+                                        b,
+                                        pat,
+                                        Either::Left(field_value),
+                                        span,
+                                        &mut field_stmts,
+                                    );
+                                }
+                                HirStructFieldPattern::Name { id, .. } => {
+                                    let thir_local = b.local_map[id];
+                                    field_stmts.push(ThirStmt::let_(
+                                        thir_local,
+                                        field_value,
+                                        span,
+                                        true,
+                                    ));
+                                }
+                            }
                         }
-                        HirStructFieldPattern::Name { id, .. } => {
-                            let thir_local = b.local_map[id];
-                            v.push(ThirStmt::let_(thir_local, field_value, span, true));
-                        }
-                    }
-                }
+                        field_stmts
+                    });
+                v.push(ThirStmt::block(
+                    scope,
+                    field_stmts,
+                    pat.span,
+                    is_synthetic,
+                    Some(BlockSemanticInfo::StructDestructure(def)),
+                ));
             }
             HirPatternDesc::Constructor { .. }
             | HirPatternDesc::IntLit(_)
