@@ -236,14 +236,14 @@ impl<'db> ThirTranslator<'db> {
 
     fn handle_break(&self, b: &ThirBuilder, span: Span) -> ThirStmt {
         match self.innermost_loop_scope(b) {
-            Some(scope_id) => ThirStmt::brk(scope_id, span),
+            Some(scope_id) => ThirStmt::brk(scope_id, span, false),
             None => {
                 if self.scope_stack.is_empty() {
                     println!("Cannot break at function top-level")
                 } else {
                     println!("Cannot break out of non-loop block")
                 }
-                ThirStmt::error(span)
+                ThirStmt::error(span, false)
             }
         }
     }
@@ -257,7 +257,7 @@ impl<'db> ThirTranslator<'db> {
         let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
             stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
         });
-        ThirStmt::block(scope, stmts, span)
+        ThirStmt::block(scope, stmts, span, false)
     }
 
     fn expr_or_place(
@@ -287,19 +287,19 @@ impl<'db> ThirTranslator<'db> {
                 let mut res = vec![];
                 let place = self.place(b, lhs, &mut res);
                 let value = self.expr(b, rhs, &mut res);
-                res.push(ThirStmt::assign(place, value, stmt.span));
+                res.push(ThirStmt::assign(place, value, stmt.span, false));
                 res
             }
             HirStmtKind::Expr(hir_expr) => {
                 let mut res = vec![];
                 let expr = self.expr(b, hir_expr, &mut res);
-                res.push(ThirStmt::expr(expr, hir_expr.span));
+                res.push(ThirStmt::expr(expr, hir_expr.span, false));
                 res
             }
             HirStmtKind::Return(hir_expr) => {
                 let mut res = vec![];
                 let expr = hir_expr.as_ref().map(|expr| self.expr(b, expr, &mut res));
-                res.push(ThirStmt::ret(expr, stmt.span));
+                res.push(ThirStmt::ret(expr, stmt.span, false));
                 res
             }
             HirStmtKind::If { cond, then, else_ } => {
@@ -323,10 +323,10 @@ impl<'db> ThirTranslator<'db> {
                     stmt.span,
                 )
                 .accumulate(self.db);
-                vec![ThirStmt::error(stmt.span)]
+                vec![ThirStmt::error(stmt.span, false)]
             }
             HirStmtKind::Break => vec![self.handle_break(b, stmt.span)],
-            HirStmtKind::Error => vec![ThirStmt::error(stmt.span)],
+            HirStmtKind::Error => vec![ThirStmt::error(stmt.span, false)],
         }
     }
 
@@ -371,7 +371,9 @@ impl<'db> ThirTranslator<'db> {
             None => (None, None),
         };
 
-        ThirStmt::ifte(thir_cond, then_stmts, then_scope, else_stmts, else_scope, span)
+        ThirStmt::ifte(
+            thir_cond, then_stmts, then_scope, else_stmts, else_scope, span, false,
+        )
     }
 
     fn handle_single_stmt(
@@ -401,7 +403,7 @@ impl<'db> ThirTranslator<'db> {
         let cond = self.expr_with_setup(b, cond);
         let (scope, body) = self
             .scoped(b, span, ScopeKind::Loop, |this, b| this.handle_single_stmt(b, body));
-        ThirStmt::whl(cond, scope, body, span)
+        ThirStmt::whl(cond, scope, body, span, false)
     }
 
     fn handle_branch(
@@ -428,7 +430,7 @@ impl<'db> ThirTranslator<'db> {
         let scrut = self.expr_with_setup(b, scrutinee);
         let branches =
             branches.iter().map(|branch| self.handle_branch(b, branch)).collect_vec();
-        ThirStmt::mtch(scrut, branches, span)
+        ThirStmt::mtch(scrut, branches, span, false)
     }
 
     fn expr_args(
@@ -583,12 +585,13 @@ impl<'db> ThirTranslator<'db> {
                     thir_local,
                     self.place_or_expr_as_expr(b, value),
                     span,
+                    true,
                 ))
             }
             HirPatternDesc::Any => {
                 // Just compute the expression
                 let expr = self.place_or_expr_as_expr(b, value);
-                v.push(ThirStmt::expr(expr, span));
+                v.push(ThirStmt::expr(expr, span, true));
             }
             HirPatternDesc::Tuple(hir_patterns) => {
                 // TODO: handle tuple destructuring with place.
@@ -597,7 +600,7 @@ impl<'db> ThirTranslator<'db> {
                         let ty = self.canonicalize_type(b.get_expr(expr).ty);
                         let the_tuple_local =
                             b.new_synthetic_local(ty, Mutability::Const, span);
-                        v.push(ThirStmt::let_(the_tuple_local, expr, span));
+                        v.push(ThirStmt::let_(the_tuple_local, expr, span, true));
                         b.new_place(ThirPlace::local(the_tuple_local, b, span))
                     }
                     Either::Right(place) => place,
@@ -630,7 +633,7 @@ impl<'db> ThirTranslator<'db> {
                         let ty = self.canonicalize_type(b.get_expr(expr).ty);
                         let fresh =
                             b.new_synthetic_local(ty, Mutability::Const, pat.span);
-                        v.push(ThirStmt::let_(fresh, expr, span));
+                        v.push(ThirStmt::let_(fresh, expr, span, true));
                         let place = b.new_place(ThirPlace::local(fresh, b, pat.span));
                         (place, ty)
                     }
@@ -690,7 +693,7 @@ impl<'db> ThirTranslator<'db> {
                             let mutable = mutability.is_mut();
                             cur_ty = cur_ty.wrap_ref(self.db, mutable);
                             let tmp = b.new_synthetic_local(cur_ty, *mutability, span);
-                            v.push(ThirStmt::let_(tmp, val, span));
+                            v.push(ThirStmt::let_(tmp, val, span, true));
                             let tmp_place = b.new_place(ThirPlace::local(tmp, b, span));
                             val = b.new_expr(ThirExpr {
                                 kind: ExprKind::Ref {
@@ -715,7 +718,7 @@ impl<'db> ThirTranslator<'db> {
                         }
                         HirStructFieldPattern::Name { id, .. } => {
                             let thir_local = b.local_map[id];
-                            v.push(ThirStmt::let_(thir_local, field_value, span));
+                            v.push(ThirStmt::let_(thir_local, field_value, span, true));
                         }
                     }
                 }
@@ -963,7 +966,7 @@ impl<'db> ThirTranslator<'db> {
         let ty = b.exprs[expr].ty;
         let span = b.exprs[expr].span;
         let local = b.new_synthetic_local(ty, mutability, span);
-        stmts.push(ThirStmt::let_(local, expr, span));
+        stmts.push(ThirStmt::let_(local, expr, span, true));
         b.new_place(ThirPlace::local(local, b, span))
     }
 
@@ -1209,7 +1212,7 @@ impl<'db> ThirTranslator<'db> {
                     (expr.ty, expr.span)
                 };
                 let fresh = b.new_synthetic_local(ty, Mutability::Const, span);
-                stmts.push(ThirStmt::let_(fresh, value, place.span));
+                stmts.push(ThirStmt::let_(fresh, value, place.span, true));
                 b.new_place(ThirPlace::local(fresh, b, span))
             }
         }

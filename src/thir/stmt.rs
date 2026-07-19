@@ -23,6 +23,7 @@ use crate::{
 pub struct ThirStmt {
     pub kind: StmtKind,
     pub span: Span,
+    pub is_synthetic: bool,
 }
 
 pub enum StmtKind {
@@ -62,12 +63,12 @@ pub enum StmtKind {
 }
 
 impl ThirStmt {
-    pub fn brk(id: ScopeId, span: Span) -> Self {
-        Self { kind: StmtKind::Break(id), span }
+    pub fn brk(id: ScopeId, span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Break(id), span, is_synthetic }
     }
 
-    pub fn error(span: Span) -> Self {
-        Self { kind: StmtKind::Error, span }
+    pub fn error(span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Error, span, is_synthetic }
     }
 
     pub fn ifte(
@@ -77,12 +78,17 @@ impl ThirStmt {
         else_: Option<Vec<ThirStmt>>,
         else_scope: Option<ScopeId>,
         span: Span,
+        is_synthetic: bool,
     ) -> Self {
-        Self { kind: StmtKind::If { cond, then, then_scope, else_, else_scope }, span }
+        Self {
+            kind: StmtKind::If { cond, then, then_scope, else_, else_scope },
+            span,
+            is_synthetic,
+        }
     }
 
-    pub fn expr(expr: ExprId, span: Span) -> Self {
-        Self { kind: StmtKind::Expr(expr), span }
+    pub fn expr(expr: ExprId, span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Expr(expr), span, is_synthetic }
     }
 
     pub fn whl(
@@ -90,31 +96,38 @@ impl ThirStmt {
         scope: ScopeId,
         body: Vec<Self>,
         span: Span,
+        is_synthetic: bool,
     ) -> Self {
-        Self { kind: StmtKind::While { scope, cond, body }, span }
+        Self { kind: StmtKind::While { scope, cond, body }, span, is_synthetic }
     }
 
-    pub fn ret(expr: Option<ExprId>, span: Span) -> Self {
-        Self { kind: StmtKind::Return(expr), span }
+    pub fn ret(expr: Option<ExprId>, span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Return(expr), span, is_synthetic }
     }
 
     pub fn mtch(
         scrut: ThirExprWithSetup,
         branches: Vec<ThirMatchBranch>,
         span: Span,
+        is_synthetic: bool,
     ) -> Self {
-        Self { kind: StmtKind::Match { scrutinee: scrut, branches }, span }
+        Self { kind: StmtKind::Match { scrutinee: scrut, branches }, span, is_synthetic }
     }
 
-    pub fn block(scope: ScopeId, stmts: Vec<Self>, span: Span) -> Self {
-        Self { kind: StmtKind::Block { scope, stmts }, span }
+    pub fn block(
+        scope: ScopeId,
+        stmts: Vec<Self>,
+        span: Span,
+        is_synthetic: bool,
+    ) -> Self {
+        Self { kind: StmtKind::Block { scope, stmts }, span, is_synthetic }
     }
 
-    pub fn assign(place: PlaceId, expr: ExprId, span: Span) -> Self {
-        Self { kind: StmtKind::Assign { place, rhs: expr }, span }
+    pub fn assign(place: PlaceId, expr: ExprId, span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Assign { place, rhs: expr }, span, is_synthetic }
     }
 
-    pub fn let_(local: LocalId, value: ExprId, span: Span) -> Self {
-        Self { kind: StmtKind::Let { local, init: value }, span }
+    pub fn let_(local: LocalId, value: ExprId, span: Span, is_synthetic: bool) -> Self {
+        Self { kind: StmtKind::Let { local, init: value }, span, is_synthetic }
     }
 }
