@@ -1173,6 +1173,7 @@ impl<'db> LowerFundef<'db> {
         iterator: &AstExpr,
         body: &AstStmt,
     ) -> HirStmtKind {
+        // TODO: handle synthetic HIR nodes so they can be flagged as such
         // for pat in iterator {...}
         // becomes
         // let mut iterator = IntoIterator::into_iter(iterator);

@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::ops::Not;
+
 use crate::{
     Db,
     common::location::Location,
@@ -195,7 +197,7 @@ impl Thir {
             StmtKind::Expr(idx) => self.expr_at(db, *idx, loc),
             StmtKind::Error => None,
         };
-        Some(res.unwrap_or(ThirNode::Stmt(stmt)))
+        res.or(stmt.is_synthetic.not().then_some(ThirNode::Stmt(stmt)))
     }
 
     pub fn node_at<'a>(&'a self, db: &dyn Db, loc: Location) -> Option<ThirNode<'a>> {
