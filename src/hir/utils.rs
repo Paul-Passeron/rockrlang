@@ -93,8 +93,8 @@ impl LowerFundef<'_> {
         locals: Vec<LocalId>,
         stmt: HirStmt,
     ) -> HirStmt {
-        let stmt_span = stmt.span;
         let pat_span = pat.span;
+        let stmt_span = pat_span.start().span(stmt.span.end());
 
         self.new_stmt(
             HirStmtKind::Match {
