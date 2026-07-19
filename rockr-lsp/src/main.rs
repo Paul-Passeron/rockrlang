@@ -356,6 +356,13 @@ impl<'a> Lsp<'a> {
                     stmt.span.start().loc_info(&self.db),
                     struct_ref.clone().as_type_ref(&self.db).to_string(&self.db)
                 ),
+                StmtKind::Block {
+                    semantic_infos: Some(BlockSemanticInfo::ForLoop),
+                    ..
+                } => log!(
+                    "{}: for-loop",
+                    stmt.span.start().loc_info(&self.db),
+                ),
                 _ => log!("Stmt: {}", stmt.span.start().loc_info(&self.db)),
             },
             ThirNode::Pattern(pat) => {

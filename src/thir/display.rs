@@ -76,6 +76,9 @@ impl<'a> ThirPrinter<'a> {
                             struct_ref.clone().as_type_ref(self.db).to_string(self.db)
                         ))
                     }
+                    Some(BlockSemanticInfo::ForLoop) => {
+                        self.line(&format!("{lbl} (for-loop): {{",))
+                    }
 
                     None => self.line(&format!("{lbl}: {{")),
                 }

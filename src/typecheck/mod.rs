@@ -573,7 +573,7 @@ impl<'db> TyCtx<'db> {
                     .accumulate(self.db);
                 }
             },
-            HirStmtKind::Block(stmts) => {
+            HirStmtKind::Block(stmts, _) => {
                 stmts.iter().for_each(|stmt| self.type_check_stmt(stmt))
             }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),

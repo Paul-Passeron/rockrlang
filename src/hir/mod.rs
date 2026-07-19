@@ -224,6 +224,11 @@ pub struct HirMatchBranch {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HIRBlockSemanticInfo {
+    ForLoop,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirStmtKind {
     Let {
         pattern: HirPattern,
@@ -250,7 +255,7 @@ pub enum HirStmtKind {
         cond: HirExpr,
         body: Box<HirStmt>,
     },
-    Block(Vec<HirStmt>),
+    Block(Vec<HirStmt>, Option<HIRBlockSemanticInfo>),
     Defer(Box<HirStmt>),
     Break,
     Error,

@@ -18,15 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::fmt::{self, Formatter};
 
 use crate::{
-    Db,
-    common::symbols::{StrLit, Symbol},
-    hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern,
-        HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt,
-        HirStmtKind, HirStructFieldPattern, Mutability,
-    },
-    parse_tree::expr::BinaryOperator,
-    ril::{TypeDefId, display::Display},
+    Db, common::symbols::{StrLit, Symbol}, hir::{
+        HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
+    }, parse_tree::expr::BinaryOperator, ril::{TypeDefId, display::Display},
 };
 
 impl Symbol {
@@ -173,8 +167,15 @@ fn write_stmt(
             write_indent(f, depth)?;
             writeln!(f, "}}")
         }
-        HirStmtKind::Block(stmts) => {
-            writeln!(f, "{{")?;
+        HirStmtKind::Block(stmts, infos) => {
+            writeln!(
+                f,
+                "{}{{",
+                match infos {
+                    Some(HIRBlockSemanticInfo::ForLoop) => "for-loop ",
+                    None => "",
+                }
+            )?;
             for s in stmts {
                 write_stmt(f, s, db, depth + 1)?;
             }

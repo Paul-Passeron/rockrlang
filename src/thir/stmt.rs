@@ -30,6 +30,7 @@ pub struct ThirStmt {
 
 pub enum BlockSemanticInfo {
     StructDestructure(StructRef),
+    ForLoop,
 }
 
 pub enum StmtKind {

@@ -30,9 +30,9 @@ use crate::{
     },
     compiler::diagnostic::Diag,
     hir::{
-        self, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirMatchBranch,
-        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
-        HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
+        self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
+        HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
+        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     ril::{
@@ -257,11 +257,20 @@ impl<'db> ThirTranslator<'db> {
         stmts: &[HirStmt],
         span: Span,
         is_synthetic: bool,
+        infos: Option<&HIRBlockSemanticInfo>,
     ) -> ThirStmt {
         let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
             stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
         });
-        ThirStmt::block(scope, stmts, span, is_synthetic, None)
+        ThirStmt::block(
+            scope,
+            stmts,
+            span,
+            is_synthetic,
+            infos.map(|info| match info {
+                HIRBlockSemanticInfo::ForLoop => BlockSemanticInfo::ForLoop,
+            }),
+        )
     }
 
     fn expr_or_place(
@@ -325,8 +334,14 @@ impl<'db> ThirTranslator<'db> {
             HirStmtKind::While { cond, body } => {
                 vec![self.handle_while(b, cond, body, stmt.span, stmt.is_synthetic)]
             }
-            HirStmtKind::Block(hir_stmts) => {
-                vec![self.handle_block(b, hir_stmts, stmt.span, stmt.is_synthetic)]
+            HirStmtKind::Block(hir_stmts, infos) => {
+                vec![self.handle_block(
+                    b,
+                    hir_stmts,
+                    stmt.span,
+                    stmt.is_synthetic,
+                    infos.as_ref(),
+                )]
             }
             HirStmtKind::Defer(_) => {
                 Diag::generic_error(
@@ -402,7 +417,7 @@ impl<'db> ThirTranslator<'db> {
         stmt: &HirStmt,
     ) -> Vec<ThirStmt> {
         match &stmt.kind {
-            HirStmtKind::Block(stmts) => {
+            HirStmtKind::Block(stmts, None) => {
                 if stmts.len() == 1 {
                     self.handle_single_stmt(b, &stmts[0])
                 } else {

@@ -33,9 +33,10 @@ use crate::{
     },
     compiler::diagnostic::Diag,
     hir::{
-        HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId, HirMatchBranch,
-        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
-        HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo, Mutability,
+        HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
+        HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
+        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo,
+        Mutability,
     },
     name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
@@ -1097,7 +1098,6 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_stmt(&mut self, stmt: &AstStmt, scope: &mut Scope) -> HirStmt {
-        let mut is_synthetic = false;
         let kind = match &stmt.data {
             AstStmtDesc::Return { value } => {
                 let value =
@@ -1116,7 +1116,6 @@ impl<'db> LowerFundef<'db> {
                 HirStmtKind::While { cond, body: body.boxed() }
             }
             AstStmtDesc::For { element, iterator, body } => {
-                is_synthetic = true;
                 self.desugar_for_loop(scope, element, iterator, body)
             }
             AstStmtDesc::LetDecl { pat, type_constraint, value } => {
@@ -1133,6 +1132,7 @@ impl<'db> LowerFundef<'db> {
                 let mut block_scope = scope.clone();
                 HirStmtKind::Block(
                     stmts.iter().map(|s| self.lower_stmt(s, &mut block_scope)).collect(),
+                    None,
                 )
             }
             AstStmtDesc::Assign { lhs, rhs } => {
@@ -1192,7 +1192,7 @@ impl<'db> LowerFundef<'db> {
             AstStmtDesc::Break => HirStmtKind::Break,
             AstStmtDesc::Error(_) => HirStmtKind::Error,
         };
-        self.new_stmt(kind, stmt.span, is_synthetic)
+        self.new_stmt(kind, stmt.span, false)
     }
 
     fn desugar_for_loop(
@@ -1263,7 +1263,10 @@ impl<'db> LowerFundef<'db> {
             self.match_some_do_or_break(next_expr, pat, locals, iterator_body);
 
         let while_true_loop = self.while_true_do(while_body, iterator_span, true);
-        HirStmtKind::Block(vec![let_iter, while_true_loop])
+        HirStmtKind::Block(
+            vec![let_iter, while_true_loop],
+            Some(HIRBlockSemanticInfo::ForLoop),
+        )
     }
 
     fn next_iterator_id(&self) -> usize {
