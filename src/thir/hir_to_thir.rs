@@ -234,16 +234,16 @@ impl<'db> ThirTranslator<'db> {
         b.finalize(*self.hir.owner(self.db), params, zelf, stmts)
     }
 
-    fn handle_break(&self, b: &ThirBuilder, span: Span) -> ThirStmt {
+    fn handle_break(&self, b: &ThirBuilder, span: Span, is_synthetic: bool) -> ThirStmt {
         match self.innermost_loop_scope(b) {
-            Some(scope_id) => ThirStmt::brk(scope_id, span, false),
+            Some(scope_id) => ThirStmt::brk(scope_id, span, is_synthetic),
             None => {
                 if self.scope_stack.is_empty() {
                     println!("Cannot break at function top-level")
                 } else {
                     println!("Cannot break out of non-loop block")
                 }
-                ThirStmt::error(span, false)
+                ThirStmt::error(span, is_synthetic)
             }
         }
     }
@@ -253,11 +253,12 @@ impl<'db> ThirTranslator<'db> {
         b: &mut ThirBuilder,
         stmts: &[HirStmt],
         span: Span,
+        is_synthetic: bool,
     ) -> ThirStmt {
         let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
             stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
         });
-        ThirStmt::block(scope, stmts, span, false)
+        ThirStmt::block(scope, stmts, span, is_synthetic)
     }
 
     fn expr_or_place(
@@ -281,25 +282,31 @@ impl<'db> ThirTranslator<'db> {
                 res
             }
             HirStmtKind::Match { scrutinee, branches } => {
-                vec![self.handle_match(b, scrutinee, branches, stmt.span)]
+                vec![self.handle_match(
+                    b,
+                    scrutinee,
+                    branches,
+                    stmt.span,
+                    stmt.is_synthetic,
+                )]
             }
             HirStmtKind::Assign { lhs, rhs } => {
                 let mut res = vec![];
                 let place = self.place(b, lhs, &mut res);
                 let value = self.expr(b, rhs, &mut res);
-                res.push(ThirStmt::assign(place, value, stmt.span, false));
+                res.push(ThirStmt::assign(place, value, stmt.span, stmt.is_synthetic));
                 res
             }
             HirStmtKind::Expr(hir_expr) => {
                 let mut res = vec![];
                 let expr = self.expr(b, hir_expr, &mut res);
-                res.push(ThirStmt::expr(expr, hir_expr.span, false));
+                res.push(ThirStmt::expr(expr, hir_expr.span, stmt.is_synthetic));
                 res
             }
             HirStmtKind::Return(hir_expr) => {
                 let mut res = vec![];
                 let expr = hir_expr.as_ref().map(|expr| self.expr(b, expr, &mut res));
-                res.push(ThirStmt::ret(expr, stmt.span, false));
+                res.push(ThirStmt::ret(expr, stmt.span, stmt.is_synthetic));
                 res
             }
             HirStmtKind::If { cond, then, else_ } => {
@@ -309,13 +316,14 @@ impl<'db> ThirTranslator<'db> {
                     then,
                     else_.as_ref().map(Box::as_ref),
                     stmt.span,
+                    stmt.is_synthetic,
                 )]
             }
             HirStmtKind::While { cond, body } => {
-                vec![self.handle_while(b, cond, body, stmt.span)]
+                vec![self.handle_while(b, cond, body, stmt.span, stmt.is_synthetic)]
             }
             HirStmtKind::Block(hir_stmts) => {
-                vec![self.handle_block(b, hir_stmts, stmt.span)]
+                vec![self.handle_block(b, hir_stmts, stmt.span, stmt.is_synthetic)]
             }
             HirStmtKind::Defer(_) => {
                 Diag::generic_error(
@@ -323,10 +331,12 @@ impl<'db> ThirTranslator<'db> {
                     stmt.span,
                 )
                 .accumulate(self.db);
-                vec![ThirStmt::error(stmt.span, false)]
+                vec![ThirStmt::error(stmt.span, stmt.is_synthetic)]
             }
-            HirStmtKind::Break => vec![self.handle_break(b, stmt.span)],
-            HirStmtKind::Error => vec![ThirStmt::error(stmt.span, false)],
+            HirStmtKind::Break => {
+                vec![self.handle_break(b, stmt.span, stmt.is_synthetic)]
+            }
+            HirStmtKind::Error => vec![ThirStmt::error(stmt.span, stmt.is_synthetic)],
         }
     }
 
@@ -352,6 +362,7 @@ impl<'db> ThirTranslator<'db> {
         then: &HirStmt,
         else_: Option<&HirStmt>,
         span: Span,
+        is_synthetic: bool,
     ) -> ThirStmt {
         let thir_cond = self.expr_with_setup(b, cond);
 
@@ -372,7 +383,13 @@ impl<'db> ThirTranslator<'db> {
         };
 
         ThirStmt::ifte(
-            thir_cond, then_stmts, then_scope, else_stmts, else_scope, span, false,
+            thir_cond,
+            then_stmts,
+            then_scope,
+            else_stmts,
+            else_scope,
+            span,
+            is_synthetic,
         )
     }
 
@@ -399,11 +416,12 @@ impl<'db> ThirTranslator<'db> {
         cond: &HirExpr,
         body: &HirStmt,
         span: Span,
+        is_synthetic: bool,
     ) -> ThirStmt {
         let cond = self.expr_with_setup(b, cond);
         let (scope, body) = self
             .scoped(b, span, ScopeKind::Loop, |this, b| this.handle_single_stmt(b, body));
-        ThirStmt::whl(cond, scope, body, span, false)
+        ThirStmt::whl(cond, scope, body, span, is_synthetic)
     }
 
     fn handle_branch(
@@ -426,11 +444,12 @@ impl<'db> ThirTranslator<'db> {
         scrutinee: &HirExpr,
         branches: &[HirMatchBranch],
         span: Span,
+        is_synthetic: bool,
     ) -> ThirStmt {
         let scrut = self.expr_with_setup(b, scrutinee);
         let branches =
             branches.iter().map(|branch| self.handle_branch(b, branch)).collect_vec();
-        ThirStmt::mtch(scrut, branches, span, false)
+        ThirStmt::mtch(scrut, branches, span, is_synthetic)
     }
 
     fn expr_args(
