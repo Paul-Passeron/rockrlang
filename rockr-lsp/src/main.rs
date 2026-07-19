@@ -16,20 +16,21 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use itertools::Itertools;
-use lsp_server::{Connection, Message, Notification, Request};
+use lsp_server::{Connection, Message, Notification, Request, Response};
 use lsp_types::{
     Diagnostic, DiagnosticSeverity, DidChangeConfigurationParams,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, InitializeParams, Position,
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind, Uri,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverParams,
+    HoverProviderCapability, InitializeParams, OneOf, Position, PublishDiagnosticsParams,
+    Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
     notification::{
         DidChangeConfiguration, DidChangeTextDocument, DidOpenTextDocument,
         Notification as INotification, PublishDiagnostics,
     },
+    request::{HoverRequest, Request as IRequest},
 };
 use rockr::{
     RockrDb, SourceFile,
-    common::location::{Location, Span},
+    common::location::{Location, Span, offset_at},
     compiler::{
         Config, Workspace, compute_all_files_from_roots, compute_package_roots,
         diagnostic::{Diag, Severity},
@@ -83,6 +84,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(
             TextDocumentSyncKind::FULL,
         )),
+        definition_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        references_provider: Some(OneOf::Left(true)),
+        document_symbol_provider: Some(OneOf::Left(true)),
         ..Default::default()
     })?;
 
@@ -130,12 +135,12 @@ impl<'a> Lsp<'a> {
 
     fn handle_notif(&mut self, notif: Notification) {
         match notif.method.as_str() {
-            "textDocument/didOpen" => {
+            DidOpenTextDocument::METHOD => {
                 self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open)
             }
-            "textDocument/didChange" => self
+            DidChangeTextDocument::METHOD => self
                 .dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change),
-            "workspace/didChangeConfiguration" => self
+            DidChangeConfiguration::METHOD => self
                 .dispatch_notification::<DidChangeConfiguration>(
                     notif,
                     Self::handle_did_change_configuration,
@@ -216,10 +221,34 @@ impl<'a> Lsp<'a> {
         mut handler: impl FnMut(&mut Self, N::Params),
     ) {
         if n.method != N::METHOD {
-            panic!("Tried to handle method `{}` using `{}` handler", n.method, N::METHOD)
+            panic!(
+                "Tried to handle notification method `{}` using `{}` handler",
+                n.method,
+                N::METHOD
+            )
         }
         let parsed = serde_json::from_value::<N::Params>(n.params).unwrap();
         handler(self, parsed);
+    }
+
+    fn dispatch_request<R: IRequest, Err: Display>(
+        &mut self,
+        r: Request,
+        mut handler: impl FnMut(&mut Self, R::Params) -> Result<R::Result, Err>,
+    ) {
+        if r.method != R::METHOD {
+            panic!(
+                "Tried to handle request method `{}` using `{}` handler",
+                r.method,
+                R::METHOD
+            )
+        }
+        let parsed = serde_json::from_value::<R::Params>(r.params).unwrap();
+        let response = match handler(self, parsed) {
+            Ok(result) => Response::new_ok(r.id, result),
+            Err(msg) => Response::new_err(r.id, 1, msg.to_string()),
+        };
+        self.connection.sender.send(Message::Response(response)).unwrap();
     }
 
     fn did_open(&mut self, params: DidOpenTextDocumentParams) {
@@ -244,11 +273,33 @@ impl<'a> Lsp<'a> {
     }
 
     fn handle_did_change_configuration(&mut self, _: DidChangeConfigurationParams) {
-        log!("{}:{}: TODO: handle didChangeConfiguration", file!(), line!())
+        log!("TODO: handle didChangeConfiguration")
     }
 
-    fn handle_request(&mut self, _req: Request) {
-        log!("TOOD: Need to handle request !");
+    fn handle_request(&mut self, req: Request) {
+        match req.method.as_str() {
+            HoverRequest::METHOD => self
+                .dispatch_request::<HoverRequest, String>(req, |this, params| {
+                    Ok(this.handle_hover(params))
+                }),
+            _ => log!("TODO: Unhandled request ! {}", req.method),
+        }
+    }
+
+    fn rockr_loc(&self, uri: Uri, pos: Position) -> Option<Location> {
+        let sf = self.sf_of_uri(uri)?;
+        let offset =
+            offset_at(&self.db, sf, pos.line as usize + 1, pos.character as usize + 1);
+        Some(Location { file: sf, offset })
+    }
+
+    fn handle_hover(&mut self, params: HoverParams) -> Option<Hover> {
+        let pos_params = params.text_document_position_params;
+        let uri = pos_params.text_document.uri;
+        let pos = pos_params.position;
+        let loc = self.rockr_loc(uri, pos)?;
+        log!("TODO: handle hover request at {}", loc.loc_info(&self.db));
+        None
     }
 }
 

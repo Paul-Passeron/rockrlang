@@ -110,9 +110,11 @@ fn _loc_info(db: &dyn Db, loc: Location) -> &LocationInfo {
 
 #[salsa::tracked(returns(copy))]
 pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
+    let line = line - 1;
+    let col = col - 1;
     let lines = line_starts(db, file);
     let length = file.content(db).len();
-    if lines.len() >= line {
+    if lines.len() <= line {
         return length;
     }
     let line_offset = lines[line];
