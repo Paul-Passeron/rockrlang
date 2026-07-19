@@ -28,6 +28,7 @@ pub mod hir;
 pub mod layout;
 pub mod lexer;
 pub mod lir;
+pub mod lookup;
 pub mod mangle;
 pub mod mir;
 pub mod name_resolve;

@@ -52,6 +52,19 @@ impl Span {
     pub fn new(file: SourceFile, start_offset: usize, end_offset: usize) -> Self {
         Self { file, start_offset, end_offset }
     }
+
+    pub fn encloses(&self, loc: Location) -> bool {
+        if self.file != loc.file {
+            return false;
+        };
+        if self.start_offset > loc.offset {
+            return false;
+        }
+        if self.end_offset < loc.offset {
+            return false;
+        }
+        true
+    }
 }
 
 impl Location {

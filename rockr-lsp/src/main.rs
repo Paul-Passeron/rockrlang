@@ -36,6 +36,10 @@ use rockr::{
         diagnostic::{Diag, Severity},
         program_has_errors,
     },
+    hir::{FunctionLikeAst, function_ast},
+    lookup::{enclosing_fun, thir::ThirNode},
+    ril::FunctionId,
+    thir::thir_body,
 };
 use salsa::Setter;
 use std::{
@@ -298,7 +302,61 @@ impl<'a> Lsp<'a> {
         let uri = pos_params.text_document.uri;
         let pos = pos_params.position;
         let loc = self.rockr_loc(uri, pos)?;
-        log!("TODO: handle hover request at {}", loc.loc_info(&self.db));
+        if let Some(id) = enclosing_fun(&self.db, loc) {
+            self.handle_hover_in_function(id, loc)
+        } else {
+            log!(
+                "TODO: handle hover request at {} (Not inside a function)",
+                loc.loc_info(&self.db)
+            );
+            None
+        }
+    }
+
+    fn handle_hover_in_function(
+        &mut self,
+        func: FunctionId,
+        loc: Location,
+    ) -> Option<Hover> {
+        let db = &self.db;
+        let body_span = match function_ast(db, func.into()).inner(db) {
+            FunctionLikeAst::ExternDef(_, _) => None,
+            FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
+            FunctionLikeAst::Method(ast) => Some(ast.data.body_span),
+            FunctionLikeAst::TraitMethod(_) => None,
+        }?;
+        if !body_span.encloses(loc) {
+            if loc.offset >= body_span.start_offset {
+                return None;
+            }
+            log!(
+                "TODO: handle hover request at {} (Inside function signature)",
+                loc.loc_info(&self.db)
+            );
+            return None;
+        }
+        let thir_body = thir_body(db, func)?;
+        let node = thir_body.node_at(&self.db, loc)?;
+        log!("Found a node !");
+        match node {
+            ThirNode::Expr { id, setup } => {
+                log!("Expr with id = {:?}, setup = {}", id.into_raw(), setup.is_some())
+            }
+            ThirNode::Place(idx) => log!("Place with id = {}", idx.into_raw()),
+            ThirNode::Local(idx) => log!("Local with id = {}", idx.into_raw()),
+            ThirNode::Stmt(stmt) => {
+                log!("Stmt: {}", stmt.span.start().loc_info(&self.db))
+            }
+            ThirNode::Pattern(pat) => {
+                log!("Pattern: {}", pat.span.start().loc_info(&self.db))
+            }
+            ThirNode::MatchBranch(br) => {
+                log!(
+                    "Match branch: {}",
+                    br.get_whole_span(thir_body).start().loc_info(&self.db)
+                )
+            }
+        }
         None
     }
 }
