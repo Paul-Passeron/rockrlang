@@ -16,14 +16,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{Lsp, log};
-use lsp_types::{Hover, HoverParams};
+use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
 use rockr::{
-    common::location::Location,
+    common::location::{Location, Span},
     hir::{FunctionLikeAst, function_ast},
     lookup::{enclosing_fun, thir::ThirNode},
-    ril::FunctionId,
+    ril::{FunctionId, TypeRef},
     thir::{
-        stmt::{BlockSemanticInfo, StmtKind},
+        ExprId, LocalId, PlaceId, Thir,
+        stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
         thir_body,
     },
 };
@@ -43,6 +44,17 @@ impl<'a> Lsp<'a> {
             );
             None
         }
+    }
+
+    fn hover_type_span_response(&self, ty: TypeRef, span: Span) -> Hover {
+        let ty_str = format!("`{}`", ty.to_string(&self.db));
+        self.hover_span_response(ty_str, span)
+    }
+
+    fn hover_span_response(&self, md: String, span: Span) -> Hover {
+        let range = self.span(span);
+        let contents = HoverContents::Scalar(MarkedString::from_markdown(md));
+        Hover { contents, range: Some(range) }
     }
 
     fn handle_hover_in_function(
@@ -67,40 +79,79 @@ impl<'a> Lsp<'a> {
             );
             return None;
         }
-        let thir_body = thir_body(db, func)?;
-        let node = thir_body.node_at(&self.db, loc)?;
+        let thir = thir_body(db, func)?;
+        let node = thir.node_at(&self.db, loc)?;
         log!("Found a node !");
         match node {
-            ThirNode::Expr { id, setup } => {
-                log!("Expr with id = {:?}, setup = {}", id.into_raw(), setup.is_some())
-            }
-            ThirNode::Place(idx) => log!("Place with id = {}", idx.into_raw()),
-            ThirNode::Local(idx) => log!("Local with id = {}", idx.into_raw()),
+            ThirNode::Expr { id, setup } => Some(self.hover_expr(thir, id, setup)),
+            ThirNode::Place(idx) => Some(self.hover_place(thir, idx)),
+            ThirNode::Local(idx) => Some(self.hover_local(thir, idx)),
             ThirNode::Stmt(stmt) => match &stmt.kind {
                 StmtKind::Block {
                     semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
                     ..
-                } => log!(
-                    "{}: Struct destructuring: {}",
-                    stmt.span.start().loc_info(&self.db),
-                    struct_ref.clone().as_type_ref(&self.db).to_string(&self.db)
-                ),
+                } => {
+                    let ty = struct_ref.clone().as_type_ref(&self.db);
+                    Some(self.hover_type_span_response(ty, stmt.span))
+                }
                 StmtKind::Block {
                     semantic_infos: Some(BlockSemanticInfo::ForLoop),
                     ..
-                } => log!("{}: for-loop", stmt.span.start().loc_info(&self.db),),
-                _ => log!("Stmt: {}", stmt.span.start().loc_info(&self.db)),
+                } => {
+                    log!("{}: for-loop", stmt.span.start().loc_info(&self.db),);
+                    None
+                }
+                _ => {
+                    log!("Stmt: {}", stmt.span.start().loc_info(&self.db));
+                    None
+                }
             },
             ThirNode::Pattern(pat) => {
-                log!("Pattern: {}", pat.span.start().loc_info(&self.db))
+                Some(self.hover_type_span_response(pat.ty, pat.span))
             }
             ThirNode::MatchBranch(br) => {
                 log!(
                     "Match branch: {}",
-                    br.get_whole_span(thir_body).start().loc_info(&self.db)
-                )
+                    br.get_whole_span(thir).start().loc_info(&self.db)
+                );
+                None
             }
         }
-        None
+    }
+
+    fn hover_local(&self, thir: &Thir, idx: LocalId) -> Hover {
+        let local = &thir.locals[idx];
+        let local_name = if let Some((_, s)) = &local.source {
+            s.to_string(&self.db)
+        } else {
+            format!("_{}", idx.into_raw())
+        };
+        self.hover_span_response(
+            format!(
+                "```rockr\nlet {}{local_name}: {}\n```",
+                local.mutability,
+                local.ty.to_string(&self.db)
+            ),
+            local.span,
+        )
+    }
+
+    fn hover_place(&self, thir: &Thir, idx: PlaceId) -> Hover {
+        let place = &thir.places[idx];
+        if place.projections.is_empty() {
+            match place.base {
+                rockr::thir::PlaceBase::Local(local) => {
+                    let mut hover = self.hover_local(thir, local);
+                    hover.range = Some(self.span(place.span));
+                    return hover;
+                }
+            }
+        }
+        self.hover_type_span_response(place.ty, place.span)
+    }
+
+    fn hover_expr(&self, thir: &Thir, id: ExprId, _setup: Option<&[ThirStmt]>) -> Hover {
+        let expr = &thir.exprs[id];
+        self.hover_type_span_response(expr.ty, expr.span)
     }
 }
