@@ -220,6 +220,7 @@ pub struct HirMatchBranch {
     pub locals: Vec<LocalId>,
     pub guard: Option<HirExpr>,
     pub body: Box<HirStmt>,
+    pub is_synthetic: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

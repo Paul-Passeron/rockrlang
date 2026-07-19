@@ -196,6 +196,7 @@ pub struct ThirMatchBranch {
     pub guard: Option<ThirExprWithSetup>,
     pub body_scope: ScopeId,
     pub body: Vec<ThirStmt>,
+    pub is_synthetic: bool,
 }
 
 // Does this match the old behaviour ?

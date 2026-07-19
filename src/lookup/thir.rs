@@ -38,7 +38,9 @@ pub enum ThirNode<'thir> {
 
 impl Thir {
     fn local_at<'a>(&'a self, local: LocalId, loc: Location) -> Option<ThirNode<'a>> {
-        self.locals[local].span.encloses(loc).then_some(ThirNode::Local(local))
+        let thir_loc = &self.locals[local];
+        thir_loc.span.encloses(loc).then_some(())?;
+        thir_loc.is_synthetic.not().then_some(ThirNode::Local(local))
     }
 
     fn place_at<'a>(&'a self, place: PlaceId, loc: Location) -> Option<ThirNode<'a>> {
@@ -46,9 +48,9 @@ impl Thir {
         let pl = &self.places[place];
         pl.span.encloses(loc).then_some(())?;
         match pl.base {
-            PlaceBase::Local(idx) => {
-                self.local_at(idx, loc).or(Some(ThirNode::Place(place)))
-            }
+            PlaceBase::Local(idx) => self
+                .local_at(idx, loc)
+                .or(pl.is_synthetic.not().then_some(ThirNode::Place(place))),
         }
     }
 
@@ -97,7 +99,7 @@ impl Thir {
                 ThirConstructorArgs::None => None,
             },
         };
-        Some(res.unwrap_or(ThirNode::Expr { id: expr, setup: None }))
+        res.or(e.is_synthetic.not().then_some(ThirNode::Expr { id: expr, setup: None }))
     }
 
     fn expr_with_setup_at<'a>(
@@ -106,7 +108,9 @@ impl Thir {
         setup: &'a ThirExprWithSetup,
         loc: Location,
     ) -> Option<ThirNode<'a>> {
-        if let Some(node) = setup.stmts.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)) {
+        if let Some(node) =
+            setup.stmts.iter().find_map(|stmt| self.stmt_at(db, stmt, loc))
+        {
             return Some(node);
         }
         Some(match self.expr_at(db, setup.expr, loc)? {
@@ -145,7 +149,7 @@ impl Thir {
             ThirPatternKind::IntLit(_) => None,
             ThirPatternKind::Error => None,
         };
-        Some(res.unwrap_or(ThirNode::Pattern(pat)))
+        res.or(pat.is_synthetic.not().then_some(ThirNode::Pattern(pat)))
     }
 
     fn branch_at<'a>(
@@ -161,7 +165,7 @@ impl Thir {
             .or_else(|| self.expr_with_setup_at(db, branch.guard.as_ref()?, loc))
             .or_else(|| branch.body.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)));
 
-        Some(res.unwrap_or(ThirNode::MatchBranch(branch)))
+        res.or(branch.is_synthetic.not().then_some(ThirNode::MatchBranch(branch)))
     }
 
     fn stmt_at<'a>(

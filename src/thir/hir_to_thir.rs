@@ -437,7 +437,13 @@ impl<'db> ThirTranslator<'db> {
             self.scoped(b, branch.body.span, ScopeKind::Block, |this, b| {
                 this.handle_single_stmt(b, &branch.body)
             });
-        ThirMatchBranch { pattern, guard, body_scope, body }
+        ThirMatchBranch {
+            pattern,
+            guard,
+            body_scope,
+            body,
+            is_synthetic: branch.is_synthetic,
+        }
     }
 
     fn handle_match(

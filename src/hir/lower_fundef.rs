@@ -1097,6 +1097,7 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_stmt(&mut self, stmt: &AstStmt, scope: &mut Scope) -> HirStmt {
+        let mut is_synthetic = false;
         let kind = match &stmt.data {
             AstStmtDesc::Return { value } => {
                 let value =
@@ -1115,6 +1116,7 @@ impl<'db> LowerFundef<'db> {
                 HirStmtKind::While { cond, body: body.boxed() }
             }
             AstStmtDesc::For { element, iterator, body } => {
+                is_synthetic = true;
                 self.desugar_for_loop(scope, element, iterator, body)
             }
             AstStmtDesc::LetDecl { pat, type_constraint, value } => {
@@ -1173,7 +1175,13 @@ impl<'db> LowerFundef<'db> {
                             self.lower_expr(expr, &branch_scope, self.module)
                         });
                         let body = self.lower_stmt(body, &mut branch_scope);
-                        HirMatchBranch { pattern, locals, guard, body: body.boxed() }
+                        HirMatchBranch {
+                            pattern,
+                            locals,
+                            guard,
+                            body: body.boxed(),
+                            is_synthetic: false,
+                        }
                     })
                     .collect();
                 HirStmtKind::Match { scrutinee, branches }
@@ -1184,7 +1192,7 @@ impl<'db> LowerFundef<'db> {
             AstStmtDesc::Break => HirStmtKind::Break,
             AstStmtDesc::Error(_) => HirStmtKind::Error,
         };
-        self.new_stmt(kind, stmt.span, false)
+        self.new_stmt(kind, stmt.span, is_synthetic)
     }
 
     fn desugar_for_loop(
