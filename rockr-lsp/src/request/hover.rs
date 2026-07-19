@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::convert::identity;
+
 use crate::{
     Lsp, log,
     naming::{function_id_to_named_string, type_ref_to_named_string_in},
@@ -23,12 +25,15 @@ use itertools::Itertools;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
 use rockr::{
     common::location::{Location, Span},
-    hir::{FunctionLikeAst, function_ast},
-    lookup::{enclosing_fun, thir::ThirNode},
+    lookup::{
+        enclosing_fun,
+        sig::{SigNode, sig_node_at},
+        thir::ThirNode,
+    },
     name_resolve::type_expr::get_templates_of_fun,
-    ril::{FunctionId, TypeRef},
+    ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
-        ExprId, ExprKind, LocalId, PlaceId, Thir,
+        Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
         thir_body,
     },
@@ -67,29 +72,87 @@ impl<'a> Lsp<'a> {
         Hover { contents, range: Some(range) }
     }
 
+    fn hover_sig(&self, func: FunctionId, node: SigNode) -> Hover {
+        log!("Hovering sig !");
+        match node {
+            SigNode::ParamType(function_param) => self.hover_type_span_response(
+                func,
+                function_param.ty,
+                function_param.ty_span,
+            ),
+            SigNode::ParamName(function_param) => {
+                let name = function_param.name.to_string(&self.db);
+                self.hover_span_response(
+                    format!(
+                        "arg {}: `{name}: {}\n`",
+                        function_param.idx,
+                        type_ref_to_named_string_in(&self.db, func, function_param.ty)
+                    ),
+                    function_param.name_span,
+                )
+            }
+            SigNode::ReturnTy(return_ty) => {
+                self.hover_type_span_response(func, return_ty.ty, return_ty.span)
+            }
+            SigNode::TemplateParam { param, constraints } => {
+                let constraints_str = constraints
+                    .into_iter()
+                    .filter_map(identity)
+                    .map(|cs| cs.to_string(&self.db))
+                    .join(" + ");
+
+                self.hover_span_response(
+                    format!(
+                        "template {}: {}{}",
+                        param.idx,
+                        param.name.to_string(&self.db),
+                        if constraints_str.is_empty() {
+                            String::new()
+                        } else {
+                            format!(": `{constraints_str}`")
+                        }
+                    ),
+                    param.span,
+                )
+            }
+            SigNode::FunctionName { span, .. } => {
+                let func_ref = FunctionRef {
+                    id: func,
+                    args: get_templates_of_fun(&self.db, func.into())
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| TypeRef::Param(TypeParamId(i)))
+                        .collect(),
+                    self_ty: Some(TypeRef::Zelf),
+                    dispatch: Dispatch::Direct,
+                };
+                self.hover_function_infos(func, &func_ref, false, span)
+            }
+            SigNode::TemplateConstraint { param, constraint } => self
+                .hover_span_response(
+                    format!(
+                        "template {}: {}`: {}`",
+                        param.idx,
+                        param.name.to_string(&self.db),
+                        constraint.iref.to_string(&self.db)
+                    ),
+                    constraint.span,
+                ),
+        }
+    }
+
     fn handle_hover_in_function(
         &mut self,
         func: FunctionId,
         loc: Location,
     ) -> Option<Hover> {
-        let db = &self.db;
-        let body_span = match function_ast(db, func.into()).inner(db) {
-            FunctionLikeAst::ExternDef(_, _) => None,
-            FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::Method(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::TraitMethod(_) => None,
-        }?;
-        if !body_span.encloses(loc) {
-            if loc.offset >= body_span.start_offset {
-                return None;
-            }
-            log!(
-                "TODO: handle hover request at {} (Inside function signature)",
-                loc.loc_info(&self.db)
-            );
-            return None;
+        if let Some(node) = sig_node_at(&self.db, loc) {
+            return Some(self.hover_sig(func, node));
         }
-        let thir = thir_body(db, func)?;
+        let body_span = func.body_span(&self.db)?;
+        // Make sure we are inside the body
+        body_span.encloses(loc).then_some(())?;
+        let thir = thir_body(&self.db, func)?;
         let node = thir.node_at(&self.db, loc)?;
         match node {
             ThirNode::Expr { id, setup } => self.hover_expr(func, thir, id, setup),
@@ -147,6 +210,35 @@ impl<'a> Lsp<'a> {
         self.hover_type_span_response(func, place.ty, place.span)
     }
 
+    fn hover_function_infos(
+        &self,
+        in_func: FunctionId,
+        target_func: &FunctionRef,
+        show_templates: bool,
+        span: Span,
+    ) -> Hover {
+        let function_name = function_id_to_named_string(&self.db, target_func.id);
+        let hover_string = if !show_templates || target_func.args.is_empty() {
+            format!("`{function_name}`\n")
+        } else {
+            let templates = get_templates_of_fun(&self.db, target_func.id.interned());
+            let template_string = templates
+                .iter()
+                .zip(&target_func.args)
+                .map(|(temp, arg)| {
+                    format!(
+                        "`{}` = `{}`",
+                        temp.name.to_string(&self.db),
+                        type_ref_to_named_string_in(&self.db, in_func, *arg)
+                    )
+                })
+                .join(", ");
+
+            format!("`{function_name}`\n\n{template_string}\n")
+        };
+        self.hover_span_response(hover_string, span)
+    }
+
     fn hover_expr(
         &self,
         func: FunctionId,
@@ -158,26 +250,7 @@ impl<'a> Lsp<'a> {
         match &expr.kind {
             ExprKind::Use(idx) => Some(self.hover_place(func, thir, *idx)),
             ExprKind::Call { called, .. } => {
-                let function_name = function_id_to_named_string(&self.db, called.id);
-                let hover_string = if called.args.is_empty() {
-                    format!("`{function_name}`\n")
-                } else {
-                    let templates = get_templates_of_fun(&self.db, called.id.interned());
-                    let template_string = templates
-                        .iter()
-                        .zip(&called.args)
-                        .map(|(temp, arg)| {
-                            format!(
-                                "`{}` = `{}`",
-                                temp.name.to_string(&self.db),
-                                type_ref_to_named_string_in(&self.db, func, *arg)
-                            )
-                        })
-                        .join(", ");
-
-                    format!("`{function_name}`\n\n{template_string}\n")
-                };
-                Some(self.hover_span_response(hover_string, expr.span))
+                Some(self.hover_function_infos(func, called, true, expr.span))
             }
             ExprKind::AddressOf { .. }
             | ExprKind::Ref { .. }

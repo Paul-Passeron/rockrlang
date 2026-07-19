@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use itertools::Itertools;
+
 use crate::{
     Db, SourceFile,
     common::{
@@ -66,9 +68,9 @@ pub enum SigNode {
     ParamType(FunctionParam),
     ParamName(FunctionParam),
     ReturnTy(ReturnTy),
-    TemplateParam(TemplateParam),
+    TemplateParam { param: TemplateParam, constraints: Vec<Option<InterfaceRef>> },
     FunctionName { name: Symbol, span: Span },
-    TemplateConstrait { param: TemplateParam, constraint: TypeConstraint },
+    TemplateConstraint { param: TemplateParam, constraint: TypeConstraint },
 }
 
 struct GeneralSignature<'a> {
@@ -110,7 +112,7 @@ impl FunctionLikeAst {
 }
 
 impl FunctionId {
-    fn body_span(self, db: &dyn Db) -> Option<Span> {
+    pub fn body_span(self, db: &dyn Db) -> Option<Span> {
         match function_ast(db, self.into()).inner(db) {
             FunctionLikeAst::ExternDef(_, _) => None,
             FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
@@ -128,7 +130,7 @@ pub fn sig_node_at(db: &dyn Db, loc: Location) -> Option<SigNode> {
 
         // Make sure we are inside the signature
         func.body_span(db)
-            .is_none_or(|span| span.encloses(loc) || loc.offset >= span.start_offset)
+            .is_none_or(|span| !span.encloses(loc) && loc.offset < span.start_offset)
             .then_some(())?;
 
         let ast = function_ast(db, func.into()).inner(db);
@@ -227,8 +229,18 @@ fn templ_at(
     if !templ.span.encloses(loc) {
         return Some(None);
     }
+
+    let resolved_constraints = templ
+        .constraints
+        .iter()
+        .map(|constraint| ctx.resolve_interface(db, &constraint.data))
+        .collect_vec();
+
     if templ.name_span.encloses(loc) {
-        return Some(Some(SigNode::TemplateParam(param)));
+        return Some(Some(SigNode::TemplateParam {
+            param,
+            constraints: resolved_constraints,
+        }));
     }
     for constraint in &templ.constraints {
         if !constraint.span.encloses(loc) {
@@ -239,7 +251,7 @@ fn templ_at(
             // This is an error !
             return None;
         };
-        return Some(Some(SigNode::TemplateConstrait {
+        return Some(Some(SigNode::TemplateConstraint {
             param,
             constraint: TypeConstraint { iref, span: constraint.span },
         }));
