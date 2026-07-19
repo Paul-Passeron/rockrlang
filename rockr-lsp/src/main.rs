@@ -42,6 +42,7 @@ use std::{
     time::SystemTime,
 };
 
+pub mod naming;
 pub mod notif;
 pub mod request;
 

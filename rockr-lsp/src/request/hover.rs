@@ -15,7 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Lsp, log};
+use crate::{
+    Lsp, log,
+    naming::{function_id_to_named_string, type_ref_to_named_string_in},
+};
 use itertools::Itertools;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
 use rockr::{
@@ -48,8 +51,8 @@ impl<'a> Lsp<'a> {
         }
     }
 
-    fn hover_type_span_response(&self, ty: TypeRef, span: Span) -> Hover {
-        let ty_str = format!("`{}`", ty.to_string(&self.db));
+    fn hover_type_span_response(&self, func: FunctionId, ty: TypeRef, span: Span) -> Hover {
+        let ty_str = format!("`{}`", type_ref_to_named_string_in(&self.db, func, ty));
         self.hover_span_response(ty_str, span)
     }
 
@@ -85,16 +88,16 @@ impl<'a> Lsp<'a> {
         let node = thir.node_at(&self.db, loc)?;
         log!("Found a node !");
         match node {
-            ThirNode::Expr { id, setup } => self.hover_expr(thir, id, setup),
-            ThirNode::Place(idx) => Some(self.hover_place(thir, idx)),
-            ThirNode::Local(idx) => Some(self.hover_local(thir, idx)),
+            ThirNode::Expr { id, setup } => self.hover_expr(func, thir, id, setup),
+            ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
+            ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
             ThirNode::Stmt(stmt) => match &stmt.kind {
                 StmtKind::Block {
                     semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
                     ..
                 } => {
                     let ty = struct_ref.clone().as_type_ref(&self.db);
-                    Some(self.hover_type_span_response(ty, stmt.span))
+                    Some(self.hover_type_span_response(func, ty, stmt.span))
                 }
                 StmtKind::Block {
                     semantic_infos: Some(BlockSemanticInfo::ForLoop),
@@ -109,7 +112,7 @@ impl<'a> Lsp<'a> {
                 }
             },
             ThirNode::Pattern(pat) => {
-                Some(self.hover_type_span_response(pat.ty, pat.span))
+                Some(self.hover_type_span_response(func, pat.ty, pat.span))
             }
             ThirNode::MatchBranch(br) => {
                 log!(
@@ -121,7 +124,7 @@ impl<'a> Lsp<'a> {
         }
     }
 
-    fn hover_local(&self, thir: &Thir, idx: LocalId) -> Hover {
+    fn hover_local(&self, func: FunctionId, thir: &Thir, idx: LocalId) -> Hover {
         let local = &thir.locals[idx];
         let local_name = if let Some((_, s)) = &local.source {
             s.to_string(&self.db)
@@ -132,37 +135,38 @@ impl<'a> Lsp<'a> {
             format!(
                 "```rockr\nlet {}{local_name}: {}\n```",
                 local.mutability,
-                local.ty.to_string(&self.db)
+                type_ref_to_named_string_in(&self.db, func, local.ty)
             ),
             local.span,
         )
     }
 
-    fn hover_place(&self, thir: &Thir, idx: PlaceId) -> Hover {
+    fn hover_place(&self, func: FunctionId, thir: &Thir, idx: PlaceId) -> Hover {
         let place = &thir.places[idx];
         if place.projections.is_empty() {
             match place.base {
                 rockr::thir::PlaceBase::Local(local) => {
-                    let mut hover = self.hover_local(thir, local);
+                    let mut hover = self.hover_local(func, thir, local);
                     hover.range = Some(self.span(place.span));
                     return hover;
                 }
             }
         }
-        self.hover_type_span_response(place.ty, place.span)
+        self.hover_type_span_response(func, place.ty, place.span)
     }
 
     fn hover_expr(
         &self,
+        func: FunctionId,
         thir: &Thir,
         id: ExprId,
         _setup: Option<&[ThirStmt]>,
     ) -> Option<Hover> {
         let expr = &thir.exprs[id];
         match &expr.kind {
-            ExprKind::Use(idx) => Some(self.hover_place(thir, *idx)),
+            ExprKind::Use(idx) => Some(self.hover_place(func, thir, *idx)),
             ExprKind::Call { called, .. } => {
-                let function_name = called.id.sig_to_string(&self.db);
+                let function_name = function_id_to_named_string(&self.db, called.id);
                 let hover_string = if called.args.is_empty() {
                     format!("`{function_name}`\n")
                 } else {
@@ -174,7 +178,7 @@ impl<'a> Lsp<'a> {
                             format!(
                                 "`{}` = `{}`",
                                 temp.name.to_string(&self.db),
-                                arg.to_string(&self.db)
+                                type_ref_to_named_string_in(&self.db, func, *arg)
                             )
                         })
                         .join(", ");
@@ -196,7 +200,7 @@ impl<'a> Lsp<'a> {
             | ExprKind::Constructor { .. }
             | ExprKind::Metadata(_)
             | ExprKind::Cast(_, _) => {
-                Some(self.hover_type_span_response(expr.ty, expr.span))
+                Some(self.hover_type_span_response(func, expr.ty, expr.span))
             }
             _ => None,
         }
