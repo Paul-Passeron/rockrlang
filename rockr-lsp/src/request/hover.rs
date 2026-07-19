@@ -16,14 +16,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{Lsp, log};
+use itertools::Itertools;
 use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
 use rockr::{
     common::location::{Location, Span},
     hir::{FunctionLikeAst, function_ast},
     lookup::{enclosing_fun, thir::ThirNode},
+    name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeRef},
     thir::{
-        ExprId, LocalId, PlaceId, Thir,
+        ExprId, ExprKind, LocalId, PlaceId, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
         thir_body,
     },
@@ -83,7 +85,7 @@ impl<'a> Lsp<'a> {
         let node = thir.node_at(&self.db, loc)?;
         log!("Found a node !");
         match node {
-            ThirNode::Expr { id, setup } => Some(self.hover_expr(thir, id, setup)),
+            ThirNode::Expr { id, setup } => self.hover_expr(thir, id, setup),
             ThirNode::Place(idx) => Some(self.hover_place(thir, idx)),
             ThirNode::Local(idx) => Some(self.hover_local(thir, idx)),
             ThirNode::Stmt(stmt) => match &stmt.kind {
@@ -150,8 +152,53 @@ impl<'a> Lsp<'a> {
         self.hover_type_span_response(place.ty, place.span)
     }
 
-    fn hover_expr(&self, thir: &Thir, id: ExprId, _setup: Option<&[ThirStmt]>) -> Hover {
+    fn hover_expr(
+        &self,
+        thir: &Thir,
+        id: ExprId,
+        _setup: Option<&[ThirStmt]>,
+    ) -> Option<Hover> {
         let expr = &thir.exprs[id];
-        self.hover_type_span_response(expr.ty, expr.span)
+        match &expr.kind {
+            ExprKind::Use(idx) => Some(self.hover_place(thir, *idx)),
+            ExprKind::Call { called, .. } => {
+                let function_name = called.id.called_to_string(&self.db);
+                let hover_string = if called.args.is_empty() {
+                    format!("`{function_name}`\n")
+                } else {
+                    let templates = get_templates_of_fun(&self.db, called.id.interned());
+                    let template_string = templates
+                        .iter()
+                        .zip(&called.args)
+                        .map(|(temp, arg)| {
+                            format!(
+                                "`{}` = `{}`",
+                                temp.name.to_string(&self.db),
+                                arg.to_string(&self.db)
+                            )
+                        })
+                        .join(", ");
+
+                    format!("`{function_name}`\n\n{template_string}\n")
+                };
+                Some(self.hover_span_response(hover_string, expr.span))
+            }
+            ExprKind::AddressOf { .. }
+            | ExprKind::Ref { .. }
+            | ExprKind::BinOp { .. }
+            | ExprKind::StructLit { .. }
+            | ExprKind::Neg(_)
+            | ExprKind::Not(_)
+            | ExprKind::Tuple(_)
+            | ExprKind::SliceLit(_)
+            | ExprKind::TypeName(_)
+            | ExprKind::SizeOf(_)
+            | ExprKind::Constructor { .. }
+            | ExprKind::Metadata(_)
+            | ExprKind::Cast(_, _) => {
+                Some(self.hover_type_span_response(expr.ty, expr.span))
+            }
+            _ => None,
+        }
     }
 }
