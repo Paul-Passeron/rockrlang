@@ -22,7 +22,9 @@ use crate::{
     naming::{function_id_to_named_string, type_ref_to_named_string_in},
 };
 use itertools::Itertools;
-use lsp_types::{Hover, HoverContents, HoverParams, MarkedString};
+use lsp_types::{
+    Hover, HoverContents, HoverParams, MarkedString, MarkupContent, MarkupKind,
+};
 use rockr::{
     common::location::{Location, Span},
     lookup::{
@@ -72,8 +74,14 @@ impl<'a> Lsp<'a> {
         Hover { contents, range: Some(range) }
     }
 
+    fn hover_span_response_blocks(&self, mds: Vec<String>, span: Span) -> Hover {
+        let value = mds.join("\n\n---\n\n");
+        let contents =
+            HoverContents::Markup(MarkupContent { kind: MarkupKind::Markdown, value });
+        Hover { contents, range: Some(self.span(span)) }
+    }
+
     fn hover_sig(&self, func: FunctionId, node: SigNode) -> Hover {
-        log!("Hovering sig !");
         match node {
             SigNode::ParamType(function_param) => self.hover_type_span_response(
                 func,
@@ -188,7 +196,7 @@ impl<'a> Lsp<'a> {
         };
         self.hover_span_response(
             format!(
-                "```rockr\nlet {}{local_name}: {}\n```",
+                "`let {}{local_name}: {}`",
                 local.mutability,
                 type_ref_to_named_string_in(&self.db, func, local.ty)
             ),
@@ -218,25 +226,26 @@ impl<'a> Lsp<'a> {
         span: Span,
     ) -> Hover {
         let function_name = function_id_to_named_string(&self.db, target_func.id);
-        let hover_string = if !show_templates || target_func.args.is_empty() {
-            format!("`{function_name}`\n")
-        } else {
-            let templates = get_templates_of_fun(&self.db, target_func.id.interned());
-            let template_string = templates
-                .iter()
-                .zip(&target_func.args)
-                .map(|(temp, arg)| {
-                    format!(
-                        "`{}` = `{}`",
-                        temp.name.to_string(&self.db),
-                        type_ref_to_named_string_in(&self.db, in_func, *arg)
-                    )
-                })
-                .join(", ");
+        if !show_templates || target_func.args.is_empty() {
+            return self.hover_span_response(format!("`{function_name}`"), span);
+        }
+        let templates = get_templates_of_fun(&self.db, target_func.id.interned());
+        let template_string = templates
+            .iter()
+            .zip(&target_func.args)
+            .map(|(temp, arg)| {
+                format!(
+                    "`{}` = `{}`",
+                    temp.name.to_string(&self.db),
+                    type_ref_to_named_string_in(&self.db, in_func, *arg)
+                )
+            })
+            .join(", ");
 
-            format!("`{function_name}`\n\n--------\n{template_string}\n")
-        };
-        self.hover_span_response(hover_string, span)
+        self.hover_span_response_blocks(
+            vec![format!("```rockr\n{function_name}\n```"), template_string],
+            span,
+        )
     }
 
     fn hover_expr(
