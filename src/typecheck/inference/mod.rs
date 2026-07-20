@@ -181,29 +181,11 @@ impl<'db> InferenceCtx<'db> {
         let ast = function_ast(this.db, func.interned()).inner(this.db);
         let args = ast.get_args();
         for (local, ast) in params.iter().zip_eq(args) {
-            let ty = this.implicit_ctx().resolve(this.db, &ast.ty.data).unwrap_or_else(||
-                panic!(
-                    "Top level items should already have valid and resolved types ({})",
-                    ast.ty.span.start().loc_info(db)
-                )
-            );
+            let ty = this.implicit_ctx().resolve_err(this.db, &ast.ty.data);
             let ty = this.allocate_type_ref(ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
             this.unify(local_ty, ty)
                 .expect("First local type unification should not fail");
-        }
-
-        #[cfg(debug_assertions)]
-        for (local, var) in &this.local_map {
-            if params.contains(local)
-            /* or however params are identifiable */
-            {
-                debug_assert!(
-                    this.table.probe_value(*var).is_some(),
-                    "param local {local:?} left unseeded in `{}`",
-                    func.name(db).display(db),
-                );
-            }
         }
 
         match (func.receiver(db).as_zelf_arg(), zelf_ty) {
