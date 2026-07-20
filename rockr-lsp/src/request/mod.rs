@@ -17,9 +17,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Lsp, log};
 use lsp_server::{Message, Request, Response};
-use lsp_types::request::{HoverRequest, Request as IRequest};
+use lsp_types::request::{GotoDefinition, HoverRequest, References, Request as IRequest};
 use std::fmt::Display;
 
+pub mod def;
 pub mod hover;
 
 impl<'a> Lsp<'a> {
@@ -49,6 +50,13 @@ impl<'a> Lsp<'a> {
                 .dispatch_request::<HoverRequest, String>(req, |this, params| {
                     Ok(this.handle_hover(params))
                 }),
+            GotoDefinition::METHOD => self
+                .dispatch_request::<GotoDefinition, String>(req, |this, params| {
+                    Ok(this.handle_goto_def(params))
+                }),
+            References::METHOD => {
+                self.dispatch_request::<References, String>(req, |_, _| Ok(None))
+            }
             _ => log!("TODO: Unhandled request ! {}", req.method),
         }
     }

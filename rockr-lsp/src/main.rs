@@ -198,6 +198,10 @@ impl<'a> Lsp<'a> {
         Some(sf)
     }
 
+    fn uri_of_sf(&self, sf: SourceFile) -> Uri {
+        self.uri_of_path(sf.path(&self.db))
+    }
+
     fn rockr_loc(&self, uri: Uri, pos: Position) -> Option<Location> {
         let sf = self.sf_of_uri(uri)?;
         let offset =
