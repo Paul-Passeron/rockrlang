@@ -18,16 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    check::{
+    Db, check::{
         mir::check_mir,
         thir::{checked_thir_body, thir_is_valid},
-    },
-    hir::function_ast,
-    name_resolve::type_expr::get_templates_of_fun,
-    ril::{FunctionId, ScopeOwnerId, TypeRef},
-    thir_to_mir::{MIRKey, mir},
-    typecheck::{conformance::method_impl_for, type_check_function},
+    }, hir::function_ast, mir::passes::dead_code_elimination::dce, name_resolve::type_expr::get_templates_of_fun, ril::{FunctionId, ScopeOwnerId, TypeRef}, thir_to_mir::{MIRKey, mir}, typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;
 
@@ -37,7 +31,8 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
     for (fdef, subs) in reachable_mir_instances(db, fdef) {
         if fdef.has_body(db) && thir_is_valid(db, fdef) {
             let the_mir = mir(db, fdef, subs);
-            check_mir(db, the_mir);
+            let dce = dce(db, the_mir.func);
+            check_mir(db, dce);
         }
     }
 }
