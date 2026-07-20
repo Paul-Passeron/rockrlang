@@ -18,15 +18,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::ops::Not;
 
 use crate::{
-    Db,
-    common::location::Location,
-    thir::{
+    Db, common::location::{Location, Span}, ril::TypeRef, thir::{
         ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Thir, ThirConstructorArgs,
         ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
 };
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ThirNode<'thir> {
     Expr { id: ExprId, setup: Option<&'thir [ThirStmt]> },
     Place(PlaceId),

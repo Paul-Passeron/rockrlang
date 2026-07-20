@@ -22,17 +22,20 @@ use crate::{
     },
 };
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ThirStmt {
     pub kind: StmtKind,
     pub span: Span,
     pub is_synthetic: bool,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum BlockSemanticInfo {
     StructDestructure(StructRef),
     ForLoop,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum StmtKind {
     Block {
         scope: ScopeId,

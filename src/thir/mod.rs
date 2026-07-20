@@ -150,18 +150,20 @@ pub enum ExprKind {
     // Todo: Add metadata maybe
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ThirExprWithSetup {
     pub stmts: Vec<ThirStmt>,
     pub expr: ExprId,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ThirConstructorArgs<T> {
     Tuple(Vec<T>),
     Struct(Vec<(Symbol, T)>),
     None,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ThirPattern {
     pub kind: ThirPatternKind,
     pub ty: TypeRef,
@@ -169,6 +171,7 @@ pub struct ThirPattern {
     pub is_synthetic: bool,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ThirPatternKind {
     Any,
     Bind { local: LocalId, mutable: bool },
@@ -191,6 +194,7 @@ pub enum ScopeKind {
     Block,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ThirMatchBranch {
     pub pattern: ThirPattern,
     pub guard: Option<ThirExprWithSetup>,
