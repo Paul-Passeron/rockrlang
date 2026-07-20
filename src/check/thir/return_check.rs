@@ -35,7 +35,7 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
     }
     if let Completeness::MayFallthrough { span } = check_stmts(db, thir, &thir.root) {
         Diag::generic_error(
-            format!("Emit real fallthrough diagnostic ({}:{})", file!(), line!()),
+            format!("This falls through, you probably forgot to add a `return` statement !"),
             span,
         )
         .accumulate(db)
@@ -101,8 +101,8 @@ pub fn check_stmts(db: &dyn Db, thir: &Thir, stmts: &[ThirStmt]) -> Completeness
         if check_stmt(db, thir, stmt).always_returns() {
             if i < stmts.len() - 1 {
                 let next_stmt = &stmts[i + 1];
-                Diag::todo(
-                    "Have a real unreachable diagnostic".to_string(),
+                Diag::generic_warning(
+                    "This statement is unreachable".to_string(),
                     next_stmt.span,
                 )
                 .accumulate(db);

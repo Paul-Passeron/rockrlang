@@ -928,15 +928,19 @@ impl<'db> ThirTranslator<'db> {
             }
             HirExprDesc::CallDirect { target, args, .. } => {
                 let args = args.iter().map(|arg| self.expr(b, arg, stmts)).collect_vec();
-                let call_infos =
-                    &self.tc.call_infos(self.db)[&typecheck::ExprId(expr.id)];
-                let fref = FunctionRef {
-                    id: *target,
-                    args: call_infos.substitution.clone(),
-                    self_ty: None,
-                    dispatch: Dispatch::Direct,
-                };
-                ExprKind::Call { called: fref, args }
+                if let Some(call_infos) =
+                    &self.tc.call_infos(self.db).get(&typecheck::ExprId(expr.id))
+                {
+                    let fref = FunctionRef {
+                        id: *target,
+                        args: call_infos.substitution.clone(),
+                        self_ty: None,
+                        dispatch: Dispatch::Direct,
+                    };
+                    ExprKind::Call { called: fref, args }
+                } else {
+                    ExprKind::Error
+                }
             }
             HirExprDesc::CallMethod { receiver, args, .. } => {
                 let Some(call_infos) =

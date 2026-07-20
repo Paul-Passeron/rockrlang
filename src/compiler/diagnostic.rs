@@ -113,6 +113,12 @@ impl Diag {
         Diag::new(Severity::Error, message, primary, vec![], vec![], vec![])
     }
 
+    pub fn generic_warning(message: String, span: Span) -> Self {
+        let primary = DiagLabel::new(span, None);
+
+        Diag::new(Severity::Warning, message, primary, vec![], vec![], vec![])
+    }
+
     pub fn new(
         severity: Severity,
         message: String,
