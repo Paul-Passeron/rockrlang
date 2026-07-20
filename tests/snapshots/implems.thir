@@ -1,48 +1,48 @@
 core/io.rkr:26:5
-thir fun core::io::`impl core::io::str`::println(&self): void {
+thir fun core::io::str::println(&self): void {
     core::io::printf(c"%.*s\n\0", (*self).len, (*self).data);
 }
 
 core/io.rkr:30:5
-thir fun core::io::`impl core::io::str`::print(&self): void {
+thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
     core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nExitting with code 1...\n\0");
     core::sys::exit(1);
 }
 
 examples/implems.rkr:17:5
-thir fun implems::`impl implems::First`::fst(): implems::First {
+thir fun implems::First::fst(): implems::First {
     return implems::First { x: 69 };
 }
 
 examples/implems.rkr:23:6
-thir fun implems::`impl implems::Foo for implems::First`::foo(&self): void {
+thir fun <implems::First as implems::Foo>::foo(&self): void {
     core::io::printf(c"Hello from first, x = %d\n\0", (*self).x);
 }
 
 examples/implems.rkr:27:6
-thir fun implems::`impl implems::Foo for implems::First`::theStatic(): void {
+thir fun <implems::First as implems::Foo>::theStatic(): void {
     let _0: core::io::str = "Hey from theStatic (First)";
-    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+    <core::io::str>::core::io::str::println(&_0);
 }
 
 examples/implems.rkr:33:5
-thir fun implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo<T0: implems::Foo>(&self): void {
+thir fun <implems::Hello<T0> as implems::Foo>::foo<T0: implems::Foo>(&self): void {
     <T0>::implems::Foo::foo(&(*self).x);
     core::io::printf(c"Hello from Hello !\n\0");
 }
 
 examples/implems.rkr:38:5
-thir fun implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic<T0: implems::Foo>(): void {
+thir fun <implems::Hello<T0> as implems::Foo>::theStatic<T0: implems::Foo>(): void {
     <T0>::implems::Foo::theStatic();
     let _0: core::io::str = "Hey from theStatic (Hello)";
-    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+    <core::io::str>::core::io::str::println(&_0);
 }
 
 examples/implems.rkr:44:1
@@ -51,14 +51,14 @@ thir fun implems::theStatic<T0: implems::Foo>(): void {
 }
 
 examples/implems.rkr:49:5
-thir fun implems::`impl <T0>implems::Hello<T0>`::new<T0>(x: T0): implems::Hello<T0> {
+thir fun implems::Hello<T0>::new<T0>(x: T0): implems::Hello<T0> {
     return implems::Hello::<T0> { x: x };
 }
 
 examples/implems.rkr:54:1
 thir fun implems::main(): i32 {
-    let _0: implems::Hello<implems::Hello<implems::First>> = <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(<implems::Hello<implems::First>>::implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(<implems::First>::implems::`impl implems::First`::fst()));
-    <implems::Hello<implems::Hello<implems::First>>>::implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(&_0);
+    let _0: implems::Hello<implems::Hello<implems::First>> = <implems::Hello<implems::Hello<implems::First>>>::implems::Hello<T0>::new::<implems::Hello<implems::First>>(<implems::Hello<implems::First>>::implems::Hello<T0>::new::<implems::First>(<implems::First>::implems::First::fst()));
+    <implems::Hello<implems::Hello<implems::First>>>::<implems::Hello<T0> as implems::Foo>::foo::<implems::Hello<implems::First>>(&_0);
     implems::theStatic::<implems::Hello<implems::Hello<implems::First>>>();
     return 0;
 }

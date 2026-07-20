@@ -1,4 +1,4 @@
-core::io::`impl core::io::str`::println
+core::io::str::println
 mir {
   locals:
     _0: self :&core::io::str
@@ -17,7 +17,7 @@ mir {
     return
 }
 
-core::io::`impl core::io::str`::print
+core::io::str::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -57,7 +57,7 @@ mir {
 
   bb1:
     _2 = &_0
-    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+    _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
@@ -69,7 +69,7 @@ mir {
     diverge
 }
 
-zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump
+zelf_non_receiver::Foo::dump
 mir {
   locals:
     _0: self :&zelf_non_receiver::Foo
@@ -91,7 +91,7 @@ mir {
   bb0 (entry):
     _1 = str {data: c"Foo {", len: 5_i32}
     _2 = &_1
-    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb1
+    _3 = call core::io::str::println(move _2) -> bb1
 
   bb1:
     _4 = call core::io::printf(c"  .x = %d,\n\0", copy _0.*.x) -> bb2
@@ -102,13 +102,13 @@ mir {
   bb3:
     _6 = str {data: c"}", len: 1_i32}
     _7 = &_6
-    _8 = call core::io::`impl core::io::str`::println(move _7) -> bb4
+    _8 = call core::io::str::println(move _7) -> bb4
 
   bb4:
     return
 }
 
-zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add
+zelf_non_receiver::Foo::comsuming_add
 mir {
   locals:
     _0: self :zelf_non_receiver::Foo
@@ -127,7 +127,7 @@ mir {
   bb0 (entry):
     _2 = &_0
     _3 = &_1
-    _4 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _2, move _3) -> bb1
+    _4 = call <zelf_non_receiver::Foo as zelf_non_receiver::Addable>::add(move _2, move _3) -> bb1
 
   bb1:
     return move _4
@@ -148,13 +148,13 @@ mir {
 
   bb0 (entry):
     _1 = &_0.*
-    _2 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _1, copy _0) -> bb1
+    _2 = call <zelf_non_receiver::Foo as zelf_non_receiver::Addable>::add(move _1, copy _0) -> bb1
 
   bb1:
     return move _2
 }
 
-zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add
+<zelf_non_receiver::Foo as zelf_non_receiver::Addable>::add
 mir {
   locals:
     _0: self :&zelf_non_receiver::Foo
@@ -177,7 +177,7 @@ mir {
     return move _4
 }
 
-zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double
+T0::double
 mir {
   locals:
     _0: self :&zelf_non_receiver::Foo
@@ -211,7 +211,7 @@ mir {
   bb0 (entry):
     _0 = str {data: c"", len: 0_i32}
     _1 = &_0
-    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
+    _2 = call core::io::str::println(move _1) -> bb1
 
   bb1:
     return
@@ -257,49 +257,49 @@ mir {
     _1 = Foo {x: 321_i32, y: 654_i32}
     _2 = &_0
     _3 = &_1
-    _4 = call zelf_non_receiver::`impl zelf_non_receiver::Addable for zelf_non_receiver::Foo`::add(move _2, move _3) -> bb1
+    _4 = call <zelf_non_receiver::Foo as zelf_non_receiver::Addable>::add(move _2, move _3) -> bb1
 
   bb1:
     _5 = move _4
     _6 = &_0
-    _7 = call zelf_non_receiver::`impl <T0: zelf_non_receiver::Addable>T0`::double::<zelf_non_receiver::Foo>(move _6) -> bb2
+    _7 = call T0::double::<zelf_non_receiver::Foo>(move _6) -> bb2
 
   bb2:
     _8 = move _7
     _9 = &_0
-    _10 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _9) -> bb3
+    _10 = call zelf_non_receiver::Foo::dump(move _9) -> bb3
 
   bb3:
     _11 = call zelf_non_receiver::nl() -> bb4
 
   bb4:
     _12 = &_1
-    _13 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _12) -> bb5
+    _13 = call zelf_non_receiver::Foo::dump(move _12) -> bb5
 
   bb5:
     _14 = call zelf_non_receiver::nl() -> bb6
 
   bb6:
     _15 = &_5
-    _16 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _15) -> bb7
+    _16 = call zelf_non_receiver::Foo::dump(move _15) -> bb7
 
   bb7:
     _17 = call zelf_non_receiver::nl() -> bb8
 
   bb8:
     _18 = &_8
-    _19 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _18) -> bb9
+    _19 = call zelf_non_receiver::Foo::dump(move _18) -> bb9
 
   bb9:
     _20 = call zelf_non_receiver::nl() -> bb10
 
   bb10:
-    _21 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::comsuming_add(move _0, move _1) -> bb11
+    _21 = call zelf_non_receiver::Foo::comsuming_add(move _0, move _1) -> bb11
 
   bb11:
     _22 = move _21
     _23 = &_22
-    _24 = call zelf_non_receiver::`impl zelf_non_receiver::Foo`::dump(move _23) -> bb12
+    _24 = call zelf_non_receiver::Foo::dump(move _23) -> bb12
 
   bb12:
     _25 = call zelf_non_receiver::nl() -> bb13

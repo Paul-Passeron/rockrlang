@@ -1,4 +1,4 @@
-core::io::`impl core::io::str`::println
+core::io::str::println
 mir {
   locals:
     _0: self :&core::io::str
@@ -17,7 +17,7 @@ mir {
     return
 }
 
-core::io::`impl core::io::str`::print
+core::io::str::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -57,7 +57,7 @@ mir {
 
   bb1:
     _2 = &_0
-    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+    _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
@@ -69,7 +69,7 @@ mir {
     diverge
 }
 
-implems::`impl implems::First`::fst
+implems::First::fst
 mir {
   locals:
     _0: implems::First
@@ -84,7 +84,7 @@ mir {
     return move _0
 }
 
-implems::`impl implems::Foo for implems::First`::foo
+<implems::First as implems::Foo>::foo
 mir {
   locals:
     _0: self :&implems::First
@@ -103,7 +103,7 @@ mir {
     return
 }
 
-implems::`impl implems::Foo for implems::First`::theStatic
+<implems::First as implems::Foo>::theStatic
 mir {
   locals:
     _0: core::io::str
@@ -118,13 +118,13 @@ mir {
   bb0 (entry):
     _0 = str {data: c"Hey from theStatic (First)", len: 26_i32}
     _1 = &_0
-    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
+    _2 = call core::io::str::println(move _1) -> bb1
 
   bb1:
     return
 }
 
-implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
+<implems::Hello<T0> as implems::Foo>::foo
 mir {
   locals:
     _0: self :&implems::Hello<implems::First>
@@ -140,7 +140,7 @@ mir {
 
   bb0 (entry):
     _1 = &_0.*.x
-    _2 = call implems::`impl implems::Foo for implems::First`::foo(move _1) -> bb1
+    _2 = call <implems::First as implems::Foo>::foo(move _1) -> bb1
 
   bb1:
     _3 = call core::io::printf(c"Hello from Hello !\n\0") -> bb2
@@ -149,7 +149,7 @@ mir {
     return
 }
 
-implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo
+<implems::Hello<T0> as implems::Foo>::foo
 mir {
   locals:
     _0: self :&implems::Hello<implems::Hello<implems::First>>
@@ -165,7 +165,7 @@ mir {
 
   bb0 (entry):
     _1 = &_0.*.x
-    _2 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::First>(move _1) -> bb1
+    _2 = call <implems::Hello<T0> as implems::Foo>::foo::<implems::First>(move _1) -> bb1
 
   bb1:
     _3 = call core::io::printf(c"Hello from Hello !\n\0") -> bb2
@@ -174,7 +174,7 @@ mir {
     return
 }
 
-implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic
+<implems::Hello<T0> as implems::Foo>::theStatic
 mir {
   locals:
     _0: void
@@ -188,18 +188,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call implems::`impl implems::Foo for implems::First`::theStatic() -> bb1
+    _0 = call <implems::First as implems::Foo>::theStatic() -> bb1
 
   bb1:
     _1 = str {data: c"Hey from theStatic (Hello)", len: 26_i32}
     _2 = &_1
-    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
+    _3 = call core::io::str::println(move _2) -> bb2
 
   bb2:
     return
 }
 
-implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic
+<implems::Hello<T0> as implems::Foo>::theStatic
 mir {
   locals:
     _0: void
@@ -213,12 +213,12 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::First>() -> bb1
+    _0 = call <implems::Hello<T0> as implems::Foo>::theStatic::<implems::First>() -> bb1
 
   bb1:
     _1 = str {data: c"Hey from theStatic (Hello)", len: 26_i32}
     _2 = &_1
-    _3 = call core::io::`impl core::io::str`::println(move _2) -> bb2
+    _3 = call core::io::str::println(move _2) -> bb2
 
   bb2:
     return
@@ -235,13 +235,13 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::theStatic::<implems::Hello<implems::First>>() -> bb1
+    _0 = call <implems::Hello<T0> as implems::Foo>::theStatic::<implems::Hello<implems::First>>() -> bb1
 
   bb1:
     return
 }
 
-implems::`impl <T0>implems::Hello<T0>`::new
+implems::Hello<T0>::new
 mir {
   locals:
     _0: x :implems::First
@@ -258,7 +258,7 @@ mir {
     return move _1
 }
 
-implems::`impl <T0>implems::Hello<T0>`::new
+implems::Hello<T0>::new
 mir {
   locals:
     _0: x :implems::Hello<implems::First>
@@ -292,18 +292,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call implems::`impl implems::First`::fst() -> bb1
+    _0 = call implems::First::fst() -> bb1
 
   bb1:
-    _1 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::First>(move _0) -> bb2
+    _1 = call implems::Hello<T0>::new::<implems::First>(move _0) -> bb2
 
   bb2:
-    _2 = call implems::`impl <T0>implems::Hello<T0>`::new::<implems::Hello<implems::First>>(move _1) -> bb3
+    _2 = call implems::Hello<T0>::new::<implems::Hello<implems::First>>(move _1) -> bb3
 
   bb3:
     _3 = move _2
     _4 = &_3
-    _5 = call implems::`impl <T0: implems::Foo>implems::Foo for implems::Hello<T0>`::foo::<implems::Hello<implems::First>>(move _4) -> bb4
+    _5 = call <implems::Hello<T0> as implems::Foo>::foo::<implems::Hello<implems::First>>(move _4) -> bb4
 
   bb4:
     _6 = call implems::theStatic::<implems::Hello<implems::Hello<implems::First>>>() -> bb5

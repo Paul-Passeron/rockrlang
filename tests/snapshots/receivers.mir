@@ -1,4 +1,4 @@
-core::io::`impl core::io::str`::print
+core::io::str::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -38,7 +38,7 @@ mir {
 
   bb1:
     _2 = &_0
-    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+    _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
@@ -50,7 +50,7 @@ mir {
     diverge
 }
 
-receivers::`impl receivers::Foo`::mut_self
+receivers::Foo::mut_self
 mir {
   locals:
     _0: mut self :receivers::Foo
@@ -65,7 +65,7 @@ mir {
     return
 }
 
-receivers::`impl receivers::Foo`::just_self
+receivers::Foo::just_self
 mir {
   locals:
     _0: self :receivers::Foo
@@ -80,7 +80,7 @@ mir {
     return
 }
 
-receivers::`impl receivers::Foo`::ref_self
+receivers::Foo::ref_self
 mir {
   locals:
     _0: self :&receivers::Foo
@@ -95,7 +95,7 @@ mir {
     return
 }
 
-receivers::`impl receivers::Foo`::mut_ref_self
+receivers::Foo::mut_ref_self
 mir {
   locals:
     _0: mut self :&mut receivers::Foo
@@ -131,21 +131,21 @@ mir {
 
   bb0 (entry):
     _0 = Foo {}
-    _1 = call receivers::`impl receivers::Foo`::mut_self(move _0) -> bb1
+    _1 = call receivers::Foo::mut_self(move _0) -> bb1
 
   bb1:
     _2 = Foo {}
-    _3 = call receivers::`impl receivers::Foo`::just_self(move _2) -> bb2
+    _3 = call receivers::Foo::just_self(move _2) -> bb2
 
   bb2:
     _4 = Foo {}
     _5 = &_4
-    _6 = call receivers::`impl receivers::Foo`::ref_self(move _5) -> bb3
+    _6 = call receivers::Foo::ref_self(move _5) -> bb3
 
   bb3:
     _7 = Foo {}
     _8 = &mut _7
-    _9 = call receivers::`impl receivers::Foo`::mut_ref_self(move _8) -> bb4
+    _9 = call receivers::Foo::mut_ref_self(move _8) -> bb4
 
   bb4:
     return 0_i32

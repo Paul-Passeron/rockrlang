@@ -1,4 +1,4 @@
-core::io::`impl core::io::str`::print
+core::io::str::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -38,7 +38,7 @@ mir {
 
   bb1:
     _2 = &_0
-    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+    _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3

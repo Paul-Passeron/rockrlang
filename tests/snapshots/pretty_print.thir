@@ -1,38 +1,38 @@
 core/io.rkr:26:5
-thir fun core::io::`impl core::io::str`::println(&self): void {
+thir fun core::io::str::println(&self): void {
     core::io::printf(c"%.*s\n\0", (*self).len, (*self).data);
 }
 
 core/io.rkr:30:5
-thir fun core::io::`impl core::io::str`::print(&self): void {
+thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
     core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::`impl core::io::str`::print(&message);
+    <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nExitting with code 1...\n\0");
     core::sys::exit(1);
 }
 
 examples/pretty_print.rkr:9:5
-thir fun pretty_print::`impl pretty_print::PrettyPrint for i32`::print(&self): void {
+thir fun <i32 as pretty_print::PrettyPrint>::print(&self): void {
     core::io::printf(c"%d\0", (*self));
 }
 
 examples/pretty_print.rkr:20:5
-thir fun pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print<T0: pretty_print::PrettyPrint>(&self): void {
+thir fun <pretty_print::MyStruct<T0> as pretty_print::PrettyPrint>::print<T0: pretty_print::PrettyPrint>(&self): void {
     core::io::printf(c"MyStruct<\0");
     let _1: core::io::str = sizeof(T0);
-    <core::io::str>::core::io::`impl core::io::str`::print(&_1);
+    <core::io::str>::core::io::str::print(&_1);
     core::io::printf(c"> { .x: %d, .y: \0", (*self).x);
-    <core::opt::opt<T0>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<T0>(&(*self).y);
+    <core::opt::opt<T0>>::<core::opt::opt<T0> as pretty_print::PrettyPrint>::print::<T0>(&(*self).y);
     core::io::printf(c" }\0");
 }
 
 examples/pretty_print.rkr:30:5
-thir fun pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print<T0: pretty_print::PrettyPrint>(&self): void {
+thir fun <core::opt::opt<T0> as pretty_print::PrettyPrint>::print<T0: pretty_print::PrettyPrint>(&self): void {
     match self {
         core::opt::opt::<T0>::#1(val) => 's0: {
             core::io::printf(c"Some(\0");
@@ -53,19 +53,19 @@ thir fun pretty_print::type_name<T0>(of: &T0): core::io::str {
 examples/pretty_print.rkr:51:1
 thir fun pretty_print::nl(): void {
     let _0: core::io::str = "";
-    <core::io::str>::core::io::`impl core::io::str`::println(&_0);
+    <core::io::str>::core::io::str::println(&_0);
 }
 
 examples/pretty_print.rkr:55:1
 thir fun pretty_print::main(): i32 {
     let x: i32 = 123456;
     let x: core::opt::opt<core::opt::opt<core::opt::opt<i32>>> = core::opt::opt::<core::opt::opt<core::opt::opt<i32>>>::#1(core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)));
-    <core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for core::opt::opt<T0>`::print::<core::opt::opt<core::opt::opt<i32>>>(&x);
+    <core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>::<core::opt::opt<T0> as pretty_print::PrettyPrint>::print::<core::opt::opt<core::opt::opt<i32>>>(&x);
     pretty_print::nl();
     let _3: core::io::str = pretty_print::type_name::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>(&x);
-    <core::io::str>::core::io::`impl core::io::str`::println(&_3);
+    <core::io::str>::core::io::str::println(&_3);
     let wrapper: pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>> = pretty_print::MyStruct::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>> { x: 5, y: core::opt::opt::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>::#1(x) };
-    <pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>>::pretty_print::`impl <T0: pretty_print::PrettyPrint>pretty_print::PrettyPrint for pretty_print::MyStruct<T0>`::print::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>(&wrapper);
+    <pretty_print::MyStruct<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>>::<pretty_print::MyStruct<T0> as pretty_print::PrettyPrint>::print::<core::opt::opt<core::opt::opt<core::opt::opt<i32>>>>(&wrapper);
     pretty_print::nl();
     return 0;
 }

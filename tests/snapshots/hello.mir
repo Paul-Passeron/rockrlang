@@ -1,4 +1,4 @@
-core::io::`impl core::io::str`::println
+core::io::str::println
 mir {
   locals:
     _0: self :&core::io::str
@@ -17,7 +17,7 @@ mir {
     return
 }
 
-core::io::`impl core::io::str`::print
+core::io::str::print
 mir {
   locals:
     _0: self :&core::io::str
@@ -57,7 +57,7 @@ mir {
 
   bb1:
     _2 = &_0
-    _3 = call core::io::`impl core::io::str`::print(move _2) -> bb2
+    _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
     _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
@@ -84,7 +84,7 @@ mir {
   bb0 (entry):
     _0 = str {data: c"Hello, World !", len: 14_i32}
     _1 = &_0
-    _2 = call core::io::`impl core::io::str`::println(move _1) -> bb1
+    _2 = call core::io::str::println(move _1) -> bb1
 
   bb1:
     return 0_i32
