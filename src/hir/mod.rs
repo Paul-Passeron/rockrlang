@@ -128,6 +128,13 @@ impl fmt::Display for Mutability {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct HirStructField {
+    pub field: Symbol,
+    pub field_span: Span,
+    pub expr: HirExpr,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirExprDesc {
     // Literals
     IntLit(i64),
@@ -189,7 +196,7 @@ pub enum HirExprDesc {
 
     StructLit {
         ty: TypeRef,
-        fields: Vec<(Symbol, HirExpr)>,
+        fields: Vec<HirStructField>,
     },
 
     Neg(Box<HirExpr>),
@@ -296,7 +303,7 @@ pub struct HirBody<'db> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirConstructorArgs {
     TupleLike(Vec<HirExpr>),
-    StructLike { fields: Vec<(Symbol, HirExpr)> },
+    StructLike { fields: Vec<HirStructField> },
     None,
 }
 

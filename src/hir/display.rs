@@ -18,9 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::fmt::{self, Formatter};
 
 use crate::{
-    Db, common::symbols::{StrLit, Symbol}, hir::{
-        HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
-    }, parse_tree::expr::BinaryOperator, ril::{TypeDefId, display::Display},
+    Db,
+    common::symbols::{StrLit, Symbol},
+    hir::{
+        HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
+        HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
+        HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern, Mutability,
+    },
+    parse_tree::expr::BinaryOperator,
+    ril::{TypeDefId, display::Display},
 };
 
 impl Symbol {
@@ -445,11 +451,12 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
         HirExprDesc::StructLit { ty, fields } => {
             write!(f, "{}", ty.to_string(db))?;
             write!(f, " {{ ")?;
-            for (i, (name, val)) in fields.iter().enumerate() {
+            for (i, HirStructField { field, expr: val, .. }) in fields.iter().enumerate()
+            {
                 if i > 0 {
                     write!(f, ", ")?;
                 }
-                write!(f, "{}: ", name.display(db))?;
+                write!(f, "{}: ", field.display(db))?;
                 write_expr(f, val, db)?;
             }
             write!(f, " }}")
@@ -515,11 +522,13 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                 }
                 HirConstructorArgs::StructLike { fields } => {
                     write!(f, "{{")?;
-                    for (i, (name, expr)) in fields.iter().enumerate() {
+                    for (i, HirStructField { field, expr, .. }) in
+                        fields.iter().enumerate()
+                    {
                         if i > 0 {
                             write!(f, ", ")?;
                         }
-                        write!(f, ".{}: ", name.display(db))?;
+                        write!(f, ".{}: ", field.display(db))?;
                         write_expr(f, expr, db)?;
                     }
                     write!(f, "}}")

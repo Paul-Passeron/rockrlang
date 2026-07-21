@@ -29,7 +29,7 @@ use crate::{
     compiler::diagnostic::Diag,
     hir::{
         FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace,
-        HirPlaceKind, LocalId, function_ast,
+        HirPlaceKind, HirStructField, LocalId, function_ast,
     },
     name_resolve::type_expr::{
         enum_item, get_templates_of_fun, struct_item, templates_of_enum,
@@ -262,14 +262,14 @@ impl<'db> InferenceCtx<'db> {
     fn infer_struct_lit(
         &mut self,
         ty: &TypeRef,
-        fields: &[(Symbol, HirExpr)],
+        fields: &[HirStructField],
         span: Span,
     ) -> Result<InferTy, UnificationError> {
         if let Some((struct_id, templates)) = self.allocate_struct_partial_ref(ty) {
             let ast = struct_item(self.db, struct_id.interned());
             let inferred_fields = fields
                 .iter()
-                .map(|(name, expr)| self.infer_expr(expr).map(|res| (*name, res)))
+                .map(|field| self.infer_expr(&field.expr).map(|res| (field.field, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
             if !diagnose_bad_struct_fields(
@@ -324,13 +324,13 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         enum_id: EnumId,
         variant: Symbol,
-        fields: &[(Symbol, HirExpr)],
+        fields: &[HirStructField],
         ast_fields: &[AstStructDefField],
         span: Span,
     ) {
         let expected_fields: HashSet<Symbol> =
             HashSet::from_iter(ast_fields.iter().map(|f| f.name));
-        let got_fields: HashSet<Symbol> = HashSet::from_iter(fields.iter().map(|f| f.0));
+        let got_fields: HashSet<Symbol> = HashSet::from_iter(fields.iter().map(|f| f.field));
         for field in got_fields.difference(&expected_fields) {
             Diag::generic_error(
                 format!(
@@ -432,11 +432,11 @@ impl<'db> InferenceCtx<'db> {
                     span,
                 );
                 for field in fields {
-                    let ast = ast_fields.iter().find(|ast| ast.name == field.0);
+                    let ast = ast_fields.iter().find(|ast| ast.name == field.field);
                     let field_ty = ast
                         .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
                         .unwrap_or_else(|| self.fresh_var().into());
-                    let err = match self.infer_expr(&field.1) {
+                    let err = match self.infer_expr(&field.expr) {
                         Ok(expr_ty) => {
                             if let Err(err) = self.unify(expr_ty, field_ty) {
                                 Some(err)
@@ -452,7 +452,7 @@ impl<'db> InferenceCtx<'db> {
                                 "Unification error in expr: {}",
                                 err.display(self.db)
                             ),
-                            field.1.span,
+                            field.expr.span,
                         )
                         .accumulate(self.db);
                     }

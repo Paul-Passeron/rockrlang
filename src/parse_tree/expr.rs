@@ -16,8 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    common::symbols::{StrLit, Symbol},
-    parse_tree::{
+    common::{location::Span, symbols::{StrLit, Symbol}}, parse_tree::{
         Spanned,
         type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },
@@ -124,6 +123,7 @@ pub enum AstExprDesc {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AstStructField {
     pub name: Symbol,
+    pub name_span: Span,
     pub value: AstExpr,
 }
 

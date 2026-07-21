@@ -42,7 +42,7 @@ use crate::{
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope,
+        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, ThirStructField,
         stmt::{BlockSemanticInfo, ThirStmt},
     },
     typecheck::{
@@ -487,7 +487,14 @@ impl<'db> ThirTranslator<'db> {
                 hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect(),
             ),
             HirConstructorArgs::StructLike { fields } => ThirConstructorArgs::Struct(
-                fields.iter().map(|f| (f.0, self.expr(b, &f.1, stmts))).collect(),
+                fields
+                    .iter()
+                    .map(|f| ThirStructField {
+                        field: f.field,
+                        field_span: f.field_span,
+                        expr: self.expr(b, &f.expr, stmts),
+                    })
+                    .collect(),
             ),
             HirConstructorArgs::None => ThirConstructorArgs::None,
         }
@@ -503,11 +510,19 @@ impl<'db> ThirTranslator<'db> {
             HirPatternConstructorArgs::StructFields(pats) => ThirConstructorArgs::Struct(
                 pats.iter()
                     .map(|pat| match pat {
-                        HirStructFieldPattern::Name { id, name, .. } => {
-                            (*name, self.pattern_of_local(b, *id))
+                        HirStructFieldPattern::Name { id, name, span } => {
+                            ThirStructField {
+                                field: *name,
+                                field_span: *span,
+                                expr: self.pattern_of_local(b, *id),
+                            }
                         }
-                        HirStructFieldPattern::Rebind { name, pattern, .. } => {
-                            (*name, self.pat(b, pattern))
+                        HirStructFieldPattern::Rebind { name, pattern, name_span } => {
+                            ThirStructField {
+                                field: *name,
+                                field_span: *name_span,
+                                expr: self.pat(b, pattern),
+                            }
                         }
                     })
                     .collect(),
@@ -869,7 +884,11 @@ impl<'db> ThirTranslator<'db> {
             HirExprDesc::StructLit { fields, .. } => {
                 let fields = fields
                     .iter()
-                    .map(|field| (field.0, self.expr(b, &field.1, stmts)))
+                    .map(|field| ThirStructField {
+                        field: field.field,
+                        field_span: field.field_span,
+                        expr: self.expr(b, &field.expr, stmts),
+                    })
                     .collect_vec();
                 if let Some(struct_def) = ty.as_struct_ref(self.db) {
                     ExprKind::StructLit { struct_def, fields }

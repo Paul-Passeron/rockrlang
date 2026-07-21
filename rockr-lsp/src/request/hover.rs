@@ -179,6 +179,8 @@ impl<'a> Lsp<'a> {
                     }
                     // Nothing to say here
                     ThirNode::MatchBranch(_) => None,
+                    ThirNode::EnumVariant { enum_def, variant, span } => todo!(),
+                    ThirNode::StructField { struct_def, field, span } => todo!(),
                 }
             }
             FunctionNode::SigNode(node) => Some(self.hover_sig(func, node)),

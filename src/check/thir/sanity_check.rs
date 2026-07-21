@@ -394,9 +394,9 @@ impl<'db> SanityChecker<'db> {
                 self.check_types(ty, infos.ty, infos.span);
                 let struct_fields = struct_def.get_fields_ty(self.db);
                 for field in fields {
-                    let matching_field = struct_fields[&field.0];
-                    let field_ty = self.check_expr(field.1);
-                    let span = self.thir.exprs[field.1].span;
+                    let matching_field = struct_fields[&field.field];
+                    let field_ty = self.check_expr(field.expr);
+                    let span = self.thir.exprs[field.expr].span;
                     self.check_types(matching_field, field_ty, span);
                 }
             }
@@ -561,7 +561,7 @@ impl<'db> SanityChecker<'db> {
             ) => {
                 assert_eq!(field_tys.len(), pat_tys.len());
                 for field in field_tys {
-                    let field_expr = pat_tys.iter().find(|p| p.0 == field.0).unwrap().1;
+                    let field_expr = pat_tys.iter().find(|p| p.field == field.0).unwrap().expr;
                     let field_ty = self.check_expr(field_expr);
                     let span = self.thir.exprs[field_expr].span;
                     self.check_types(field.1, field_ty, span);
@@ -599,7 +599,7 @@ impl<'db> SanityChecker<'db> {
             (ConstructorType::Struct(tys), ThirConstructorArgs::Struct(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 for (sym, fty) in tys {
-                    let fpat = &pats.iter().find(|p| p.0 == *sym).unwrap().1;
+                    let fpat = &pats.iter().find(|p| p.field == *sym).unwrap().expr;
                     self.check_pattern(peeled.wrap_like(self.db, *fty), fpat);
                 }
             }

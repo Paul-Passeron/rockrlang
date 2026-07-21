@@ -35,8 +35,8 @@ use crate::{
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
-        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalId, LocalInfo,
-        Mutability,
+        HirPlaceKind, HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern,
+        LocalId, LocalInfo, Mutability,
     },
     name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},
@@ -472,6 +472,7 @@ impl<'db> LowerFundef<'db> {
     ) -> HirExprDesc {
         let from = self.lower_expr(from, scope, self.module);
         let to = self.lower_expr(to, scope, self.module);
+        let span = from.span.end().span(to.span.start());
 
         let int_iter = core_int_iter_struct(self.db);
         let type_ref =
@@ -479,8 +480,16 @@ impl<'db> LowerFundef<'db> {
         HirExprDesc::StructLit {
             ty: type_ref,
             fields: vec![
-                (Symbol::new(self.db, "start"), from),
-                (Symbol::new(self.db, "end"), to),
+                HirStructField {
+                    field: Symbol::new(self.db, "start"),
+                    field_span: span,
+                    expr: from,
+                },
+                HirStructField {
+                    field: Symbol::new(self.db, "end"),
+                    field_span: span,
+                    expr: to,
+                },
             ],
         }
     }
@@ -613,11 +622,15 @@ impl<'db> LowerFundef<'db> {
                 .as_enum_with_filled_holes(ty)
                 .expect("StructLit with variant: could not resolve enum type");
 
-            let lowered_fields: Vec<(Symbol, HirExpr)> = fields
+            let lowered_fields: Vec<HirStructField> = fields
                 .iter()
                 .map(|field| {
                     let value = self.lower_expr(&field.value, scope, self.module);
-                    (field.name, value)
+                    HirStructField {
+                        field: field.name,
+                        field_span: field.name_span,
+                        expr: value,
+                    }
                 })
                 .collect();
             HirExprDesc::Constructor {
@@ -631,8 +644,10 @@ impl<'db> LowerFundef<'db> {
                 ty: self.resolve_holed(ty),
                 fields: fields
                     .iter()
-                    .map(|field| {
-                        (field.name, self.lower_expr(&field.value, scope, self.module))
+                    .map(|field| HirStructField {
+                        field: field.name,
+                        field_span: field.name_span,
+                        expr: self.lower_expr(&field.value, scope, self.module),
                     })
                     .collect(),
             }
@@ -805,9 +820,13 @@ impl<'db> LowerFundef<'db> {
             }
         };
         let mut lowered_fields = vec![];
-        for AstStructField { name, value } in fields {
+        for AstStructField { name, value, name_span } in fields {
             let expr = self.lower_expr(value, scope, self.module);
-            lowered_fields.push((*name, expr));
+            lowered_fields.push(HirStructField {
+                field: *name,
+                field_span: *name_span,
+                expr,
+            });
         }
         let args = HirConstructorArgs::StructLike { fields: lowered_fields };
 

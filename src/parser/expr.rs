@@ -531,10 +531,11 @@ impl<'db> Parser<'db> {
             }
             TokenKind::OpenBra => {
                 self.consume();
-                let exprs =
-                    self.parse_list(Self::parse_expr_unrestricted, TokenKind::Comma, |p| {
-                        p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra)
-                    })?;
+                let exprs = self.parse_list(
+                    Self::parse_expr_unrestricted,
+                    TokenKind::Comma,
+                    |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
+                )?;
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
                 Ok(Spanned::new(AstExprDesc::SliceLit(exprs), vec![], tok.location))
@@ -782,9 +783,9 @@ impl<'db> Parser<'db> {
         // block by accident.
         let is_struct_lit = !self.restrict_struct_lit
             && self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::OpenBra))
-            && self.peek_n(1).is_some_and(|t| {
-                matches!(t.kind, TokenKind::Dot | TokenKind::CloseBra)
-            });
+            && self
+                .peek_n(1)
+                .is_some_and(|t| matches!(t.kind, TokenKind::Dot | TokenKind::CloseBra));
 
         if is_struct_lit {
             self.consume();
@@ -873,7 +874,7 @@ impl<'db> Parser<'db> {
                 p.expect(TokenKind::Colon)?;
                 p.consume();
                 let value = p.parse_expr_unrestricted()?;
-                Ok(AstStructField { name: name.data, value })
+                Ok(AstStructField { name: name.data, name_span: name.span, value })
             },
             TokenKind::Comma,
             |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),

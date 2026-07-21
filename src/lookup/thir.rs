@@ -19,10 +19,14 @@ use std::ops::Not;
 
 use crate::{
     Db,
-    common::location::{Location, Span},
+    common::{
+        location::{Location, Span},
+        symbols::Symbol,
+    },
     thir::{
-        ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Thir, ThirConstructorArgs,
-        ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
+        EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, StructRef, Thir,
+        ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+        ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
 };
@@ -35,6 +39,8 @@ pub enum ThirNode<'thir> {
     Stmt(&'thir ThirStmt),
     Pattern(&'thir ThirPattern),
     MatchBranch(&'thir ThirMatchBranch),
+    EnumVariant { enum_def: EnumRef, variant: usize, span: Span },
+    StructField { struct_def: StructRef, field: Symbol, span: Span },
 }
 
 impl Thir {
@@ -84,7 +90,7 @@ impl Thir {
                 self.expr_at(db, *lhs, loc).or_else(|| self.expr_at(db, *rhs, loc))
             }
             ExprKind::StructLit { fields, .. } => {
-                fields.iter().find_map(|(_, e)| self.expr_at(db, *e, loc))
+                fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
             }
             ExprKind::Neg(idx)
             | ExprKind::Not(idx)
@@ -95,7 +101,7 @@ impl Thir {
                     items.iter().find_map(|e| self.expr_at(db, *e, loc))
                 }
                 ThirConstructorArgs::Struct(fields) => {
-                    fields.iter().find_map(|(_, e)| self.expr_at(db, *e, loc))
+                    fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
                 }
                 ThirConstructorArgs::None => None,
             },
@@ -142,9 +148,9 @@ impl Thir {
                 ThirConstructorArgs::Tuple(items) => {
                     items.iter().find_map(|pat| self.pattern_at(db, pat, loc))
                 }
-                ThirConstructorArgs::Struct(fields) => {
-                    fields.iter().find_map(|(_, pat)| self.pattern_at(db, pat, loc))
-                }
+                ThirConstructorArgs::Struct(fields) => fields
+                    .iter()
+                    .find_map(|fields| self.pattern_at(db, &fields.expr, loc)),
                 ThirConstructorArgs::None => None,
             },
             ThirPatternKind::IntLit(_) => None,
@@ -223,6 +229,8 @@ impl ThirNode<'_> {
             ThirNode::MatchBranch(thir_match_branch) => {
                 thir_match_branch.get_whole_span(thir)
             }
+            ThirNode::EnumVariant { enum_def, variant, span } => todo!(),
+            ThirNode::StructField { struct_def, field, span } => todo!(),
         }
     }
 }

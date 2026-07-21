@@ -367,7 +367,10 @@ impl ThirPattern {
                     symbs
                         .iter()
                         .map(|symb| {
-                            items.iter().find(|(name, _)| symb == name).map(|f| &f.1)
+                            items
+                                .iter()
+                                .find(|field| symb == &field.field)
+                                .map(|f| &f.expr)
                         })
                         .collect()
                 }

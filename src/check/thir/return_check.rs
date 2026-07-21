@@ -68,7 +68,7 @@ pub fn expr_contains_never(db: &dyn Db, thir: &Thir, expr: ExprId) -> bool {
             expr_contains_never(db, thir, *lhs) || expr_contains_never(db, thir, *rhs)
         }
         ExprKind::StructLit { fields, .. } => {
-            fields.iter().any(|item| expr_contains_never(db, thir, item.1))
+            fields.iter().any(|item| expr_contains_never(db, thir, item.expr))
         }
         ExprKind::Not(e) | ExprKind::Neg(e) => expr_contains_never(db, thir, *e),
         ExprKind::Call { args: items, .. }
@@ -81,7 +81,7 @@ pub fn expr_contains_never(db: &dyn Db, thir: &Thir, expr: ExprId) -> bool {
                 items.iter().any(|item| expr_contains_never(db, thir, *item))
             }
             ThirConstructorArgs::Struct(items) => {
-                items.iter().any(|item| expr_contains_never(db, thir, item.1))
+                items.iter().any(|item| expr_contains_never(db, thir, item.expr))
             }
             ThirConstructorArgs::None => false,
         },

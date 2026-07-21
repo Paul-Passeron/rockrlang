@@ -48,7 +48,7 @@ use crate::{
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
-        ThirMatchBranch,
+        ThirMatchBranch, ThirStructField,
         stmt::{StmtKind, ThirStmt},
         thir_body,
     },
@@ -604,13 +604,13 @@ impl<'a> ThirToMIR<'a> {
 
     fn build_fields(
         &mut self,
-        fields: &[(Symbol, ExprId)],
+        fields: &[ThirStructField<ExprId>],
     ) -> BTreeMap<Symbol, MIROperand> {
         fields
             .iter()
-            .map(|(name, expr)| {
-                let operand = self.build_operand(*expr);
-                (*name, operand)
+            .map(|field| {
+                let operand = self.build_operand(field.expr);
+                (field.field, operand)
             })
             .collect()
     }

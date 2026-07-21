@@ -22,6 +22,7 @@ use super::{
     ThirPatternKind,
 };
 use crate::ril::TypeDefId;
+use crate::thir::ThirStructField;
 use crate::thir::stmt::BlockSemanticInfo;
 use crate::{Db, hir::Mutability, ril::TypeRef};
 
@@ -258,8 +259,12 @@ impl<'a> ThirPrinter<'a> {
                 } else {
                     let fs = fields
                         .iter()
-                        .map(|(s, e)| {
-                            format!("{}: {}", s.to_string(self.db), self.render_expr(*e))
+                        .map(|field| {
+                            format!(
+                                "{}: {}",
+                                field.field.to_string(self.db),
+                                self.render_expr(field.expr)
+                            )
                         })
                         .collect::<Vec<_>>()
                         .join(", ");
@@ -313,8 +318,12 @@ impl<'a> ThirPrinter<'a> {
             ThirConstructorArgs::Struct(items) => {
                 let s = items
                     .iter()
-                    .map(|(sym, e)| {
-                        format!("{}: {}", sym.to_string(self.db), self.render_expr(*e))
+                    .map(|ThirStructField { field, expr, .. }| {
+                        format!(
+                            "{}: {}",
+                            field.to_string(self.db),
+                            self.render_expr(*expr)
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
@@ -401,8 +410,12 @@ impl<'a> ThirPrinter<'a> {
             ThirConstructorArgs::Struct(items) => {
                 let s = items
                     .iter()
-                    .map(|(sym, p)| {
-                        format!("{}: {}", sym.to_string(self.db), self.render_pattern(p))
+                    .map(|ThirStructField { field, expr, .. }| {
+                        format!(
+                            "{}: {}",
+                            field.to_string(self.db),
+                            self.render_pattern(expr)
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join(", ");

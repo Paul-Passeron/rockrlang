@@ -114,6 +114,13 @@ pub struct EnumRef {
     pub args: Vec<TypeRef>,
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ThirStructField<T> {
+    pub field: Symbol,
+    pub field_span: Span,
+    pub expr: T,
+}
+
 pub enum ExprKind {
     // Literals
     IntLit(i64),
@@ -130,7 +137,7 @@ pub enum ExprKind {
 
     BinOp { op: BinaryOperator, lhs: ExprId, rhs: ExprId },
 
-    StructLit { struct_def: StructRef, fields: Vec<(Symbol, ExprId)> },
+    StructLit { struct_def: StructRef, fields: Vec<ThirStructField<ExprId>> },
 
     Neg(ExprId),
     Not(ExprId),
@@ -159,7 +166,7 @@ pub struct ThirExprWithSetup {
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum ThirConstructorArgs<T> {
     Tuple(Vec<T>),
-    Struct(Vec<(Symbol, T)>),
+    Struct(Vec<ThirStructField<T>>),
     None,
 }
 
