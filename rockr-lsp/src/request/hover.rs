@@ -19,21 +19,27 @@ use std::convert::identity;
 
 use crate::{
     Lsp, log,
-    naming::{function_id_to_named_string, type_ref_to_named_string_in},
+    naming::{
+        function_id_to_named_string, type_ref_to_named_string,
+        type_ref_to_named_string_in,
+    },
 };
 use itertools::Itertools;
 use lsp_types::{
     Hover, HoverContents, HoverParams, MarkedString, MarkupContent, MarkupKind,
 };
 use rockr::{
-    common::location::{Location, Span},
+    common::{
+        location::{Location, Span},
+        symbols::Symbol,
+    },
     lookup::{
         FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
     },
-    name_resolve::type_expr::{get_templates_of_fun, templates_of_struct},
+    name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
-        Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
+        Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, StructRef, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
     },
 };
@@ -184,49 +190,13 @@ impl<'a> Lsp<'a> {
                         None
                     }
                     ThirNode::StructField { struct_def, field, span } => {
-                        let struct_id = struct_def.def;
-                        let template_defs =
-                            templates_of_struct(&self.db, struct_id.interned());
-                        let struct_name = if template_defs.is_empty() {
-                            struct_id.name(&self.db).to_string(&self.db)
-                        } else {
-                            format!(
-                                "{}<{}>",
-                                struct_id.name(&self.db).to_string(&self.db),
-                                template_defs
-                                    .iter()
-                                    .map(|t| t.name.to_string(&self.db))
-                                    .join(", ")
-                            )
-                        };
-                        let struct_def_extract = format!(
-                            "```rockr\nstruct {struct_name} {{\n    {}: {};\n    // ...\n}}\n```",
-                            field.to_string(&self.db),
-                            type_ref_to_named_string_in(
-                                &self.db,
+                        let blocks = self
+                            .struct_display(
+                                struct_def,
+                                StructDisplayOption::Fields(&[field]),
                                 func,
-                                struct_def
-                                    .typeof_field(&self.db, field)
-                                    .unwrap_or(TypeRef::Error)
-                            )
-                        );
-
-                        let template_string = template_defs
-                            .iter()
-                            .zip(&struct_def.args)
-                            .map(|(temp, arg)| {
-                                format!(
-                                    "`{}` = `{}`",
-                                    temp.name.to_string(&self.db),
-                                    type_ref_to_named_string_in(&self.db, func, *arg)
-                                )
-                            })
-                            .join(", ");
-
-                        let mut blocks = vec![struct_def_extract];
-                        if !template_string.is_empty() {
-                            blocks.push(template_string);
-                        }
+                            )?
+                            .to_vec();
 
                         Some(self.hover_span_response_blocks(blocks, span))
                     }
@@ -316,7 +286,6 @@ impl<'a> Lsp<'a> {
             ExprKind::AddressOf { .. }
             | ExprKind::Ref { .. }
             | ExprKind::BinOp { .. }
-            | ExprKind::StructLit { .. }
             | ExprKind::Neg(_)
             | ExprKind::Not(_)
             | ExprKind::Tuple(_)
@@ -328,7 +297,100 @@ impl<'a> Lsp<'a> {
             | ExprKind::Cast(_, _) => {
                 Some(self.hover_type_span_response(func, expr.ty, expr.span))
             }
+            ExprKind::StructLit { struct_def, .. } => {
+                let blocks = self
+                    .struct_display(struct_def.clone(), StructDisplayOption::AllFields, func)?
+                    .to_vec();
+
+                Some(self.hover_span_response_blocks(blocks, expr.span))
+            }
+
             _ => None,
         }
     }
+
+    fn struct_display(
+        &self,
+        struct_def: StructRef,
+        opt: StructDisplayOption<'_>,
+        func: FunctionId,
+    ) -> Option<StructDisplay> {
+        let struct_id = struct_def.def;
+        let template_defs = templates_of_struct(&self.db, struct_id.interned());
+        let template_names =
+            template_defs.iter().map(|t| t.name.to_string(&self.db)).collect_vec();
+        let struct_name = if template_defs.is_empty() {
+            struct_id.name(&self.db).to_string(&self.db)
+        } else {
+            format!(
+                "{}<{}>",
+                struct_id.name(&self.db).to_string(&self.db),
+                template_names.iter().join(", ")
+            )
+        };
+
+        let field_str = |field: Symbol, ty| {
+            format!(
+                "    {}: {};\n",
+                field.to_string(&self.db),
+                type_ref_to_named_string(&self.db, &template_names, ty)
+            )
+        };
+
+        let fields = match opt {
+            StructDisplayOption::AllFields => {
+                let tys = struct_def.get_fields_ty(&self.db);
+                struct_item(&self.db, struct_def.def.into())
+                    .fields
+                    .iter()
+                    .map(|field| field_str(field.name, tys[&field.name]))
+                    .join("")
+            }
+            StructDisplayOption::Fields(symbols) => symbols
+                .iter()
+                .map(|field| {
+                    Some(field_str(*field, struct_def.typeof_field(&self.db, *field)?))
+                })
+                .collect::<Option<Vec<_>>>()?
+                .join(""),
+        };
+
+        let struct_def_extract =
+            format!("```rockr\nstruct {struct_name} {{\n{fields}}}\n```",);
+
+        let templates = (!template_defs.is_empty()).then(|| {
+            template_defs
+                .iter()
+                .zip(&struct_def.args)
+                .map(|(temp, arg)| {
+                    format!(
+                        "`{}` = `{}`",
+                        temp.name.to_string(&self.db),
+                        type_ref_to_named_string_in(&self.db, func, *arg)
+                    )
+                })
+                .join(", ")
+        });
+
+        Some(StructDisplay { struct_def: struct_def_extract, templates })
+    }
+}
+
+struct StructDisplay {
+    struct_def: String,
+    templates: Option<String>,
+}
+
+impl StructDisplay {
+    pub fn to_vec(self) -> Vec<String> {
+        match self.templates {
+            Some(templates) => vec![self.struct_def, templates],
+            None => vec![self.struct_def],
+        }
+    }
+}
+
+pub enum StructDisplayOption<'a> {
+    AllFields,
+    Fields(&'a [Symbol]),
 }
