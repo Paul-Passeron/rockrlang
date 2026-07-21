@@ -67,8 +67,16 @@ impl<'a> Lsp<'a> {
         ty: TypeRef,
         span: Span,
     ) -> Hover {
-        let ty_str = format!("`{}`", type_ref_to_named_string_in(&self.db, func, ty));
-        self.hover_span_response(ty_str, span)
+        if let Some(struct_ref) = ty.as_struct_ref(&self.db)
+            && let Some(blocks) = self
+                .struct_display(struct_ref.clone(), StructDisplayOption::AllFields, func)
+                .map(|s| s.to_vec())
+        {
+            self.hover_span_response_blocks(blocks, span)
+        } else {
+            let ty_str = format!("`{}`", type_ref_to_named_string_in(&self.db, func, ty));
+            self.hover_span_response(ty_str, span)
+        }
     }
 
     fn hover_span_response(&self, md: String, span: Span) -> Hover {
