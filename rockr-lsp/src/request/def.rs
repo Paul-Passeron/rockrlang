@@ -20,16 +20,14 @@ use rockr::{
     common::location::{Location, Span},
     hir::{function_ast, hir_body, impl_sources},
     lookup::{
-        enclosing_fun,
-        sig::{FunctionParam, ReturnTy, SigNode, sig_node_at},
-        thir::ThirNode,
+        FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
     },
     name_resolve::{
         interfaces::interface_item,
         type_expr::{enum_item, get_templates_of_fun, struct_item},
     },
     ril::{FunctionId, InterfaceId, ScopeOwnerId, TypeDefId, TypeRef},
-    thir::{ExprId, ExprKind, LocalId, PlaceId, Thir, thir_body},
+    thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 
 use crate::{Lsp, log};
@@ -59,27 +57,33 @@ impl<'a> Lsp<'a> {
         func: FunctionId,
         loc: Location,
     ) -> Option<GotoDefinitionResponse> {
-        if let Some(node) = sig_node_at(&self.db, loc) {
-            return self.goto_def_sig(func, node);
-        }
-        let body_span = func.body_span(&self.db)?;
-        // Make sure we are inside the body
-        body_span.encloses(loc).then_some(())?;
-        let thir = thir_body(&self.db, func)?;
-        let node = thir.node_at(&self.db, loc)?;
-        let thir_answer = match node {
-            ThirNode::Expr { id, .. } => self.goto_def_expr(thir, id),
-            ThirNode::Place(idx) => self.goto_def_place(thir, idx),
-            ThirNode::Local(idx) => self.goto_def_local(thir, idx),
-            ThirNode::Pattern(thir_pattern) => {
-                self.goto_def_ty_in_func(func, thir_pattern.ty, loc)
+        let node = function_node_at(&self.db, loc)?;
+        match node {
+            FunctionNode::ThirNode(thir, thir_node) => match thir_node {
+                ThirNode::Expr { id, .. } => self.goto_def_expr(thir, id),
+                ThirNode::Place(idx) => self.goto_def_place(thir, idx),
+                ThirNode::Local(idx) => self.goto_def_local(thir, idx),
+                ThirNode::Pattern(thir_pattern) => {
+                    self.goto_def_ty_in_func(func, thir_pattern.ty, loc)
+                }
+                _ => None,
+            },
+            FunctionNode::SigNode(sig_node) => match sig_node {
+                SigNode::ParamType(p) => self.goto_def_ty_in_func(func, p.ty, loc),
+                SigNode::ParamName(_) => None,
+                SigNode::ReturnTy(return_ty) => {
+                    self.goto_def_ty_in_func(func, return_ty.ty, loc)
+                }
+                SigNode::TemplateParam { .. } => None,
+                SigNode::FunctionName { .. } => None,
+                SigNode::TemplateConstraint { constraint, .. } => {
+                    Some(self.goto_def_interface(constraint.iref.def(&self.db)))
+                }
+            },
+            FunctionNode::TypeNode(type_node) => {
+                self.goto_def_ty_in_func(func, type_node.ty, loc)
             }
-            _ => None,
-        };
-        if let Some(res) = thir_answer {
-            return Some(res);
         }
-        None
     }
 
     fn goto_def_ty_in_func(
@@ -175,25 +179,6 @@ impl<'a> Lsp<'a> {
                 e.span.start(),
             ),
             _ => None,
-        }
-    }
-
-    fn goto_def_sig(
-        &self,
-        func: FunctionId,
-        node: SigNode,
-    ) -> Option<GotoDefinitionResponse> {
-        match node {
-            SigNode::ParamType(FunctionParam { ty, ty_span: span, .. })
-            | SigNode::ReturnTy(ReturnTy { ty, span }) => {
-                self.goto_def_ty_in_func(func, ty, span.start())
-            }
-            SigNode::TemplateParam { .. }
-            | SigNode::FunctionName { .. }
-            | SigNode::ParamName(_) => None,
-            SigNode::TemplateConstraint { constraint, .. } => {
-                Some(self.goto_def_interface(constraint.iref.def(&self.db)))
-            }
         }
     }
 

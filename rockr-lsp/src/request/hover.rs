@@ -183,7 +183,6 @@ impl<'a> Lsp<'a> {
             }
             FunctionNode::SigNode(node) => Some(self.hover_sig(func, node)),
             FunctionNode::TypeNode(node) => {
-                log!("Using type node !");
                 Some(self.hover_type_span_response(func, node.ty, node.span))
             }
         }
