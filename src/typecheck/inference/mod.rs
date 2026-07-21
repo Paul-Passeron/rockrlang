@@ -34,6 +34,7 @@ use std::{
 use crate::{
     Db,
     common::symbols::Symbol,
+    compiler::diagnostic::Diag,
     hir::{LocalId, Mutability, function_ast},
     name_resolve::{
         definition::Definition,
@@ -60,6 +61,7 @@ use crate::{
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
+use salsa::Accumulator;
 use var::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -211,29 +213,32 @@ impl<'db> InferenceCtx<'db> {
             (None, _) => {} // free function, nothing to seed
         }
 
-        infer_templates
-            .iter()
-            .zip(templates)
-            .for_each(|(infer_ty, ast)| {
-                let constraints = &ast.constraints;
-                for cons in constraints {
-                    let resolved = resolve_type_expr_as_interface(
-                        this.db,
-                        cons,
-                        this.implicit_ctx().owner_module(this.db),
-                        templates.as_ref(),
-                        false,
-                    )
-                    .expect("Top level template argument constraints should already be resolved to interfaces");
-                    let interface_id = resolved.def(this.db);
-                    let interface_args = resolved
-                        .args(this.db)
-                        .iter()
-                        .map(|t_ref| this.allocate_type_ref(*t_ref, this.implicit_ctx().as_ref()))
-                        .collect::<Box<[_]>>();
-                    this.add_implementation(interface_id, infer_ty.clone(), &interface_args);
-                }
-            });
+        infer_templates.iter().zip(templates).for_each(|(infer_ty, ast)| {
+            let constraints = &ast.constraints;
+            for cons in constraints {
+                let Some(resolved) = resolve_type_expr_as_interface(
+                    this.db,
+                    cons,
+                    this.implicit_ctx().owner_module(this.db),
+                    templates.as_ref(),
+                    false,
+                ) else {
+                    Diag::generic_error("Unknown interface in scope".into(), cons.span)
+                        .accumulate(this.db);
+                    continue;
+                };
+
+                let interface_id = resolved.def(this.db);
+                let interface_args = resolved
+                    .args(this.db)
+                    .iter()
+                    .map(|t_ref| {
+                        this.allocate_type_ref(*t_ref, this.implicit_ctx().as_ref())
+                    })
+                    .collect::<Box<[_]>>();
+                this.add_implementation(interface_id, infer_ty.clone(), &interface_args);
+            }
+        });
 
         this
     }
