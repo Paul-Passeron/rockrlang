@@ -23,6 +23,7 @@ use crate::{
         location::{Location, Span},
         symbols::Symbol,
     },
+    ril::TypeRef,
     thir::{
         EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, StructRef, Thir,
         ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
@@ -224,6 +225,42 @@ impl Thir {
 
     pub fn node_at<'a>(&'a self, db: &dyn Db, loc: Location) -> Option<ThirNode<'a>> {
         self.root.iter().find_map(|stmt| self.stmt_at(db, stmt, loc))
+    }
+
+    pub fn resolved_type_seed_at(&self, db: &dyn Db, loc: Location) -> Option<TypeRef> {
+        match self.node_at(db, loc) {
+            Some(ThirNode::Expr { id, .. }) => match &self.exprs[id].kind {
+                ExprKind::Cast(_, ty)
+                | ExprKind::SizeOf(ty)
+                | ExprKind::TypeName(ty) => Some(*ty),
+                ExprKind::StructLit { .. } | ExprKind::Constructor { .. } => {
+                    Some(self.exprs[id].ty)
+                }
+                _ => None,
+            },
+            Some(_) => None,
+            // `node_at` skips synthetic nodes, and a plain `let` lowers to a synthetic
+            // `Let`, so its annotation region lands here.
+            None => self.enclosing_let_ty(loc),
+        }
+    }
+
+    fn enclosing_let_ty(&self, loc: Location) -> Option<TypeRef> {
+        fn find(stmts: &[ThirStmt], loc: Location) -> Option<LocalId> {
+            let stmt = stmts.iter().find(|s| s.span.encloses(loc))?;
+            match &stmt.kind {
+                StmtKind::Let { local, .. } => Some(*local),
+                StmtKind::Block { stmts, .. } => find(stmts, loc),
+                StmtKind::While { body, .. } => find(body, loc),
+                StmtKind::If { then, else_, .. } => find(then, loc)
+                    .or_else(|| else_.as_ref().and_then(|e| find(e, loc))),
+                StmtKind::Match { branches, .. } => {
+                    branches.iter().find_map(|b| find(&b.body, loc))
+                }
+                _ => None,
+            }
+        }
+        find(&self.root, loc).map(|local| self.locals[local].ty)
     }
 }
 

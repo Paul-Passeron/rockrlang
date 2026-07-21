@@ -33,6 +33,7 @@ use crate::{
         type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
     ril::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
+    thir::thir_body,
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
@@ -98,47 +99,60 @@ fn function_type_at(db: &dyn Db, func: FunctionId, loc: Location) -> Option<Type
     )
     .ok()?;
 
-    if let Some(node) = args.iter().find_map(|arg| type_expr_at(db, &ctx, &arg.ty, loc)) {
+    let resolved = thir_body(db, func).and_then(|t| t.resolved_type_seed_at(db, loc));
+
+    if let Some(node) =
+        args.iter().find_map(|arg| type_expr_at(db, &ctx, &arg.ty, resolved, loc))
+    {
         return Some(node);
     }
-    if let Some(node) = type_expr_at(db, &ctx, ret_ty, loc) {
+    if let Some(node) = type_expr_at(db, &ctx, ret_ty, resolved, loc) {
         return Some(node);
     }
-    body.iter().find_map(|stmt| stmt_type_at(db, &ctx, stmt, loc))
+    body.iter().find_map(|stmt| stmt_type_at(db, &ctx, stmt, resolved, loc))
 }
 
 fn stmt_type_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     stmt: &AstStmt,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
     stmt.span.encloses(loc).then_some(())?;
     match &stmt.data {
         AstStmtDesc::Return { value } => {
-            value.as_ref().and_then(|v| expr_type_at(db, ctx, v, loc))
+            value.as_ref().and_then(|v| expr_type_at(db, ctx, v, resolved, loc))
         }
-        AstStmtDesc::If { cond, then, else_ } => expr_type_at(db, ctx, cond, loc)
-            .or_else(|| stmt_type_at(db, ctx, then, loc))
-            .or_else(|| else_.as_ref().and_then(|e| stmt_type_at(db, ctx, e, loc))),
-        AstStmtDesc::While { cond, body } => expr_type_at(db, ctx, cond, loc)
-            .or_else(|| stmt_type_at(db, ctx, body, loc)),
-        AstStmtDesc::For { iterator, body, .. } => expr_type_at(db, ctx, iterator, loc)
-            .or_else(|| stmt_type_at(db, ctx, body, loc)),
+        AstStmtDesc::If { cond, then, else_ } => expr_type_at(db, ctx, cond, resolved, loc)
+            .or_else(|| stmt_type_at(db, ctx, then, resolved, loc))
+            .or_else(|| {
+                else_.as_ref().and_then(|e| stmt_type_at(db, ctx, e, resolved, loc))
+            }),
+        AstStmtDesc::While { cond, body } => expr_type_at(db, ctx, cond, resolved, loc)
+            .or_else(|| stmt_type_at(db, ctx, body, resolved, loc)),
+        AstStmtDesc::For { iterator, body, .. } => {
+            expr_type_at(db, ctx, iterator, resolved, loc)
+                .or_else(|| stmt_type_at(db, ctx, body, resolved, loc))
+        }
         AstStmtDesc::LetDecl { type_constraint, value, .. } => type_constraint
             .as_ref()
-            .and_then(|t| any_type_expr_at(db, ctx, t, loc))
-            .or_else(|| expr_type_at(db, ctx, value, loc)),
+            .and_then(|t| any_type_expr_at(db, ctx, t, resolved, loc))
+            .or_else(|| expr_type_at(db, ctx, value, resolved, loc)),
         AstStmtDesc::Block { stmts } => {
-            stmts.iter().find_map(|s| stmt_type_at(db, ctx, s, loc))
+            stmts.iter().find_map(|s| stmt_type_at(db, ctx, s, resolved, loc))
         }
         AstStmtDesc::Assign { lhs, rhs }
-        | AstStmtDesc::CompoundAssign { lhs, rhs, .. } => expr_type_at(db, ctx, lhs, loc)
-            .or_else(|| expr_type_at(db, ctx, rhs, loc)),
-        AstStmtDesc::Match { scrutinee, branches } => expr_type_at(db, ctx, scrutinee, loc)
-            .or_else(|| branches.iter().find_map(|b| branch_type_at(db, ctx, b, loc))),
-        AstStmtDesc::Expr(e) => expr_type_at(db, ctx, e, loc),
-        AstStmtDesc::Defer(s) => stmt_type_at(db, ctx, s, loc),
+        | AstStmtDesc::CompoundAssign { lhs, rhs, .. } => {
+            expr_type_at(db, ctx, lhs, resolved, loc)
+                .or_else(|| expr_type_at(db, ctx, rhs, resolved, loc))
+        }
+        AstStmtDesc::Match { scrutinee, branches } => {
+            expr_type_at(db, ctx, scrutinee, resolved, loc)
+                .or_else(|| branches.iter().find_map(|b| branch_type_at(db, ctx, b, resolved, loc)))
+        }
+        AstStmtDesc::Expr(e) => expr_type_at(db, ctx, e, resolved, loc),
+        AstStmtDesc::Defer(s) => stmt_type_at(db, ctx, s, resolved, loc),
         AstStmtDesc::Break | AstStmtDesc::Error(_) => None,
     }
 }
@@ -147,19 +161,21 @@ fn branch_type_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     branch: &AstMatchBranch,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
     branch
         .guard
         .as_ref()
-        .and_then(|g| expr_type_at(db, ctx, g, loc))
-        .or_else(|| stmt_type_at(db, ctx, &branch.body, loc))
+        .and_then(|g| expr_type_at(db, ctx, g, resolved, loc))
+        .or_else(|| stmt_type_at(db, ctx, &branch.body, resolved, loc))
 }
 
 fn expr_type_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     expr: &AstExpr,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
     expr.span.encloses(loc).then_some(())?;
@@ -170,13 +186,18 @@ fn expr_type_at(
         | AstExprDesc::CStrLit(_)
         | AstExprDesc::BoolLit(_)
         | AstExprDesc::Name(_) => None,
-        AstExprDesc::NameResolved { to, .. } => expr_type_at(db, ctx, to, loc),
-        AstExprDesc::StaticCall { ty, type_args, args, .. } => type_expr_at(db, ctx, ty, loc)
-            .or_else(|| type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, loc)))
-            .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, loc))),
-        AstExprDesc::QualifiedPath { ty, .. } => type_expr_at(db, ctx, ty, loc),
+        AstExprDesc::NameResolved { to, .. } => expr_type_at(db, ctx, to, resolved, loc),
+        AstExprDesc::StaticCall { ty, type_args, args, .. } => {
+            type_expr_at(db, ctx, ty, resolved, loc)
+                .or_else(|| {
+                    type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, resolved, loc))
+                })
+                .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, resolved, loc)))
+        }
+        AstExprDesc::QualifiedPath { ty, .. } => type_expr_at(db, ctx, ty, resolved, loc),
         AstExprDesc::BinOp { lhs, rhs, .. } | AstExprDesc::Range { from: lhs, to: rhs } => {
-            expr_type_at(db, ctx, lhs, loc).or_else(|| expr_type_at(db, ctx, rhs, loc))
+            expr_type_at(db, ctx, lhs, resolved, loc)
+                .or_else(|| expr_type_at(db, ctx, rhs, resolved, loc))
         }
         AstExprDesc::Neg(e)
         | AstExprDesc::Not(e)
@@ -184,27 +205,39 @@ fn expr_type_at(
         | AstExprDesc::PostfixDeref(e)
         | AstExprDesc::PrefixDeref(e)
         | AstExprDesc::Metadata(e)
-        | AstExprDesc::Ref(_, e) => expr_type_at(db, ctx, e, loc),
+        | AstExprDesc::Ref(_, e) => expr_type_at(db, ctx, e, resolved, loc),
         AstExprDesc::FieldAccess { object, .. }
-        | AstExprDesc::TupleAccess { object, .. } => expr_type_at(db, ctx, object, loc),
-        AstExprDesc::Call { callee, type_args, args } => expr_type_at(db, ctx, callee, loc)
-            .or_else(|| type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, loc)))
-            .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, loc))),
+        | AstExprDesc::TupleAccess { object, .. } => {
+            expr_type_at(db, ctx, object, resolved, loc)
+        }
+        AstExprDesc::Call { callee, type_args, args } => {
+            expr_type_at(db, ctx, callee, resolved, loc)
+                .or_else(|| {
+                    type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, resolved, loc))
+                })
+                .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, resolved, loc)))
+        }
         AstExprDesc::MethodCall { object, type_args, args, .. } => {
-            expr_type_at(db, ctx, object, loc)
-                .or_else(|| type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, loc)))
-                .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, loc)))
+            expr_type_at(db, ctx, object, resolved, loc)
+                .or_else(|| {
+                    type_args.iter().find_map(|t| any_type_expr_at(db, ctx, t, resolved, loc))
+                })
+                .or_else(|| args.iter().find_map(|a| expr_type_at(db, ctx, a, resolved, loc)))
         }
-        AstExprDesc::Index { object, index } => expr_type_at(db, ctx, object, loc)
-            .or_else(|| expr_type_at(db, ctx, index, loc)),
-        AstExprDesc::StructLit { ty, fields, .. } => type_expr_at(db, ctx, ty, loc)
-            .or_else(|| fields.iter().find_map(|f| expr_type_at(db, ctx, &f.value, loc))),
+        AstExprDesc::Index { object, index } => expr_type_at(db, ctx, object, resolved, loc)
+            .or_else(|| expr_type_at(db, ctx, index, resolved, loc)),
+        AstExprDesc::StructLit { ty, fields, .. } => type_expr_at(db, ctx, ty, resolved, loc)
+            .or_else(|| {
+                fields.iter().find_map(|f| expr_type_at(db, ctx, &f.value, resolved, loc))
+            }),
         AstExprDesc::Tuple(items) | AstExprDesc::SliceLit(items) => {
-            items.iter().find_map(|e| expr_type_at(db, ctx, e, loc))
+            items.iter().find_map(|e| expr_type_at(db, ctx, e, resolved, loc))
         }
-        AstExprDesc::SizeOf(ty) | AstExprDesc::TypeName(ty) => type_expr_at(db, ctx, ty, loc),
-        AstExprDesc::As { expr, ty } => expr_type_at(db, ctx, expr, loc)
-            .or_else(|| type_expr_at(db, ctx, ty, loc)),
+        AstExprDesc::SizeOf(ty) | AstExprDesc::TypeName(ty) => {
+            type_expr_at(db, ctx, ty, resolved, loc)
+        }
+        AstExprDesc::As { expr, ty } => expr_type_at(db, ctx, expr, resolved, loc)
+            .or_else(|| type_expr_at(db, ctx, ty, resolved, loc)),
     }
 }
 
@@ -232,7 +265,7 @@ fn struct_type_at(
         ast.template_args.iter().cloned().collect(),
     )
     .ok()?;
-    ast.fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, loc))
+    ast.fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, None, loc))
 }
 
 fn enum_type_at(
@@ -252,10 +285,10 @@ fn enum_type_at(
         match &variant.kind {
             AstEnumVariantKind::Unit => None,
             AstEnumVariantKind::StructLike(fields) => {
-                fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, loc))
+                fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, None, loc))
             }
             AstEnumVariantKind::TupleLike(tys) => {
-                tys.iter().find_map(|ty| type_expr_at(db, &ctx, ty, loc))
+                tys.iter().find_map(|ty| type_expr_at(db, &ctx, ty, None, loc))
             }
         }
     })
@@ -276,8 +309,8 @@ fn extern_type_at(
     sig.data
         .args
         .iter()
-        .find_map(|arg| type_expr_at(db, &ctx, &arg.ty, loc))
-        .or_else(|| type_expr_at(db, &ctx, &sig.data.return_type, loc))
+        .find_map(|arg| type_expr_at(db, &ctx, &arg.ty, None, loc))
+        .or_else(|| type_expr_at(db, &ctx, &sig.data.return_type, None, loc))
 }
 
 fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode> {
@@ -294,15 +327,15 @@ fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode>
         AstImplicitContext::new(db, ScopeOwnerId::Impl(impl_id), Arc::from([])).ok()?;
 
     if let Some(iface) = &block.interface
-        && let Some(node) = type_expr_at(db, &ctx, iface, loc)
+        && let Some(node) = type_expr_at(db, &ctx, iface, None, loc)
     {
         return Some(node);
     }
-    if let Some(node) = type_expr_at(db, &ctx, &block.implemented, loc) {
+    if let Some(node) = type_expr_at(db, &ctx, &block.implemented, None, loc) {
         return Some(node);
     }
     block.items.iter().find_map(|item| match item {
-        AstImplItem::Type { ty, .. } => type_expr_at(db, &ctx, ty, loc),
+        AstImplItem::Type { ty, .. } => type_expr_at(db, &ctx, ty, None, loc),
         AstImplItem::Fundef(_) => None,
     })
 }
@@ -320,12 +353,14 @@ fn interface_type_at(
     )
     .ok()?;
 
-    if let Some(node) = ast.supers.iter().find_map(|sup| type_expr_at(db, &ctx, sup, loc)) {
+    if let Some(node) =
+        ast.supers.iter().find_map(|sup| type_expr_at(db, &ctx, sup, None, loc))
+    {
         return Some(node);
     }
     ast.items.iter().find_map(|item| match item {
         AstInterfaceItem::Type(arg) => {
-            arg.constraints.iter().find_map(|c| type_expr_at(db, &ctx, c, loc))
+            arg.constraints.iter().find_map(|c| type_expr_at(db, &ctx, c, None, loc))
         }
         AstInterfaceItem::Sig(_) => None,
     })
@@ -335,48 +370,68 @@ fn type_expr_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     ty: &AstTypeExpr,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
     ty.span.encloses(loc).then_some(())?;
-    if let Some(node) = type_expr_children_at(db, ctx, &ty.data, loc) {
+    if let Some(node) = type_expr_children_at(db, ctx, &ty.data, resolved, loc) {
         return Some(node);
     }
-    Some(TypeNode { ty: ctx.resolve_err(db, &ty.data), span: ty.span })
+    let ty_ref = resolved
+        .filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))
+        .unwrap_or_else(|| ctx.resolve_err(db, &ty.data));
+    Some(TypeNode { ty: ty_ref, span: ty.span })
 }
 
 fn any_type_expr_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     any: &AstAnyTypeExpr,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
-    type_expr_at(db, ctx, &any.as_known()?, loc)
+    match any.as_known() {
+        Some(ty) => type_expr_at(db, ctx, &ty, resolved, loc),
+        None => {
+            any.span.encloses(loc).then_some(())?;
+            let ty = resolved.filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))?;
+            Some(TypeNode { ty, span: any.span })
+        }
+    }
+}
+
+fn project(db: &dyn Db, resolved: Option<TypeRef>, idx: usize) -> Option<TypeRef> {
+    resolved
+        .and_then(|r| r.as_type_id())
+        .and_then(|id| id.args(db).get(idx).copied())
 }
 
 fn type_expr_children_at(
     db: &dyn Db,
     ctx: &AstImplicitContext,
     desc: &AstTypeExprDesc,
+    resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
     match desc {
-        AstTypeExprDesc::Named { args, .. } => {
-            args.iter().find_map(|arg| any_type_expr_at(db, ctx, arg, loc))
+        AstTypeExprDesc::Named { args, .. } => args
+            .iter()
+            .enumerate()
+            .find_map(|(i, arg)| any_type_expr_at(db, ctx, arg, project(db, resolved, i), loc)),
+        AstTypeExprDesc::NameResolved { to, .. } => {
+            type_expr_children_at(db, ctx, &to.data, resolved, loc)
         }
-        AstTypeExprDesc::NameResolved { to, .. } => match &to.data {
-            AstTypeExprDesc::Named { args, .. } => {
-                args.iter().find_map(|arg| any_type_expr_at(db, ctx, arg, loc))
-            }
-            other => type_expr_children_at(db, ctx, other, loc),
-        },
         AstTypeExprDesc::Ref { pointee, .. }
         | AstTypeExprDesc::Pointer { pointee, .. } => {
-            any_type_expr_at(db, ctx, pointee, loc)
+            any_type_expr_at(db, ctx, pointee, project(db, resolved, 0), loc)
         }
-        AstTypeExprDesc::Slice { ty, .. } => any_type_expr_at(db, ctx, ty, loc),
-        AstTypeExprDesc::Tuple(tys) => {
-            tys.iter().find_map(|ty| any_type_expr_at(db, ctx, ty, loc))
+        AstTypeExprDesc::Slice { ty, .. } => {
+            any_type_expr_at(db, ctx, ty, project(db, resolved, 0), loc)
         }
+        AstTypeExprDesc::Tuple(tys) => tys
+            .iter()
+            .enumerate()
+            .find_map(|(i, ty)| any_type_expr_at(db, ctx, ty, project(db, resolved, i), loc)),
         AstTypeExprDesc::Error(_) => None,
     }
 }
