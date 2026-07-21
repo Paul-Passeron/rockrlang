@@ -244,7 +244,7 @@ fn templ_at(
     }
     for constraint in &templ.constraints {
         if !constraint.span.encloses(loc) {
-            return Some(None);
+            continue;
         }
         let Some(iref) = ctx.resolve_interface(db, &constraint.data) else {
             // Bail if we are in an unresolved interface.
