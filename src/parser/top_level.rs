@@ -176,7 +176,7 @@ impl<'db> Parser<'db> {
         {
             self.consume();
             let args = self.parse_list(Self::parse_type_expr, TokenKind::Plus, |p| {
-                p.peek_n(0).is_none()
+                p.peek_n(0).is_none_or(|t| t.kind == TokenKind::Comma)
             })?;
             if args.is_empty() {
                 self.parse_type_expr()?; // Should bail early if we have no supertraits
