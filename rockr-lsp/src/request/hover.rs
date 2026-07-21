@@ -30,7 +30,7 @@ use rockr::{
     lookup::{
         FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
     },
-    name_resolve::type_expr::get_templates_of_fun,
+    name_resolve::type_expr::{get_templates_of_fun, templates_of_struct},
     ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
@@ -179,8 +179,57 @@ impl<'a> Lsp<'a> {
                     }
                     // Nothing to say here
                     ThirNode::MatchBranch(_) => None,
-                    ThirNode::EnumVariant { enum_def, variant, span } => todo!(),
-                    ThirNode::StructField { struct_def, field, span } => todo!(),
+                    ThirNode::EnumVariant { .. } => {
+                        log!("TODO: handle enum variant");
+                        None
+                    }
+                    ThirNode::StructField { struct_def, field, span } => {
+                        let struct_id = struct_def.def;
+                        let template_defs =
+                            templates_of_struct(&self.db, struct_id.interned());
+                        let struct_name = if template_defs.is_empty() {
+                            struct_id.name(&self.db).to_string(&self.db)
+                        } else {
+                            format!(
+                                "{}<{}>",
+                                struct_id.name(&self.db).to_string(&self.db),
+                                template_defs
+                                    .iter()
+                                    .map(|t| t.name.to_string(&self.db))
+                                    .join(", ")
+                            )
+                        };
+                        let struct_def_extract = format!(
+                            "```rockr\nstruct {struct_name} {{\n    {}: {};\n    // ...\n}}\n```",
+                            field.to_string(&self.db),
+                            type_ref_to_named_string_in(
+                                &self.db,
+                                func,
+                                struct_def
+                                    .typeof_field(&self.db, field)
+                                    .unwrap_or(TypeRef::Error)
+                            )
+                        );
+
+                        let template_string = template_defs
+                            .iter()
+                            .zip(&struct_def.args)
+                            .map(|(temp, arg)| {
+                                format!(
+                                    "`{}` = `{}`",
+                                    temp.name.to_string(&self.db),
+                                    type_ref_to_named_string_in(&self.db, func, *arg)
+                                )
+                            })
+                            .join(", ");
+
+                        let mut blocks = vec![struct_def_extract];
+                        if !template_string.is_empty() {
+                            blocks.push(template_string);
+                        }
+
+                        Some(self.hover_span_response_blocks(blocks, span))
+                    }
                 }
             }
             FunctionNode::SigNode(node) => Some(self.hover_sig(func, node)),

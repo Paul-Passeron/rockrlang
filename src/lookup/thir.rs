@@ -89,9 +89,18 @@ impl Thir {
             ExprKind::BinOp { lhs, rhs, .. } => {
                 self.expr_at(db, *lhs, loc).or_else(|| self.expr_at(db, *rhs, loc))
             }
-            ExprKind::StructLit { fields, .. } => {
-                fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
-            }
+            ExprKind::StructLit { fields, struct_def } => fields
+                .iter()
+                .find_map(|field| {
+                    field.field_span.encloses(loc).then(|| ThirNode::StructField {
+                        struct_def: struct_def.clone(),
+                        field: field.field,
+                        span: field.field_span,
+                    })
+                })
+                .or_else(|| {
+                    fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
+                }),
             ExprKind::Neg(idx)
             | ExprKind::Not(idx)
             | ExprKind::Metadata(idx)
@@ -229,8 +238,8 @@ impl ThirNode<'_> {
             ThirNode::MatchBranch(thir_match_branch) => {
                 thir_match_branch.get_whole_span(thir)
             }
-            ThirNode::EnumVariant { enum_def, variant, span } => todo!(),
-            ThirNode::StructField { struct_def, field, span } => todo!(),
+            ThirNode::EnumVariant {  span, .. } |
+            ThirNode::StructField {  span, .. } => *span,
         }
     }
 }
