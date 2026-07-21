@@ -60,7 +60,7 @@ mir {
     _3 = call core::io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nExitting with code 1...\n\0") -> bb3
+    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
     _5 = call core::sys::exit(1_i32) -> bb4

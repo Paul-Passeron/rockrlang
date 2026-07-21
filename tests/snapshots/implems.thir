@@ -12,7 +12,7 @@ core/panic.rkr:1:1
 thir fun core::panic::panic(message: core::io::str): never {
     core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
     <core::io::str>::core::io::str::print(&message);
-    core::io::printf(c"\'\n\nExitting with code 1...\n\0");
+    core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
 }
 
