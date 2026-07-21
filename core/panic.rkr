@@ -1,6 +1,6 @@
 fun panic(message: str): never {
     core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'");
     message.print();
-    core::io::printf(c"\'\n\nExitting with code 1...\n");
+    core::io::printf(c"\'\n\nAborting with code 1...\n");
     sys::exit(1);
 }
