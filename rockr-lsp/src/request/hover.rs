@@ -172,8 +172,15 @@ impl<'a> Lsp<'a> {
                                 Some(BlockSemanticInfo::StructDestructure(struct_ref)),
                             ..
                         } => {
-                            let ty = struct_ref.clone().as_type_ref(&self.db);
-                            Some(self.hover_type_span_response(func, ty, stmt.span))
+                            let blocks = self
+                                .struct_display(
+                                    struct_ref.clone(),
+                                    StructDisplayOption::AllFields,
+                                    func,
+                                )?
+                                .to_vec();
+
+                            Some(self.hover_span_response_blocks(blocks, stmt.span))
                         }
                         _ => {
                             // Nothing to say here
@@ -299,7 +306,11 @@ impl<'a> Lsp<'a> {
             }
             ExprKind::StructLit { struct_def, .. } => {
                 let blocks = self
-                    .struct_display(struct_def.clone(), StructDisplayOption::AllFields, func)?
+                    .struct_display(
+                        struct_def.clone(),
+                        StructDisplayOption::AllFields,
+                        func,
+                    )?
                     .to_vec();
 
                 Some(self.hover_span_response_blocks(blocks, expr.span))
