@@ -197,10 +197,10 @@ impl AstImplicitContext {
         ) -> Option<InterfaceRef> {
             match ty {
                 AstTypeExprDesc::Named { name, args } => {
-                    if this.template_asts.iter().any(|temp| temp.name == *name) {
+                    if this.template_asts.iter().any(|temp| temp.name == name.data) {
                         return None;
                     }
-                    match resolve_in_module(db, *name, module)? {
+                    match resolve_in_module(db, name.data, module)? {
                         Definition::Interface(def) => {
                             let args = args
                                 .iter()
@@ -212,7 +212,7 @@ impl AstImplicitContext {
                     }
                 }
                 AstTypeExprDesc::NameResolved { from, to } => {
-                    let new_module = match resolve_in_module(db, *from, module)? {
+                    let new_module = match resolve_in_module(db, from.data, module)? {
                         Definition::Module(module_id) => module_id,
                         _ => return None,
                     };
@@ -303,21 +303,21 @@ pub trait AsAstImplCtx {
     ) -> Option<TypeRef> {
         match ty {
             AstTypeExprDesc::Named { name, args } => {
-                if *name == Symbol::new(db, "Self") && module == this.owning_module(db) {
+                if name.data == Symbol::new(db, "Self") && module == this.owning_module(db) {
                     return if let Some(zelf) = this.owner(db).get_canonical_zelf(db) {
                         Some(zelf)
                     } else {
                         panic!("No zelf ???")
                     };
                 } else if let Some(pos) =
-                    this.get_ast_templates().iter().position(|temp| temp.name == *name)
+                    this.get_ast_templates().iter().position(|temp| temp.name == name.data)
                 {
                     if !args.is_empty() {
                         return None;
                     }
                     return Some(TypeRef::Param(TypeParamId(pos)));
                 }
-                match resolve_in_module(db, *name, module)? {
+                match resolve_in_module(db, name.data, module)? {
                     Definition::Type(type_def_id) => {
                         let args = args
                             .iter()
@@ -329,16 +329,16 @@ pub trait AsAstImplCtx {
                 }
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                if *from == Symbol::new(db, "Self") && module == this.owning_module(db) {
+                if from.data == Symbol::new(db, "Self") && module == this.owning_module(db) {
                     if let AstTypeExprDesc::Named { name, args } = &to.as_ref().data
                         && args.is_empty()
                     {
-                        this.get_associated_type(db, *name)
+                        this.get_associated_type(db, name.data)
                     } else {
                         None
                     }
                 } else {
-                    let new_module = match resolve_in_module(db, *from, module)? {
+                    let new_module = match resolve_in_module(db, from.data, module)? {
                         Definition::Module(module_id) => module_id,
                         _ => return None,
                     };

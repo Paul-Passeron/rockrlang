@@ -179,7 +179,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.value {
             AstTypeExprDesc::Named { name, args } => {
-                write!(f, "{}", name.display(self.db))?;
+                write!(f, "{}", name.data.display(self.db))?;
                 if !args.is_empty() {
                     write!(
                         f,
@@ -197,7 +197,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
                 Ok(())
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                write!(f, "{}::{}", from.display(self.db), to.data.display(self.db))
+                write!(f, "{}::{}", from.data.display(self.db), to.data.display(self.db))
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
                 write!(

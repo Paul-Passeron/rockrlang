@@ -44,12 +44,12 @@ pub fn resolve_type_expr_as_interface<'db>(
     match &interface.data {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty()
-                && let Some(_) = template_args.iter().position(|p| p.name == *name)
+                && let Some(_) = template_args.iter().position(|p| p.name == name.data)
             {
                 return None;
             }
 
-            resolve_in_module(db, *name, module).and_then(|def| {
+            resolve_in_module(db, name.data, module).and_then(|def| {
                 if let Definition::Interface(interface_id) = def {
                     let resolved_args = args
                         .iter()
@@ -70,7 +70,7 @@ pub fn resolve_type_expr_as_interface<'db>(
             })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, *from, module)
+            if let Some(Definition::Module(module)) = resolve_in_module(db, from.data, module)
             {
                 resolve_type_expr_as_interface(db, to, module, template_args, has_zelf)
             } else {

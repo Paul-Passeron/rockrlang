@@ -64,15 +64,15 @@ pub fn resolve_type_expr_desc<'db>(
     match type_expr {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty() {
-                if *name == Symbol::new(db, "Self") {
+                if name.data == Symbol::new(db, "Self") {
                     return TypeRef::Zelf;
                 }
-                if let Some(idx) = template_args.iter().position(|p| p.name == *name) {
+                if let Some(idx) = template_args.iter().position(|p| p.name == name.data) {
                     return TypeRef::Param(TypeParamId(idx));
                 }
             }
 
-            resolve_in_module(db, *name, module.into()).map_or(TypeRef::Error, |def| {
+            resolve_in_module(db, name.data, module.into()).map_or(TypeRef::Error, |def| {
                 if let Definition::Type(type_def_id) = def {
                     let resolved_args = args
                         .iter()
@@ -94,7 +94,7 @@ pub fn resolve_type_expr_desc<'db>(
         }
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) =
-                resolve_in_module(db, *from, module.into())
+                resolve_in_module(db, from.data, module.into())
             {
                 resolve_type_expr(db, to, module.interned(), template_args, has_zelf)
             } else {

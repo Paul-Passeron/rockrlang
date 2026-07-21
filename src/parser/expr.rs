@@ -476,12 +476,13 @@ impl<'db> Parser<'db> {
         let Spanned { data, annotations, span } = e;
 
         let data = match data {
-            AstExprDesc::Name(symbol) => {
-                AstTypeExprDesc::Named { name: symbol, args: vec![] }
-            }
+            AstExprDesc::Name(symbol) => AstTypeExprDesc::Named {
+                name: Spanned { data: symbol, annotations: vec![], span },
+                args: vec![],
+            },
             AstExprDesc::NameResolved { from, to } => {
                 let to = self.reinterpret_expr_as_ty(*to)?;
-                AstTypeExprDesc::NameResolved { from: from.data, to: Box::new(to) }
+                AstTypeExprDesc::NameResolved { from, to: Box::new(to) }
             }
             _ => return Err(self.parse_error(ParseErrorKind::ExpectedTypeName)),
         };
@@ -627,7 +628,14 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         let ty_span = start.span(start);
                         let ty = Spanned::new(
-                            AstTypeExprDesc::Named { name, args: vec![] },
+                            AstTypeExprDesc::Named {
+                                name: Spanned {
+                                    data: name,
+                                    annotations: vec![],
+                                    span: tok.location,
+                                },
+                                args: vec![],
+                            },
                             vec![],
                             ty_span,
                         );
@@ -638,13 +646,6 @@ impl<'db> Parser<'db> {
                         ))
                     }
 
-                    // `<` is not handled here — just return the Name and let
-                    // parse_postfix handle it for static calls / qualified
-                    // paths. This way `a::b::c<T>::Variant`
-                    // works correctly: `a::b::c`
-                    // is built up as NameResolved through the Access arm, then
-                    // postfix sees `<` and tries static_call / qualified_cons
-                    // with the full expression (not just the last identifier).
                     _ => {
                         let end = self.get_end();
                         Ok(Spanned::new(AstExprDesc::Name(name), vec![], start.span(end)))

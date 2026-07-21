@@ -220,17 +220,17 @@ impl<'db> LowerFundef<'db> {
         match &desc.data {
             AstTypeExprDesc::Named { name, args } => {
                 if args.is_empty() {
-                    if *name == Symbol::new(self.db, "Self") {
+                    if name.data == Symbol::new(self.db, "Self") {
                         return TypeRef::Zelf;
                     }
                     if let Some(idx) =
-                        self.template_args.iter().position(|p| p.name == *name)
+                        self.template_args.iter().position(|p| p.name == name.data)
                     {
                         return TypeRef::Param(TypeParamId(idx));
                     }
                 }
 
-                match resolve_in_module(self.db, *name, module) {
+                match resolve_in_module(self.db, name.data, module) {
                     Some(resolution) => {
                         let type_def_id = match resolution {
                             Definition::Type(type_def_id) => type_def_id,
@@ -254,7 +254,7 @@ impl<'db> LowerFundef<'db> {
                             format!(
                                 "{}: Could not resolve name {} in scope",
                                 desc.span.start().loc_info(self.db),
-                                name.display(self.db),
+                                name.data.display(self.db),
                             ),
                             desc.span,
                         )
@@ -265,7 +265,7 @@ impl<'db> LowerFundef<'db> {
             }
 
             AstTypeExprDesc::NameResolved { from, to } => {
-                match resolve_in_module(self.db, *from, module) {
+                match resolve_in_module(self.db, from.data, module) {
                     Some(Definition::Module(inner_module)) => {
                         self.resolve_holed_ty(to, inner_module)
                     }
@@ -812,7 +812,7 @@ impl<'db> LowerFundef<'db> {
             v
         } else {
             match &ty.data {
-                AstTypeExprDesc::Named { name, args } if args.is_empty() => *name,
+                AstTypeExprDesc::Named { name, args } if args.is_empty() => name.data,
                 _ => unreachable!(
                     "NameResolved+StructLit with no variant and complex
         ty"

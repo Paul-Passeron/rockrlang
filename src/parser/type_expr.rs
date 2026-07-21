@@ -28,8 +28,8 @@ use crate::{
 impl<'db> Parser<'db> {
     pub(super) fn parse_type_expr(&mut self) -> Result<AstTypeExpr, ParseError> {
         let start = self.get_start();
-
-        match self.current_token()?.kind {
+        let tok = self.current_token()?;
+        match tok.kind {
             TokenKind::Mult | TokenKind::BitAnd | TokenKind::And => {
                 let is_ptr = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mult)
@@ -118,6 +118,7 @@ impl<'db> Parser<'db> {
             }
 
             TokenKind::Identifier(name) => {
+                let span = tok.location;
                 self.consume();
 
                 match self.peek_n(0).map(|t| t.kind) {
@@ -127,7 +128,7 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstTypeExprDesc::NameResolved {
-                                from: name,
+                                from: Spanned { data: name, annotations: vec![], span },
                                 to: Box::new(rhs),
                             },
                             vec![],
@@ -142,7 +143,10 @@ impl<'db> Parser<'db> {
                         self.consume();
                         let end = self.get_end();
                         Ok(Spanned::new(
-                            AstTypeExprDesc::Named { name, args },
+                            AstTypeExprDesc::Named {
+                                name: Spanned { data: name, annotations: vec![], span },
+                                args,
+                            },
                             vec![],
                             start.span(end),
                         ))
@@ -151,7 +155,10 @@ impl<'db> Parser<'db> {
                     _ => {
                         let end = self.get_end();
                         Ok(Spanned::new(
-                            AstTypeExprDesc::Named { name, args: vec![] },
+                            AstTypeExprDesc::Named {
+                                name: Spanned { data: name, annotations: vec![], span },
+                                args: vec![],
+                            },
                             vec![],
                             start.span(end),
                         ))
