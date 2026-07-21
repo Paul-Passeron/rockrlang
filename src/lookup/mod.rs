@@ -17,12 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, SourceFile,
-    common::location::Location,
+    common::location::{Location, Span},
     compiler::{Workspace, workspace_packages},
     hir::{impl_items, interface_items},
     lookup::{
         sig::{SigNode, sig_node_at},
         thir::ThirNode,
+        ty::{TypeNode, type_node_at},
     },
     name_resolve::{file_module_id, implems::module_impls, module_items},
     parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTopLevelItemDesc},
@@ -30,11 +31,12 @@ use crate::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef,
     },
-    thir::thir_body,
+    thir::{Thir, thir_body},
 };
 
 pub mod sig;
 pub mod thir;
+pub mod ty;
 
 fn file_module_of<'db>(
     db: &'db dyn Db,
@@ -163,14 +165,40 @@ pub fn enclosing_fun(db: &dyn Db, loc: Location) -> Option<FunctionId> {
 }
 
 pub enum FunctionNode<'a> {
-    ThirNode(ThirNode<'a>),
+    ThirNode(&'a Thir, ThirNode<'a>),
     SigNode(SigNode),
+    TypeNode(TypeNode),
+}
+
+impl FunctionNode<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            FunctionNode::ThirNode(thir, thir_node) => thir_node.span(thir),
+            FunctionNode::SigNode(sig_node) => sig_node.span(),
+            FunctionNode::TypeNode(type_node) => type_node.span,
+        }
+    }
 }
 
 pub fn function_node_at(db: &dyn Db, loc: Location) -> Option<FunctionNode<'_>> {
     let f = enclosing_fun(db, loc)?;
-    sig_node_at(db, loc).map(FunctionNode::SigNode).or_else(|| {
+
+    let type_node = type_node_at(db, loc);
+
+    let fun_node = sig_node_at(db, loc).map(FunctionNode::SigNode).or_else(|| {
         let thir = thir_body(db, f)?;
-        thir.node_at(db, loc).map(FunctionNode::ThirNode)
-    })
+        thir.node_at(db, loc).map(|node| FunctionNode::ThirNode(thir, node))
+    });
+
+    if let Some(type_node) = type_node
+        && let Some(fun_node) = fun_node
+    {
+        if type_node.span == fun_node.span() {
+            Some(fun_node)
+        } else {
+            Some(FunctionNode::TypeNode(type_node))
+        }
+    } else {
+        type_node.map(FunctionNode::TypeNode).or(fun_node)
+    }
 }

@@ -258,3 +258,16 @@ fn templ_at(
     }
     return Some(None);
 }
+
+impl SigNode {
+    pub fn span(&self) -> Span {
+        match self {
+            SigNode::ParamType(function_param) => function_param.ty_span,
+            SigNode::ParamName(function_param) => function_param.name_span,
+            SigNode::ReturnTy(return_ty) => return_ty.span,
+            SigNode::TemplateParam { param, .. } => param.span,
+            SigNode::FunctionName { span, .. } => *span,
+            SigNode::TemplateConstraint { constraint, .. } => constraint.span,
+        }
+    }
+}

@@ -18,7 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::ops::Not;
 
 use crate::{
-    Db, common::location::{Location, Span}, ril::TypeRef, thir::{
+    Db,
+    common::location::{Location, Span},
+    thir::{
         ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Thir, ThirConstructorArgs,
         ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
@@ -207,5 +209,20 @@ impl Thir {
 
     pub fn node_at<'a>(&'a self, db: &dyn Db, loc: Location) -> Option<ThirNode<'a>> {
         self.root.iter().find_map(|stmt| self.stmt_at(db, stmt, loc))
+    }
+}
+
+impl ThirNode<'_> {
+    pub fn span(&self, thir: &Thir) -> Span {
+        match self {
+            ThirNode::Expr { id, .. } => thir.exprs[*id].span,
+            ThirNode::Place(idx) => thir.places[*idx].span,
+            ThirNode::Local(idx) => thir.locals[*idx].span,
+            ThirNode::Stmt(thir_stmt) => thir_stmt.span,
+            ThirNode::Pattern(thir_pattern) => thir_pattern.span,
+            ThirNode::MatchBranch(thir_match_branch) => {
+                thir_match_branch.get_whole_span(thir)
+            }
+        }
     }
 }

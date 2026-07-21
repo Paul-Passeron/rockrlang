@@ -28,16 +28,13 @@ use lsp_types::{
 use rockr::{
     common::location::{Location, Span},
     lookup::{
-        enclosing_fun,
-        sig::{SigNode, sig_node_at},
-        thir::ThirNode,
+        FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
     },
     name_resolve::type_expr::get_templates_of_fun,
     ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
-        thir_body,
     },
 };
 
@@ -106,18 +103,18 @@ impl<'a> Lsp<'a> {
                 let constraints_str = constraints
                     .into_iter()
                     .filter_map(identity)
-                    .map(|cs| cs.to_string(&self.db))
+                    .map(|cs| format!("`{}`", cs.to_string(&self.db)))
                     .join(" + ");
 
                 self.hover_span_response(
                     format!(
-                        "template {}: {}{}",
+                        "template {}: `{}`{}",
                         param.idx,
                         param.name.to_string(&self.db),
                         if constraints_str.is_empty() {
                             String::new()
                         } else {
-                            format!(": `{constraints_str}`")
+                            format!(": {constraints_str}")
                         }
                     ),
                     param.span,
@@ -139,7 +136,7 @@ impl<'a> Lsp<'a> {
             SigNode::TemplateConstraint { param, constraint } => self
                 .hover_span_response(
                     format!(
-                        "template {}: {}`: {}`",
+                        "template {}: `{}`: `{}`",
                         param.idx,
                         param.name.to_string(&self.db),
                         constraint.iref.to_string(&self.db)
@@ -154,36 +151,41 @@ impl<'a> Lsp<'a> {
         func: FunctionId,
         loc: Location,
     ) -> Option<Hover> {
-        if let Some(node) = sig_node_at(&self.db, loc) {
-            return Some(self.hover_sig(func, node));
-        }
-        let body_span = func.body_span(&self.db)?;
-        // Make sure we are inside the body
-        body_span.encloses(loc).then_some(())?;
-        let thir = thir_body(&self.db, func)?;
-        let node = thir.node_at(&self.db, loc)?;
-        match node {
-            ThirNode::Expr { id, setup } => self.hover_expr(func, thir, id, setup),
-            ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
-            ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
-            ThirNode::Stmt(stmt) => match &stmt.kind {
-                StmtKind::Block {
-                    semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
-                    ..
-                } => {
-                    let ty = struct_ref.clone().as_type_ref(&self.db);
-                    Some(self.hover_type_span_response(func, ty, stmt.span))
-                }
-                _ => {
+        let fun_node = function_node_at(&self.db, loc)?;
+        match fun_node {
+            FunctionNode::ThirNode(thir, node) => {
+                match node {
+                    ThirNode::Expr { id, setup } => {
+                        self.hover_expr(func, thir, id, setup)
+                    }
+                    ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
+                    ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
+                    ThirNode::Stmt(stmt) => match &stmt.kind {
+                        StmtKind::Block {
+                            semantic_infos:
+                                Some(BlockSemanticInfo::StructDestructure(struct_ref)),
+                            ..
+                        } => {
+                            let ty = struct_ref.clone().as_type_ref(&self.db);
+                            Some(self.hover_type_span_response(func, ty, stmt.span))
+                        }
+                        _ => {
+                            // Nothing to say here
+                            None
+                        }
+                    },
+                    ThirNode::Pattern(pat) => {
+                        Some(self.hover_type_span_response(func, pat.ty, pat.span))
+                    }
                     // Nothing to say here
-                    None
+                    ThirNode::MatchBranch(_) => None,
                 }
-            },
-            ThirNode::Pattern(pat) => {
-                Some(self.hover_type_span_response(func, pat.ty, pat.span))
             }
-            // Nothing to say here
-            ThirNode::MatchBranch(_) => None,
+            FunctionNode::SigNode(node) => Some(self.hover_sig(func, node)),
+            FunctionNode::TypeNode(node) => {
+                log!("Using type node !");
+                Some(self.hover_type_span_response(func, node.ty, node.span))
+            }
         }
     }
 
