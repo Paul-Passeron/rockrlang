@@ -34,9 +34,12 @@ use rockr::{
         symbols::Symbol,
     },
     lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
-    name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
+    name_resolve::{
+        definition::Definition,
+        type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
+    },
     parse_tree::top_level::AstTemplateArg,
-    ril::{FunctionId, TypeParamId, TypeRef},
+    ril::{FunctionId, TypeDefId, TypeParamId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, StructRef, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
@@ -220,7 +223,31 @@ impl<'a> Lsp<'a> {
             AstNode::TypeNode(node) => {
                 Some(self.hover_type_span_response(func, node.ty, node.span))
             }
-            AstNode::Path(_, _) => None,
+            AstNode::Path(definition, span) => self.hover_path(func, definition, span),
+        }
+    }
+
+    fn hover_path(
+        &self,
+        func: FunctionId,
+        definition: Definition,
+        span: Span,
+    ) -> Option<Hover> {
+        if let Definition::Type(TypeDefId::Struct(struct_id)) = definition {
+            let args = (0..templates_of_struct(&self.db, struct_id.interned()).len())
+                .map(|i| TypeRef::Param(TypeParamId(i)))
+                .collect();
+            let display = self.struct_display(
+                StructRef { def: struct_id, args },
+                StructDisplayOption::AllFields,
+                func,
+            )?;
+            Some(self.hover_span_response_blocks(vec![display.struct_def], span))
+        } else {
+            Some(self.hover_span_response(
+                format!("`{}`", definition.to_string(&self.db)),
+                span,
+            ))
         }
     }
 
