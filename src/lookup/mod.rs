@@ -165,30 +165,30 @@ pub fn enclosing_fun(db: &dyn Db, loc: Location) -> Option<FunctionId> {
     }
 }
 
-pub enum FunctionNode<'a> {
+pub enum AstNode<'a> {
     ThirNode(&'a Thir, ThirNode<'a>),
     SigNode(SigNode),
     TypeNode(TypeNode),
 }
 
-impl FunctionNode<'_> {
+impl AstNode<'_> {
     pub fn span(&self) -> Span {
         match self {
-            FunctionNode::ThirNode(thir, thir_node) => thir_node.span(thir),
-            FunctionNode::SigNode(sig_node) => sig_node.span(),
-            FunctionNode::TypeNode(type_node) => type_node.span,
+            AstNode::ThirNode(thir, thir_node) => thir_node.span(thir),
+            AstNode::SigNode(sig_node) => sig_node.span(),
+            AstNode::TypeNode(type_node) => type_node.span,
         }
     }
 }
 
-pub fn function_node_at(db: &dyn Db, loc: Location) -> Option<FunctionNode<'_>> {
+pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
     let f = enclosing_fun(db, loc)?;
 
     let type_node = type_node_at(db, loc);
 
-    let fun_node = sig_node_at(db, loc).map(FunctionNode::SigNode).or_else(|| {
+    let fun_node = sig_node_at(db, loc).map(AstNode::SigNode).or_else(|| {
         let thir = thir_body(db, f)?;
-        thir.node_at(db, loc).map(|node| FunctionNode::ThirNode(thir, node))
+        thir.node_at(db, loc).map(|node| AstNode::ThirNode(thir, node))
     });
 
     if let Some(type_node) = type_node
@@ -197,9 +197,9 @@ pub fn function_node_at(db: &dyn Db, loc: Location) -> Option<FunctionNode<'_>> 
         if type_node.span == fun_node.span() {
             Some(fun_node)
         } else {
-            Some(FunctionNode::TypeNode(type_node))
+            Some(AstNode::TypeNode(type_node))
         }
     } else {
-        type_node.map(FunctionNode::TypeNode).or(fun_node)
+        type_node.map(AstNode::TypeNode).or(fun_node)
     }
 }

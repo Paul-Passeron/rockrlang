@@ -20,7 +20,7 @@ use rockr::{
     common::location::{Location, Span},
     hir::{function_ast, hir_body, impl_sources},
     lookup::{
-        FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
+        AstNode, enclosing_fun, ast_node_at, sig::SigNode, thir::ThirNode,
     },
     name_resolve::{
         interfaces::interface_item,
@@ -57,9 +57,9 @@ impl<'a> Lsp<'a> {
         func: FunctionId,
         loc: Location,
     ) -> Option<GotoDefinitionResponse> {
-        let node = function_node_at(&self.db, loc)?;
+        let node = ast_node_at(&self.db, loc)?;
         match node {
-            FunctionNode::ThirNode(thir, thir_node) => match thir_node {
+            AstNode::ThirNode(thir, thir_node) => match thir_node {
                 ThirNode::Expr { id, .. } => self.goto_def_expr(thir, id),
                 ThirNode::Place(idx) => self.goto_def_place(thir, idx),
                 ThirNode::Local(idx) => self.goto_def_local(thir, idx),
@@ -68,7 +68,7 @@ impl<'a> Lsp<'a> {
                 }
                 _ => None,
             },
-            FunctionNode::SigNode(sig_node) => match sig_node {
+            AstNode::SigNode(sig_node) => match sig_node {
                 SigNode::ParamType(p) => self.goto_def_ty_in_func(func, p.ty, loc),
                 SigNode::ParamName(_) => None,
                 SigNode::ReturnTy(return_ty) => {
@@ -80,7 +80,7 @@ impl<'a> Lsp<'a> {
                     Some(self.goto_def_interface(constraint.iref.def(&self.db)))
                 }
             },
-            FunctionNode::TypeNode(type_node) => {
+            AstNode::TypeNode(type_node) => {
                 self.goto_def_ty_in_func(func, type_node.ty, loc)
             }
         }

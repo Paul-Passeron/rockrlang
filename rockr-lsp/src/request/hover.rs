@@ -34,7 +34,7 @@ use rockr::{
         symbols::Symbol,
     },
     lookup::{
-        FunctionNode, enclosing_fun, function_node_at, sig::SigNode, thir::ThirNode,
+        AstNode, enclosing_fun, ast_node_at, sig::SigNode, thir::ThirNode,
     },
     name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     ril::{FunctionId, TypeParamId, TypeRef},
@@ -165,9 +165,9 @@ impl<'a> Lsp<'a> {
         func: FunctionId,
         loc: Location,
     ) -> Option<Hover> {
-        let fun_node = function_node_at(&self.db, loc)?;
+        let fun_node = ast_node_at(&self.db, loc)?;
         match fun_node {
-            FunctionNode::ThirNode(thir, node) => {
+            AstNode::ThirNode(thir, node) => {
                 match node {
                     ThirNode::Expr { id, setup } => {
                         self.hover_expr(func, thir, id, setup)
@@ -217,8 +217,8 @@ impl<'a> Lsp<'a> {
                     }
                 }
             }
-            FunctionNode::SigNode(node) => Some(self.hover_sig(func, node)),
-            FunctionNode::TypeNode(node) => {
+            AstNode::SigNode(node) => Some(self.hover_sig(func, node)),
+            AstNode::TypeNode(node) => {
                 Some(self.hover_type_span_response(func, node.ty, node.span))
             }
         }
