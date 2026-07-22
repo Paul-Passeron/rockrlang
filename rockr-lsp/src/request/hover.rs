@@ -219,7 +219,7 @@ impl<'a> Lsp<'a> {
             AstNode::TypeNode(node) => {
                 Some(self.hover_type_span_response(func, node.ty, node.span))
             }
-            AstNode::Path(definition, span) => None,
+            AstNode::Path(_, _) => None,
         }
     }
 

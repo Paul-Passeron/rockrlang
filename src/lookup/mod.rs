@@ -187,8 +187,10 @@ impl AstNode<'_> {
 }
 
 pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
+    let path_node = path_node_at(db, loc).map(|(def, span)| AstNode::Path(def, span));
+
     let Some(f) = enclosing_fun(db, loc) else {
-        return path_node_at(db, loc).map(|(def, span)| AstNode::Path(def, span));
+        return path_node;
     };
 
     let type_node = type_node_at(db, loc);
@@ -198,7 +200,7 @@ pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
         thir.node_at(db, loc).map(|node| AstNode::ThirNode(thir, node))
     });
 
-    if let Some(type_node) = type_node
+    let base = if let Some(type_node) = type_node
         && let Some(fun_node) = fun_node
     {
         if type_node.span == fun_node.span() {
@@ -208,5 +210,11 @@ pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
         }
     } else {
         type_node.map(AstNode::TypeNode).or(fun_node)
+    };
+
+    match (base, path_node) {
+        (Some(base), Some(path)) if path.span().len() <= base.span().len() => Some(path),
+        (Some(base), _) => Some(base),
+        (None, path) => path,
     }
 }

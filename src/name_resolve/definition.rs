@@ -76,15 +76,20 @@ impl Definition {
 
 impl ModuleId {
     pub fn name_span(self, db: &dyn Db) -> Option<Span> {
-        let parent = self.parent(db)?;
-        for item in module_items(db, parent.interned()).iter().flatten() {
-            if let AstTopLevelItemDesc::Module(curr_mod) = &item.data
-                && curr_mod.data.name.data == self.name(db)
-            {
-                return Some(curr_mod.data.name.span);
-            }
+        if let Some(file) = *self.interned().file(db) {
+            return Some(Span::new(file, 0, 0));
         }
-        unreachable!()
+        let parent = self.parent(db)?;
+        module_items(db, parent.interned()).iter().flatten().find_map(|item| {
+            match &item.data {
+                AstTopLevelItemDesc::Module(curr_mod)
+                    if curr_mod.data.name.data == self.name(db) =>
+                {
+                    Some(curr_mod.data.name.span)
+                }
+                _ => None,
+            }
+        })
     }
 }
 

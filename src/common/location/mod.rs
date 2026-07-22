@@ -65,6 +65,10 @@ impl Span {
         }
         true
     }
+
+    pub fn len(&self) -> usize {
+        self.end_offset - self.start_offset
+    }
 }
 
 impl Location {
