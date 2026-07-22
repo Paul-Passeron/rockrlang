@@ -42,6 +42,10 @@ impl Symbol {
         InternedSymbol(self.0, PhantomData)
     }
 
+    pub fn display(&self, db: &dyn Db) -> String {
+        self.interned().contents(db).to_string()
+    }
+
     pub fn to_string(&self, db: &dyn Db) -> String {
         self.display(db).to_string()
     }
@@ -69,5 +73,9 @@ impl StrLit {
 
     pub fn interned(&self) -> InternedStrLit<'_> {
         InternedStrLit(self.0, PhantomData)
+    }
+
+    pub fn display(&self, db: &dyn Db) -> String {
+        self.interned().contents(db).to_string()
     }
 }

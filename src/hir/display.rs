@@ -19,7 +19,6 @@ use std::fmt::{self, Formatter};
 
 use crate::{
     Db,
-    common::symbols::{StrLit, Symbol},
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
@@ -28,18 +27,6 @@ use crate::{
     parse_tree::expr::BinaryOperator,
     ril::{TypeDefId, display::Display},
 };
-
-impl Symbol {
-    pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db).to_string()
-    }
-}
-
-impl StrLit {
-    pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db).to_string()
-    }
-}
 
 impl<'db> HirBody<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> Display<'db, &'db Self> {
