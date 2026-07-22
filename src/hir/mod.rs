@@ -291,12 +291,9 @@ pub struct LocalInfo {
 #[salsa::tracked]
 pub struct HirBody<'db> {
     pub owner: FunctionId,
-    #[returns(ref)]
     pub params: Vec<LocalId>,
-    #[returns(ref)]
     pub locals: Vec<LocalInfo>,
     pub zelf: Option<LocalId>,
-    #[returns(ref)]
     pub stmts: Vec<HirStmt>,
 }
 
@@ -451,7 +448,6 @@ impl FunctionLikeAst {
 
 #[salsa::tracked]
 pub struct InternedFunctionLikeAst<'db> {
-    #[returns(ref)]
     pub inner: FunctionLikeAst,
 }
 

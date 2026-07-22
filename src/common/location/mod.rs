@@ -21,9 +21,7 @@ use std::{fmt::Display, path::PathBuf, sync::Arc};
 #[salsa::input]
 #[derive(Debug, PartialOrd, Ord)]
 pub struct SourceFile {
-    #[returns(ref)]
     pub path: PathBuf,
-    #[returns(ref)]
     pub content: Arc<str>,
 }
 

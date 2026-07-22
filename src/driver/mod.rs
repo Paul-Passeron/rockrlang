@@ -70,7 +70,6 @@ fn discover_dir(dir: &Path) -> Option<DiscoveredModule> {
 
 #[salsa::interned]
 pub struct SalsaPath<'db> {
-    #[returns(ref)]
     pub value: PathBuf,
 }
 

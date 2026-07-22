@@ -601,15 +601,10 @@ impl<'db> TyCtx<'db> {
 
 #[salsa::tracked]
 pub struct TypeCheckResults<'db> {
-    #[returns(ref)]
     pub expr_types: BTreeMap<ExprId, TypeRef>,
-    #[returns(ref)]
     pub pat_types: BTreeMap<PatternId, TypeRef>,
-    #[returns(ref)]
     pub place_types: BTreeMap<PlaceId, TypeRef>,
-    #[returns(ref)]
     pub call_infos: BTreeMap<ExprId, CallInfos>,
-    #[returns(ref)]
     pub locals: BTreeMap<LocalId, Option<TypeRef>>,
 }
 

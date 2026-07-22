@@ -98,7 +98,7 @@ fn type_id_is_concrete(db: &dyn Db, ty: TypeId) -> bool {
     ty.args(db).iter().all(|arg| type_ref_is_concrete(db, *arg))
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked]
 fn _candidate_impls_for<'db>(
     db: &'db dyn Db,
     ty: InternedTypeId<'db>,

@@ -431,7 +431,7 @@ impl<'a> DCECtx<'a> {
     }
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked]
 fn _dce<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
     let mir = _mir(db, key);
     DeadCodeElimination.run(db, mir)

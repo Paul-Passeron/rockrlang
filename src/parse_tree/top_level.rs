@@ -292,9 +292,7 @@ pub enum AstImplItem {
 
 #[salsa::tracked]
 pub struct Ast<'db> {
-    #[returns(ref)]
     pub items: Vec<AstTopLevelItem>,
-    #[returns(ref)]
     pub includes: Vec<AstIncludePath>,
 }
 

@@ -97,7 +97,6 @@ pub enum LayoutData {
 pub struct Layout {
     pub size: Size,
     pub align: Align,
-    #[returns(ref)]
     pub inner: self::LayoutData,
 }
 

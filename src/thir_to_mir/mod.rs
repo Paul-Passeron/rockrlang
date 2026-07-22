@@ -74,7 +74,6 @@ pub struct ThirToMIR<'a> {
 pub struct MIRKey {
     pub fdef: FunctionId,
 
-    #[returns(ref)]
     pub subs: Vec<TypeRef>,
 }
 
@@ -183,7 +182,7 @@ impl FuncInst {
     }
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked]
 pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
     let Some(thir) = thir_body(db, *key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
