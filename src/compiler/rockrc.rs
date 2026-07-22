@@ -42,6 +42,12 @@ pub struct CliArgs {
 
     #[clap(long, default_value_t = false)]
     display_thir: bool,
+
+    #[clap(short = 'c', long, default_value_t = false)]
+    compile_only: bool,
+
+    #[clap(short = 'o', long)]
+    output: Option<PathBuf>,
 }
 
 fn main() -> std::process::ExitCode {
@@ -53,6 +59,8 @@ fn main() -> std::process::ExitCode {
         display_mir: args.display_mir,
         display_thir: args.display_thir,
         display_opt_llvm: args.display_opt_llvm,
+        compile_only: args.compile_only,
+        output: args.output,
     };
     let root = args.file.unwrap_or_else(|| std::env::current_dir().unwrap());
     match build_from_disk(root, cfg) {

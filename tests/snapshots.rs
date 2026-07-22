@@ -20,11 +20,15 @@ use std::process::Command;
 
 fn run_snapshot_with_args(name: &str, folder: &str, args: &[&str]) {
     let example = format!("examples/{name}.rkr");
+    let obj = std::env::temp_dir().join(format!("rockr-snapshot-{name}-{folder}.o"));
     let output = Command::new(env!("CARGO_BIN_EXE_rockrc"))
         .args([example.as_str()])
         .args(args)
+        .args(["-c", "-o"])
+        .arg(&obj)
         .output()
         .unwrap_or_else(|e| panic!("failed to run rockrc on {example}: {e}"));
+    let _ = std::fs::remove_file(&obj);
 
     assert!(
         output.status.success(),

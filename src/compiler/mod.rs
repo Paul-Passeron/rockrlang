@@ -63,9 +63,7 @@ pub mod diagnostic;
 #[salsa::input(singleton)]
 pub struct Workspace {
     pub config: Config,
-    #[returns(ref)]
     pub files: DashSet<SourceFile>,
-    #[returns(ref)]
     pub roots: DashSet<PackageRoot>,
 }
 
@@ -125,7 +123,7 @@ impl Workspace {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Config {
     pub no_std: bool,
     pub skip_core: bool,
@@ -133,6 +131,8 @@ pub struct Config {
     pub display_opt_llvm: bool,
     pub display_mir: bool,
     pub display_thir: bool,
+    pub compile_only: bool,
+    pub output: Option<PathBuf>,
 }
 
 pub enum CompilerError {
@@ -141,6 +141,7 @@ pub enum CompilerError {
     NoFileFoundAt(PathBuf),
     CoreLibNotFound,
     CompiledWithErrors,
+    LinkFailed(String),
 }
 
 impl fmt::Display for CompilerError {
@@ -160,6 +161,9 @@ impl fmt::Display for CompilerError {
             }
             CompilerError::CompiledWithErrors => {
                 write!(f, "Errors encountered, did not compile.")
+            }
+            CompilerError::LinkFailed(msg) => {
+                write!(f, "Linking failed: {msg}")
             }
         }
     }
@@ -487,6 +491,20 @@ pub fn write_object_file(
     machine.write_to_file(&m, FileType::Object, path).map_err(|e| e.to_string())
 }
 
+fn link_executable(obj: &Path, out: &Path) -> Result<(), CompilerError> {
+    let cc = std::env::var("CC").unwrap_or_else(|_| "cc".into());
+    let status = std::process::Command::new(&cc)
+        .arg(obj)
+        .arg("-o")
+        .arg(out)
+        .status()
+        .map_err(|e| CompilerError::LinkFailed(format!("failed to spawn `{cc}`: {e}")))?;
+    if !status.success() {
+        return Err(CompilerError::LinkFailed(format!("`{cc}` exited with {status}")));
+    }
+    Ok(())
+}
+
 pub fn optimize(module: &Module, opt_level: OptimizationLevel) -> TargetMachine {
     module.verify().unwrap();
 
@@ -526,6 +544,10 @@ pub fn optimize(module: &Module, opt_level: OptimizationLevel) -> TargetMachine 
 }
 
 pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
+    let stem = root
+        .is_file()
+        .then(|| root.file_stem().and_then(|s| s.to_str()).map(String::from))
+        .flatten();
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
     check(&db, ws);
@@ -570,10 +592,35 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
         llvm_module.print_to_stderr();
     }
 
-    write_object_file(llvm_module, &PathBuf::from("./a.o"), machine).map_err(|err| {
-        eprintln!("LLVM errors:\n{err}");
-        CompilerError::CompiledWithErrors
-    })?;
+    let write_object = |path: &Path| {
+        write_object_file(llvm_module, path, machine).map_err(|err| {
+            eprintln!("LLVM errors:\n{err}");
+            CompilerError::CompiledWithErrors
+        })
+    };
+
+    if db.config().compile_only {
+        let obj_path = db
+            .config()
+            .output
+            .clone()
+            .unwrap_or_else(|| PathBuf::from(format!("{}.o", stem.as_deref().unwrap_or("a"))));
+        write_object(&obj_path)?;
+        return Ok(());
+    }
+
+    let exe_path = db
+        .config()
+        .output
+        .clone()
+        .unwrap_or_else(|| PathBuf::from(stem.as_deref().unwrap_or("a.out")));
+    let obj_path =
+        std::env::temp_dir().join(format!("{}.o", stem.as_deref().unwrap_or("a")));
+
+    write_object(&obj_path)?;
+    let link_result = link_executable(&obj_path, &exe_path);
+    let _ = std::fs::remove_file(&obj_path);
+    link_result?;
     Ok(())
 }
 
