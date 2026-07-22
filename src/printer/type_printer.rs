@@ -21,8 +21,8 @@ use std::fmt::Write;
 
 use crate::{
     Db,
-    compiler::{FunctionSignature, get_sig_of_function},
     hir::Mutability,
+    hir::signature::{FunctionSignature, get_sig_of_function},
     name_resolve::{builtin_module, definition::Definition},
     ril::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,

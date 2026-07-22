@@ -20,7 +20,8 @@ use salsa::Accumulator;
 use crate::{
     Db,
     common::location::Span,
-    compiler::{diagnostic::Diag, get_sig_of_function},
+    compiler::diagnostic::Diag,
+    hir::signature::get_sig_of_function,
     ril::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
         ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,

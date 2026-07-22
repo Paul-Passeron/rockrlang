@@ -18,8 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 use rockr::{
     common::location::Location,
-    compiler::{FunctionSignature, get_sig_of_function},
     hir::Mutability,
+    hir::signature::{FunctionSignature, get_sig_of_function},
     printer::type_printer::TypePrinter,
     ril::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceRef, ScopeOwnerId,

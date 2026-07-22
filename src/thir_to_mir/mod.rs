@@ -27,8 +27,8 @@ use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
-    compiler::{Workspace, diagnostic::Diag, get_sig_of_function, workspace_packages},
-    hir::{Mutability, function_ast},
+    compiler::{Workspace, diagnostic::Diag, workspace_packages},
+    hir::{Mutability, function_ast, signature::get_sig_of_function},
     mir::{
         MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},

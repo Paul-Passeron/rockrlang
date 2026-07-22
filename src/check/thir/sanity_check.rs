@@ -23,8 +23,9 @@ use salsa::Accumulator;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
-    compiler::{diagnostic::Diag, get_sig_of_function},
+    compiler::diagnostic::Diag,
     hir::Mutability,
+    hir::signature::get_sig_of_function,
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     ril::{
