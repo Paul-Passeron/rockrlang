@@ -19,16 +19,20 @@ use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse};
 use rockr::{
     common::location::{Location, Span},
     hir::{function_ast, hir_body, impl_sources},
-    lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
+    lookup::{
+        AstNode, ast_node_at, enclosing_fun, enclosing_scope_owner, sig::SigNode,
+        thir::ThirNode,
+    },
     name_resolve::{
         interfaces::interface_item,
-        type_expr::{enum_item, get_templates_of_fun, struct_item},
+        type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_owner},
     },
-    ril::{FunctionId, InterfaceId, ScopeOwnerId, TypeDefId, TypeRef},
+    parse_tree::top_level::AstTemplateArg,
+    ril::{InterfaceId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 
-use crate::{Lsp, log};
+use crate::Lsp;
 
 impl<'a> Lsp<'a> {
     pub fn handle_goto_def(
@@ -39,22 +43,6 @@ impl<'a> Lsp<'a> {
         let uri = pos_params.text_document.uri;
         let pos = pos_params.position;
         let loc = self.rockr_loc(uri, pos)?;
-        if let Some(id) = enclosing_fun(&self.db, loc) {
-            self.handle_goto_def_in_function(id, loc)
-        } else {
-            log!(
-                "TODO: handle hover request at {} (Not inside a function)",
-                loc.loc_info(&self.db)
-            );
-            None
-        }
-    }
-
-    fn handle_goto_def_in_function(
-        &self,
-        func: FunctionId,
-        loc: Location,
-    ) -> Option<GotoDefinitionResponse> {
         let node = ast_node_at(&self.db, loc)?;
         match node {
             AstNode::ThirNode(thir, thir_node) => match thir_node {
@@ -62,36 +50,31 @@ impl<'a> Lsp<'a> {
                 ThirNode::Place(idx) => self.goto_def_place(thir, idx),
                 ThirNode::Local(idx) => self.goto_def_local(thir, idx),
                 ThirNode::Pattern(thir_pattern) => {
-                    self.goto_def_ty_in_func(func, thir_pattern.ty, loc)
+                    self.goto_def_ty_at(thir_pattern.ty, loc)
                 }
                 _ => None,
             },
             AstNode::SigNode(sig_node) => match sig_node {
-                SigNode::ParamType(p) => self.goto_def_ty_in_func(func, p.ty, loc),
+                SigNode::ParamType(p) => self.goto_def_ty_at(p.ty, loc),
                 SigNode::ParamName(_) => None,
-                SigNode::ReturnTy(return_ty) => {
-                    self.goto_def_ty_in_func(func, return_ty.ty, loc)
-                }
+                SigNode::ReturnTy(return_ty) => self.goto_def_ty_at(return_ty.ty, loc),
                 SigNode::TemplateParam { .. } => None,
                 SigNode::FunctionName { .. } => None,
                 SigNode::TemplateConstraint { constraint, .. } => {
                     Some(self.goto_def_interface(constraint.iref.def(&self.db)))
                 }
             },
-            AstNode::TypeNode(type_node) => {
-                self.goto_def_ty_in_func(func, type_node.ty, loc)
-            }
+            AstNode::TypeNode(type_node) => self.goto_def_ty_at(type_node.ty, loc),
             AstNode::Path(definition, _) => {
                 Some(self.goto_span(definition.span(&self.db)?))
             }
         }
     }
 
-    fn goto_def_ty_in_func(
+    fn goto_def_ty_at(
         &self,
-        func: FunctionId,
         ty: TypeRef,
-        loc: Location,
+        ty_loc: Location,
     ) -> Option<GotoDefinitionResponse> {
         match ty {
             TypeRef::Concrete(type_id) => match type_id.def(&self.db) {
@@ -107,26 +90,35 @@ impl<'a> Lsp<'a> {
             },
             TypeRef::Param(id) => {
                 let id = id.0;
-                let ts = get_templates_of_fun(&self.db, func.into());
+                let ts = self.templates_at_loc(ty_loc);
                 let ast = ts.get(id)?;
                 Some(self.goto_span(ast.span))
             }
-            TypeRef::Zelf => match func.parent(&self.db) {
+            TypeRef::Zelf => match enclosing_scope_owner(&self.db, ty_loc)? {
                 ScopeOwnerId::Module(_) => None,
                 ScopeOwnerId::Impl(impl_id) => {
                     let src = impl_sources(&self.db, impl_id.into())
                         .iter()
-                        .find(|src| src.span(&self.db).encloses(loc))?;
+                        .find(|src| src.span(&self.db).encloses(ty_loc))?;
                     Some(self.goto_span(*src.span(&self.db)))
                 }
                 ScopeOwnerId::Interface(interface_ref) => {
                     Some(self.goto_def_interface(interface_ref.def(&self.db)))
                 }
             },
-            // TODO
             TypeRef::Associated(_) => None,
             _ => None,
         }
+    }
+
+    pub fn templates_at_loc(&self, loc: Location) -> Vec<AstTemplateArg> {
+        enclosing_fun(&self.db, loc)
+            .map(|func| get_templates_of_fun(&self.db, func.into()).clone())
+            .or_else(|| {
+                enclosing_scope_owner(&self.db, loc)
+                    .map(|owner| templates_of_owner(&self.db, owner).to_vec())
+            })
+            .unwrap_or_default()
     }
 
     fn goto_def_interface(&self, interface: InterfaceId) -> GotoDefinitionResponse {
@@ -169,16 +161,10 @@ impl<'a> Lsp<'a> {
                 let ast = function_ast(&self.db, called.id.into()).inner(&self.db);
                 Some(self.goto_span(ast.get_span()))
             }
-            ExprKind::StructLit { struct_def, .. } => self.goto_def_ty_in_func(
-                thir.id,
-                struct_def.clone().as_type_ref(&self.db),
-                e.span.start(),
-            ),
-            ExprKind::Constructor { enum_def, .. } => self.goto_def_ty_in_func(
-                thir.id,
-                enum_def.clone().as_type_ref(&self.db),
-                e.span.start(),
-            ),
+            ExprKind::StructLit { struct_def, .. } => self
+                .goto_def_ty_at(struct_def.clone().as_type_ref(&self.db), e.span.start()),
+            ExprKind::Constructor { enum_def, .. } => self
+                .goto_def_ty_at(enum_def.clone().as_type_ref(&self.db), e.span.start()),
             _ => None,
         }
     }

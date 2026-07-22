@@ -17,13 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::convert::identity;
 
-use crate::{
-    Lsp, log,
-    naming::{
-        function_id_to_named_string, type_ref_to_named_string,
-        type_ref_to_named_string_in,
-    },
-};
+use crate::{Lsp, log};
 use itertools::Itertools;
 use lsp_types::{
     Hover, HoverContents, HoverParams, MarkedString, MarkupContent, MarkupKind,
@@ -55,28 +49,33 @@ impl<'a> Lsp<'a> {
         if let Some(id) = enclosing_fun(&self.db, loc) {
             self.handle_hover_in_function(id, loc)
         } else {
-            log!(
-                "TODO: handle hover request at {} (Not inside a function)",
-                loc.loc_info(&self.db)
-            );
-            None
+            let node = ast_node_at(&self.db, loc)?;
+            match node {
+                // TODO: Have a way of displaying types in hover without a function
+                AstNode::TypeNode(type_node) => {
+                    Some(self.hover_type_span_response(type_node.ty, type_node.span))
+                }
+                // TODO: Have a way of diplaying defs in hover without a function
+                AstNode::Path(definition, span) => self.hover_path(definition, span),
+                _ => None,
+            }
         }
     }
 
-    fn hover_type_span_response(
-        &self,
-        func: FunctionId,
-        ty: TypeRef,
-        span: Span,
-    ) -> Hover {
+    fn hover_type_span_response(&self, ty: TypeRef, span: Span) -> Hover {
         if let Some(struct_ref) = ty.as_struct_ref(&self.db)
             && let Some(blocks) = self
-                .struct_display(struct_ref.clone(), StructDisplayOption::AllFields, func)
+                .struct_display(
+                    struct_ref.clone(),
+                    StructDisplayOption::AllFields,
+                    span.start(),
+                )
                 .map(|s| s.to_vec())
         {
             self.hover_span_response_blocks(blocks, span)
         } else {
-            let ty_str = format!("`{}`", type_ref_to_named_string_in(&self.db, func, ty));
+            let ty_str =
+                format!("`{}`", self.type_ref_to_named_string_at(span.start(), ty));
             self.hover_span_response(ty_str, span)
         }
     }
@@ -96,24 +95,25 @@ impl<'a> Lsp<'a> {
 
     fn hover_sig(&self, func: FunctionId, node: SigNode) -> Hover {
         match node {
-            SigNode::ParamType(function_param) => self.hover_type_span_response(
-                func,
-                function_param.ty,
-                function_param.ty_span,
-            ),
+            SigNode::ParamType(function_param) => {
+                self.hover_type_span_response(function_param.ty, function_param.ty_span)
+            }
             SigNode::ParamName(function_param) => {
                 let name = function_param.name.to_string(&self.db);
                 self.hover_span_response(
                     format!(
                         "arg {}: `{name}: {}\n`",
                         function_param.idx,
-                        type_ref_to_named_string_in(&self.db, func, function_param.ty)
+                        self.type_ref_to_named_string_at(
+                            function_param.ty_span.start(),
+                            function_param.ty
+                        )
                     ),
                     function_param.name_span,
                 )
             }
             SigNode::ReturnTy(return_ty) => {
-                self.hover_type_span_response(func, return_ty.ty, return_ty.span)
+                self.hover_type_span_response(return_ty.ty, return_ty.span)
             }
             SigNode::TemplateParam { param, constraints } => {
                 let constraints_str = constraints
@@ -147,7 +147,7 @@ impl<'a> Lsp<'a> {
                     self_ty: Some(TypeRef::Zelf),
                     dispatch: Dispatch::Direct,
                 };
-                self.hover_function_infos(func, &func_ref, false, span)
+                self.hover_function_infos(&func_ref, false, span)
             }
             SigNode::TemplateConstraint { param, constraint } => self
                 .hover_span_response(
@@ -186,7 +186,7 @@ impl<'a> Lsp<'a> {
                                 .struct_display(
                                     struct_ref.clone(),
                                     StructDisplayOption::AllFields,
-                                    func,
+                                    loc,
                                 )?
                                 .to_vec();
 
@@ -198,7 +198,7 @@ impl<'a> Lsp<'a> {
                         }
                     },
                     ThirNode::Pattern(pat) => {
-                        Some(self.hover_type_span_response(func, pat.ty, pat.span))
+                        Some(self.hover_type_span_response(pat.ty, pat.span))
                     }
                     // Nothing to say here
                     ThirNode::MatchBranch(_) => None,
@@ -211,7 +211,7 @@ impl<'a> Lsp<'a> {
                             .struct_display(
                                 struct_def,
                                 StructDisplayOption::Fields(&[field]),
-                                func,
+                                loc,
                             )?
                             .to_vec();
 
@@ -221,18 +221,13 @@ impl<'a> Lsp<'a> {
             }
             AstNode::SigNode(node) => Some(self.hover_sig(func, node)),
             AstNode::TypeNode(node) => {
-                Some(self.hover_type_span_response(func, node.ty, node.span))
+                Some(self.hover_type_span_response(node.ty, node.span))
             }
-            AstNode::Path(definition, span) => self.hover_path(func, definition, span),
+            AstNode::Path(definition, span) => self.hover_path(definition, span),
         }
     }
 
-    fn hover_path(
-        &self,
-        func: FunctionId,
-        definition: Definition,
-        span: Span,
-    ) -> Option<Hover> {
+    fn hover_path(&self, definition: Definition, span: Span) -> Option<Hover> {
         if let Definition::Type(TypeDefId::Struct(struct_id)) = definition {
             let args = (0..templates_of_struct(&self.db, struct_id.interned()).len())
                 .map(|i| TypeRef::Param(TypeParamId(i)))
@@ -240,7 +235,7 @@ impl<'a> Lsp<'a> {
             let display = self.struct_display(
                 StructRef { def: struct_id, args },
                 StructDisplayOption::AllFields,
-                func,
+                span.start(),
             )?;
             Some(self.hover_span_response_blocks(vec![display.struct_def], span))
         } else {
@@ -262,7 +257,7 @@ impl<'a> Lsp<'a> {
             format!(
                 "`let {}{local_name}: {}`",
                 local.mutability,
-                type_ref_to_named_string_in(&self.db, func, local.ty)
+                self.type_ref_to_named_string_at(func.span(&self.db).start(), local.ty)
             ),
             local.span,
         )
@@ -279,23 +274,22 @@ impl<'a> Lsp<'a> {
                 }
             }
         }
-        self.hover_type_span_response(func, place.ty, place.span)
+        self.hover_type_span_response(place.ty, place.span)
     }
 
     fn hover_function_infos(
         &self,
-        in_func: FunctionId,
         target_func: &FunctionRef,
         show_templates: bool,
         span: Span,
     ) -> Hover {
-        let function_name = function_id_to_named_string(&self.db, target_func.id);
+        let function_name = self.function_id_to_named_string(target_func.id);
         if !show_templates || target_func.args.is_empty() {
             return self.hover_span_response(format!("`{function_name}`"), span);
         }
         let templates = get_templates_of_fun(&self.db, target_func.id.interned());
         let template_string =
-            self.template_substitutions(in_func, &templates, &target_func.args);
+            self.template_substitutions(span.start(), &templates, &target_func.args);
 
         self.hover_span_response_blocks(
             vec![format!("```rockr\n{function_name}\n```"), template_string],
@@ -305,7 +299,7 @@ impl<'a> Lsp<'a> {
 
     fn template_substitutions(
         &self,
-        in_func: FunctionId,
+        loc: Location,
         templates: &[AstTemplateArg],
         args: &[TypeRef],
     ) -> String {
@@ -316,7 +310,7 @@ impl<'a> Lsp<'a> {
                 format!(
                     "`{}` = `{}`",
                     temp.name.to_string(&self.db),
-                    type_ref_to_named_string_in(&self.db, in_func, *arg)
+                    self.type_ref_to_named_string_at(loc, *arg)
                 )
             })
             .join(", ")
@@ -333,7 +327,7 @@ impl<'a> Lsp<'a> {
         match &expr.kind {
             ExprKind::Use(idx) => Some(self.hover_place(func, thir, *idx)),
             ExprKind::Call { called, .. } => {
-                Some(self.hover_function_infos(func, called, true, expr.span))
+                Some(self.hover_function_infos(called, true, expr.span))
             }
             ExprKind::AddressOf { .. }
             | ExprKind::Ref { .. }
@@ -347,14 +341,14 @@ impl<'a> Lsp<'a> {
             | ExprKind::Constructor { .. }
             | ExprKind::Metadata(_)
             | ExprKind::Cast(_, _) => {
-                Some(self.hover_type_span_response(func, expr.ty, expr.span))
+                Some(self.hover_type_span_response(expr.ty, expr.span))
             }
             ExprKind::StructLit { struct_def, .. } => {
                 let blocks = self
                     .struct_display(
                         struct_def.clone(),
                         StructDisplayOption::AllFields,
-                        func,
+                        expr.span.start(),
                     )?
                     .to_vec();
 
@@ -369,7 +363,7 @@ impl<'a> Lsp<'a> {
         &self,
         struct_def: StructRef,
         opt: StructDisplayOption<'_>,
-        func: FunctionId,
+        loc: Location,
     ) -> Option<StructDisplay> {
         let struct_id = struct_def.def;
         let template_defs = templates_of_struct(&self.db, struct_id.interned());
@@ -389,7 +383,7 @@ impl<'a> Lsp<'a> {
             format!(
                 "    {}: {};\n",
                 field.to_string(&self.db),
-                type_ref_to_named_string(&self.db, &template_names, ty)
+                self.type_ref_to_named_string(&template_names, ty)
             )
         };
 
@@ -415,7 +409,7 @@ impl<'a> Lsp<'a> {
             format!("```rockr\nstruct {struct_name} {{\n{fields}}}\n```",);
 
         let templates = (!template_defs.is_empty())
-            .then(|| self.template_substitutions(func, &template_defs, &struct_def.args));
+            .then(|| self.template_substitutions(loc, &template_defs, &struct_def.args));
 
         Some(StructDisplay { struct_def: struct_def_extract, templates })
     }
