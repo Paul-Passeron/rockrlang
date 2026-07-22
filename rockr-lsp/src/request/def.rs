@@ -25,10 +25,11 @@ use rockr::{
     },
     name_resolve::{
         interfaces::interface_item,
+        module_items,
         type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_owner},
     },
-    parse_tree::top_level::AstTemplateArg,
-    ril::{InterfaceId, ScopeOwnerId, TypeDefId, TypeRef},
+    parse_tree::top_level::{AstTemplateArg, AstTopLevelItemDesc},
+    ril::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 
@@ -112,11 +113,38 @@ impl<'a> Lsp<'a> {
     }
 
     pub fn templates_at_loc(&self, loc: Location) -> Vec<AstTemplateArg> {
-        enclosing_fun(&self.db, loc)
-            .map(|func| get_templates_of_fun(&self.db, func.into()).clone())
-            .or_else(|| {
-                enclosing_scope_owner(&self.db, loc)
-                    .map(|owner| templates_of_owner(&self.db, owner).to_vec())
+        if let Some(func) = enclosing_fun(&self.db, loc) {
+            return get_templates_of_fun(&self.db, func.into()).clone();
+        }
+        match enclosing_scope_owner(&self.db, loc) {
+            Some(ScopeOwnerId::Module(module)) => {
+                self.templates_of_enclosing_item(module, loc)
+            }
+            Some(owner) => templates_of_owner(&self.db, owner).to_vec(),
+            None => Vec::new(),
+        }
+    }
+
+    fn templates_of_enclosing_item(
+        &self,
+        module: ModuleId,
+        loc: Location,
+    ) -> Vec<AstTemplateArg> {
+        module_items(&self.db, module.interned())
+            .iter()
+            .flatten()
+            .find_map(|item| {
+                item.span.encloses(loc).then_some(())?;
+                match &item.data {
+                    AstTopLevelItemDesc::StructDef(def) => {
+                        Some(def.template_args.clone())
+                    }
+                    AstTopLevelItemDesc::EnumDef(def) => Some(def.template_args.clone()),
+                    AstTopLevelItemDesc::ExternDef(sig, _) => {
+                        Some(sig.data.template_args.clone())
+                    }
+                    _ => None,
+                }
             })
             .unwrap_or_default()
     }

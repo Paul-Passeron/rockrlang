@@ -189,15 +189,13 @@ impl AstNode<'_> {
 pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
     let path_node = path_node_at(db, loc).map(|(def, span)| AstNode::Path(def, span));
 
-    let Some(f) = enclosing_fun(db, loc) else {
-        return path_node;
-    };
-
     let type_node = type_node_at(db, loc);
 
-    let fun_node = sig_node_at(db, loc).map(AstNode::SigNode).or_else(|| {
-        let thir = thir_body(db, f)?;
-        thir.node_at(db, loc).map(|node| AstNode::ThirNode(thir, node))
+    let fun_node = enclosing_fun(db, loc).and_then(|f| {
+        sig_node_at(db, loc).map(AstNode::SigNode).or_else(|| {
+            let thir = thir_body(db, f)?;
+            thir.node_at(db, loc).map(|node| AstNode::ThirNode(thir, node))
+        })
     });
 
     let base = if let Some(type_node) = type_node
