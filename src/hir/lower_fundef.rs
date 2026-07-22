@@ -586,8 +586,12 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
-    fn as_enum_with_filled_holes(&mut self, ty: &AstTypeExpr) -> Option<EnumRef> {
-        let partial_ty = self.resolve_holed(ty).as_type_id()?;
+    fn as_enum_with_filled_holes(
+        &mut self,
+        ty: &AstTypeExpr,
+        module: ModuleId,
+    ) -> Option<EnumRef> {
+        let partial_ty = self.resolve_holed_ty(ty, module).as_type_id()?;
         let enum_def = match partial_ty.def(self.db) {
             TypeDefId::Enum(enum_id) => Some(enum_id),
             _ => None,
@@ -616,10 +620,11 @@ impl<'db> LowerFundef<'db> {
         variant: Option<Symbol>,
         fields: &[AstStructField],
         scope: &Scope,
+        module: ModuleId,
     ) -> HirExprDesc {
         if let Some(variant_name) = variant {
             let EnumRef { def: enum_def, args: template_hints } = self
-                .as_enum_with_filled_holes(ty)
+                .as_enum_with_filled_holes(ty, module)
                 .expect("StructLit with variant: could not resolve enum type");
 
             let lowered_fields: Vec<HirStructField> = fields
@@ -641,7 +646,7 @@ impl<'db> LowerFundef<'db> {
             }
         } else {
             HirExprDesc::StructLit {
-                ty: self.resolve_holed(ty),
+                ty: self.resolve_holed_ty(ty, module),
                 fields: fields
                     .iter()
                     .map(|field| HirStructField {
@@ -666,7 +671,7 @@ impl<'db> LowerFundef<'db> {
 
     fn lower_qualified(&mut self, name: Symbol, ty: &AstTypeExpr) -> HirExprDesc {
         let EnumRef { def: enum_def, args: template_hints } = self
-            .as_enum_with_filled_holes(ty)
+            .as_enum_with_filled_holes(ty, self.module)
             .expect("QualifiedPath with variant: could not resolve enum type");
 
         HirExprDesc::Constructor {
@@ -725,7 +730,7 @@ impl<'db> LowerFundef<'db> {
                 self.lower_method_call(object, *method, type_args, args, scope, module)
             }
             AstExprDesc::StructLit { ty, variant, fields } => {
-                self.lower_structlit(ty, *variant, fields, scope)
+                self.lower_structlit(ty, *variant, fields, scope, module)
             }
             AstExprDesc::Tuple(exprs) => self.lower_tuple(exprs, scope),
             AstExprDesc::SliceLit(exprs) => HirExprDesc::SliceLit(
