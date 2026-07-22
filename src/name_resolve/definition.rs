@@ -72,6 +72,17 @@ impl Definition {
             Definition::Type(type_def_id) => type_def_id.name_span(db),
         }
     }
+
+    pub fn span(self, db: &dyn Db) -> Option<Span> {
+        match self {
+            Definition::Function(function_id) => Some(function_id.span(db)),
+            Definition::Interface(interface_id) => {
+                Some(interface_item(db, interface_id.interned()).span)
+            }
+            Definition::Module(module_id) => module_id.name_span(db),
+            Definition::Type(type_def_id) => type_def_id.span(db),
+        }
+    }
 }
 
 impl ModuleId {

@@ -35,6 +35,7 @@ use rockr::{
     },
     lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
     name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
+    parse_tree::top_level::AstTemplateArg,
     ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, StructRef, Thir,
@@ -266,9 +267,24 @@ impl<'a> Lsp<'a> {
             return self.hover_span_response(format!("`{function_name}`"), span);
         }
         let templates = get_templates_of_fun(&self.db, target_func.id.interned());
-        let template_string = templates
+        let template_string =
+            self.template_substitutions(in_func, &templates, &target_func.args);
+
+        self.hover_span_response_blocks(
+            vec![format!("```rockr\n{function_name}\n```"), template_string],
+            span,
+        )
+    }
+
+    fn template_substitutions(
+        &self,
+        in_func: FunctionId,
+        templates: &[AstTemplateArg],
+        args: &[TypeRef],
+    ) -> String {
+        templates
             .iter()
-            .zip(&target_func.args)
+            .zip(args)
             .map(|(temp, arg)| {
                 format!(
                     "`{}` = `{}`",
@@ -276,12 +292,7 @@ impl<'a> Lsp<'a> {
                     type_ref_to_named_string_in(&self.db, in_func, *arg)
                 )
             })
-            .join(", ");
-
-        self.hover_span_response_blocks(
-            vec![format!("```rockr\n{function_name}\n```"), template_string],
-            span,
-        )
+            .join(", ")
     }
 
     fn hover_expr(
@@ -376,19 +387,8 @@ impl<'a> Lsp<'a> {
         let struct_def_extract =
             format!("```rockr\nstruct {struct_name} {{\n{fields}}}\n```",);
 
-        let templates = (!template_defs.is_empty()).then(|| {
-            template_defs
-                .iter()
-                .zip(&struct_def.args)
-                .map(|(temp, arg)| {
-                    format!(
-                        "`{}` = `{}`",
-                        temp.name.to_string(&self.db),
-                        type_ref_to_named_string_in(&self.db, func, *arg)
-                    )
-                })
-                .join(", ")
-        });
+        let templates = (!template_defs.is_empty())
+            .then(|| self.template_substitutions(func, &template_defs, &struct_def.args));
 
         Some(StructDisplay { struct_def: struct_def_extract, templates })
     }

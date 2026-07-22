@@ -21,7 +21,6 @@ use rockr::{
     hir::{function_ast, hir_body, impl_sources},
     lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
     name_resolve::{
-        definition::Definition,
         interfaces::interface_item,
         type_expr::{enum_item, get_templates_of_fun, struct_item},
     },
@@ -83,23 +82,7 @@ impl<'a> Lsp<'a> {
                 self.goto_def_ty_in_func(func, type_node.ty, loc)
             }
             AstNode::Path(definition, _) => {
-                let def_span: Span = match definition {
-                    Definition::Function(function_id) => Some(function_id.span(&self.db)),
-                    Definition::Interface(interface_id) => {
-                        Some(interface_item(&self.db, interface_id.into()).span)
-                    }
-                    Definition::Module(module_id) => module_id.name_span(&self.db),
-                    Definition::Type(def) => match def {
-                        TypeDefId::Builtin(_) => None,
-                        TypeDefId::Struct(struct_id) => {
-                            Some(struct_item(&self.db, struct_id.interned()).span)
-                        }
-                        TypeDefId::Enum(enum_id) => {
-                            Some(enum_item(&self.db, enum_id.interned()).span)
-                        }
-                    },
-                }?;
-                Some(self.goto_span(def_span))
+                Some(self.goto_span(definition.span(&self.db)?))
             }
         }
     }
