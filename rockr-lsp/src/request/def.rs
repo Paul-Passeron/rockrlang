@@ -53,6 +53,14 @@ impl<'a> Lsp<'a> {
                 ThirNode::Pattern(thir_pattern) => {
                     self.goto_def_ty_at(thir_pattern.ty, loc)
                 }
+                ThirNode::StructField { struct_def, field, .. } => {
+                    let field_span = struct_item(&self.db, struct_def.def.into())
+                        .fields
+                        .iter()
+                        .find(|f| f.name == field)?
+                        .span;
+                    Some(self.goto_span(field_span))
+                }
                 _ => None,
             },
             AstNode::SigNode(sig_node) => match sig_node {
