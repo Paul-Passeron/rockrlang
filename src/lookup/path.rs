@@ -88,6 +88,23 @@ fn module_path_node_at(
     })
 }
 
+fn signature_path_node_at(
+    db: &dyn Db,
+    args: &[AstFundefArg],
+    template_args: &[AstTemplateArg],
+    return_type: &AstTypeExpr,
+    loc: Location,
+) -> Option<(Definition, Span)> {
+    args.iter()
+        .find_map(|arg| fundef_arg_path_node_at(db, arg, loc))
+        .or_else(|| {
+            template_args
+                .iter()
+                .find_map(|templ| template_arg_path_node_at(db, templ, loc))
+        })
+        .or_else(|| type_expr_path_node_at(db, return_type, enclosing_module(db, loc)?, loc))
+}
+
 fn fundef_path_node_at(
     db: &dyn Db,
     ast: &AstFundef,
@@ -96,24 +113,13 @@ fn fundef_path_node_at(
     if ast.data.body_span.encloses(loc) {
         ast.data.body.iter().find_map(|stmt| stmt_path_node_at(db, stmt, loc))
     } else {
-        ast.data
-            .args
-            .iter()
-            .find_map(|arg| fundef_arg_path_node_at(db, arg, loc))
-            .or_else(|| {
-                ast.data
-                    .template_args
-                    .iter()
-                    .find_map(|templ| template_arg_path_node_at(db, templ, loc))
-            })
-            .or_else(|| {
-                type_expr_path_node_at(
-                    db,
-                    &ast.data.return_type,
-                    enclosing_module(db, loc)?,
-                    loc,
-                )
-            })
+        signature_path_node_at(
+            db,
+            &ast.data.args,
+            &ast.data.template_args,
+            &ast.data.return_type,
+            loc,
+        )
     }
 }
 
@@ -480,24 +486,13 @@ fn sig_path_node_at(
     loc: Location,
 ) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
-    ast.data
-        .args
-        .iter()
-        .find_map(|arg| fundef_arg_path_node_at(db, arg, loc))
-        .or_else(|| {
-            ast.data
-                .template_args
-                .iter()
-                .find_map(|templ| template_arg_path_node_at(db, templ, loc))
-        })
-        .or_else(|| {
-            type_expr_path_node_at(
-                db,
-                &ast.data.return_type,
-                enclosing_module(db, loc)?,
-                loc,
-            )
-        })
+    signature_path_node_at(
+        db,
+        &ast.data.args,
+        &ast.data.template_args,
+        &ast.data.return_type,
+        loc,
+    )
 }
 
 fn impl_path_node_at(
@@ -576,24 +571,13 @@ fn method_def_path_node_at(
     if ast.data.body_span.encloses(loc) {
         ast.data.body.iter().find_map(|stmt| stmt_path_node_at(db, stmt, loc))
     } else {
-        ast.data
-            .args
-            .iter()
-            .find_map(|arg| fundef_arg_path_node_at(db, arg, loc))
-            .or_else(|| {
-                ast.data
-                    .template_args
-                    .iter()
-                    .find_map(|templ| template_arg_path_node_at(db, templ, loc))
-            })
-            .or_else(|| {
-                type_expr_path_node_at(
-                    db,
-                    &ast.data.return_type,
-                    enclosing_module(db, loc)?,
-                    loc,
-                )
-            })
+        signature_path_node_at(
+            db,
+            &ast.data.args,
+            &ast.data.template_args,
+            &ast.data.return_type,
+            loc,
+        )
     }
 }
 
@@ -602,22 +586,11 @@ fn method_sig_path_node_at(
     ast: &AstMethodsig,
     loc: Location,
 ) -> Option<(Definition, Span)> {
-    ast.data
-        .args
-        .iter()
-        .find_map(|arg| fundef_arg_path_node_at(db, arg, loc))
-        .or_else(|| {
-            ast.data
-                .template_args
-                .iter()
-                .find_map(|templ| template_arg_path_node_at(db, templ, loc))
-        })
-        .or_else(|| {
-            type_expr_path_node_at(
-                db,
-                &ast.data.return_type,
-                enclosing_module(db, loc)?,
-                loc,
-            )
-        })
+    signature_path_node_at(
+        db,
+        &ast.data.args,
+        &ast.data.template_args,
+        &ast.data.return_type,
+        loc,
+    )
 }
