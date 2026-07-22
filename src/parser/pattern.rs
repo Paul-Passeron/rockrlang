@@ -35,7 +35,7 @@ impl<'db> Parser<'db> {
         match self.current_token()?.kind {
             TokenKind::Mut => {
                 self.consume();
-                let name = self.parse_symbol()?.data;
+                let name = self.parse_symbol()?;
                 Ok(Spanned::new(
                     AstPatternDesc::Named(AstNamedPattern::Mut { name }),
                     vec![],
@@ -82,7 +82,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_named_pattern(&mut self) -> Result<AstNamedPattern, ParseError> {
-        let name = self.parse_symbol()?.data;
+        let name = self.parse_symbol()?;
 
         match self.peek_n(0).map(|t| t.kind) {
             Some(TokenKind::Access) => {
@@ -98,7 +98,7 @@ impl<'db> Parser<'db> {
                 );
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
-                Ok(AstNamedPattern::Constructor { name, args })
+                Ok(AstNamedPattern::Constructor { name: name.data, args })
             }
 
             Some(TokenKind::OpenBra) => {
@@ -113,10 +113,10 @@ impl<'db> Parser<'db> {
 
                 let args = AstConstructFields::StructFields(fields);
 
-                Ok(AstNamedPattern::Constructor { name, args })
+                Ok(AstNamedPattern::Constructor { name: name.data, args })
             }
 
-            _ => Ok(AstNamedPattern::Bare(name)),
+            _ => Ok(AstNamedPattern::Bare(name.data)),
         }
     }
 

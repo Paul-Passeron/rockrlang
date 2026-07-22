@@ -39,10 +39,10 @@ pub enum AstConstructFields {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum AstNamedPattern {
-    Mut { name: Symbol },
+    Mut { name: Spanned<Symbol> },
     Bare(Symbol),
     Constructor { name: Symbol, args: AstConstructFields },
-    NameResolved { from: Symbol, to: Box<AstNamedPattern> },
+    NameResolved { from: Spanned<Symbol>, to: Box<AstNamedPattern> },
     Tuple { fields: Vec<AstPattern> },
 }
 

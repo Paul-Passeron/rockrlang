@@ -995,7 +995,7 @@ impl<'db> LowerFundef<'db> {
                     AstNamedPattern::Mut { name } => {
                         let local_id = this.allocate_local(
                             scope,
-                            *name,
+                            name.data,
                             Mutability::Mutable,
                             None,
                             pat.span,
@@ -1006,7 +1006,7 @@ impl<'db> LowerFundef<'db> {
                             id: this.alloc.fresh(),
                             data: HirPatternDesc::Bind {
                                 id: local_id,
-                                name: *name,
+                                name: name.data,
                                 mutable: true,
                             },
                             span: pat.span,
@@ -1039,7 +1039,7 @@ impl<'db> LowerFundef<'db> {
                             pat, scope, locals, module, name, args,
                         ),
                     AstNamedPattern::NameResolved { from, to } => {
-                        match resolve_in_module(this.db, *from, module) {
+                        match resolve_in_module(this.db, from.data, module) {
                             Some(Definition::Module(id)) => {
                                 let inner_pat = AstPattern::new(
                                     AstPatternDesc::Named(*to.clone()),
@@ -1070,11 +1070,11 @@ impl<'db> LowerFundef<'db> {
                             }
                             Some(_) => todo!(
                                 "error: `{}` in pattern is not a module",
-                                from.interned().contents(this.db)
+                                from.data.to_string(this.db)
                             ),
                             None => todo!(
                                 "error: `{}` not found in pattern path",
-                                from.interned().contents(this.db)
+                                from.data.to_string(this.db)
                             ),
                         }
                     }

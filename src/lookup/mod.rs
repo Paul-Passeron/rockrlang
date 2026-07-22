@@ -34,6 +34,7 @@ use crate::{
     thir::{Thir, thir_body},
 };
 
+pub mod path;
 pub mod sig;
 pub mod thir;
 pub mod ty;
