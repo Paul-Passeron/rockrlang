@@ -213,6 +213,10 @@ pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
     };
 
     match (base, path_node) {
+        (
+            Some(AstNode::TypeNode(ty_node)),
+            Some(AstNode::Path(Definition::Type(_), _)),
+        ) => Some(AstNode::TypeNode(ty_node)),
         (Some(base), Some(path)) if path.span().len() <= base.span().len() => Some(path),
         (Some(base), _) => Some(base),
         (None, path) => path,
