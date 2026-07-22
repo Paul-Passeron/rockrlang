@@ -46,19 +46,17 @@ impl<'a> Lsp<'a> {
         let uri = pos_params.text_document.uri;
         let pos = pos_params.position;
         let loc = self.rockr_loc(uri, pos)?;
-        if let Some(id) = enclosing_fun(&self.db, loc) {
-            self.handle_hover_in_function(id, loc)
-        } else {
-            let node = ast_node_at(&self.db, loc)?;
-            match node {
-                // TODO: Have a way of displaying types in hover without a function
-                AstNode::TypeNode(type_node) => {
-                    Some(self.hover_type_span_response(type_node.ty, type_node.span))
-                }
-                // TODO: Have a way of diplaying defs in hover without a function
-                AstNode::Path(definition, span) => self.hover_path(definition, span),
-                _ => None,
+        match ast_node_at(&self.db, loc)? {
+            AstNode::ThirNode(thir, node) => {
+                self.hover_thir(enclosing_fun(&self.db, loc)?, thir, node, loc)
             }
+            AstNode::SigNode(node) => {
+                Some(self.hover_sig(enclosing_fun(&self.db, loc)?, node))
+            }
+            AstNode::TypeNode(node) => {
+                Some(self.hover_type_span_response(node.ty, node.span))
+            }
+            AstNode::Path(definition, span) => self.hover_path(definition, span),
         }
     }
 
@@ -162,68 +160,54 @@ impl<'a> Lsp<'a> {
         }
     }
 
-    fn handle_hover_in_function(
-        &mut self,
+    fn hover_thir(
+        &self,
         func: FunctionId,
+        thir: &Thir,
+        node: ThirNode,
         loc: Location,
     ) -> Option<Hover> {
-        let fun_node = ast_node_at(&self.db, loc)?;
-        match fun_node {
-            AstNode::ThirNode(thir, node) => {
-                match node {
-                    ThirNode::Expr { id, setup } => {
-                        self.hover_expr(func, thir, id, setup)
-                    }
-                    ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
-                    ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
-                    ThirNode::Stmt(stmt) => match &stmt.kind {
-                        StmtKind::Block {
-                            semantic_infos:
-                                Some(BlockSemanticInfo::StructDestructure(struct_ref)),
-                            ..
-                        } => {
-                            let blocks = self
-                                .struct_display(
-                                    struct_ref.clone(),
-                                    StructDisplayOption::AllFields,
-                                    loc,
-                                )?
-                                .to_vec();
+        match node {
+            ThirNode::Expr { id, setup } => self.hover_expr(func, thir, id, setup),
+            ThirNode::Place(idx) => Some(self.hover_place(func, thir, idx)),
+            ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
+            ThirNode::Stmt(stmt) => match &stmt.kind {
+                StmtKind::Block {
+                    semantic_infos:
+                        Some(BlockSemanticInfo::StructDestructure(struct_ref)),
+                    ..
+                } => {
+                    let blocks = self
+                        .struct_display(
+                            struct_ref.clone(),
+                            StructDisplayOption::AllFields,
+                            loc,
+                        )?
+                        .to_vec();
 
-                            Some(self.hover_span_response_blocks(blocks, stmt.span))
-                        }
-                        _ => {
-                            // Nothing to say here
-                            None
-                        }
-                    },
-                    ThirNode::Pattern(pat) => {
-                        Some(self.hover_type_span_response(pat.ty, pat.span))
-                    }
-                    // Nothing to say here
-                    ThirNode::MatchBranch(_) => None,
-                    ThirNode::EnumVariant { .. } => {
-                        log!("TODO: handle enum variant");
-                        None
-                    }
-                    ThirNode::StructField { struct_def, field, span } => {
-                        let blocks = self
-                            .struct_display(
-                                struct_def,
-                                StructDisplayOption::Fields(&[field]),
-                                loc,
-                            )?
-                            .to_vec();
-
-                        Some(self.hover_span_response_blocks(blocks, span))
-                    }
+                    Some(self.hover_span_response_blocks(blocks, stmt.span))
                 }
+                _ => None,
+            },
+            ThirNode::Pattern(pat) => {
+                Some(self.hover_type_span_response(pat.ty, pat.span))
             }
-            AstNode::SigNode(node) => Some(self.hover_sig(func, node)),
-            AstNode::TypeNode(node) => {
-                Some(self.hover_type_span_response(node.ty, node.span))
+            ThirNode::MatchBranch(_) => None,
+            ThirNode::EnumVariant { .. } => {
+                log!("TODO: handle enum variant");
+                None
             }
-            AstNode::Path(definition, span) => self.hover_path(definition, span),
+            ThirNode::StructField { struct_def, field, span } => {
+                let blocks = self
+                    .struct_display(
+                        struct_def,
+                        StructDisplayOption::Fields(&[field]),
+                        loc,
+                    )?
+                    .to_vec();
+
+                Some(self.hover_span_response_blocks(blocks, span))
+            }
         }
     }
 
