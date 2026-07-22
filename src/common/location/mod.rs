@@ -136,7 +136,7 @@ pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usiz
     }
     let line_offset = lines[line];
     let offset = line_offset + col;
-    if lines.len() > line && lines[line + 1] <= offset {
+    if lines.len() > line + 1 && lines[line + 1] <= offset {
         return lines[line + 1] - 1;
     }
     offset.min(length)
