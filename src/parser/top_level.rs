@@ -753,6 +753,7 @@ impl<'db> Parser<'db> {
                         supers,
                         template_args,
                         items,
+                        span: start.span(self.get_end()),
                     }),
                     vec![],
                     start.span(self.get_end()),

@@ -33,9 +33,7 @@ use rockr::{
         location::{Location, Span},
         symbols::Symbol,
     },
-    lookup::{
-        AstNode, enclosing_fun, ast_node_at, sig::SigNode, thir::ThirNode,
-    },
+    lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
     name_resolve::type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     ril::{FunctionId, TypeParamId, TypeRef},
     thir::{
@@ -221,6 +219,7 @@ impl<'a> Lsp<'a> {
             AstNode::TypeNode(node) => {
                 Some(self.hover_type_span_response(func, node.ty, node.span))
             }
+            AstNode::Path(definition, span) => None,
         }
     }
 

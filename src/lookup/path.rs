@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::location::Location,
+    common::location::{Location, Span},
     lookup::enclosing_scope_owner,
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -41,7 +41,7 @@ use crate::{
     ril::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
 };
 
-pub fn path_node_at(db: &dyn Db, loc: Location) -> Option<Definition> {
+pub fn path_node_at(db: &dyn Db, loc: Location) -> Option<(Definition, Span)> {
     let scope_owner = enclosing_scope_owner(db, loc)?;
     match scope_owner {
         ScopeOwnerId::Module(module) => module_path_node_at(db, module, loc),
@@ -64,7 +64,7 @@ fn module_path_node_at(
     db: &dyn Db,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     module_items(db, module.into()).as_ref()?.iter().find_map(|item| {
         item.span.encloses(loc).then_some(())?;
         match &item.data {
@@ -92,7 +92,7 @@ fn fundef_path_node_at(
     db: &dyn Db,
     ast: &AstFundef,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     if ast.data.body_span.encloses(loc) {
         ast.data.body.iter().find_map(|stmt| stmt_path_node_at(db, stmt, loc))
     } else {
@@ -121,7 +121,7 @@ fn template_arg_path_node_at(
     db: &dyn Db,
     ast: &AstTemplateArg,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     let module = enclosing_module(db, loc)?;
     ast.constraints.iter().find_map(|cons| type_expr_path_node_at(db, cons, module, loc))
@@ -131,13 +131,17 @@ fn fundef_arg_path_node_at(
     db: &dyn Db,
     ast: &AstFundefArg,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     let module = enclosing_module(db, loc)?;
     type_expr_path_node_at(db, &ast.ty, module, loc)
 }
 
-fn stmt_path_node_at(db: &dyn Db, ast: &AstStmt, loc: Location) -> Option<Definition> {
+fn stmt_path_node_at(
+    db: &dyn Db,
+    ast: &AstStmt,
+    loc: Location,
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     let module = enclosing_module(db, loc)?;
     match &ast.data {
@@ -190,13 +194,13 @@ fn expr_path_node_at(
     ast: &AstExpr,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     match &ast.data {
         AstExprDesc::NameResolved { from, to } => {
             let resolved = resolve_in_module(db, from.data, module)?;
             if from.span.encloses(loc) {
-                Some(resolved)
+                Some((resolved, from.span))
             } else {
                 match resolved {
                     Definition::Module(resolved_module) => {
@@ -279,7 +283,7 @@ fn branch_path_node_at(
     ast: &AstMatchBranch,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     let span = ast.pat.span.start().span(ast.body.span.end());
     span.encloses(loc).then_some(())?;
     pat_path_node_at(db, &ast.pat, module, loc)
@@ -294,7 +298,7 @@ fn any_type_path_node_at(
     ast: &AstAnyTypeExpr,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     match &ast.data {
         AstAnyTypeExprDesc::Any => None,
@@ -309,7 +313,7 @@ fn type_expr_path_node_at(
     ast: &AstTypeExpr,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     type_expr_desc_path_node_at(db, &ast.data, module, loc)
 }
@@ -319,7 +323,7 @@ fn type_expr_desc_path_node_at(
     ast: &AstTypeExprDesc,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     match ast {
         AstTypeExprDesc::Tuple(tys) => tys.iter().find_map(|ty| {
             any_type_path_node_at(db, ty, enclosing_module(db, loc)?, loc)
@@ -329,12 +333,12 @@ fn type_expr_desc_path_node_at(
             .find_map(|ty| any_type_path_node_at(db, ty, enclosing_module(db, loc)?, loc))
             .or_else(|| {
                 name.span.encloses(loc).then_some(())?;
-                resolve_in_module(db, name.data, module)
+                resolve_in_module(db, name.data, module).map(|d| (d, name.span))
             }),
         AstTypeExprDesc::NameResolved { from, to } => {
             let resolved = resolve_in_module(db, from.data, module)?;
             if from.span.encloses(loc) {
-                Some(resolved)
+                Some((resolved, from.span))
             } else {
                 match resolved {
                     Definition::Module(resolved_module) => {
@@ -358,14 +362,14 @@ fn named_pat_path_node_at(
     ast: &AstNamedPattern,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     match ast {
         AstNamedPattern::Mut { .. } | AstNamedPattern::Bare(_) => None,
         AstNamedPattern::Constructor { args, .. } => cons_arg_node_at(db, args, loc),
         AstNamedPattern::NameResolved { from, to } => {
             let resolved = resolve_in_module(db, from.data, module)?;
             if from.span.encloses(loc) {
-                Some(resolved)
+                Some((resolved, from.span))
             } else {
                 match resolved {
                     Definition::Module(resolved_module) => {
@@ -386,7 +390,7 @@ fn pat_path_node_at(
     ast: &AstPattern,
     module: ModuleId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     match &ast.data {
         AstPatternDesc::Named(named) => named_pat_path_node_at(db, named, module, loc),
@@ -400,7 +404,7 @@ fn cons_arg_node_at(
     db: &dyn Db,
     ast: &AstConstructFields,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     match ast {
         AstConstructFields::TupleFields(fields) => fields.iter().find_map(|field| {
             pat_path_node_at(db, field, enclosing_module(db, loc)?, loc)
@@ -420,7 +424,7 @@ fn struct_path_node_at(
     db: &dyn Db,
     ast: &AstStructDef,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     ast.template_args
         .iter()
@@ -433,7 +437,11 @@ fn struct_path_node_at(
         })
 }
 
-fn enum_path_node_at(db: &dyn Db, ast: &AstEnumDef, loc: Location) -> Option<Definition> {
+fn enum_path_node_at(
+    db: &dyn Db,
+    ast: &AstEnumDef,
+    loc: Location,
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     ast.template_args
         .iter()
@@ -449,7 +457,7 @@ fn enum_variant_path_node_at(
     db: &dyn Db,
     ast: &AstEnumVariant,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     match &ast.kind {
         AstEnumVariantKind::Unit => None,
@@ -466,7 +474,11 @@ fn enum_variant_path_node_at(
     }
 }
 
-fn sig_path_node_at(db: &dyn Db, ast: &AstFunsig, loc: Location) -> Option<Definition> {
+fn sig_path_node_at(
+    db: &dyn Db,
+    ast: &AstFunsig,
+    loc: Location,
+) -> Option<(Definition, Span)> {
     ast.span.encloses(loc).then_some(())?;
     ast.data
         .args
@@ -488,7 +500,11 @@ fn sig_path_node_at(db: &dyn Db, ast: &AstFunsig, loc: Location) -> Option<Defin
         })
 }
 
-fn impl_path_node_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<Definition> {
+fn impl_path_node_at(
+    db: &dyn Db,
+    impl_id: ImplId,
+    loc: Location,
+) -> Option<(Definition, Span)> {
     let module = impl_id.parent(db);
     let ast =
         module_items(db, module.into()).as_ref()?.iter().find_map(|ast| {
@@ -515,7 +531,7 @@ fn interface_path_node_at(
     db: &dyn Db,
     interface_id: InterfaceId,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     let ast = interface_item(db, interface_id.interned());
     let module = interface_id.parent(db);
     ast.template_args
@@ -533,7 +549,7 @@ fn interface_item_path_node_at(
     db: &dyn Db,
     item: &AstInterfaceItem,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     match item {
         AstInterfaceItem::Type(ast) => template_arg_path_node_at(db, ast, loc),
         AstInterfaceItem::Sig(sig) => method_sig_path_node_at(db, sig, loc),
@@ -544,7 +560,7 @@ fn impl_item_node_path_at(
     db: &dyn Db,
     item: &AstImplItem,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     let module = enclosing_module(db, loc)?;
     match item {
         AstImplItem::Type { ty, .. } => type_expr_path_node_at(db, ty, module, loc),
@@ -556,7 +572,7 @@ fn method_def_path_node_at(
     db: &dyn Db,
     ast: &AstMethodDef,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     if ast.data.body_span.encloses(loc) {
         ast.data.body.iter().find_map(|stmt| stmt_path_node_at(db, stmt, loc))
     } else {
@@ -585,7 +601,7 @@ fn method_sig_path_node_at(
     db: &dyn Db,
     ast: &AstMethodsig,
     loc: Location,
-) -> Option<Definition> {
+) -> Option<(Definition, Span)> {
     ast.data
         .args
         .iter()

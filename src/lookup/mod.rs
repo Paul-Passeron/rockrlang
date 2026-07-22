@@ -21,11 +21,14 @@ use crate::{
     compiler::{Workspace, workspace_packages},
     hir::{impl_items, interface_items},
     lookup::{
+        path::path_node_at,
         sig::{SigNode, sig_node_at},
         thir::ThirNode,
         ty::{TypeNode, type_node_at},
     },
-    name_resolve::{file_module_id, implems::module_impls, module_items},
+    name_resolve::{
+        definition::Definition, file_module_id, implems::module_impls, module_items,
+    },
     parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTopLevelItemDesc},
     ril::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
@@ -169,6 +172,7 @@ pub enum AstNode<'a> {
     ThirNode(&'a Thir, ThirNode<'a>),
     SigNode(SigNode),
     TypeNode(TypeNode),
+    Path(Definition, Span),
 }
 
 impl AstNode<'_> {
@@ -177,12 +181,15 @@ impl AstNode<'_> {
             AstNode::ThirNode(thir, thir_node) => thir_node.span(thir),
             AstNode::SigNode(sig_node) => sig_node.span(),
             AstNode::TypeNode(type_node) => type_node.span,
+            AstNode::Path(_, span) => *span,
         }
     }
 }
 
 pub fn ast_node_at(db: &dyn Db, loc: Location) -> Option<AstNode<'_>> {
-    let f = enclosing_fun(db, loc)?;
+    let Some(f) = enclosing_fun(db, loc) else {
+        return path_node_at(db, loc).map(|(def, span)| AstNode::Path(def, span));
+    };
 
     let type_node = type_node_at(db, loc);
 

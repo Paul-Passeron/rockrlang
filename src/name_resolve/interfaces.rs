@@ -136,12 +136,10 @@ pub fn module_interfaces<'db>(
 pub fn interface_item<'db>(
     db: &'db dyn Db,
     interface: InternedInterfaceId<'db>,
-) -> Arc<AstInterface> {
-    Arc::new(
-        module_interfaces(db, interface.parent(db).interned())
-            .iter()
-            .find(|inter| inter.name.data == *interface.name(db))
-            .unwrap()
-            .clone(),
-    )
+) -> AstInterface {
+    module_interfaces(db, interface.parent(db).interned())
+        .iter()
+        .find(|inter| inter.name.data == *interface.name(db))
+        .unwrap()
+        .clone()
 }

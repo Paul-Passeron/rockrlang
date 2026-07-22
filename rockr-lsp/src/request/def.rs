@@ -19,13 +19,14 @@ use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse};
 use rockr::{
     common::location::{Location, Span},
     hir::{function_ast, hir_body, impl_sources},
-    lookup::{
-        AstNode, enclosing_fun, ast_node_at, sig::SigNode, thir::ThirNode,
-    },
+    lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
     name_resolve::{
+        definition::Definition,
         interfaces::interface_item,
+        module_items,
         type_expr::{enum_item, get_templates_of_fun, struct_item},
     },
+    parse_tree::top_level::AstTopLevelItemDesc,
     ril::{FunctionId, InterfaceId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
@@ -82,6 +83,49 @@ impl<'a> Lsp<'a> {
             },
             AstNode::TypeNode(type_node) => {
                 self.goto_def_ty_in_func(func, type_node.ty, loc)
+            }
+            AstNode::Path(definition, _) => {
+                let def_span: Span = match definition {
+                    Definition::Function(function_id) => Some(function_id.span(&self.db)),
+                    Definition::Interface(interface_id) => {
+                        Some(interface_item(&self.db, interface_id.into()).span)
+                    }
+                    Definition::Module(module_id) => {
+                        module_id.parent(&self.db).map_or_else(
+                            || {
+                                module_id.package(&self.db).and_then(|pkg| {
+                                    let sf = *pkg.root(&self.db).file(&self.db);
+                                    Some(Span::new(sf, 0, sf.content(&self.db).len()))
+                                })
+                            },
+                            |m| {
+                                let items = module_items(&self.db, m.into()).as_ref()?;
+                                items.iter().find_map(|item| match &item.data {
+                                    AstTopLevelItemDesc::Module(spanned) => {
+                                        if spanned.data.name.data
+                                            == module_id.name(&self.db)
+                                        {
+                                            Some(spanned.span)
+                                        } else {
+                                            None
+                                        }
+                                    }
+                                    _ => None,
+                                })
+                            },
+                        )
+                    }
+                    Definition::Type(def) => match def {
+                        TypeDefId::Builtin(_) => None,
+                        TypeDefId::Struct(struct_id) => {
+                            Some(struct_item(&self.db, struct_id.interned()).span)
+                        }
+                        TypeDefId::Enum(enum_id) => {
+                            Some(enum_item(&self.db, enum_id.interned()).span)
+                        }
+                    },
+                }?;
+                Some(self.goto_span(def_span))
             }
         }
     }

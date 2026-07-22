@@ -257,6 +257,7 @@ pub struct AstInterface {
     pub supers: Vec<AstTypeExpr>,
     pub template_args: Vec<AstTemplateArg>,
     pub items: Vec<AstInterfaceItem>,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
