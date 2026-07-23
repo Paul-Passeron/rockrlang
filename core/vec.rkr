@@ -126,7 +126,7 @@ impl<T> Iter for VecIter<T> {
 }
 
 impl<T> IntoIterator for Vec<T> {
-    type IntoIter = VecIter<T>;
+    type Out = VecIter<T>;
 
     fun into_iter(self): VecIter<T> {
         return VecIter {
