@@ -30,8 +30,8 @@ use crate::{
     },
     parse_tree::top_level::{AstImplItem, AstInterfaceItem},
     resolved::{
-        FunctionId, ImplId, ImplSource, InterfaceRef, ScopeOwnerId, TypeId,
-        TypeParamId, TypeRef,
+        FunctionId, ImplId, ImplSource, InterfaceRef, ScopeOwnerId, TypeId, TypeParamId,
+        TypeRef,
     },
 };
 
@@ -121,9 +121,9 @@ fn check_interface_conformance<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
                 impl_span,
             )
             .accumulate(db),
-            Some(&method_span) => check_method_signature(
-                db, impl_id, iref, name, method_span, &iface_name,
-            ),
+            Some(&method_span) => {
+                check_method_signature(db, impl_id, iref, name, method_span, &iface_name)
+            }
         }
     }
     for &name in &required_types {
@@ -306,10 +306,9 @@ fn is_comparable(db: &dyn Db, ty: TypeRef) -> bool {
     match ty {
         TypeRef::Concrete(id) => id.args(db).iter().all(|t| is_comparable(db, *t)),
         TypeRef::Param(_) => true,
-        TypeRef::Associated(_)
-        | TypeRef::Zelf
-        | TypeRef::Error
-        | TypeRef::Unknown => false,
+        TypeRef::Associated(_) | TypeRef::Zelf | TypeRef::Error | TypeRef::Unknown => {
+            false
+        }
     }
 }
 
