@@ -24,8 +24,8 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     ril::{
-        BuiltinTypeId, BuiltinTypeKind, PtrKind, ScopeOwnerId, StructId, TypeDefId,
-        TypeRef, rehole, str_def,
+        BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
+        rehole, str_def,
     },
     typecheck::inference::{
         InferTy, InferenceCtx,
@@ -279,13 +279,5 @@ impl InferTy {
             let kind = def.is_ptr_like(db)?;
             Some((kind.mutability(), &vals[0]))
         })
-    }
-}
-
-impl PtrKind {
-    pub fn mutability(&self) -> Mutability {
-        match self {
-            PtrKind::Ref(m) | PtrKind::RawPtr(m) => *m,
-        }
     }
 }

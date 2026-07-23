@@ -35,10 +35,7 @@ use crate::{
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
-    ril::{
-        BuiltinTypeId, BuiltinTypeKind, FunctionId, PtrKind, ScopeOwnerId, TypeDefId,
-        TypeId, TypeRef, ref_of, rehole,
-    },
+    ril::{FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, rehole},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
@@ -1350,21 +1347,6 @@ impl<'db> ThirTranslator<'db> {
 }
 
 impl TypeRef {
-    pub fn as_type_id(self) -> Option<TypeId> {
-        match self {
-            TypeRef::Concrete(type_id) => Some(type_id),
-            _ => None,
-        }
-    }
-
-    pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[TypeRef])> {
-        let id = self.as_type_id()?;
-        match id.def(db) {
-            TypeDefId::Builtin(bid) => Some((bid, id.args(db))),
-            _ => None,
-        }
-    }
-
     pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
         let type_id = self.as_type_id()?;
         match type_id.def(db) {
@@ -1384,35 +1366,6 @@ impl TypeRef {
             _ => None,
         }
     }
-
-    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
-        let (b, args) = self.as_builtin(db)?;
-        matches!(b.kind(db), BuiltinTypeKind::Tuple).then(|| args.to_vec())
-    }
-
-    pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
-        let type_id = self.as_type_id()?;
-        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
-        match ptr_kind {
-            PtrKind::Ref(mutability) => Some((mutability, type_id.args(db)[0])),
-            _ => None,
-        }
-    }
-
-    pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
-        let type_id = self.as_type_id()?;
-        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
-        match ptr_kind {
-            PtrKind::RawPtr(mutability) => Some((mutability, type_id.args(db)[0])),
-            _ => None,
-        }
-    }
-
-    pub fn as_ptr_like(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
-        let type_id = self.as_type_id()?;
-        let mutability = type_id.def(db).is_ptr_like(db)?.mutability();
-        Some((mutability, type_id.args(db)[0]))
-    }
 }
 
 impl ThirPlace {
@@ -1424,20 +1377,6 @@ impl ThirPlace {
             ty: l.ty,
             span,
             is_synthetic: l.is_synthetic,
-        }
-    }
-}
-
-impl TypeRef {
-    pub fn with_substitution(self, db: &dyn Db, sub: &[Self]) -> Self {
-        match self {
-            Self::Concrete(type_id) => Self::Concrete(TypeId::new(
-                db,
-                type_id.def(db),
-                type_id.args(db).iter().map(|t| t.with_substitution(db, sub)).collect(),
-            )),
-            Self::Param(id) => sub[id.0],
-            Self::Associated(_) | Self::Zelf | Self::Error | TypeRef::Unknown => self,
         }
     }
 }
@@ -1454,14 +1393,5 @@ impl StructRef {
         .unwrap();
         let resolution = ctx.resolve(db, &found.ty.data)?;
         Some(resolution.with_substitution(db, &self.args))
-    }
-}
-
-impl TypeRef {
-    pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
-        match self {
-            TypeRef::Error | TypeRef::Unknown => self,
-            _ => TypeRef::Concrete(ref_of(db, self, mutable)),
-        }
     }
 }

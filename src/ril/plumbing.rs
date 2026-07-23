@@ -494,6 +494,14 @@ pub enum PtrKind {
     RawPtr(Mutability),
 }
 
+impl PtrKind {
+    pub fn mutability(&self) -> Mutability {
+        match self {
+            PtrKind::Ref(m) | PtrKind::RawPtr(m) => *m,
+        }
+    }
+}
+
 pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
     if mutable { mut_ptr_of(db, ty) } else { const_ptr_of(db, ty) }
 }

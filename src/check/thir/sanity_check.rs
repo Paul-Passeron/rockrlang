@@ -29,9 +29,8 @@ use crate::{
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     ril::{
-        BuiltinTypeKind, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, usize_id,
-        void_id,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, int_id,
+        ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -562,7 +561,8 @@ impl<'db> SanityChecker<'db> {
             ) => {
                 assert_eq!(field_tys.len(), pat_tys.len());
                 for field in field_tys {
-                    let field_expr = pat_tys.iter().find(|p| p.field == field.0).unwrap().expr;
+                    let field_expr =
+                        pat_tys.iter().find(|p| p.field == field.0).unwrap().expr;
                     let field_ty = self.check_expr(field_expr);
                     let span = self.thir.exprs[field_expr].span;
                     self.check_types(field.1, field_ty, span);
@@ -765,40 +765,6 @@ impl FunctionRef {
     }
 }
 
-impl TypeRef {
-    pub fn as_slice(self, db: &dyn Db) -> Option<Self> {
-        let (b, args) = self.as_builtin(db)?;
-        match b.kind(db) {
-            BuiltinTypeKind::Slice => Some(args[0]),
-            _ => None,
-        }
-    }
-
-    pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {
-        if let Some((_, inner)) = self.as_ptr(db) {
-            Some(inner)
-        } else if let Some(inner) = self.as_slice(db) {
-            Some(inner)
-        } else if let Some(inner) = self.as_ref(db).and_then(|t| t.1.as_slice(db)) {
-            Some(inner)
-        } else {
-            None
-        }
-    }
-
-    pub fn ref_slice_of(db: &dyn Db, inner: Self) -> Self {
-        TypeRef::Concrete(slice_of(db, TypeRef::Concrete(slice_of(db, inner))))
-    }
-
-    pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
-        if self.as_ref(db).and_then(|(_, ty)| ty.as_slice(db)).is_some() {
-            Some(Self::Concrete(usize_id(db)))
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WrapKind {
     Ref(Mutability),
@@ -854,27 +820,5 @@ impl WrapKind {
     pub fn wrap(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         let Self::Ref(mutability) = self;
         ref_of(db, ty, mutability.is_mut()).into()
-    }
-}
-
-impl TypeRef {
-    pub fn instantiate(
-        self,
-        db: &dyn Db,
-        subs: &[TypeRef],
-        zelf: Option<TypeRef>,
-    ) -> TypeRef {
-        match self {
-            TypeRef::Concrete(id) => TypeRef::Concrete(TypeId::new(
-                db,
-                id.def(db),
-                id.args(db).iter().map(|t| t.instantiate(db, subs, zelf)).collect(),
-            )),
-            TypeRef::Param(p) => subs[p.0], // callee-space param
-            TypeRef::Zelf => {
-                zelf.expect("Zelf in signature but no self type on FunctionRef")
-            }
-            other => other,
-        }
     }
 }

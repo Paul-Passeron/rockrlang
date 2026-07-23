@@ -19,6 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod display;
 pub mod plumbing;
+pub mod type_ref;
 
 pub use plumbing::*;
 
@@ -112,12 +113,6 @@ pub enum TypeRef {
     Zelf,
     Error,
     Unknown,
-}
-
-impl TypeRef {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().type_ref_to_string(db, *self)
-    }
 }
 
 #[salsa::interned]
