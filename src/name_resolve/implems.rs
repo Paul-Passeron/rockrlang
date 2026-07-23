@@ -31,7 +31,7 @@ use crate::{
         top_level::{AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
+    resolved::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
 
 pub fn resolve_type_expr_as_interface<'db>(

@@ -41,7 +41,7 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    ril::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id},
+    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id},
     thir_to_mir::FuncInst,
 };
 

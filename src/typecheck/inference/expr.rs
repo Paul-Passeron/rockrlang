@@ -39,7 +39,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDefField},
     },
-    ril::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
+    resolved::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
         inference::{

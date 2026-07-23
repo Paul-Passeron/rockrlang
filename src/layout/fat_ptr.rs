@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     layout::{AggregateLayout, LayoutData, LayoutID, Offset, Size},
-    ril::TypeRef,
+    resolved::TypeRef,
 };
 
 pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {

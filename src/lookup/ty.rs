@@ -32,7 +32,7 @@ use crate::{
         },
         type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
+    resolved::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
     thir::thir_body,
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };

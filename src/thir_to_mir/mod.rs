@@ -41,7 +41,7 @@ use crate::{
     name_resolve::{
         core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
     },
-    ril::{
+    resolved::{
         BuiltinTypeKind, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, char_id,
         never_id, str_def, str_id, void_id,
     },

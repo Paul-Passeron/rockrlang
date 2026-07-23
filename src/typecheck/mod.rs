@@ -24,7 +24,7 @@ use crate::compiler::diagnostic::Diag;
 use crate::hir::{HirMatchBranch, HirPatternDesc};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::printer::render_diagnostics;
-use crate::ril::TypeId;
+use crate::resolved::TypeId;
 use crate::{
     Db,
     hir::{
@@ -33,7 +33,7 @@ use crate::{
     },
     name_resolve::type_expr::get_templates_of_fun,
     parse_tree::top_level::AstTemplateArg,
-    ril::{FunctionId, InternedFunctionId, TypeRef},
+    resolved::{FunctionId, InternedFunctionId, TypeRef},
     typecheck::inference::{InferTy, InferenceCtx, UnificationError},
 };
 

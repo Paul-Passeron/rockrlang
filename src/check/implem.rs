@@ -26,7 +26,7 @@ use crate::{
     compiler::diagnostic::Diag,
     hir::impl_items,
     parse_tree::top_level::AstImplItem,
-    ril::{FunctionId, ImplSource, ScopeOwnerId},
+    resolved::{FunctionId, ImplSource, ScopeOwnerId},
 };
 
 pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {

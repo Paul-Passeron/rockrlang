@@ -31,7 +31,7 @@ use crate::{
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     printer::type_printer::TypePrinter,
-    ril::{
+    resolved::{
         EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
         StructId, TypeDefId, bool_id, char_id, int_id, never_id, usize_id, void_id,
     },

@@ -26,7 +26,7 @@ use crate::{
     hir::function_ast,
     mir::passes::dead_code_elimination::dce,
     name_resolve::type_expr::get_templates_of_fun,
-    ril::{FunctionId, ScopeOwnerId, TypeRef},
+    resolved::{FunctionId, ScopeOwnerId, TypeRef},
     thir_to_mir::{MIRKey, mir},
     typecheck::{conformance::method_impl_for, type_check_function},
 };

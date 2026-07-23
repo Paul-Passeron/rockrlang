@@ -19,7 +19,7 @@ use crate::{
     Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
     compiler::diagnostic::{Diag, Severity},
-    ril::{FunctionId, InternedFunctionId},
+    resolved::{FunctionId, InternedFunctionId},
     thir::{Thir, thir_body},
 };
 

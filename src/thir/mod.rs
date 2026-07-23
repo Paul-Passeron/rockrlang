@@ -24,7 +24,7 @@ use crate::{
     },
     hir::{self, Mutability, function_ast, hir_body},
     parse_tree::expr::BinaryOperator,
-    ril::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
+    resolved::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
     thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
     typecheck::type_check_function,
 };

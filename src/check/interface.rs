@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, ril::InterfaceId, unused};
+use crate::{Db, resolved::InterfaceId, unused};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
     unused!(db);

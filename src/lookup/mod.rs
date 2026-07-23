@@ -30,7 +30,7 @@ use crate::{
         definition::Definition, file_module_id, implems::module_impls, module_items,
     },
     parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTopLevelItemDesc},
-    ril::{
+    resolved::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef,
     },

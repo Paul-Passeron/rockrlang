@@ -32,7 +32,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstInterfaceItem, AstMethodsig},
     },
-    ril::{
+    resolved::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
     },

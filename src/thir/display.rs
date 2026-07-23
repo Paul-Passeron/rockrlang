@@ -21,10 +21,10 @@ use super::{
     ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
     ThirPatternKind,
 };
-use crate::ril::TypeDefId;
+use crate::resolved::TypeDefId;
 use crate::thir::ThirStructField;
 use crate::thir::stmt::BlockSemanticInfo;
-use crate::{Db, hir::Mutability, ril::TypeRef};
+use crate::{Db, hir::Mutability, resolved::TypeRef};
 
 const INDENT: &str = "    ";
 

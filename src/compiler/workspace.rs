@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, SourceFile,
     driver::ANCHOR_FILE_NAME,
-    ril::{FileModule, Package},
+    resolved::{FileModule, Package},
 };
 use dashmap::DashSet;
 use itertools::Itertools;

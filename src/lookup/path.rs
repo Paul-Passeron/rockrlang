@@ -38,7 +38,7 @@ use crate::{
         },
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
+    resolved::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
 };
 
 pub fn path_node_at(db: &dyn Db, loc: Location) -> Option<(Definition, Span)> {

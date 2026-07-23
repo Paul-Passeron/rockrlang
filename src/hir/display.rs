@@ -25,7 +25,7 @@ use crate::{
         HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern, Mutability,
     },
     parse_tree::expr::BinaryOperator,
-    ril::{TypeDefId, display::Display},
+    resolved::{TypeDefId, display::Display},
 };
 
 impl<'db> HirBody<'db> {

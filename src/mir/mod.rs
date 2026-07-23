@@ -35,7 +35,7 @@ use crate::{
             MIRProjection, MIRRValue, MIRRValueKind,
         },
     },
-    ril::TypeRef,
+    resolved::TypeRef,
     thir,
     thir_to_mir::FuncInst,
 };

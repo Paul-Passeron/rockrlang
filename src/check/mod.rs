@@ -37,7 +37,7 @@ use crate::{
         file_module_id,
         implems::module_impls,
     },
-    ril::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
+    resolved::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
     thir_to_mir::{FuncInst, MIRKey, mir},
 };
 pub mod fundef;

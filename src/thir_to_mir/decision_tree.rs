@@ -29,7 +29,7 @@ use crate::{
     },
     name_resolve::type_expr::enum_item,
     parse_tree::top_level::AstEnumVariantKind,
-    ril::{TypeRef, bool_id},
+    resolved::{TypeRef, bool_id},
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
     thir_to_mir::ThirToMIR,
 };

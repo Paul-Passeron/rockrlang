@@ -41,7 +41,7 @@ use crate::{
         },
         type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },
-    ril::{
+    resolved::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
     },

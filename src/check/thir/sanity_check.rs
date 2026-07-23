@@ -28,7 +28,7 @@ use crate::{
     hir::signature::get_sig_of_function,
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
-    ril::{
+    resolved::{
         ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, int_id,
         ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },

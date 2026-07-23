@@ -24,7 +24,7 @@ use crate::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, finish_aggregate, layout_of,
     },
-    ril::{EnumId, TypeRef},
+    resolved::{EnumId, TypeRef},
     thir::EnumRef,
 };
 

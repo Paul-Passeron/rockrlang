@@ -23,7 +23,7 @@ use crate::{
     hir::Mutability,
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
-    ril::{
+    resolved::{
         BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
         rehole, str_def,
     },

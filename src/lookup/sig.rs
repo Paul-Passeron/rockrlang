@@ -31,7 +31,7 @@ use crate::{
         top_level::{AstFundefArg, AstTemplateArg},
         type_expr::AstTypeExpr,
     },
-    ril::{FunctionId, InterfaceRef, TypeRef},
+    resolved::{FunctionId, InterfaceRef, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 

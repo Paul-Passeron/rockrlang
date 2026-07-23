@@ -26,7 +26,7 @@ use crate::{
     hir::impl_items,
     name_resolve::implems::impls_in_package,
     parse_tree::top_level::AstImplItem,
-    ril::{
+    resolved::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
         InternedTypeId, ScopeOwnerId, TypeId, TypeRef,
     },

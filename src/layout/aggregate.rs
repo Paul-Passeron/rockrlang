@@ -24,7 +24,7 @@ use crate::{
         layout_of,
     },
     name_resolve::type_expr::struct_item,
-    ril::{StructId, TypeRef},
+    resolved::{StructId, TypeRef},
     thir::StructRef,
 };
 

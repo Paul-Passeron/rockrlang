@@ -29,7 +29,7 @@ use rockr::{
         type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_owner},
     },
     parse_tree::top_level::{AstTemplateArg, AstTopLevelItemDesc},
-    ril::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
+    resolved::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 

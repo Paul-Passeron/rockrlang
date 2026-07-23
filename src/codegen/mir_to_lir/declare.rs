@@ -26,7 +26,7 @@ use crate::{
     lir::{DefinedLinkage::Export, Module, Signature},
     mangle::fun_mangle,
     mir::MIR,
-    ril::TypeRef,
+    resolved::TypeRef,
     thir_to_mir::FuncInst,
 };
 

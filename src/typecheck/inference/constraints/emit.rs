@@ -20,7 +20,7 @@ use std::sync::Arc;
 use crate::{
     common::symbols::Symbol,
     parse_tree::expr::BinaryOperator,
-    ril::InterfaceId,
+    resolved::InterfaceId,
     typecheck::{
         ExprId,
         inference::{

@@ -32,7 +32,7 @@ use crate::{
         top_level::{AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{
+    resolved::{
         InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
         ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of,
         slice_of, tuple_of,

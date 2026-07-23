@@ -32,7 +32,7 @@ use crate::{
     hir::Mutability,
     mir::{ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
-    ril::{TypeRef, bool_id, char_id, ptr_of},
+    resolved::{TypeRef, bool_id, char_id, ptr_of},
     thir::{EnumRef, FunctionRef, StructRef},
 };
 

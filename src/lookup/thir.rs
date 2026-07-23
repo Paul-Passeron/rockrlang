@@ -23,7 +23,7 @@ use crate::{
         location::{Location, Span},
         symbols::Symbol,
     },
-    ril::TypeRef,
+    resolved::TypeRef,
     thir::{
         EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, StructRef, Thir,
         ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,

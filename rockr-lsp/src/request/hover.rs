@@ -33,7 +33,7 @@ use rockr::{
         type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     },
     parse_tree::top_level::AstTemplateArg,
-    ril::{FunctionId, TypeDefId, TypeParamId, TypeRef},
+    resolved::{FunctionId, TypeDefId, TypeParamId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, StructRef, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},

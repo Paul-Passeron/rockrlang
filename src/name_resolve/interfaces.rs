@@ -26,7 +26,7 @@ use crate::{
         module_items,
     },
     parse_tree::top_level::{AstInterface, AstTopLevelItemDesc},
-    ril::{
+    resolved::{
         EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId, StructId,
         TypeDefId,
     },

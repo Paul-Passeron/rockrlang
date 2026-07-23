@@ -23,7 +23,7 @@ use crate::{
     compiler::{Workspace, diagnostic::Diag, workspace_packages},
     parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     parser::{ParseError, parse_file},
-    ril::{FileModule, InternedModuleId, ModuleId, Package},
+    resolved::{FileModule, InternedModuleId, ModuleId, Package},
 };
 
 pub mod definition;

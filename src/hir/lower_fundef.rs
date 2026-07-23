@@ -60,7 +60,7 @@ use crate::{
         },
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
-    ril::{
+    resolved::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
         TypeParamId, TypeRef, compute_template_hints, rehole, tuple_of,
     },

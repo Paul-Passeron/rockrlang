@@ -21,7 +21,7 @@ use rockr::{
     hir::Mutability,
     hir::signature::{FunctionSignature, get_sig_of_function},
     printer::type_printer::TypePrinter,
-    ril::{
+    resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceRef, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
     },

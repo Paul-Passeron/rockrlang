@@ -26,7 +26,7 @@ use crate::{
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
     },
-    ril::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
+    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
 };
 
 pub mod aggregate;

@@ -22,7 +22,7 @@ use crate::{
     common::location::Span,
     compiler::diagnostic::Diag,
     hir::signature::get_sig_of_function,
-    ril::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
+    resolved::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
         ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},

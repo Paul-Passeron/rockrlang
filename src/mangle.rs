@@ -24,7 +24,7 @@ use crate::{
     hir::{FunctionLikeAst, function_ast, owning_module},
     layout::{IntWidth, Size},
     name_resolve::builtin_module,
-    ril::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeId, TypeRef},
+    resolved::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeId, TypeRef},
     thir_to_mir::{FuncInst, MIRKey},
 };
 

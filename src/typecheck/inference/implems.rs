@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     compiler::{Workspace, workspace_packages},
     name_resolve::implems::impls_in_package,
-    ril::{ImplSource, ScopeOwnerId},
+    resolved::{ImplSource, ScopeOwnerId},
     typecheck::inference::{
         constraints::InferenceConstraintKind, implicit::ImplicitContext,
     },

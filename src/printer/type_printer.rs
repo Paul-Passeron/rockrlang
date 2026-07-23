@@ -24,7 +24,7 @@ use crate::{
     hir::Mutability,
     hir::signature::{FunctionSignature, get_sig_of_function},
     name_resolve::{builtin_module, definition::Definition},
-    ril::{
+    resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
         ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },

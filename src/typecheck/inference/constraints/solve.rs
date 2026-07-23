@@ -29,7 +29,7 @@ use crate::{
         top_level::{AstImplItem, AstReceiver},
     },
     printer::type_printer::{TypePrinter, TypePrinterOption, TypePrinterOptionSet},
-    ril::{
+    resolved::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
     },

@@ -24,7 +24,7 @@ use crate::{
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
-    ril::{EnumId, ScopeOwnerId},
+    resolved::{EnumId, ScopeOwnerId},
 };
 
 use super::*;

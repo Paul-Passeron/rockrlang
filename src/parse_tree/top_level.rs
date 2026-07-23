@@ -31,7 +31,7 @@ use crate::{
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
     parser::ParseError,
-    ril::display::Display,
+    resolved::display::Display,
 };
 
 pub type AstTopLevelItem = Spanned<AstTopLevelItemDesc>;

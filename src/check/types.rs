@@ -25,7 +25,7 @@ use crate::{
     compiler::diagnostic::Diag,
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
-    ril::{EnumId, ScopeOwnerId, StructId, TypeDefId},
+    resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 

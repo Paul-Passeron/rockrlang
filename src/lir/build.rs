@@ -35,7 +35,7 @@ use crate::{
             VoidInstKind,
         },
     },
-    ril::ptr_of,
+    resolved::ptr_of,
 };
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;

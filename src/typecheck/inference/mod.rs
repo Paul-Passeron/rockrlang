@@ -46,7 +46,7 @@ use crate::{
     },
     parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
-    ril::{
+    resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, InterfaceId, Package, StructId,
         TypeDefId, TypeId, TypeParamId, TypeRef, display::Display,
     },

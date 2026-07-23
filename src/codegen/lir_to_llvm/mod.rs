@@ -42,7 +42,7 @@ use crate::{
         finalized::{BlockData, FunctionBody, StackSlot},
         inst::{ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind},
     },
-    ril::never_id,
+    resolved::never_id,
 };
 
 impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {

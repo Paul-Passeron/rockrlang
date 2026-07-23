@@ -35,7 +35,7 @@ use crate::{
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
     },
     name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
-    ril::{FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, rehole},
+    resolved::{FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, rehole},
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
         ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
