@@ -15,10 +15,54 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, resolved::InterfaceId, unused};
+use std::collections::HashMap;
+
+use salsa::Accumulator;
+
+use crate::{
+    Db,
+    common::{location::Span, symbols::Symbol},
+    compiler::diagnostic::Diag,
+    hir::interface_items,
+    parse_tree::top_level::AstInterfaceItem,
+    resolved::InterfaceId,
+};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
-    unused!(db);
-    unused!(interface);
-    // TODO
+    check_ambiguous_interface_items(db, interface);
+}
+
+fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
+    let mut names: HashMap<Symbol, Span> = HashMap::new();
+    for item in interface_items(db, interface.interned()).iter() {
+        let name = item.name();
+        if names.contains_key(&name) {
+            Diag::generic_error(
+                format!(
+                    "Cannot define the same name multiple time: `{}`",
+                    name.to_string(db)
+                ),
+                item.name_span(),
+            )
+            .accumulate(db);
+        } else {
+            names.insert(name, item.name_span());
+        }
+    }
+}
+
+impl AstInterfaceItem {
+    pub fn name(&self) -> Symbol {
+        match self {
+            AstInterfaceItem::Type(arg) => arg.name,
+            AstInterfaceItem::Sig(sig) => sig.data.name.data,
+        }
+    }
+
+    pub fn name_span(&self) -> Span {
+        match self {
+            AstInterfaceItem::Type(arg) => arg.name_span,
+            AstInterfaceItem::Sig(sig) => sig.data.name.span,
+        }
+    }
 }
