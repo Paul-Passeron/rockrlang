@@ -39,10 +39,7 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDefField},
     },
-    ril::{
-        BuiltinTypeDef, BuiltinTypeId, EnumId, FunctionId, InterfaceId, ScopeOwnerId,
-        StructId, TypeDefId, TypeRef,
-    },
+    ril::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
         inference::{
@@ -74,15 +71,33 @@ impl<'db> InferenceCtx<'db> {
                 args,
                 interface_hint,
                 type_args,
-            } => self.infer_method(
-                ExprId(expr.id),
-                receiver,
-                *method,
-                type_args,
-                args,
-                *interface_hint,
-                expr.span,
-            ),
+            } => {
+                let id = ExprId(expr.id);
+                let method = *method;
+                let interface_hint = *interface_hint;
+                let span = expr.span;
+                if !type_args.is_empty() {
+                    Diag::todo(
+                        "Turbofish on method call is not supported yet.".into(),
+                        span,
+                    )
+                    .accumulate(self.db);
+                }
+                let receiver_ty = self.infer_expr(receiver)?;
+                let inferred_args = args
+                    .iter()
+                    .map(|arg| self.infer_expr(arg))
+                    .collect::<Result<Box<[_]>, _>>()?;
+                let res_var = self.emit_method_constraint(
+                    id,
+                    receiver_ty,
+                    method,
+                    inferred_args,
+                    interface_hint,
+                    false,
+                );
+                Ok(InferTy::Var(res_var))
+            }
             HirExprDesc::CallStatic { ty, method, args, type_args } => self.infer_static(
                 ExprId(expr.id),
                 ty,
@@ -143,22 +158,22 @@ impl<'db> InferenceCtx<'db> {
                 Ok(metadata_var.into())
             }
             HirExprDesc::As { expr: castee, ty } => {
-                if let Some((id, _)) = ty.as_builtin(self.db) {
-                    if id.is_int_like(self.db).is_some() {
-                        let expr_ty = self.emit_intlike_constraint();
-                        let actual_expr_ty = self.infer_expr(castee)?;
+                if let Some((id, _)) = ty.as_builtin(self.db)
+                    && id.is_int_like(self.db).is_some()
+                {
+                    let expr_ty = self.emit_intlike_constraint();
+                    let actual_expr_ty = self.infer_expr(castee)?;
 
-                        let casted_to = self
-                            .allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
-                        if let Err(err) = self.unify(expr_ty.into(), actual_expr_ty) {
-                            Diag::generic_error(
-                                format!("Invalid cast: {}", err.display(self.db)),
-                                expr.span,
-                            )
-                            .accumulate(self.db);
-                        }
-                        return Ok(casted_to);
+                    let casted_to =
+                        self.allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
+                    if let Err(err) = self.unify(expr_ty.into(), actual_expr_ty) {
+                        Diag::generic_error(
+                            format!("Invalid cast: {}", err.display(self.db)),
+                            expr.span,
+                        )
+                        .accumulate(self.db);
                     }
+                    return Ok(casted_to);
                 }
                 // For the moment, this only works on pointer types.
                 // This can do ref -> ptr but not ptr -> ref
@@ -458,13 +473,7 @@ impl<'db> InferenceCtx<'db> {
                         .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
                         .unwrap_or_else(|| self.fresh_var().into());
                     let err = match self.infer_expr(&field.expr) {
-                        Ok(expr_ty) => {
-                            if let Err(err) = self.unify(expr_ty, field_ty) {
-                                Some(err)
-                            } else {
-                                None
-                            }
-                        }
+                        Ok(expr_ty) => self.unify(expr_ty, field_ty).err(),
                         Err(err) => Some(err),
                     };
                     if let Some(err) = err {
@@ -503,7 +512,7 @@ impl<'db> InferenceCtx<'db> {
     ) -> Result<InferTy, UnificationError> {
         if !type_args.is_empty() {
             Diag::todo(
-                format!("Turbofish on static method call is not supported yet."),
+                "Turbofish on static method call is not supported yet.".into(),
                 span,
             )
             .accumulate(self.db);
@@ -520,36 +529,6 @@ impl<'db> InferenceCtx<'db> {
             inferred_args,
             None,
             true,
-        );
-        Ok(InferTy::Var(res_var))
-    }
-
-    fn infer_method(
-        &mut self,
-        id: ExprId,
-        receiver: &HirExpr,
-        method: Symbol,
-        type_args: &[TypeRef],
-        args: &[HirExpr],
-        interface_hint: Option<InterfaceId>,
-        span: Span,
-    ) -> Result<InferTy, UnificationError> {
-        if !type_args.is_empty() {
-            Diag::todo(format!("Turbofish on method call is not supported yet."), span)
-                .accumulate(self.db);
-        }
-        let receiver_ty = self.infer_expr(receiver)?;
-        let inferred_args = args
-            .iter()
-            .map(|arg| self.infer_expr(arg))
-            .collect::<Result<Box<[_]>, _>>()?;
-        let res_var = self.emit_method_constraint(
-            id,
-            receiver_ty,
-            method,
-            inferred_args,
-            interface_hint,
-            false,
         );
         Ok(InferTy::Var(res_var))
     }

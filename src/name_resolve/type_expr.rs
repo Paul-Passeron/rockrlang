@@ -122,7 +122,7 @@ pub fn resolve_type_expr_desc<'db>(
             let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            slice_of(db, elem.into()).into()
+            slice_of(db, elem).into()
         }
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys

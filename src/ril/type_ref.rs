@@ -80,15 +80,10 @@ impl TypeRef {
     }
 
     pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {
-        if let Some((_, inner)) = self.as_ptr(db) {
-            Some(inner)
-        } else if let Some(inner) = self.as_slice(db) {
-            Some(inner)
-        } else if let Some(inner) = self.as_ref(db).and_then(|t| t.1.as_slice(db)) {
-            Some(inner)
-        } else {
-            None
-        }
+        self.as_ptr(db)
+            .map(|(_, inner)| inner)
+            .or_else(|| self.as_slice(db))
+            .or_else(|| self.as_ref(db).and_then(|t| t.1.as_slice(db)))
     }
 
     pub fn ref_slice_of(db: &dyn Db, inner: Self) -> Self {

@@ -35,7 +35,7 @@ use crate::{
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionParam {
     pub idx: usize,
     pub name: Symbol,
@@ -145,7 +145,7 @@ fn general_sig_at(
     sig: GeneralSignature<'_>,
     loc: Location,
 ) -> Option<SigNode> {
-    if let Some(node) = fun_name_at(&sig.name, loc) {
+    if let Some(node) = fun_name_at(sig.name, loc) {
         return Some(node);
     }
 
@@ -153,7 +153,7 @@ fn general_sig_at(
     let ctx = AstImplicitContext::new(db, owner, sig.templates.iter().cloned().collect())
         .unwrap();
 
-    if let Some(node) = ret_ty_at(db, &sig.ret_ty, &ctx, loc) {
+    if let Some(node) = ret_ty_at(db, sig.ret_ty, &ctx, loc) {
         return Some(node);
     }
 
@@ -206,13 +206,10 @@ fn arg_at(
         ty,
         ty_span: arg.ty.span,
     };
-    if arg.name_span.encloses(loc) {
-        Some(SigNode::ParamName(param))
-    } else if arg.ty.span.encloses(loc) {
-        return Some(SigNode::ParamType(param));
-    } else {
-        None
-    }
+    arg.name_span
+        .encloses(loc)
+        .then_some(SigNode::ParamName(param))
+        .or_else(|| arg.ty.span.encloses(loc).then_some(SigNode::ParamType(param)))
 }
 
 /// Returns `None` if an error has occured (Should drop current work)
@@ -256,7 +253,7 @@ fn templ_at(
             constraint: TypeConstraint { iref, span: constraint.span },
         }));
     }
-    return Some(None);
+    Some(None)
 }
 
 impl SigNode {

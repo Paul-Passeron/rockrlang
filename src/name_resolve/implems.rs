@@ -161,7 +161,7 @@ pub fn module_impls<'db>(
                 }
                 Some(None) => {
                     Diag::generic_error(
-                        format!("Cannot implement for an unknown interface"),
+                        "Cannot implement for an unknown interface".into(),
                         item.interface.as_ref().unwrap().span,
                     )
                     .accumulate(db);

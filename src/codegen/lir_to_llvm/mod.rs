@@ -525,7 +525,6 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                         self.b
                             .build_cast(InstructionOpcode::ZExt, value, llvm_ty, "")
                             .unwrap()
-                            .into()
                     }
                     ValueInstKind::IndexPtr { ptr, elem_ty, index } => {
                         let ptr = ctx.values[ptr].into_pointer_value();

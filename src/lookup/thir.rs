@@ -62,12 +62,7 @@ impl Thir {
         }
     }
 
-    fn expr_at<'a>(
-        &'a self,
-        db: &dyn Db,
-        expr: ExprId,
-        loc: Location,
-    ) -> Option<ThirNode<'a>> {
+    fn expr_at<'a>(&'a self, expr: ExprId, loc: Location) -> Option<ThirNode<'a>> {
         let e = &self.exprs[expr];
         e.span.encloses(loc).then_some(())?;
         let res = match &e.kind {
@@ -85,10 +80,10 @@ impl Thir {
             ExprKind::Tuple(items)
             | ExprKind::SliceLit(items)
             | ExprKind::Call { args: items, .. } => {
-                items.iter().find_map(|e| self.expr_at(db, *e, loc))
+                items.iter().find_map(|e| self.expr_at(*e, loc))
             }
             ExprKind::BinOp { lhs, rhs, .. } => {
-                self.expr_at(db, *lhs, loc).or_else(|| self.expr_at(db, *rhs, loc))
+                self.expr_at(*lhs, loc).or_else(|| self.expr_at(*rhs, loc))
             }
             ExprKind::StructLit { fields, struct_def } => fields
                 .iter()
@@ -100,18 +95,18 @@ impl Thir {
                     })
                 })
                 .or_else(|| {
-                    fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
+                    fields.iter().find_map(|field| self.expr_at(field.expr, loc))
                 }),
             ExprKind::Neg(idx)
             | ExprKind::Not(idx)
             | ExprKind::Metadata(idx)
-            | ExprKind::Cast(idx, _) => self.expr_at(db, *idx, loc),
+            | ExprKind::Cast(idx, _) => self.expr_at(*idx, loc),
             ExprKind::Constructor { args, .. } => match args {
                 ThirConstructorArgs::Tuple(items) => {
-                    items.iter().find_map(|e| self.expr_at(db, *e, loc))
+                    items.iter().find_map(|e| self.expr_at(*e, loc))
                 }
                 ThirConstructorArgs::Struct(fields) => {
-                    fields.iter().find_map(|field| self.expr_at(db, field.expr, loc))
+                    fields.iter().find_map(|field| self.expr_at(field.expr, loc))
                 }
                 ThirConstructorArgs::None => None,
             },
@@ -130,7 +125,7 @@ impl Thir {
         {
             return Some(node);
         }
-        Some(match self.expr_at(db, setup.expr, loc)? {
+        Some(match self.expr_at(setup.expr, loc)? {
             ThirNode::Expr { id, setup: None } if id == setup.expr => {
                 ThirNode::Expr { id, setup: Some(setup.stmts.as_slice()) }
             }
@@ -140,7 +135,6 @@ impl Thir {
 
     fn pattern_at<'a>(
         &'a self,
-        db: &dyn Db,
         pat: &'a ThirPattern,
         loc: Location,
     ) -> Option<ThirNode<'a>> {
@@ -149,18 +143,18 @@ impl Thir {
             ThirPatternKind::Any => None,
             ThirPatternKind::Bind { local, .. } => self.local_at(*local, loc),
             ThirPatternKind::Tuple(pats) => {
-                pats.iter().find_map(|pat| self.pattern_at(db, pat, loc))
+                pats.iter().find_map(|pat| self.pattern_at(pat, loc))
             }
             ThirPatternKind::Struct { fields, .. } => {
-                fields.iter().find_map(|(_, pat)| self.pattern_at(db, pat, loc))
+                fields.iter().find_map(|(_, pat)| self.pattern_at(pat, loc))
             }
             ThirPatternKind::Constructor { args, .. } => match args {
                 ThirConstructorArgs::Tuple(items) => {
-                    items.iter().find_map(|pat| self.pattern_at(db, pat, loc))
+                    items.iter().find_map(|pat| self.pattern_at(pat, loc))
                 }
-                ThirConstructorArgs::Struct(fields) => fields
-                    .iter()
-                    .find_map(|fields| self.pattern_at(db, &fields.expr, loc)),
+                ThirConstructorArgs::Struct(fields) => {
+                    fields.iter().find_map(|fields| self.pattern_at(&fields.expr, loc))
+                }
                 ThirConstructorArgs::None => None,
             },
             ThirPatternKind::IntLit(_) => None,
@@ -178,7 +172,7 @@ impl Thir {
         branch.get_whole_span(self).encloses(loc).then_some(())?;
 
         let res = self
-            .pattern_at(db, &branch.pattern, loc)
+            .pattern_at(&branch.pattern, loc)
             .or_else(|| self.expr_with_setup_at(db, branch.guard.as_ref()?, loc))
             .or_else(|| branch.body.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)));
 
@@ -206,18 +200,18 @@ impl Thir {
                 .expr_with_setup_at(db, cond, loc)
                 .or_else(|| body.iter().find_map(|stmt| self.stmt_at(db, stmt, loc))),
             StmtKind::Let { local, init } => {
-                self.local_at(*local, loc).or_else(|| self.expr_at(db, *init, loc))
+                self.local_at(*local, loc).or_else(|| self.expr_at(*init, loc))
             }
             StmtKind::Assign { place, rhs } => {
-                self.place_at(*place, loc).or_else(|| self.expr_at(db, *rhs, loc))
+                self.place_at(*place, loc).or_else(|| self.expr_at(*rhs, loc))
             }
-            StmtKind::Return(idx) => idx.and_then(|expr| self.expr_at(db, expr, loc)),
+            StmtKind::Return(idx) => idx.and_then(|expr| self.expr_at(expr, loc)),
             StmtKind::Break(_) => None,
             StmtKind::Continue(_) => None,
             StmtKind::Match { scrutinee, branches } => self
                 .expr_with_setup_at(db, scrutinee, loc)
                 .or_else(|| branches.iter().find_map(|br| self.branch_at(db, br, loc))),
-            StmtKind::Expr(idx) => self.expr_at(db, *idx, loc),
+            StmtKind::Expr(idx) => self.expr_at(*idx, loc),
             StmtKind::Error => None,
         };
         res.or(stmt.is_synthetic.not().then_some(ThirNode::Stmt(stmt)))

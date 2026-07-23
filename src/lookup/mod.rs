@@ -65,7 +65,7 @@ fn file_module_of<'db>(
 }
 
 #[salsa::tracked(returns(copy))]
-fn module_of_sf<'db>(db: &'db dyn Db, file: SourceFile) -> Option<ModuleId> {
+fn module_of_sf(db: &dyn Db, file: SourceFile) -> Option<ModuleId> {
     let (file_module, package, parent) = file_module_of(db, file)?;
     let module = file_module_id(db, file_module, parent, package);
     Some(module)
@@ -73,8 +73,8 @@ fn module_of_sf<'db>(db: &'db dyn Db, file: SourceFile) -> Option<ModuleId> {
 
 pub fn enclosing_scope_owner(db: &dyn Db, loc: Location) -> Option<ScopeOwnerId> {
     #[salsa::tracked(returns(copy))]
-    fn _enclosing_scope_owner<'db>(
-        db: &'db dyn Db,
+    fn _enclosing_scope_owner(
+        db: &dyn Db,
         file: SourceFile,
         offset: usize,
     ) -> Option<ScopeOwnerId> {
@@ -110,7 +110,7 @@ pub fn enclosing_scope_owner(db: &dyn Db, loc: Location) -> Option<ScopeOwnerId>
                     }
                     AstTopLevelItemDesc::Impl(ast_impl_block) => {
                         module_impls(db, module.interned())
-                            .into_iter()
+                            .iter()
                             .find(|src| *src.span(db) == ast_impl_block.span)
                             .map(|src| ScopeOwnerId::Impl(*src.id(db)))
                     }

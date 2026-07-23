@@ -64,8 +64,14 @@ impl Span {
         true
     }
 
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.end_offset - self.start_offset
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
