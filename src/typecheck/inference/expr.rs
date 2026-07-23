@@ -350,7 +350,8 @@ impl<'db> InferenceCtx<'db> {
     ) {
         let expected_fields: HashSet<Symbol> =
             HashSet::from_iter(ast_fields.iter().map(|f| f.name));
-        let got_fields: HashSet<Symbol> = HashSet::from_iter(fields.iter().map(|f| f.field));
+        let got_fields: HashSet<Symbol> =
+            HashSet::from_iter(fields.iter().map(|f| f.field));
         for field in got_fields.difference(&expected_fields) {
             Diag::generic_error(
                 format!(

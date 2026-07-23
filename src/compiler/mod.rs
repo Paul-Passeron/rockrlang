@@ -143,12 +143,10 @@ pub fn write_object_file(
 
 fn link_executable(obj: &Path, out: &Path) -> Result<(), CompilerError> {
     let cc = std::env::var("CC").unwrap_or_else(|_| "cc".into());
-    let status = std::process::Command::new(&cc)
-        .arg(obj)
-        .arg("-o")
-        .arg(out)
-        .status()
-        .map_err(|e| CompilerError::LinkFailed(format!("failed to spawn `{cc}`: {e}")))?;
+    let status =
+        std::process::Command::new(&cc).arg(obj).arg("-o").arg(out).status().map_err(
+            |e| CompilerError::LinkFailed(format!("failed to spawn `{cc}`: {e}")),
+        )?;
     if !status.success() {
         return Err(CompilerError::LinkFailed(format!("`{cc}` exited with {status}")));
     }

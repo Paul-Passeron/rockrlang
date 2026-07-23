@@ -173,8 +173,7 @@ impl<'a> Lsp<'a> {
             ThirNode::Local(idx) => Some(self.hover_local(func, thir, idx)),
             ThirNode::Stmt(stmt) => match &stmt.kind {
                 StmtKind::Block {
-                    semantic_infos:
-                        Some(BlockSemanticInfo::StructDestructure(struct_ref)),
+                    semantic_infos: Some(BlockSemanticInfo::StructDestructure(struct_ref)),
                     ..
                 } => {
                     let blocks = self

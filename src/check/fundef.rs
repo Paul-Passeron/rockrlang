@@ -18,10 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::Itertools;
 
 use crate::{
-    Db, check::{
+    Db,
+    check::{
         mir::check_mir,
         thir::{checked_thir_body, thir_is_valid},
-    }, hir::function_ast, mir::passes::dead_code_elimination::dce, name_resolve::type_expr::get_templates_of_fun, ril::{FunctionId, ScopeOwnerId, TypeRef}, thir_to_mir::{MIRKey, mir}, typecheck::{conformance::method_impl_for, type_check_function},
+    },
+    hir::function_ast,
+    mir::passes::dead_code_elimination::dce,
+    name_resolve::type_expr::get_templates_of_fun,
+    ril::{FunctionId, ScopeOwnerId, TypeRef},
+    thir_to_mir::{MIRKey, mir},
+    typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;
 

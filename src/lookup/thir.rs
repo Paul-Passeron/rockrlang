@@ -230,9 +230,9 @@ impl Thir {
     pub fn resolved_type_seed_at(&self, db: &dyn Db, loc: Location) -> Option<TypeRef> {
         match self.node_at(db, loc) {
             Some(ThirNode::Expr { id, .. }) => match &self.exprs[id].kind {
-                ExprKind::Cast(_, ty)
-                | ExprKind::SizeOf(ty)
-                | ExprKind::TypeName(ty) => Some(*ty),
+                ExprKind::Cast(_, ty) | ExprKind::SizeOf(ty) | ExprKind::TypeName(ty) => {
+                    Some(*ty)
+                }
                 ExprKind::StructLit { .. } | ExprKind::Constructor { .. } => {
                     Some(self.exprs[id].ty)
                 }
@@ -252,8 +252,9 @@ impl Thir {
                 StmtKind::Let { local, .. } => Some(*local),
                 StmtKind::Block { stmts, .. } => find(stmts, loc),
                 StmtKind::While { body, .. } => find(body, loc),
-                StmtKind::If { then, else_, .. } => find(then, loc)
-                    .or_else(|| else_.as_ref().and_then(|e| find(e, loc))),
+                StmtKind::If { then, else_, .. } => {
+                    find(then, loc).or_else(|| else_.as_ref().and_then(|e| find(e, loc)))
+                }
                 StmtKind::Match { branches, .. } => {
                     branches.iter().find_map(|b| find(&b.body, loc))
                 }
@@ -275,8 +276,9 @@ impl ThirNode<'_> {
             ThirNode::MatchBranch(thir_match_branch) => {
                 thir_match_branch.get_whole_span(thir)
             }
-            ThirNode::EnumVariant {  span, .. } |
-            ThirNode::StructField {  span, .. } => *span,
+            ThirNode::EnumVariant { span, .. } | ThirNode::StructField { span, .. } => {
+                *span
+            }
         }
     }
 }

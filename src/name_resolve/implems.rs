@@ -70,7 +70,8 @@ pub fn resolve_type_expr_as_interface<'db>(
             })
         }
         AstTypeExprDesc::NameResolved { from, to } => {
-            if let Some(Definition::Module(module)) = resolve_in_module(db, from.data, module)
+            if let Some(Definition::Module(module)) =
+                resolve_in_module(db, from.data, module)
             {
                 resolve_type_expr_as_interface(db, to, module, template_args, has_zelf)
             } else {

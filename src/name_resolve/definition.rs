@@ -91,15 +91,15 @@ impl ModuleId {
             return Some(Span::new(file, 0, 0));
         }
         let parent = self.parent(db)?;
-        module_items(db, parent.interned()).iter().flatten().find_map(|item| {
-            match &item.data {
-                AstTopLevelItemDesc::Module(curr_mod)
-                    if curr_mod.data.name.data == self.name(db) =>
-                {
-                    Some(curr_mod.data.name.span)
-                }
-                _ => None,
+        module_items(db, parent.interned()).iter().flatten().find_map(|item| match &item
+            .data
+        {
+            AstTopLevelItemDesc::Module(curr_mod)
+                if curr_mod.data.name.data == self.name(db) =>
+            {
+                Some(curr_mod.data.name.span)
             }
+            _ => None,
         })
     }
 }

@@ -67,30 +67,34 @@ pub fn resolve_type_expr_desc<'db>(
                 if name.data == Symbol::new(db, "Self") {
                     return TypeRef::Zelf;
                 }
-                if let Some(idx) = template_args.iter().position(|p| p.name == name.data) {
+                if let Some(idx) = template_args.iter().position(|p| p.name == name.data)
+                {
                     return TypeRef::Param(TypeParamId(idx));
                 }
             }
 
-            resolve_in_module(db, name.data, module.into()).map_or(TypeRef::Error, |def| {
-                if let Definition::Type(type_def_id) = def {
-                    let resolved_args = args
-                        .iter()
-                        .map(|arg| {
-                            resolve_any_type_expr(
-                                db,
-                                arg,
-                                module,
-                                template_args,
-                                has_zelf,
-                            )
-                        })
-                        .collect_vec();
-                    TypeId::new(db, type_def_id, resolved_args).into()
-                } else {
-                    TypeRef::Error
-                }
-            })
+            resolve_in_module(db, name.data, module.into()).map_or(
+                TypeRef::Error,
+                |def| {
+                    if let Definition::Type(type_def_id) = def {
+                        let resolved_args = args
+                            .iter()
+                            .map(|arg| {
+                                resolve_any_type_expr(
+                                    db,
+                                    arg,
+                                    module,
+                                    template_args,
+                                    has_zelf,
+                                )
+                            })
+                            .collect_vec();
+                        TypeId::new(db, type_def_id, resolved_args).into()
+                    } else {
+                        TypeRef::Error
+                    }
+                },
+            )
         }
         AstTypeExprDesc::NameResolved { from, to } => {
             if let Some(Definition::Module(module)) =

@@ -36,7 +36,9 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
     }
     if let Completeness::MayFallthrough { span } = check_stmts(db, thir, &thir.root) {
         Diag::generic_error(
-            format!("This falls through, you probably forgot to add a `return` statement !"),
+            format!(
+                "This falls through, you probably forgot to add a `return` statement !"
+            ),
             span,
         )
         .accumulate(db)

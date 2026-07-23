@@ -16,7 +16,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    common::{location::Span, symbols::{StrLit, Symbol}}, parse_tree::{
+    common::{
+        location::Span,
+        symbols::{StrLit, Symbol},
+    },
+    parse_tree::{
         Spanned,
         type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },

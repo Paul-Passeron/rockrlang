@@ -111,8 +111,7 @@ impl<'db> Parser<'db> {
         let element = self.parse_pattern()?;
         self.expect(TokenKind::In)?;
         self.consume();
-        let iterator =
-            self.with_struct_lit_restriction(true, Self::parse_expr)?;
+        let iterator = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
         Ok(AstStmt::new(

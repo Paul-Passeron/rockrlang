@@ -519,7 +519,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             .unwrap()
                             .into()
                     }
-                    ValueInstKind::Cast {  value, to, .. } => {
+                    ValueInstKind::Cast { value, to, .. } => {
                         let llvm_ty = self.basic(LayoutID::scalar(self.db, *to));
                         let value = ctx.values[value];
                         self.b

@@ -102,7 +102,9 @@ fn signature_path_node_at(
                 .iter()
                 .find_map(|templ| template_arg_path_node_at(db, templ, loc))
         })
-        .or_else(|| type_expr_path_node_at(db, return_type, enclosing_module(db, loc)?, loc))
+        .or_else(|| {
+            type_expr_path_node_at(db, return_type, enclosing_module(db, loc)?, loc)
+        })
 }
 
 fn fundef_path_node_at(
