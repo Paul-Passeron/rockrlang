@@ -39,7 +39,10 @@ use crate::{
         expr::BinaryOperator,
         top_level::{AstEnumVariantKind, AstStructDefField},
     },
-    ril::{EnumId, FunctionId, InterfaceId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
+    ril::{
+        BuiltinTypeDef, BuiltinTypeId, EnumId, FunctionId, InterfaceId, ScopeOwnerId,
+        StructId, TypeDefId, TypeRef,
+    },
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
         inference::{
@@ -139,16 +142,33 @@ impl<'db> InferenceCtx<'db> {
                 self.unify(fat_ptr_ty, fat_ptr_var.into())?;
                 Ok(metadata_var.into())
             }
-            HirExprDesc::As { expr, ty } => {
+            HirExprDesc::As { expr: castee, ty } => {
+                if let Some((id, _)) = ty.as_builtin(self.db) {
+                    if id.is_int_like(self.db).is_some() {
+                        let expr_ty = self.emit_intlike_constraint();
+                        let actual_expr_ty = self.infer_expr(castee)?;
+
+                        let casted_to = self
+                            .allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
+                        if let Err(err) = self.unify(expr_ty.into(), actual_expr_ty) {
+                            Diag::generic_error(
+                                format!("Invalid cast: {}", err.display(self.db)),
+                                expr.span,
+                            )
+                            .accumulate(self.db);
+                        }
+                        return Ok(casted_to);
+                    }
+                }
                 // For the moment, this only works on pointer types.
                 // This can do ref -> ptr but not ptr -> ref
                 let pointee = self.fresh_var();
                 let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
-                let expr_ty = self.infer_expr(expr)?;
+                let expr_ty = self.infer_expr(castee)?;
                 if let Err(err) = self.unify(expr_ptr_ty.into(), expr_ty) {
                     Diag::generic_error(
                         format!("Unification error in as expr: {}", err.display(self.db)),
-                        expr.span,
+                        castee.span,
                     )
                     .accumulate(self.db);
                 }

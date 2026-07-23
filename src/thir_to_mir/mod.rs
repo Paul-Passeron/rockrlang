@@ -582,7 +582,7 @@ impl<'a> ThirToMIR<'a> {
                     }
                     MIRRValueKind::Cast(self.build_operand(*expr), *ty)
                 } else {
-                    todo!()
+                    MIRRValueKind::Cast(self.build_operand(*expr), *ty)
                 }
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {

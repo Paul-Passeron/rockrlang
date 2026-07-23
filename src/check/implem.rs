@@ -17,10 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
 
+use salsa::Accumulator;
+
 use crate::{
     Db,
     check::fundef::check_fundef,
     common::{location::Span, symbols::Symbol},
+    compiler::diagnostic::Diag,
     hir::impl_items,
     parse_tree::top_level::AstImplItem,
     ril::{FunctionId, ImplSource, ScopeOwnerId},
@@ -37,7 +40,14 @@ fn check_ambiguous_impl_items<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     for item in impl_items(db, implem.id(db).interned()) {
         let item_name = item.name();
         if let Some(_value) = names.get(&item_name).copied() {
-            todo!()
+            Diag::generic_error(
+                format!(
+                    "Cannot define the same name multiple time: `{}`",
+                    item_name.to_string(db)
+                ),
+                item.name_span(),
+            )
+            .accumulate(db);
         } else {
             names.insert(item_name, item.name_span());
         }

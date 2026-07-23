@@ -135,10 +135,16 @@ impl<'db> LowerFundef<'db> {
                 if let Some(id) = scope.map.get(symbol) {
                     self.new_place(HirPlaceKind::Local(*id), expr.span, false)
                 } else {
-                    todo!(
-                        "expr_as_place: Name `{}` not found in local scope",
-                        symbol.interned().contents(self.db)
+                    Diag::generic_error(
+                        format!(
+                            "expr_as_place: Name `{}` not found in local scope",
+                            symbol.interned().contents(self.db)
+                        ),
+                        expr.span,
                     )
+                    .accumulate(self.db);
+                    let err = self.new_expr(HirExprDesc::Error, expr.span, false);
+                    self.new_place(HirPlaceKind::Temporary(err.boxed()), expr.span, false)
                 }
             }
             AstExprDesc::NameResolved { from, to } => {

@@ -26,7 +26,9 @@ use inkwell::{
     module::Linkage,
     targets::TargetData,
     types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, IntType},
-    values::{AnyValue, BasicValue, BasicValueEnum, FunctionValue, PhiValue},
+    values::{
+        AnyValue, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode, PhiValue,
+    },
 };
 use itertools::Itertools;
 
@@ -517,7 +519,14 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                             .unwrap()
                             .into()
                     }
-                    ValueInstKind::Cast { .. } => todo!(),
+                    ValueInstKind::Cast {  value, to, .. } => {
+                        let llvm_ty = self.basic(LayoutID::scalar(self.db, *to));
+                        let value = ctx.values[value];
+                        self.b
+                            .build_cast(InstructionOpcode::ZExt, value, llvm_ty, "")
+                            .unwrap()
+                            .into()
+                    }
                     ValueInstKind::IndexPtr { ptr, elem_ty, index } => {
                         let ptr = ctx.values[ptr].into_pointer_value();
                         let idx = ctx.values[index].into_int_value();

@@ -108,7 +108,7 @@ impl<T> Vec<T> {
 }
 
 struct VecIter<T> {
-    vec: &Vec<T>;
+    vec: Vec<T>;
     idx: usize;
 }
 
@@ -125,7 +125,7 @@ impl<T> Iter for VecIter<T> {
     }
 }
 
-impl<T> IntoIterator for &Vec<T> {
+impl<T> IntoIterator for Vec<T> {
     type IntoIter = VecIter<T>;
 
     fun into_iter(self): VecIter<T> {

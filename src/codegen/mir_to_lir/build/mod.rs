@@ -29,7 +29,7 @@ use crate::{
         ArithBinop, Body, CmpBinop, LIRFunctionId, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
-        inst::Terminator,
+        inst::{CastKind, Terminator},
     },
     mir::{
         MIR, MIRBlockID, MIRLocalID,
@@ -745,7 +745,16 @@ impl<'a> MTLBCtx<'a> {
                     }
                     self.lower_operand(b, op, lower)
                 } else {
-                    todo!()
+                    if let Some(value) = self.lower_operand(b, op, lower) {
+                        match layout_of(self.db, *type_ref).data(self.db) {
+                            LayoutData::Scalar(scalar_kind) => {
+                                Some(b.cast(CastKind::IntTruncate, value, *scalar_kind))
+                            }
+                            _ => todo!(),
+                        }
+                    } else {
+                        None
+                    }
                 }
             }
         }
