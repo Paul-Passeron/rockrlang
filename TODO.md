@@ -25,9 +25,11 @@ This can be a great starting point for contributors looking for something to do.
       - [ ] Speculative execution / make constraints aware of each other: This will allow things like `This type has fields a and b, Foo is the only struct having both fields so it is Foo` which isn't possible for the moment
 - [ ] Parsing
   - [x] We have no turbofish for the moment, which can make some struct / enum literals impossible to express without type hints. Look into either adding turbofish or some other syntax to remove ambiguity
-  - [ ] Make sure turbofish is everywhere we want it to be
+  - [x] Make sure turbofish is everywhere we want it to be
   - [ ] Make sure turbofish implementation is resilient
-  - [ ] Maybe rewrite the parser at one point, it's a bit of a mess
+    - [ ] Wherever turbofish isn't implemented, we get a compiler warning
+  - [] Maybe rewrite the parser at one point, it's a bit of a mess
+    - [x] Did some refactoring, the state isn't final though, but better than it used to be
   - [ ] See if we support unicode in files
   - [ ] Improve match branch parsing (For the moment we force them to be `{ ... }`)
 - [x] Create typed IR from HIR + type inference
@@ -58,8 +60,9 @@ Other:
 ## Long-term
 
 - [ ] Make it expr-based instead of stmt-based. The language is statement-based for the moment, more like C than Rust. This is because this is simpler to implement for the moment. I can see us moving to expressions once the architecture is a bit more mature.
-- [ ] Implement the lsp
+- [x] Implement the lsp
 - [ ] Write a solid Zed extension (and other IDEs but I use Zed)
+  - [x] WIP (Highlighting isn't all there yet)
 
 ## Ideas
 
