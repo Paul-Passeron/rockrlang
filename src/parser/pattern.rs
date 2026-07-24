@@ -38,14 +38,13 @@ impl<'db> Parser<'db> {
                 let name = self.parse_symbol()?;
                 Ok(Spanned::new(
                     AstPatternDesc::Named(AstNamedPattern::Mut { name }),
-                    vec![],
                     start.span(self.get_end()),
                 ))
             }
             TokenKind::Identifier(name) if name == Symbol::new(self.db, "_") => {
                 self.consume();
                 let end = self.get_end();
-                Ok(Spanned::new(AstPatternDesc::Any, vec![], start.span(end)))
+                Ok(Spanned::new(AstPatternDesc::Any, start.span(end)))
             }
 
             TokenKind::OpenPar => {
@@ -56,7 +55,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstPatternDesc::Named(AstNamedPattern::Tuple { fields }),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -65,14 +63,14 @@ impl<'db> Parser<'db> {
             TokenKind::Identifier(_) => {
                 let named = self.parse_named_pattern()?;
                 let end = self.get_end();
-                Ok(Spanned::new(AstPatternDesc::Named(named), vec![], start.span(end)))
+                Ok(Spanned::new(AstPatternDesc::Named(named), start.span(end)))
             }
 
             TokenKind::IntLit(x) => {
                 self.consume();
                 let end = self.get_end();
 
-                Ok(Spanned::new(AstPatternDesc::IntLiteral(x), vec![], start.span(end)))
+                Ok(Spanned::new(AstPatternDesc::IntLiteral(x), start.span(end)))
             }
 
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(

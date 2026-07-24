@@ -213,7 +213,6 @@ impl<'db> LowerFundef<'db> {
             AstAnyTypeExprDesc::Any => TypeRef::Unknown,
             AstAnyTypeExprDesc::Known(desc) => self.resolve_holed_desc(
                 &AstTypeExpr {
-                    annotations: Vec::new(),
                     data: desc.clone(),
                     span: any_ty.span,
                 },
@@ -558,11 +557,9 @@ impl<'db> LowerFundef<'db> {
                                 args: args.to_vec(),
                                 type_args: vec![], // TODO
                             },
-                            vec![],
                             span,
                         )),
                     },
-                    vec![],
                     span,
                 );
                 self.lower_expr(&resolved_call, scope, module).data
@@ -1054,7 +1051,6 @@ impl<'db> LowerFundef<'db> {
                             Some(Definition::Module(id)) => {
                                 let inner_pat = AstPattern::new(
                                     AstPatternDesc::Named(*to.clone()),
-                                    vec![],
                                     pat.span,
                                 );
                                 _lower(this, &inner_pat, scope, locals, id)

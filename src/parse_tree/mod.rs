@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{fmt, hash::Hash};
 
-use crate::{common::location::Span, parse_tree::annotation::AstAnnotation};
+use crate::common::location::Span;
 
 pub mod annotation;
 pub mod expr;
@@ -29,35 +29,23 @@ pub mod type_expr;
 #[derive(PartialEq, Eq, Hash)]
 pub struct Spanned<T> {
     pub data: T,
-    pub annotations: Vec<AstAnnotation>,
     pub span: Span,
 }
 
 impl<T> Spanned<T> {
-    pub fn new(data: T, annotations: Vec<AstAnnotation>, span: Span) -> Self {
-        Self { data, annotations, span }
+    pub fn new(data: T, span: Span) -> Self {
+        Self { data, span }
     }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Spanned<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.annotations.is_empty() {
-            self.data.fmt(f)
-        } else {
-            f.debug_struct("Annotated")
-                .field("data", &self.data)
-                .field("annotations", &self.annotations)
-                .finish()
-        }
+        self.data.fmt(f)
     }
 }
 
 impl<T: Clone> Clone for Spanned<T> {
     fn clone(&self) -> Self {
-        Self {
-            data: self.data.clone(),
-            annotations: self.annotations.clone(),
-            span: self.span,
-        }
+        Self { data: self.data.clone(), span: self.span }
     }
 }

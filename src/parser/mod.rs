@@ -32,7 +32,6 @@ use crate::{
     lexer::{LexError, Token, TokenKind, lex_file},
     parse_tree::{
         Spanned,
-        annotation::AstAnnotation,
         top_level::{Ast, AstAnyTopLevelItemDesc, AstTopLevelItemDesc},
     },
 };
@@ -42,7 +41,6 @@ pub struct Parser<'db> {
     pub position: usize,
     pub tokens: &'db [Token],
     pub db: &'db dyn Db,
-    pub annotations: Vec<AstAnnotation>,
     pub restrict_struct_lit: bool,
 }
 
@@ -73,7 +71,6 @@ impl<'db> Parser<'db> {
             tokens,
             db,
             file,
-            annotations: Vec::new(),
             restrict_struct_lit: false,
         }
     }
@@ -88,10 +85,6 @@ impl<'db> Parser<'db> {
         let result = f(self);
         self.restrict_struct_lit = saved;
         result
-    }
-
-    pub fn annotations(&mut self) -> Vec<AstAnnotation> {
-        std::mem::take(&mut self.annotations)
     }
 
     pub fn last_span(&self) -> Span {
@@ -158,7 +151,7 @@ impl<'db> Parser<'db> {
         match current.kind {
             TokenKind::Identifier(s) => {
                 self.consume();
-                Ok(Spanned::new(s, vec![], current.location))
+                Ok(Spanned::new(s, current.location))
             }
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),
@@ -258,7 +251,7 @@ pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
                     includes.push(include);
                 }
                 AstAnyTopLevelItemDesc::Item(x) => {
-                    items.push(Spanned::new(*x, item.annotations, item.span));
+                    items.push(Spanned::new(*x, item.span));
                 }
             },
             Err(err) => {
@@ -266,7 +259,6 @@ pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
                 parser.synchronize(Parser::is_top_level_sync_point);
                 items.push(Spanned::new(
                     AstTopLevelItemDesc::Error(err),
-                    vec![],
                     start.span(parser.get_end()),
                 ));
             }
