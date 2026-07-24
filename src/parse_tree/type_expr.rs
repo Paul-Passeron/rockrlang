@@ -42,7 +42,7 @@ pub enum AstAnyTypeExprDesc {
 impl AstAnyTypeExpr {
     pub fn as_known(&self) -> Option<AstTypeExpr> {
         if let AstAnyTypeExprDesc::Known(ty) = &self.data {
-            Some(AstTypeExpr::new(ty.clone(), self.annotations.clone(), self.span))
+            Some(AstTypeExpr::new(ty.clone(), self.span))
         } else {
             None
         }
@@ -53,7 +53,6 @@ impl From<AstTypeExpr> for AstAnyTypeExpr {
     fn from(ty: AstTypeExpr) -> Self {
         AstAnyTypeExpr {
             data: AstAnyTypeExprDesc::Known(ty.data),
-            annotations: ty.annotations,
             span: ty.span,
         }
     }

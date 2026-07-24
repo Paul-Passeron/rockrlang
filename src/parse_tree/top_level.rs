@@ -25,6 +25,7 @@ use crate::{
     common::{location::Span, symbols::Symbol},
     parse_tree::{
         Spanned,
+        annotation::AstAnnotation,
         expr::AstExpr,
         pattern::AstPattern,
         stmt::AstStmt,
@@ -60,6 +61,7 @@ pub type AstModule = Spanned<AstModuleDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstModuleDesc {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub items: Vec<AstTopLevelItem>,
     pub includes: Vec<AstIncludePath>,
@@ -69,6 +71,7 @@ pub type AstFundef = Spanned<AstFundefDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFundefDesc {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
@@ -81,6 +84,7 @@ pub type AstMethodDef = Spanned<AstMethodDefDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstMethodDefDesc {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub receiver: AstReceiver,
     pub args: Vec<AstFundefArg>,
@@ -125,6 +129,7 @@ pub type AstFunsig = Spanned<AstFunsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstFunsigDesc {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub args: Vec<AstFundefArg>,
     pub template_args: Vec<AstTemplateArg>,
@@ -135,6 +140,7 @@ pub type AstMethodsig = Spanned<AstMethodsigDesc>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstMethodsigDesc {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub receiver: AstReceiver,
     pub args: Vec<AstFundefArg>,
@@ -253,6 +259,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstInterface {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub supers: Vec<AstTypeExpr>,
     pub template_args: Vec<AstTemplateArg>,
@@ -276,6 +283,7 @@ pub struct AstConstDecl {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AstImplBlock {
+    pub annotations: Vec<AstAnnotation>,
     pub template_args: Vec<AstTemplateArg>,
 
     pub interface: Option<AstTypeExpr>, // Interface being implemented
@@ -286,7 +294,7 @@ pub struct AstImplBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
-    Type { name: Symbol, name_span: Span, ty: AstTypeExpr },
+    Type { annotations: Vec<AstAnnotation>, name: Symbol, name_span: Span, ty: AstTypeExpr },
     Fundef(Box<AstMethodDef>),
 }
 
@@ -307,6 +315,7 @@ pub enum AstIncludePathDesc {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AstStructDef {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub fields: Vec<AstStructDefField>,
@@ -315,6 +324,7 @@ pub struct AstStructDef {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AstEnumDef {
+    pub annotations: Vec<AstAnnotation>,
     pub name: Spanned<Symbol>,
     pub template_args: Vec<AstTemplateArg>,
     pub variants: Vec<AstEnumVariant>,
@@ -350,7 +360,7 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
         symbols.reverse();
 
         symbols.into_iter().fold(
-            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), vec![], span),
+            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), span),
             |acc, symb| {
                 let total_span = start_loc.span(symb.span.end());
                 AstIncludePath::new(
@@ -358,7 +368,6 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
                         from: symb.data,
                         to: Box::new(acc),
                     },
-                    vec![],
                     total_span,
                 )
             },

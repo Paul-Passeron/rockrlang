@@ -65,13 +65,11 @@ impl<'db> Parser<'db> {
                                         mutable,
                                         pointee: Box::new(inner),
                                     },
-                                    vec![],
                                     start.advance(1).span(end),
                                 )
                                 .into(),
                             ),
                         },
-                        vec![],
                         start.span(end),
                     ))
                 } else {
@@ -81,7 +79,6 @@ impl<'db> Parser<'db> {
                         } else {
                             AstTypeExprDesc::Ref { mutable, pointee: Box::new(inner) }
                         },
-                        vec![],
                         start.span(end),
                     ))
                 }
@@ -102,7 +99,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstTypeExprDesc::Slice { ty: Box::new(ty), len },
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -114,7 +110,7 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let end = self.get_end();
 
-                Ok(AstTypeExpr::new(AstTypeExprDesc::Tuple(tys), vec![], start.span(end)))
+                Ok(AstTypeExpr::new(AstTypeExprDesc::Tuple(tys), start.span(end)))
             }
 
             TokenKind::Identifier(name) => {
@@ -128,10 +124,9 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstTypeExprDesc::NameResolved {
-                                from: Spanned { data: name, annotations: vec![], span },
+                                from: Spanned { data: name, span },
                                 to: Box::new(rhs),
                             },
-                            vec![],
                             start.span(end),
                         ))
                     }
@@ -144,10 +139,9 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstTypeExprDesc::Named {
-                                name: Spanned { data: name, annotations: vec![], span },
+                                name: Spanned { data: name, span },
                                 args,
                             },
-                            vec![],
                             start.span(end),
                         ))
                     }
@@ -156,10 +150,9 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstTypeExprDesc::Named {
-                                name: Spanned { data: name, annotations: vec![], span },
+                                name: Spanned { data: name, span },
                                 args: vec![],
                             },
-                            vec![],
                             start.span(end),
                         ))
                     }
@@ -180,12 +173,12 @@ impl<'db> Parser<'db> {
         {
             self.consume();
             let end = self.get_end();
-            return Ok(Spanned::new(AstAnyTypeExprDesc::Any, vec![], start.span(end)));
+            return Ok(Spanned::new(AstAnyTypeExprDesc::Any, start.span(end)));
         }
 
         let ty = self.parse_type_expr()?;
         let span = ty.span;
-        Ok(Spanned::new(AstAnyTypeExprDesc::Known(ty.data), vec![], span))
+        Ok(Spanned::new(AstAnyTypeExprDesc::Known(ty.data), span))
     }
 
     pub fn parse_any_type_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {

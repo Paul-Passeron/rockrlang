@@ -63,14 +63,12 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(AstAnyTopLevelItem::new(
                     AstAnyTopLevelItemDesc::Include(include_path),
-                    vec![],
                     start.span(end),
                 ))
             }
             _ => self.parse_toplevel_item().map(|item| {
                 AstAnyTopLevelItem::new(
                     AstAnyTopLevelItemDesc::Item(Box::new(item.data)),
-                    item.annotations,
                     item.span,
                 )
             }),
@@ -88,8 +86,10 @@ impl<'db> Parser<'db> {
         )
     }
 
-    pub fn parse_module(&mut self) -> Result<AstModule, ParseError> {
-        let annotations = self.annotations();
+    pub fn parse_module(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstModule, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Module)?;
         self.consume();
@@ -111,7 +111,6 @@ impl<'db> Parser<'db> {
                         err.clone().accumulate(self.db);
                         includes.push(AstIncludePath::new(
                             AstIncludePathDesc::Error,
-                            vec![],
                             start.span(self.get_end()),
                         ));
                     }
@@ -127,7 +126,6 @@ impl<'db> Parser<'db> {
                         err.clone().accumulate(self.db);
                         items.push(AstTopLevelItem::new(
                             AstTopLevelItemDesc::Error(err),
-                            vec![],
                             start.span(self.get_end()),
                         ));
                     }
@@ -138,8 +136,7 @@ impl<'db> Parser<'db> {
         self.consume();
         let end = self.get_end();
         Ok(AstModule::new(
-            AstModuleDesc { name, items, includes },
-            annotations,
+            AstModuleDesc { annotations, name, items, includes },
             start.span(end),
         ))
     }
@@ -270,37 +267,46 @@ impl<'db> Parser<'db> {
 
     fn parse_funsig(
         &mut self,
+        annotations: Vec<AstAnnotation>,
         can_be_variadic: bool,
     ) -> Result<(AstFunsig, bool), ParseError> {
-        let (sig, _, var) = self.parse_any_funsig(false, can_be_variadic)?;
+        let (sig, _, var) = self.parse_any_funsig(annotations, false, can_be_variadic)?;
         Ok((sig, var))
     }
 
-    fn parse_methodsig(&mut self) -> Result<AstMethodsig, ParseError> {
+    fn parse_methodsig(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstMethodsig, ParseError> {
         let (
             AstFunsig {
-                data: AstFunsigDesc { name, args, template_args, return_type },
-                annotations,
+                data: AstFunsigDesc { annotations, name, args, template_args, return_type },
                 span,
             },
             receiver,
             _,
-        ) = self.parse_any_funsig(true, false)?;
+        ) = self.parse_any_funsig(annotations, true, false)?;
         let receiver = receiver.unwrap();
         Ok(AstMethodsig::new(
-            AstMethodsigDesc { name, receiver, args, template_args, return_type },
-            annotations,
+            AstMethodsigDesc {
+                annotations,
+                name,
+                receiver,
+                args,
+                template_args,
+                return_type,
+            },
             span,
         ))
     }
 
     fn parse_any_funsig(
         &mut self,
+        annotations: Vec<AstAnnotation>,
         accept_receiver: bool,
         can_be_variadic: bool,
     ) -> Result<(AstFunsig, Option<AstReceiver>, bool), ParseError> {
         assert!(!(accept_receiver && can_be_variadic));
-        let annotations = self.annotations();
         let start = self.get_start();
         let name = self.parse_symbol()?;
 
@@ -359,8 +365,7 @@ impl<'db> Parser<'db> {
 
         Ok((
             AstFunsig::new(
-                AstFunsigDesc { name, args, template_args, return_type },
-                annotations,
+                AstFunsigDesc { annotations, name, args, template_args, return_type },
                 start.span(end),
             ),
             receiver,
@@ -368,15 +373,25 @@ impl<'db> Parser<'db> {
         ))
     }
 
-    fn parse_methoddef(&mut self) -> Result<AstMethodDef, ParseError> {
+    fn parse_methoddef(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstMethodDef, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Fun)?;
         self.consume();
         let AstMethodsig {
-            data: AstMethodsigDesc { name, receiver, args, template_args, return_type },
-            annotations,
+            data:
+                AstMethodsigDesc {
+                    annotations,
+                    name,
+                    receiver,
+                    args,
+                    template_args,
+                    return_type,
+                },
             ..
-        } = self.parse_methodsig()?;
+        } = self.parse_methodsig(annotations)?;
 
         let body_start = self.get_start();
         let body = self.parse_block()?;
@@ -385,6 +400,7 @@ impl<'db> Parser<'db> {
         let span = start.span(end);
         Ok(AstMethodDef::new(
             AstMethodDefDesc {
+                annotations,
                 name,
                 receiver,
                 args,
@@ -393,23 +409,25 @@ impl<'db> Parser<'db> {
                 body_span,
                 body,
             },
-            annotations,
             span,
         ))
     }
 
-    fn parse_fundef(&mut self) -> Result<AstFundef, ParseError> {
+    fn parse_fundef(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstFundef, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Fun)?;
         self.consume();
         let (
             AstFunsig {
-                data: AstFunsigDesc { name, args, template_args, return_type },
-                annotations,
+                data:
+                    AstFunsigDesc { annotations, name, args, template_args, return_type },
                 ..
             },
             _,
-        ) = self.parse_funsig(false)?;
+        ) = self.parse_funsig(annotations, false)?;
 
         let body_start = self.get_start();
         let body = self.parse_block()?;
@@ -417,8 +435,15 @@ impl<'db> Parser<'db> {
         let body_span = body_start.span(end);
         let span = start.span(end);
         Ok(AstFundef::new(
-            AstFundefDesc { name, args, template_args, return_type, body_span, body },
-            annotations,
+            AstFundefDesc {
+                annotations,
+                name,
+                args,
+                template_args,
+                return_type,
+                body_span,
+                body,
+            },
             span,
         ))
     }
@@ -454,20 +479,18 @@ impl<'db> Parser<'db> {
         Ok(AstAnnotation { items })
     }
 
-    pub fn collect_annotations(&mut self) -> Result<(), ParseError> {
-        assert!(self.annotations().is_empty());
+    pub fn parse_annotations(&mut self) -> Result<Vec<AstAnnotation>, ParseError> {
+        let mut annotations = vec![];
         while let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::AddressOf)
         {
-            let annotation = self.parse_annotation()?;
-            self.annotations.push(annotation)
+            annotations.push(self.parse_annotation()?);
         }
-        Ok(())
+        Ok(annotations)
     }
 
     fn parse_impl_item(&mut self) -> Result<AstImplItem, ParseError> {
-        self.collect_annotations()?;
-        let annotations = self.annotations();
+        let annotations = self.parse_annotations()?;
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
@@ -477,11 +500,10 @@ impl<'db> Parser<'db> {
                 let ty = self.parse_type_expr()?;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
-                Ok(AstImplItem::Type { name, name_span, ty })
+                Ok(AstImplItem::Type { annotations, name, name_span, ty })
             }
             TokenKind::Fun => {
-                let mut fdef = self.parse_methoddef()?;
-                fdef.annotations = annotations;
+                let fdef = self.parse_methoddef(annotations)?;
                 Ok(AstImplItem::Fundef(Box::new(fdef)))
             }
             found => Err(self.parse_error(ParseErrorKind::ExpectedToken {
@@ -509,7 +531,10 @@ impl<'db> Parser<'db> {
         )
     }
 
-    fn parse_impl_block(&mut self) -> Result<AstImplBlock, ParseError> {
+    fn parse_impl_block(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstImplBlock, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Impl)?;
         self.consume();
@@ -539,7 +564,7 @@ impl<'db> Parser<'db> {
 
         let span = start.span(self.get_end());
 
-        Ok(AstImplBlock { template_args, interface, implemented, items, span })
+        Ok(AstImplBlock { annotations, template_args, interface, implemented, items, span })
     }
 
     fn parse_struct_def_field(&mut self) -> Result<AstStructDefField, ParseError> {
@@ -593,7 +618,10 @@ impl<'db> Parser<'db> {
         })
     }
 
-    fn parse_enum_def(&mut self) -> Result<AstEnumDef, ParseError> {
+    fn parse_enum_def(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstEnumDef, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Enum)?;
         self.consume();
@@ -604,10 +632,19 @@ impl<'db> Parser<'db> {
         let variants = self.parse_enum_variants()?;
         self.expect(TokenKind::CloseBra)?;
         self.consume();
-        Ok(AstEnumDef { name, template_args, variants, span: start.span(self.get_end()) })
+        Ok(AstEnumDef {
+            annotations,
+            name,
+            template_args,
+            variants,
+            span: start.span(self.get_end()),
+        })
     }
 
-    fn parse_struct_def(&mut self) -> Result<AstStructDef, ParseError> {
+    fn parse_struct_def(
+        &mut self,
+        annotations: Vec<AstAnnotation>,
+    ) -> Result<AstStructDef, ParseError> {
         let start = self.get_start();
         self.expect(TokenKind::Struct)?;
         self.consume();
@@ -619,7 +656,13 @@ impl<'db> Parser<'db> {
         self.expect(TokenKind::CloseBra)?;
         self.consume();
 
-        Ok(AstStructDef { name, template_args, fields, span: start.span(self.get_end()) })
+        Ok(AstStructDef {
+            annotations,
+            name,
+            template_args,
+            fields,
+            span: start.span(self.get_end()),
+        })
     }
 
     fn parse_interface_item(&mut self) -> Result<AstInterfaceItem, ParseError> {
@@ -633,7 +676,7 @@ impl<'db> Parser<'db> {
             }
             TokenKind::Fun => {
                 self.consume();
-                let sig = self.parse_methodsig()?;
+                let sig = self.parse_methodsig(vec![])?;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
                 Ok(AstInterfaceItem::Sig(Arc::new(sig)))
@@ -651,73 +694,46 @@ impl<'db> Parser<'db> {
     }
 
     pub fn parse_toplevel_item(&mut self) -> Result<AstTopLevelItem, ParseError> {
-        self.collect_annotations()?;
-        let annotations = self.annotations();
+        let annotations = self.parse_annotations()?;
         let start = self.get_start();
         match &self.current_token()?.kind {
-            TokenKind::Module => match self.parse_module() {
+            TokenKind::Module => match self.parse_module(annotations) {
                 Ok(module) => {
                     let span = module.span;
-                    Ok(AstTopLevelItem::new(
-                        AstTopLevelItemDesc::Module(module),
-                        annotations,
-                        span,
-                    ))
+                    Ok(AstTopLevelItem::new(AstTopLevelItemDesc::Module(module), span))
                 }
                 Err(err) => {
                     err.clone().accumulate(self.db);
                     Ok(AstTopLevelItem::new(
                         AstTopLevelItemDesc::Error(err),
-                        annotations,
                         start.span(self.get_end()),
                     ))
                 }
             },
             TokenKind::Fun => {
-                let fdef = self.parse_fundef()?;
+                let fdef = self.parse_fundef(annotations)?;
                 let span = fdef.span;
-                Ok(AstTopLevelItem::new(
-                    AstTopLevelItemDesc::Fundef(fdef),
-                    annotations,
-                    span,
-                ))
+                Ok(AstTopLevelItem::new(AstTopLevelItemDesc::Fundef(fdef), span))
             }
             TokenKind::Impl => {
-                self.collect_annotations()?;
-                let annotations = self.annotations();
-                let start = self.get_start();
-                let impl_block = self.parse_impl_block()?;
-                let end = self.get_end();
-                Ok(AstTopLevelItem::new(
-                    AstTopLevelItemDesc::Impl(impl_block),
-                    annotations,
-                    start.span(end),
-                ))
+                let impl_block = self.parse_impl_block(annotations)?;
+                let span = impl_block.span;
+                Ok(AstTopLevelItem::new(AstTopLevelItemDesc::Impl(impl_block), span))
             }
             TokenKind::Struct => {
-                let start = self.get_start();
-                let struct_def = self.parse_struct_def()?;
-                let end = self.get_end();
-                let span = start.span(end);
+                let struct_def = self.parse_struct_def(annotations)?;
+                let span = struct_def.span;
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::StructDef(struct_def),
-                    annotations,
                     span,
                 ))
             }
             TokenKind::Enum => {
-                let start = self.get_start();
-                let enum_def = self.parse_enum_def()?;
-                let end = self.get_end();
-                let span = start.span(end);
-                Ok(AstTopLevelItem::new(
-                    AstTopLevelItemDesc::EnumDef(enum_def),
-                    annotations,
-                    span,
-                ))
+                let enum_def = self.parse_enum_def(annotations)?;
+                let span = enum_def.span;
+                Ok(AstTopLevelItem::new(AstTopLevelItemDesc::EnumDef(enum_def), span))
             }
             TokenKind::Interface => {
-                let start = self.get_start();
                 self.consume();
                 let name = self.parse_symbol()?;
                 let template_args = self.parse_optional_template_args()?;
@@ -747,28 +763,29 @@ impl<'db> Parser<'db> {
                 }
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
+                let span = start.span(self.get_end());
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Interface(AstInterface {
+                        annotations,
                         name,
                         supers,
                         template_args,
                         items,
-                        span: start.span(self.get_end()),
+                        span,
                     }),
-                    vec![],
-                    start.span(self.get_end()),
+                    span,
                 ))
             }
             TokenKind::Directive(s) if *s == Symbol::new(self.db, "extern") => {
-                let start = self.get_start();
                 self.consume();
                 self.expect(TokenKind::OpenBra)?;
                 self.consume();
-                self.collect_annotations()?;
+                let mut annotations = annotations;
+                annotations.extend(self.parse_annotations()?);
                 let fun_start = self.get_start();
                 self.expect(TokenKind::Fun)?;
                 self.consume();
-                let (mut funsig, variadic) = self.parse_funsig(true)?;
+                let (mut funsig, variadic) = self.parse_funsig(annotations, true)?;
                 funsig.span.start_offset = fun_start.offset;
                 self.expect(TokenKind::Semicolon)?;
                 self.consume();
@@ -777,7 +794,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::ExternDef(funsig, variadic),
-                    vec![],
                     start.span(end),
                 ))
             }

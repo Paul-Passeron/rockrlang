@@ -107,7 +107,6 @@ impl<'db> Parser<'db> {
                 let span = lhs.span.start().span(self.get_end());
                 lhs = Spanned::new(
                     AstExprDesc::Range { from: Box::new(lhs), to: Box::new(rhs) },
-                    vec![],
                     span,
                 );
                 continue;
@@ -125,7 +124,6 @@ impl<'db> Parser<'db> {
                     let span = lhs.span.start().span(self.get_end());
                     lhs = Spanned::new(
                         AstExprDesc::BinOp { lhs: Box::new(lhs), op, rhs: Box::new(rhs) },
-                        vec![],
                         span,
                     );
                 }
@@ -135,7 +133,6 @@ impl<'db> Parser<'db> {
                     let span = lhs.span.start().span(self.get_end());
                     lhs = Spanned::new(
                         AstExprDesc::As { expr: Box::new(lhs), ty },
-                        vec![],
                         span,
                     )
                 }
@@ -157,7 +154,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::Neg(Box::new(operand)),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -167,7 +163,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::Not(Box::new(operand)),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -186,7 +181,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::Ref(mutable, Box::new(operand)),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -196,7 +190,6 @@ impl<'db> Parser<'db> {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::PrefixDeref(Box::new(operand)),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -228,7 +221,6 @@ impl<'db> Parser<'db> {
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
                         AstExprDesc::AddressOf(Box::new(expr)),
-                        vec![],
                         span,
                     );
                 }
@@ -239,7 +231,6 @@ impl<'db> Parser<'db> {
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
                         AstExprDesc::PostfixDeref(Box::new(expr)),
-                        vec![],
                         span,
                     );
                 }
@@ -267,7 +258,6 @@ impl<'db> Parser<'db> {
                                     args,
                                     type_args,
                                 },
-                                vec![],
                                 span,
                             );
                         }
@@ -304,7 +294,6 @@ impl<'db> Parser<'db> {
                                 object: Box::new(expr),
                                 index: index as u32,
                             },
-                            vec![],
                             span,
                         );
                         continue;
@@ -331,7 +320,6 @@ impl<'db> Parser<'db> {
                                 args,
                                 type_args,
                             },
-                            vec![],
                             span,
                         );
                     } else {
@@ -342,7 +330,6 @@ impl<'db> Parser<'db> {
                                 object: Box::new(expr),
                                 field: field.data,
                             },
-                            vec![],
                             span,
                         );
                     }
@@ -360,7 +347,6 @@ impl<'db> Parser<'db> {
                             object: Box::new(expr),
                             index: Box::new(index),
                         },
-                        vec![],
                         span,
                     );
                 }
@@ -378,7 +364,6 @@ impl<'db> Parser<'db> {
                             args,
                             type_args: vec![],
                         },
-                        vec![],
                         span,
                     );
                 }
@@ -444,7 +429,6 @@ impl<'db> Parser<'db> {
                                 };
                                 let base_expr = AstExpr::new(
                                     AstExprDesc::Name(from.data),
-                                    vec![],
                                     expr.span,
                                 );
                                 (
@@ -458,7 +442,6 @@ impl<'db> Parser<'db> {
 
                         expr = AstExpr::new(
                             AstExprDesc::StructLit { ty, variant, fields },
-                            vec![],
                             span,
                         );
                     } else {
@@ -473,11 +456,11 @@ impl<'db> Parser<'db> {
     }
 
     fn reinterpret_expr_as_ty(&mut self, e: AstExpr) -> Result<AstTypeExpr, ParseError> {
-        let Spanned { data, annotations, span } = e;
+        let Spanned { data, span } = e;
 
         let data = match data {
             AstExprDesc::Name(symbol) => AstTypeExprDesc::Named {
-                name: Spanned { data: symbol, annotations: vec![], span },
+                name: Spanned { data: symbol, span },
                 args: vec![],
             },
             AstExprDesc::NameResolved { from, to } => {
@@ -487,7 +470,7 @@ impl<'db> Parser<'db> {
             _ => return Err(self.parse_error(ParseErrorKind::ExpectedTypeName)),
         };
 
-        Ok(Spanned::new(data, annotations, span))
+        Ok(Spanned::new(data, span))
     }
 
     pub(super) fn parse_int_lit(&mut self) -> Result<Spanned<usize>, ParseError> {
@@ -495,7 +478,7 @@ impl<'db> Parser<'db> {
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(v as usize, vec![], tok.location))
+                Ok(Spanned::new(v as usize, tok.location))
             }
             x => Err(self.parse_error(ParseErrorKind::ExpectedIntLit(x))),
         }
@@ -508,27 +491,27 @@ impl<'db> Parser<'db> {
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::IntLit(v), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::IntLit(v), tok.location))
             }
             TokenKind::CharLit(c) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::CharLit(c), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::CharLit(c), tok.location))
             }
             TokenKind::StrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::StrLit(s), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::StrLit(s), tok.location))
             }
             TokenKind::CStrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::CStrLit(s), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::CStrLit(s), tok.location))
             }
             TokenKind::True => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::BoolLit(true), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::BoolLit(true), tok.location))
             }
             TokenKind::False => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::BoolLit(false), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::BoolLit(false), tok.location))
             }
             TokenKind::OpenBra => {
                 self.consume();
@@ -539,7 +522,7 @@ impl<'db> Parser<'db> {
                 )?;
                 self.expect(TokenKind::CloseBra)?;
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), vec![], tok.location))
+                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), tok.location))
             }
             TokenKind::OpenPar => {
                 self.consume();
@@ -547,7 +530,7 @@ impl<'db> Parser<'db> {
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
-                Ok(Spanned::new(AstExprDesc::Tuple(exprs), vec![], start.span(end)))
+                Ok(Spanned::new(AstExprDesc::Tuple(exprs), start.span(end)))
             }
             TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
                 self.consume();
@@ -557,7 +540,7 @@ impl<'db> Parser<'db> {
                 self.expect(TokenKind::ClosePar)?;
                 self.consume();
                 let end = self.get_end();
-                Ok(AstExpr::new(AstExprDesc::SizeOf(ty), vec![], start.span(end)))
+                Ok(AstExpr::new(AstExprDesc::SizeOf(ty), start.span(end)))
             }
 
             TokenKind::Directive(dir) if dir == Symbol::new(self.db, "metadata") => {
@@ -575,7 +558,6 @@ impl<'db> Parser<'db> {
 
                 Ok(AstExpr::new(
                     AstExprDesc::Metadata(Box::new(expr)),
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -593,7 +575,7 @@ impl<'db> Parser<'db> {
 
                 let end = self.get_end();
 
-                Ok(AstExpr::new(AstExprDesc::TypeName(ty), vec![], start.span(end)))
+                Ok(AstExpr::new(AstExprDesc::TypeName(ty), start.span(end)))
             }
 
             TokenKind::Identifier(name) => {
@@ -608,10 +590,9 @@ impl<'db> Parser<'db> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstExprDesc::NameResolved {
-                                from: Spanned::new(name, vec![], tok.location),
+                                from: Spanned::new(name, tok.location),
                                 to: Box::new(rhs),
                             },
-                            vec![],
                             start.span(end),
                         ))
                     }
@@ -631,24 +612,21 @@ impl<'db> Parser<'db> {
                             AstTypeExprDesc::Named {
                                 name: Spanned {
                                     data: name,
-                                    annotations: vec![],
                                     span: tok.location,
                                 },
                                 args: vec![],
                             },
-                            vec![],
                             ty_span,
                         );
                         Ok(Spanned::new(
                             AstExprDesc::StructLit { ty, variant: None, fields },
-                            vec![],
                             start.span(end),
                         ))
                     }
 
                     _ => {
                         let end = self.get_end();
-                        Ok(Spanned::new(AstExprDesc::Name(name), vec![], start.span(end)))
+                        Ok(Spanned::new(AstExprDesc::Name(name), start.span(end)))
                     }
                 }
             }
@@ -689,7 +667,6 @@ impl<'db> Parser<'db> {
                 args,
                 type_args: vec![], // TODO
             },
-            vec![],
             start.span(end),
         ))
     }
@@ -734,7 +711,6 @@ impl<'db> Parser<'db> {
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::StructLit { ty, variant: Some(variant_sym.data), fields },
-                vec![],
                 start.span(end),
             ))
         } else if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::OpenPar)) {
@@ -750,14 +726,12 @@ impl<'db> Parser<'db> {
                     args,
                     type_args: vec![], // TODO
                 },
-                vec![],
                 start.span(end),
             ))
         } else {
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::QualifiedPath { ty, name: variant_sym.data },
-                vec![],
                 start.span(end),
             ))
         }
@@ -796,7 +770,6 @@ impl<'db> Parser<'db> {
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::StructLit { ty, variant: Some(name_sym.data), fields },
-                vec![],
                 start.span(end),
             ))
         } else {
@@ -827,14 +800,12 @@ impl<'db> Parser<'db> {
                         args,
                         type_args,
                     },
-                    vec![],
                     start.span(end),
                 ))
             } else {
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::QualifiedPath { ty, name: name_sym.data },
-                    vec![],
                     start.span(end),
                 ))
             }
@@ -860,7 +831,7 @@ impl<'db> Parser<'db> {
     ) -> Result<AstTypeExpr, ParseError> {
         match base.data {
             AstTypeExprDesc::Named { name, args: _ } => {
-                Ok(Spanned::new(AstTypeExprDesc::Named { name, args }, vec![], span))
+                Ok(Spanned::new(AstTypeExprDesc::Named { name, args }, span))
             }
             _ => Err(self.parse_error(ParseErrorKind::ExpectedTypeName)),
         }
