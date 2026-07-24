@@ -111,7 +111,7 @@ pub fn check_file_module<'db>(
     check_module(db, module.interned());
 }
 
-fn collect_module_functions<'db>(
+pub(crate) fn collect_module_functions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
 ) -> Vec<FunctionId> {
