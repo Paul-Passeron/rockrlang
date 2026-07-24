@@ -15,18 +15,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::collections::HashSet;
+
+use salsa::Accumulator;
+
 use crate::{
     Db,
+    compiler::diagnostic::Diag,
     mir::{
         MIR,
-        analysis::init_tracking::{IterOperand, MoveMap},
+        analysis::init_tracking::{
+            InitState, IterOperand, MoveKey, MoveMap, init_key, uninit_key,
+        },
         basic_block::{MIRTerminator, Stmt},
         operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
     },
 };
-
-// TODO: Track partial moves instead of moving the whole local when one of its
-// projection gets moved
 
 pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
     let init = mir.init_tracking(db);
@@ -34,14 +38,13 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
         let mut state = init.init_in[&blk].clone();
         for stmt in &infos.stmts {
             match stmt {
-                Stmt::Assign { dest: _dest, rvalue } => {
+                Stmt::Assign { dest, rvalue } => {
                     if let Some(place) = rvalue.inner_place() {
                         place.check(db, &mut state);
                     }
-                    rvalue.for_each_operand(|op| {
-                        op.check(db, &mut state);
-                    });
-                    todo!()
+                    rvalue.for_each_operand(|op| op.check(db, &mut state));
+                    dest.for_each_operand(|op| op.check(db, &mut state));
+                    init_key(&dest.as_move_key(), &mut state);
                 }
             }
         }
@@ -53,8 +56,9 @@ impl MIRTerminator {
     fn check(&self, db: &dyn Db, state: &mut MoveMap) {
         match self {
             MIRTerminator::Goto { .. } | MIRTerminator::Diverge => (),
-            MIRTerminator::Call { arguments, .. } => {
+            MIRTerminator::Call { arguments, dest, .. } => {
                 arguments.iter().for_each(|op| op.check(db, state));
+                init_key(&MoveKey { base: *dest, projections: vec![] }, state);
             }
             MIRTerminator::Return { value, .. } => {
                 value.iter().for_each(|op| op.check(db, state))
@@ -67,28 +71,48 @@ impl MIRTerminator {
 
 impl MIROperand {
     fn check(&self, db: &dyn Db, m: &mut MoveMap) {
-        if let MIROperand::Move(p) | MIROperand::Copy(p) = self {
-            p.check(db, m)
+        match self {
+            MIROperand::Move(p) => {
+                p.check(db, m);
+                uninit_key(&p.as_move_key(), m);
+            }
+            MIROperand::Copy(p) => {
+                p.check(db, m);
+            }
+            _ => (),
         }
-        todo!()
+    }
+}
+
+pub fn place_init_state(map: &MoveMap, place: &MIRPlace) -> InitState {
+    let as_key = place.as_move_key();
+    let kinds: HashSet<InitState> =
+        HashSet::from_iter(map.iter().filter_map(|(k, state)| {
+            (k == &as_key || as_key.is_strict_prefix(k)).then_some(*state)
+        }));
+    if kinds.is_empty() {
+        InitState::Init
+    } else if kinds.len() == 1 {
+        kinds.into_iter().next().unwrap()
+    } else {
+        InitState::Maybe
     }
 }
 
 impl MIRPlace {
-    fn check(&self, _db: &dyn Db, _m: &mut MoveMap) {
-        todo!()
-        // let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
-        // match state {
-        //     InitState::Init => (),
-        //     InitState::Maybe => {
-        //         Diag::generic_error("Use after move (maybe)".to_string(),
-        // self.span)             .accumulate(db)
-        //     }
-        //     InitState::Uninit => {
-        //         Diag::generic_error("Use after move".to_string(), self.span)
-        //             .accumulate(db);
-        //     }
-        // }
+    fn check(&self, db: &dyn Db, m: &mut MoveMap) {
+        let state = place_init_state(m, self);
+        match state {
+            InitState::Init => (),
+            InitState::Maybe => {
+                Diag::generic_error("Use after move (maybe)".to_string(), self.span)
+                    .accumulate(db)
+            }
+            InitState::Uninit => {
+                Diag::generic_error("Use after move".to_string(), self.span)
+                    .accumulate(db);
+            }
+        }
     }
 }
 

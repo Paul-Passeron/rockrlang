@@ -42,7 +42,7 @@ use super::lattice::Direction;
 
 pub struct MIRInitAnalysis;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum InitState {
     Init,
     Maybe,
@@ -73,8 +73,8 @@ pub enum TrackedProjection {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MoveKey {
-    base: LocalID,
-    projections: Vec<TrackedProjection>,
+    pub base: LocalID,
+    pub projections: Vec<TrackedProjection>,
 }
 
 impl MIRProjection {
@@ -91,19 +91,6 @@ impl MIRProjection {
             MIRProjection::Downcast { variant } => {
                 Some(TrackedProjection::Downcast(*variant))
             }
-        }
-    }
-}
-
-impl MIRPlace {
-    fn as_move_key(&self) -> MoveKey {
-        MoveKey {
-            base: self.local,
-            projections: self
-                .projections
-                .iter()
-                .map_while(MIRProjection::as_tracked_projection)
-                .collect(),
         }
     }
 }
@@ -125,6 +112,17 @@ impl MIROperand {
 }
 
 impl MIRPlace {
+    pub fn as_move_key(&self) -> MoveKey {
+        MoveKey {
+            base: self.local,
+            projections: self
+                .projections
+                .iter()
+                .map_while(MIRProjection::as_tracked_projection)
+                .collect(),
+        }
+    }
+
     fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
         self.for_all_operands_dyn(&mut f);
     }
@@ -214,13 +212,13 @@ impl MoveKey {
     }
 }
 
-fn init_key(key: &MoveKey, map: &mut MoveMap) {
+pub fn init_key(key: &MoveKey, map: &mut MoveMap) {
     map.iter_mut()
         .filter_map(|(k, state)| (k == key || key.is_strict_prefix(k)).then_some(state))
         .for_each(|state| *state = InitState::Init);
 }
 
-fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
+pub fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
     map.iter_mut()
         .filter_map(|(k, state)| (k == key || key.is_strict_prefix(k)).then_some(state))
         .for_each(|state| *state = InitState::Uninit);
@@ -229,18 +227,13 @@ fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
 impl MIRInitAnalysis {
     fn get_seed(&self, db: &dyn Db, mir: &MIR) -> BlockMap<MoveMap> {
         let move_keys = compute_move_key_set(db, mir);
-        let move_map = MoveMap::from_iter(
+        let mut entry = MoveMap::from_iter(
             move_keys.into_iter().map(|key| (key, InitState::bottom())),
         );
-        BlockMap::from_iter(mir.blocks.keys().map(|blk| {
-            let mut map = move_map.clone();
-            if blk == mir.entry {
-                mir.parameters.iter().copied().for_each(|idx| {
-                    init_key(&MoveKey { base: idx, projections: vec![] }, &mut map);
-                });
-            }
-            (blk, map)
-        }))
+        mir.parameters.iter().copied().for_each(|idx| {
+            init_key(&MoveKey { base: idx, projections: vec![] }, &mut entry);
+        });
+        BlockMap::from([(mir.entry, entry)])
     }
 
     fn granular_transfer(&self, mir: &MIR, blk: BlockID, map: &MoveMap) -> MoveMap {
