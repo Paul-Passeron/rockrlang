@@ -1,0 +1,46 @@
+struct Foo {
+    a: str;
+    b: str;
+}
+
+fun f(val: Foo): str {
+    let x = val.a;
+    return val.b;
+}
+
+
+fun g(val: Foo, cond: bool): str {
+    if cond {
+        let _ = val.b;
+    }
+    return val.b;
+}
+
+fun h(val: Foo): str {
+    let _ = val.b;
+    return val.b;
+}
+
+
+fun f_ref(val: Foo): str {
+    let x = &val.a;
+    return val.b;
+}
+
+
+fun g_ref(val: Foo, cond: bool): str {
+    if cond {
+        let _ = &val.b;
+    }
+    return val.b;
+}
+
+fun h_ref(val: Foo): str {
+    let _ = &val.b;
+    return val.b;
+}
+
+
+fun main(): int {
+    return 0;
+}
