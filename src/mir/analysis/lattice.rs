@@ -284,10 +284,7 @@ impl MIR {
 
     pub fn stmt_index_iter(&self) -> impl Iterator<Item = MIRStmtIndex> {
         self.blocks.keys().flat_map(|blk| {
-            (0..self.blocks[blk].stmts.len())
-                .into_iter()
-                .chain([0]) // Even empty blocks need the 0 index
-                .map(move |i| MIRStmtIndex(blk, i))
+            (0..=self.blocks[blk].stmts.len()).map(move |i| MIRStmtIndex(blk, i))
         })
     }
 
