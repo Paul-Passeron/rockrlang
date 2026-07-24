@@ -15,25 +15,34 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 use itertools::Itertools;
 
-use crate::mir::{
-    MIR,
-    analysis::{
-        MIRAnalysis,
-        lattice::{BlockMap, FixedPointBlockRes, Lattice, LocalMap},
-    },
-    basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
-    operand::{
-        MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind,
+use crate::{
+    Db,
+    common::symbols::Symbol,
+    mir::{
+        LocalID, MIR,
+        analysis::{
+            MIRAnalysis,
+            lattice::{BlockMap, FixedPointBlockRes, Lattice, LocalMap},
+        },
+        basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
+        operand::{
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
+            MIRRValueKind,
+        },
     },
 };
 
 use super::lattice::Direction;
 
 pub struct MIRInitAnalysis;
+pub struct MIRGranularInitAnalysis;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum InitState {
@@ -53,6 +62,162 @@ impl Lattice for InitState {
             (Self::Init, Self::Init) => Self::Init,
             _ => Self::Maybe,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TrackedProjection {
+    StructField(Symbol),
+    TupleField(u32),
+    Deref,
+    Downcast(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MoveKey {
+    base: LocalID,
+    projections: Vec<TrackedProjection>,
+}
+
+impl MIRProjection {
+    fn as_tracked_projection(&self) -> Option<TrackedProjection> {
+        match self {
+            MIRProjection::Deref => Some(TrackedProjection::Deref),
+            MIRProjection::Field { name, .. } => {
+                Some(TrackedProjection::StructField(*name))
+            }
+            MIRProjection::TupleField { index, .. } => {
+                Some(TrackedProjection::TupleField(*index))
+            }
+            MIRProjection::Index { .. } => None,
+            MIRProjection::Downcast { variant } => {
+                Some(TrackedProjection::Downcast(*variant))
+            }
+        }
+    }
+}
+
+impl MIRPlace {
+    fn as_move_key(&self) -> MoveKey {
+        MoveKey {
+            base: self.local,
+            projections: self
+                .projections
+                .iter()
+                .map_while(MIRProjection::as_tracked_projection)
+                .collect(),
+        }
+    }
+}
+
+impl MIROperand {
+    fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
+        fn aux(base: &MIROperand, f: &mut impl FnMut(&MIROperand)) {
+            f(base);
+            match base {
+                MIROperand::Constant(_, _) => (),
+                MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
+                    mirplace.for_all_operands(f)
+                }
+            }
+        }
+        aux(self, &mut f);
+    }
+}
+
+impl MIRPlace {
+    fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
+        self.projections.iter().for_each(|proj| match proj {
+            MIRProjection::Index { index } => index.for_all_operands(&mut f),
+            _ => (),
+        });
+    }
+}
+
+impl MIRRValue {
+    fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
+        self.for_each_operand(|op| op.for_all_operands(&mut f));
+    }
+}
+
+#[allow(unused)]
+fn compute_move_key_set(db: &dyn Db, mir: &MIR) -> HashSet<MoveKey> {
+    let mut set = HashSet::new();
+    mir.locals.keys().for_each(|idx| {
+        set.insert(MoveKey { base: idx, projections: vec![] });
+    });
+    mir.blocks.iter().flat_map(|(_, block_data)| block_data.stmts.iter()).for_each(
+        |stmt| match stmt {
+            Stmt::Assign { dest, rvalue } => {
+                set.insert(dest.as_move_key());
+                dest.for_all_operands(|op| match op {
+                    MIROperand::Copy(dest) | MIROperand::Move(dest) => {
+                        set.insert(dest.as_move_key());
+                    }
+                    _ => (),
+                });
+                rvalue.for_all_operands(|op| match op {
+                    MIROperand::Copy(dest) | MIROperand::Move(dest) => {
+                        set.insert(dest.as_move_key());
+                    }
+                    _ => (),
+                });
+            }
+        },
+    );
+    set
+}
+
+type MoveMap = HashMap<MoveKey, InitState>;
+type GranularFPRes = FixedPointBlockRes<MoveMap>;
+
+#[derive(PartialEq, Eq)]
+pub struct MIRGranularInitOut {
+    pub init_in: BlockMap<MoveMap>,
+    pub init_out: BlockMap<MoveMap>,
+}
+
+impl From<GranularFPRes> for MIRGranularInitOut {
+    fn from(value: GranularFPRes) -> Self {
+        Self { init_in: value.block_in, init_out: value.block_out }
+    }
+}
+
+impl MIRGranularInitAnalysis {
+    fn get_seed(&self, db: &dyn Db, mir: &MIR) -> BlockMap<MoveMap> {
+        let move_keys = compute_move_key_set(db, mir);
+        let move_map = MoveMap::from_iter(
+            move_keys.into_iter().map(|key| (key, InitState::bottom())),
+        );
+        BlockMap::from_iter(mir.blocks.keys().map(|blk| {
+            let mut map = move_map.clone();
+            if blk == mir.entry {
+                mir.parameters.iter().copied().for_each(|idx| {
+                    map.insert(
+                        MoveKey { base: idx, projections: vec![] },
+                        InitState::Init,
+                    );
+                });
+            }
+            (blk, map)
+        }))
+    }
+}
+
+impl MIRAnalysis<'_, '_> for MIRGranularInitAnalysis {
+    type Out = MIRGranularInitOut;
+
+    fn run(&self, db: &'_ dyn Db, mir: &'_ MIR) -> Self::Out {
+        mir.fixed_point_iter(
+            Direction::Forward,
+            |blk, old_in| {
+                // Implement the transfer function
+                todo!()
+            },
+            Some(self.get_seed(db, mir)),
+            None,
+        )
+        .into()
     }
 }
 
