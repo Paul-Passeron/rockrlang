@@ -237,7 +237,7 @@ impl MIR {
         let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.blocks.keys());
 
         while let Some(blk) = worklist.pop_last() {
-            let (new_in, new_out) = match direction {
+            let propagate = match direction {
                 Direction::Forward => {
                     let from_preds = preds
                         .get(&blk)
@@ -248,8 +248,9 @@ impl MIR {
                         Some(seed) => from_preds.join(seed),
                         None => from_preds,
                     };
-                    let new_out = transfer(blk, &new_in);
-                    (new_in, new_out)
+                    block_in.get_mut(&blk).unwrap().join_assign(&new_in);
+                    let new_out = transfer(blk, &block_in[&blk]);
+                    block_out.get_mut(&blk).unwrap().join_assign(&new_out)
                 }
                 Direction::Backward => {
                     let from_succs = succs
@@ -261,17 +262,13 @@ impl MIR {
                         Some(seed) => from_succs.join(seed),
                         None => from_succs,
                     };
-                    let new_in = transfer(blk, &new_out);
-                    (new_in, new_out)
+                    block_out.get_mut(&blk).unwrap().join_assign(&new_out);
+                    let new_in = transfer(blk, &block_out[&blk]);
+                    block_in.get_mut(&blk).unwrap().join_assign(&new_in)
                 }
             };
 
-            let changed = block_in[&blk] != new_in || block_out[&blk] != new_out;
-
-            block_in.insert(blk, new_in);
-            block_out.insert(blk, new_out);
-
-            if changed {
+            if propagate.change() {
                 match direction {
                     Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
                     Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
@@ -345,7 +342,7 @@ impl MIR {
         let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.stmt_index_iter());
 
         while let Some(blk) = worklist.pop_last() {
-            let (new_in, new_out) = match direction {
+            let propagate = match direction {
                 Direction::Forward => {
                     let from_preds = preds
                         .get(&blk)
@@ -356,8 +353,9 @@ impl MIR {
                         Some(seed) => from_preds.join(seed),
                         None => from_preds,
                     };
-                    let new_out = transfer(blk, &new_in);
-                    (new_in, new_out)
+                    stmt_in.get_mut(&blk).unwrap().join_assign(&new_in);
+                    let new_out = transfer(blk, &stmt_in[&blk]);
+                    stmt_out.get_mut(&blk).unwrap().join_assign(&new_out)
                 }
                 Direction::Backward => {
                     let from_succs = succs
@@ -369,17 +367,13 @@ impl MIR {
                         Some(seed) => from_succs.join(seed),
                         None => from_succs,
                     };
-                    let new_in = transfer(blk, &new_out);
-                    (new_in, new_out)
+                    stmt_out.get_mut(&blk).unwrap().join_assign(&new_out);
+                    let new_in = transfer(blk, &stmt_out[&blk]);
+                    stmt_in.get_mut(&blk).unwrap().join_assign(&new_in)
                 }
             };
 
-            let changed = stmt_in[&blk] != new_in || stmt_out[&blk] != new_out;
-
-            stmt_in.insert(blk, new_in);
-            stmt_out.insert(blk, new_out);
-
-            if changed {
+            if propagate.change() {
                 match direction {
                     Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
                     Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
