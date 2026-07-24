@@ -15,20 +15,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
 use crate::{
     Db,
-    common::symbols::{InternedSymbol, Symbol},
+    common::{
+        location::Span,
+        symbols::{InternedSymbol, Symbol},
+    },
     compiler::{Workspace, workspace_packages},
-    hir::impl_items,
+    hir::{
+        impl_items, interface_items,
+        signature::{ZelfArg, get_sig_of_function},
+    },
     name_resolve::implems::impls_in_package,
-    parse_tree::top_level::AstImplItem,
+    parse_tree::top_level::{AstImplItem, AstInterfaceItem},
     resolved::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
-        InternedTypeId, ScopeOwnerId, TypeId, TypeRef,
+        InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
     },
 };
 
@@ -286,8 +292,8 @@ fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
             type_id.def(db),
             type_id.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
         )),
-        TypeRef::Param(id) => subs[id.0],
-        TypeRef::Associated(_) => todo!(),
+        TypeRef::Param(id) => subs.get(id.0).copied().unwrap_or(TypeRef::Error),
+        TypeRef::Associated(_) => ty,
         TypeRef::Zelf => zelf,
         TypeRef::Error => TypeRef::Error,
         TypeRef::Unknown => TypeRef::Unknown,
@@ -305,4 +311,206 @@ fn iref_sub(
         iref.def(db),
         iref.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
     )
+}
+
+#[derive(Clone)]
+pub enum ConformanceError {
+    MissingMethod(Symbol),
+    MissingAssocType(Symbol),
+    ExtraMethod {
+        name: Symbol,
+        span: Span,
+    },
+    ExtraAssocType {
+        name: Symbol,
+        span: Span,
+    },
+    ReceiverMismatch {
+        method: Symbol,
+        span: Span,
+        expected: Option<ZelfArg>,
+        found: Option<ZelfArg>,
+    },
+    ArityMismatch {
+        method: Symbol,
+        span: Span,
+        expected: usize,
+        found: usize,
+    },
+    GenericArityMismatch {
+        method: Symbol,
+        span: Span,
+        expected: usize,
+        found: usize,
+    },
+    ParamTypeMismatch {
+        method: Symbol,
+        span: Span,
+        param: Symbol,
+        expected: TypeRef,
+        found: TypeRef,
+    },
+    ReturnTypeMismatch {
+        method: Symbol,
+        span: Span,
+        expected: TypeRef,
+        found: TypeRef,
+    },
+}
+
+pub fn interface_conformance_errors(
+    db: &dyn Db,
+    impl_id: ImplId,
+) -> Vec<ConformanceError> {
+    let mut errors = Vec::new();
+    let Some(iref) = impl_id.interface(db) else {
+        return errors;
+    };
+    let interface_id = iref.def(db);
+
+    let mut required_methods: HashSet<Symbol> = HashSet::new();
+    let mut required_types: HashSet<Symbol> = HashSet::new();
+    for item in interface_items(db, interface_id.interned()).iter() {
+        match item {
+            AstInterfaceItem::Sig(sig) => {
+                required_methods.insert(sig.data.name.data);
+            }
+            AstInterfaceItem::Type(arg) => {
+                required_types.insert(arg.name);
+            }
+        }
+    }
+
+    let mut provided_methods: HashMap<Symbol, Span> = HashMap::new();
+    let mut provided_types: HashMap<Symbol, Span> = HashMap::new();
+    for item in impl_items(db, impl_id.interned()) {
+        match item {
+            AstImplItem::Fundef(fdef) => {
+                provided_methods
+                    .entry(fdef.data.name.data)
+                    .or_insert(fdef.data.name.span);
+            }
+            AstImplItem::Type { name, name_span, .. } => {
+                provided_types.entry(*name).or_insert(*name_span);
+            }
+        }
+    }
+
+    for &name in &required_methods {
+        match provided_methods.get(&name) {
+            None => errors.push(ConformanceError::MissingMethod(name)),
+            Some(&span) => {
+                check_method_signature(db, impl_id, iref, name, span, &mut errors)
+            }
+        }
+    }
+    for &name in &required_types {
+        if !provided_types.contains_key(&name) {
+            errors.push(ConformanceError::MissingAssocType(name));
+        }
+    }
+
+    for (&name, &span) in &provided_methods {
+        if !required_methods.contains(&name) {
+            errors.push(ConformanceError::ExtraMethod { name, span });
+        }
+    }
+    for (&name, &span) in &provided_types {
+        if !required_types.contains(&name) {
+            errors.push(ConformanceError::ExtraAssocType { name, span });
+        }
+    }
+
+    errors
+}
+
+fn check_method_signature(
+    db: &dyn Db,
+    impl_id: ImplId,
+    iref: InterfaceRef,
+    method: Symbol,
+    span: Span,
+    errors: &mut Vec<ConformanceError>,
+) {
+    let iface_fn = FunctionId::new(db, method, ScopeOwnerId::Interface(iref));
+    let impl_fn = FunctionId::new(db, method, ScopeOwnerId::Impl(impl_id));
+    let iface_sig = get_sig_of_function(db, iface_fn.interned());
+    let impl_sig = get_sig_of_function(db, impl_fn.interned());
+
+    if iface_sig.zelf != impl_sig.zelf {
+        errors.push(ConformanceError::ReceiverMismatch {
+            method,
+            span,
+            expected: iface_sig.zelf,
+            found: impl_sig.zelf,
+        });
+    }
+
+    if iface_sig.args.len() != impl_sig.args.len() {
+        errors.push(ConformanceError::ArityMismatch {
+            method,
+            span,
+            expected: iface_sig.args.len(),
+            found: impl_sig.args.len(),
+        });
+        return;
+    }
+
+    if iface_sig.added_templates.len() != impl_sig.added_templates.len() {
+        errors.push(ConformanceError::GenericArityMismatch {
+            method,
+            span,
+            expected: iface_sig.added_templates.len(),
+            found: impl_sig.added_templates.len(),
+        });
+        return;
+    }
+
+    let mut subs = iref.args(db).to_vec();
+    let impl_template_count = impl_id.templates(db).len();
+    for k in 0..iface_sig.added_templates.len() {
+        subs.push(TypeRef::Param(TypeParamId(impl_template_count + k)));
+    }
+    let implemented = impl_id.implemented(db);
+
+    for ((_, iface_ty), (param, impl_ty)) in
+        iface_sig.args.iter().zip(impl_sig.args.iter())
+    {
+        let expected = sub(db, *iface_ty, &subs, implemented);
+        if is_comparable(db, expected)
+            && is_comparable(db, *impl_ty)
+            && expected != *impl_ty
+        {
+            errors.push(ConformanceError::ParamTypeMismatch {
+                method,
+                span,
+                param: *param,
+                expected,
+                found: *impl_ty,
+            });
+        }
+    }
+
+    let expected_ret = sub(db, iface_sig.ret, &subs, implemented);
+    if is_comparable(db, expected_ret)
+        && is_comparable(db, impl_sig.ret)
+        && expected_ret != impl_sig.ret
+    {
+        errors.push(ConformanceError::ReturnTypeMismatch {
+            method,
+            span,
+            expected: expected_ret,
+            found: impl_sig.ret,
+        });
+    }
+}
+
+fn is_comparable(db: &dyn Db, ty: TypeRef) -> bool {
+    match ty {
+        TypeRef::Concrete(id) => id.args(db).iter().all(|t| is_comparable(db, *t)),
+        TypeRef::Param(_) => true,
+        TypeRef::Associated(_) | TypeRef::Zelf | TypeRef::Error | TypeRef::Unknown => {
+            false
+        }
+    }
 }
