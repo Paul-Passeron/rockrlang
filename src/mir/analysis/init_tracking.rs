@@ -20,8 +20,6 @@ use std::{
     fmt,
 };
 
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -29,23 +27,20 @@ use crate::{
         BlockID, LocalID, MIR,
         analysis::{
             MIRAnalysis,
-            lattice::{BlockMap, FixedPointBlockRes, Lattice, LocalMap},
-            loans::MIRStmtIndex,
+            lattice::{BlockMap, FixedPointBlockRes, Lattice},
         },
-        basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
+        basic_block::{MIRTerminator, Stmt},
         operand::{
             MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
             MIRRValueKind,
         },
     },
-    parse_tree::expr::BinaryOperator::Eq,
     resolved::TypeRef,
 };
 
 use super::lattice::Direction;
 
 pub struct MIRInitAnalysis;
-pub struct MIRGranularInitAnalysis;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum InitState {
@@ -115,72 +110,93 @@ impl MIRPlace {
 
 impl MIROperand {
     fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
-        fn aux(base: &MIROperand, f: &mut impl FnMut(&MIROperand)) {
-            f(base);
-            match base {
-                MIROperand::Constant(_, _) => (),
-                MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
-                    mirplace.for_all_operands(f)
-                }
+        self.for_all_operands_dyn(&mut f);
+    }
+
+    fn for_all_operands_dyn(&self, f: &mut dyn FnMut(&MIROperand)) {
+        f(self);
+        match self {
+            MIROperand::Constant(_, _) => (),
+            MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
+                mirplace.for_all_operands_dyn(f)
             }
         }
-        aux(self, &mut f);
     }
 }
 
 impl MIRPlace {
     fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
-        self.projections.iter().for_each(|proj| match proj {
-            MIRProjection::Index { index } => index.for_all_operands(&mut f),
-            _ => (),
+        self.for_all_operands_dyn(&mut f);
+    }
+
+    fn for_all_operands_dyn(&self, f: &mut dyn FnMut(&MIROperand)) {
+        self.projections.iter().for_each(|proj| {
+            if let MIRProjection::Index { index } = proj {
+                index.for_all_operands_dyn(f);
+            }
         });
     }
 }
 
 impl MIRRValue {
     fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
-        self.for_each_operand(|op| op.for_all_operands(&mut f));
+        self.for_each_operand(|op| op.for_all_operands_dyn(&mut f));
     }
 }
 
-#[allow(unused)]
+fn collect_leaves(
+    db: &dyn Db,
+    base: LocalID,
+    prefix: &mut Vec<TrackedProjection>,
+    ty: TypeRef,
+    out: &mut HashSet<MoveKey>,
+) {
+    if let Some(sr) = ty.as_struct_ref(db) {
+        let fields = sr.def.field_names(db);
+        if fields.is_empty() {
+            out.insert(MoveKey { base, projections: prefix.clone() });
+            return;
+        }
+        for name in fields.iter() {
+            let fty = sr.typeof_field(db, *name).unwrap_or(TypeRef::Unknown);
+            prefix.push(TrackedProjection::StructField(*name));
+            collect_leaves(db, base, prefix, fty, out);
+            prefix.pop();
+        }
+    } else if let Some(elems) = ty.as_tuple_ref(db) {
+        if elems.is_empty() {
+            out.insert(MoveKey { base, projections: prefix.clone() });
+            return;
+        }
+        for (i, ety) in elems.iter().enumerate() {
+            prefix.push(TrackedProjection::TupleField(i as u32));
+            collect_leaves(db, base, prefix, *ety, out);
+            prefix.pop();
+        }
+    } else {
+        out.insert(MoveKey { base, projections: prefix.clone() });
+    }
+}
+
 fn compute_move_key_set(db: &dyn Db, mir: &MIR) -> HashSet<MoveKey> {
     let mut set = HashSet::new();
-    mir.locals.keys().for_each(|idx| {
-        set.insert(MoveKey { base: idx, projections: vec![] });
-    });
-    mir.blocks.iter().flat_map(|(_, block_data)| block_data.stmts.iter()).for_each(
-        |stmt| match stmt {
-            Stmt::Assign { dest, rvalue } => {
-                set.insert(dest.as_move_key());
-                dest.for_all_operands(|op| match op {
-                    MIROperand::Copy(dest) | MIROperand::Move(dest) => {
-                        set.insert(dest.as_move_key());
-                    }
-                    _ => (),
-                });
-                rvalue.for_all_operands(|op| match op {
-                    MIROperand::Copy(dest) | MIROperand::Move(dest) => {
-                        set.insert(dest.as_move_key());
-                    }
-                    _ => (),
-                });
-            }
-        },
-    );
+    for local in mir.locals.keys() {
+        let ty = mir.locals[local].ty;
+        collect_leaves(db, local, &mut Vec::new(), ty, &mut set);
+    }
     set
 }
 
-type MoveMap = HashMap<MoveKey, InitState>;
+pub type MoveMap = HashMap<MoveKey, InitState>;
 type GranularFPRes = FixedPointBlockRes<MoveMap>;
 
 #[derive(PartialEq, Eq)]
-pub struct MIRGranularInitOut {
+pub struct MIRInitOut {
     pub init_in: BlockMap<MoveMap>,
     pub init_out: BlockMap<MoveMap>,
 }
 
-impl From<GranularFPRes> for MIRGranularInitOut {
+impl From<GranularFPRes> for MIRInitOut {
     fn from(value: GranularFPRes) -> Self {
         Self { init_in: value.block_in, init_out: value.block_out }
     }
@@ -204,7 +220,13 @@ fn init_key(key: &MoveKey, map: &mut MoveMap) {
         .for_each(|state| *state = InitState::Init);
 }
 
-impl MIRGranularInitAnalysis {
+fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
+    map.iter_mut()
+        .filter_map(|(k, state)| (k == key || key.is_strict_prefix(k)).then_some(state))
+        .for_each(|state| *state = InitState::Uninit);
+}
+
+impl MIRInitAnalysis {
     fn get_seed(&self, db: &dyn Db, mir: &MIR) -> BlockMap<MoveMap> {
         let move_keys = compute_move_key_set(db, mir);
         let move_map = MoveMap::from_iter(
@@ -221,43 +243,30 @@ impl MIRGranularInitAnalysis {
         }))
     }
 
-    fn do_init(place: &MIRPlace, map: &mut MoveMap) {
-        let d = place.as_move_key();
-        init_key(&d, map);
-        map.iter_mut().filter(|(k, _)| k.is_strict_prefix(&d)).for_each(|(_, state)| {
-            if *state == InitState::Uninit {
-                *state = InitState::Maybe
-            }
-        });
-    }
-
-    fn do_move(place: &MIRPlace, map: &mut MoveMap) {
-        let d = place.as_move_key();
-        map.iter_mut()
-            .filter(|(k, _)| *k == &d || d.is_strict_prefix(k))
-            .for_each(|(_, state)| *state = InitState::Uninit);
-        map.iter_mut().filter(|(k, _)| k.is_strict_prefix(&d)).for_each(|(_, state)| {
-            if *state == InitState::Init {
-                *state = InitState::Maybe
-            }
-        });
-    }
-
     fn granular_transfer(&self, mir: &MIR, blk: BlockID, map: &MoveMap) -> MoveMap {
         let mut res = map.clone();
         let data = &mir.blocks[blk];
         for Stmt::Assign { dest, rvalue } in &data.stmts {
             dest.for_all_operands(|op| {
                 if let MIROperand::Move(p) = op {
-                    Self::do_move(p, &mut res);
+                    {
+                        let map: &mut MoveMap = &mut res;
+                        uninit_key(&p.as_move_key(), map);
+                    };
                 }
             });
             rvalue.for_all_operands(|op| {
                 if let MIROperand::Move(p) = op {
-                    Self::do_move(p, &mut res);
+                    {
+                        let map: &mut MoveMap = &mut res;
+                        uninit_key(&p.as_move_key(), map);
+                    };
                 }
             });
-            Self::do_init(dest, &mut res);
+            {
+                let map: &mut MoveMap = &mut res;
+                init_key(&dest.as_move_key(), map);
+            };
         }
         match &data.terminator {
             MIRTerminator::Return { value: None, .. }
@@ -267,26 +276,33 @@ impl MIRGranularInitAnalysis {
                 arguments.iter().for_each(|op| {
                     op.for_all_operands(|value| {
                         if let MIROperand::Move(p) = value {
-                            Self::do_move(p, &mut res);
+                            {
+                                let map: &mut MoveMap = &mut res;
+                                uninit_key(&p.as_move_key(), map);
+                            };
                         }
                     })
                 });
-                Self::do_init(
-                    &MIRPlace {
+                {
+                    let place: &MIRPlace = &MIRPlace {
                         local: *dest,
                         projections: vec![],
                         ty: TypeRef::Unknown,
                         span: mir.locals[*dest].span,
-                    },
-                    &mut res,
-                );
+                    };
+                    let map: &mut MoveMap = &mut res;
+                    init_key(&place.as_move_key(), map);
+                };
             }
             MIRTerminator::Branch { cond: value, .. }
             | MIRTerminator::Switch { discriminant: value, .. }
             | MIRTerminator::Return { value: Some(value), .. } => {
                 value.for_all_operands(|value| {
                     if let MIROperand::Move(p) = value {
-                        Self::do_move(p, &mut res);
+                        {
+                            let map: &mut MoveMap = &mut res;
+                            uninit_key(&p.as_move_key(), map);
+                        };
                     }
                 });
             }
@@ -295,8 +311,8 @@ impl MIRGranularInitAnalysis {
     }
 }
 
-impl MIRAnalysis<'_, '_> for MIRGranularInitAnalysis {
-    type Out = MIRGranularInitOut;
+impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
+    type Out = MIRInitOut;
 
     fn run(&self, db: &'_ dyn Db, mir: &'_ MIR) -> Self::Out {
         mir.fixed_point_iter(
@@ -306,79 +322,6 @@ impl MIRAnalysis<'_, '_> for MIRGranularInitAnalysis {
             None,
         )
         .into()
-    }
-}
-
-type FPRes = FixedPointBlockRes<LocalMap<InitState>>;
-
-#[derive(PartialEq, Eq)]
-pub struct MIRInitOut {
-    pub init_in: BlockMap<LocalMap<InitState>>,
-    pub init_out: BlockMap<LocalMap<InitState>>,
-}
-
-impl From<FPRes> for MIRInitOut {
-    fn from(value: FPRes) -> Self {
-        Self { init_in: value.block_in, init_out: value.block_out }
-    }
-}
-
-impl MIRInitAnalysis {
-    fn get_seed(&self, mir: &MIR) -> BlockMap<LocalMap<InitState>> {
-        BlockMap::from([(
-            mir.entry,
-            LocalMap::from_iter(mir.parameters.iter().map(|loc| (*loc, InitState::Init))),
-        )])
-    }
-}
-
-impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
-    type Out = MIRInitOut;
-
-    fn run(&self, _: &dyn crate::Db, mir: &MIR) -> Self::Out {
-        mir.fixed_point_iter(
-            Direction::Forward,
-            |blk, old_in| {
-                // We are computing new out
-                mir.blocks[blk].init_states(old_in)
-            },
-            Some(self.get_seed(mir)),
-            None,
-        )
-        .into()
-    }
-}
-
-impl MIRBasicBlock {
-    pub fn init_states(&self, state: &LocalMap<InitState>) -> LocalMap<InitState> {
-        let mut res = state.clone();
-        for stmt in &self.stmts {
-            match stmt {
-                Stmt::Assign { dest, rvalue } => {
-                    rvalue.for_each_operand(|op| op.apply(&mut res));
-                    res.insert(dest.local, InitState::Init);
-                }
-            }
-        }
-        self.terminator.init_states(&mut res);
-        res
-    }
-}
-
-impl MIRTerminator {
-    pub fn init_states(&self, state: &mut LocalMap<InitState>) {
-        match self {
-            MIRTerminator::Call { arguments, dest, .. } => {
-                arguments.iter().for_each(|op| op.apply(state));
-                state.insert(*dest, InitState::Init);
-            }
-            MIRTerminator::Return { value, .. } => {
-                value.iter().for_each(|op| op.apply(state))
-            }
-            MIRTerminator::Branch { cond: op, .. }
-            | MIRTerminator::Switch { discriminant: op, .. } => op.apply(state),
-            _ => (),
-        }
     }
 }
 
@@ -430,42 +373,6 @@ impl IterOperand for MIRPlace {
             | MIRProjection::Deref => None,
             MIRProjection::Index { index } => Some(index),
         })
-    }
-}
-
-impl MIROperand {
-    pub fn apply(&self, state: &mut LocalMap<InitState>) {
-        if let MIROperand::Move(p) = self {
-            state.insert(p.local, InitState::Uninit);
-        }
-    }
-}
-
-impl fmt::Display for MIRInitOut {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "init-in:")?;
-        for (bb, init) in self.init_in.iter() {
-            writeln!(
-                f,
-                "    bb{}: {{{}}}",
-                bb.raw(),
-                init.iter()
-                    .map(|(local, init)| format!("_{}: {init}", local.raw(),))
-                    .join(", ")
-            )?;
-        }
-        writeln!(f, "init-out:")?;
-        for (bb, init) in self.init_out.iter() {
-            writeln!(
-                f,
-                "    bb{}: {{{}}}",
-                bb.raw(),
-                init.iter()
-                    .map(|(local, init)| format!("_{}: {init}", local.raw(),))
-                    .join(", ")
-            )?;
-        }
-        Ok(())
     }
 }
 

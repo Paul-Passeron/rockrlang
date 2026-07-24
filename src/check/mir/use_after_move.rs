@@ -15,17 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
-    compiler::diagnostic::Diag,
     mir::{
         MIR,
-        analysis::{
-            init_tracking::{InitState, IterOperand},
-            lattice::LocalMap,
-        },
+        analysis::init_tracking::{IterOperand, MoveMap},
         basic_block::{MIRTerminator, Stmt},
         operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
     },
@@ -40,14 +34,14 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
         let mut state = init.init_in[&blk].clone();
         for stmt in &infos.stmts {
             match stmt {
-                Stmt::Assign { dest, rvalue } => {
+                Stmt::Assign { dest: _dest, rvalue } => {
                     if let Some(place) = rvalue.inner_place() {
                         place.check(db, &mut state);
                     }
                     rvalue.for_each_operand(|op| {
                         op.check(db, &mut state);
                     });
-                    state.insert(dest.local, InitState::Init);
+                    todo!()
                 }
             }
         }
@@ -56,7 +50,7 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
 }
 
 impl MIRTerminator {
-    fn check(&self, db: &dyn Db, state: &mut LocalMap<InitState>) {
+    fn check(&self, db: &dyn Db, state: &mut MoveMap) {
         match self {
             MIRTerminator::Goto { .. } | MIRTerminator::Diverge => (),
             MIRTerminator::Call { arguments, .. } => {
@@ -72,28 +66,29 @@ impl MIRTerminator {
 }
 
 impl MIROperand {
-    fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
+    fn check(&self, db: &dyn Db, m: &mut MoveMap) {
         if let MIROperand::Move(p) | MIROperand::Copy(p) = self {
             p.check(db, m)
         }
-        self.apply(m);
+        todo!()
     }
 }
 
 impl MIRPlace {
-    fn check(&self, db: &dyn Db, m: &mut LocalMap<InitState>) {
-        let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
-        match state {
-            InitState::Init => (),
-            InitState::Maybe => {
-                Diag::generic_error("Use after move (maybe)".to_string(), self.span)
-                    .accumulate(db)
-            }
-            InitState::Uninit => {
-                Diag::generic_error("Use after move".to_string(), self.span)
-                    .accumulate(db);
-            }
-        }
+    fn check(&self, _db: &dyn Db, _m: &mut MoveMap) {
+        todo!()
+        // let state = m.get(&self.local).copied().unwrap_or(InitState::Uninit);
+        // match state {
+        //     InitState::Init => (),
+        //     InitState::Maybe => {
+        //         Diag::generic_error("Use after move (maybe)".to_string(),
+        // self.span)             .accumulate(db)
+        //     }
+        //     InitState::Uninit => {
+        //         Diag::generic_error("Use after move".to_string(), self.span)
+        //             .accumulate(db);
+        //     }
+        // }
     }
 }
 
