@@ -47,13 +47,20 @@ fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     block.stmts.iter().enumerate().for_each(|(i, stmt)| {
         check_stmt(db, blk, stmt, i, loans, &live_in_per_stmt[i], &mut state)
     });
+    let term_live = &live_in_per_stmt[block.stmts.len()];
+    state.retain(|loan_id| term_live.contains(&loans.loans[*loan_id].holder));
     check_terminator(db, &block.terminator, loans, &state);
 }
 
 fn live_in_per_stmt(db: &dyn Db, mir: &MIR, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
-    let seed = mir.liveness(db).live_out[&blk].clone();
+    let block = &mir.blocks[blk];
+    let mut seed = mir.liveness(db).live_out[&blk].clone();
+    for def in block.terminator.defs() {
+        seed.remove(&def);
+    }
+    seed.extend(block.terminator.uses());
     let mut res = vec![seed];
-    for stmt in mir.blocks[blk].stmts.iter().rev() {
+    for stmt in block.stmts.iter().rev() {
         let mut current = res.last().unwrap().clone();
         let Stmt::Assign { dest, rvalue } = stmt;
         current.remove(&dest.local);
