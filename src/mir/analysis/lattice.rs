@@ -185,7 +185,7 @@ where
                 change.join_assign(&changed);
             } else {
                 self.insert(key.clone(), other_value.clone());
-                if other_value == &M::Value::bottom() {
+                if other_value != &M::Value::bottom() {
                     change = LatticeChange::Changed;
                 }
             }
