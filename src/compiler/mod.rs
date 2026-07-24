@@ -17,13 +17,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    check::{check, reachable_frefs},
+    check::{
+        check, collect_module_functions, fundef::reachable_mir_instances, reachable_frefs,
+    },
     codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     common::location::LocationInfo,
     compiler::diagnostic::{Diag, Severity},
     mir::passes::dead_code_elimination::dce,
+    name_resolve::file_module_id,
     printer::render_diagnostics,
-    thir::thir_body,
+    resolved::{FunctionId, TypeRef},
+    thir::{ExprKind, thir_body},
+    thir_to_mir::{MIRKey, mir},
 };
 use inkwell::{
     OptimizationLevel,
@@ -93,32 +98,9 @@ pub fn build<'db, 'ctx>(
         .unique()
         .collect_vec();
 
-    if db.config().display_thir {
-        let fids = frefs.iter().map(|fref| fref.fdef(db)).collect::<HashSet<_>>();
-        let mut fids = fids.into_iter().collect_vec();
-        fids.sort_by_key(|id| id.span(db).start().loc_info(db));
-        for fid in fids {
-            if let Some(thir) = thir_body(db, fid) {
-                println!("{}", thir.display(db))
-            }
-        }
-    }
-
-    let mut frefs = frefs;
-    if db.config().display_mir {
-        frefs.sort_by_key(|fref| FrefSortKey {
-            info: fref.fdef(db).name_span(db).start().loc_info(db).clone(),
-            subs: fref.subs(db).iter().map(|ty| ty.to_string(db)).collect(),
-        });
-    }
-
     for fref in frefs {
         if fref.fdef(db).has_body(db) {
             let dce = dce(db, fref);
-            if db.config().display_mir {
-                println!("{}", fref.fdef(db).called_to_string(db));
-                println!("{}\n", dce.display(db));
-            }
             c.declare_mir(dce);
         } else {
             c.declare_import(
@@ -131,6 +113,68 @@ pub fn build<'db, 'ctx>(
     }
 
     c.finalize()
+}
+
+fn thir_is_lowerable(db: &dyn Db, fdef: FunctionId) -> bool {
+    thir_body(db, fdef).is_some_and(|thir| {
+        thir.exprs.iter().all(|(_, expr)| !matches!(expr.kind, ExprKind::Error))
+    })
+}
+
+fn display_ir(db: &dyn Db, w: Workspace) {
+    let cfg = db.config();
+    if !cfg.display_thir && !cfg.display_mir {
+        return;
+    }
+
+    let packages = workspace_packages(db, w);
+    let mut seen: HashSet<MIRKey> = HashSet::new();
+    let mut instances: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
+    for pkg in packages.iter() {
+        let module = file_module_id(db, *pkg.root(db), None, *pkg);
+        for root in collect_module_functions(db, module.interned()) {
+            for (fdef, subs) in reachable_mir_instances(db, root) {
+                if seen.insert(MIRKey::new(db, fdef, subs.clone())) {
+                    instances.push((fdef, subs));
+                }
+            }
+        }
+    }
+
+    if cfg.display_thir {
+        let mut fids = instances
+            .iter()
+            .map(|(fdef, _)| *fdef)
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect_vec();
+        fids.sort_by_key(|id| id.span(db).start().loc_info(db).clone());
+        for fid in fids {
+            if let Some(thir) = thir_body(db, fid) {
+                println!("{}", thir.display(db))
+            }
+        }
+    }
+
+    if cfg.display_mir {
+        let mut instances = instances;
+        instances.sort_by_key(|(fdef, subs)| FrefSortKey {
+            info: fdef.name_span(db).start().loc_info(db).clone(),
+            subs: subs.iter().map(|ty| ty.to_string(db)).collect(),
+        });
+        for (fdef, subs) in instances {
+            if !fdef.has_body(db) {
+                continue;
+            }
+            if !thir_is_lowerable(db, fdef) {
+                continue;
+            }
+            let the_mir = mir(db, fdef, subs.clone());
+            let dce = dce(db, the_mir.func);
+            println!("{}", fdef.called_to_string(db));
+            println!("{}\n", dce.display(db));
+        }
+    }
 }
 
 pub fn write_object_file(
@@ -213,6 +257,8 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     });
 
     render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
+
+    display_ir(&db, ws);
 
     if has_errors {
         return Err(CompilerError::CompiledWithErrors);
