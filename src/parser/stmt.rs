@@ -23,7 +23,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
-impl<'db> Parser<'db> {
+impl Parser<'_> {
     pub(super) fn parse_block(&mut self) -> Result<Vec<AstStmt>, ParseError> {
         self.expect(TokenKind::OpenBra)?;
         self.consume();

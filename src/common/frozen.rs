@@ -108,11 +108,11 @@ impl<T> Frozen<T> {
         })
     }
 
-    pub fn iter<'a>(&'a self) -> FrozenIter<'a, T> {
+    pub fn iter(&self) -> FrozenIter<'_, T> {
         FrozenIter { frozen: self, bucket_idx: 0, item_idx: 0 }
     }
 
-    pub fn iter_mut<'a>(&'a mut self) -> FrozenIterMut<'a, T> {
+    pub fn iter_mut(&mut self) -> FrozenIterMut<'_, T> {
         FrozenIterMut { frozen: self, bucket_idx: 0, item_idx: 0 }
     }
 
@@ -326,7 +326,7 @@ impl<T: Clone> Clone for Frozen<T> {
 
 impl<T> FromIterator<T> for Frozen<T> {
     fn from_iter<A: IntoIterator<Item = T>>(iter: A) -> Self {
-        let this = Frozen::new();
+        let this = Self::new();
         iter.into_iter().for_each(|x| this.push(x));
         this
     }
@@ -365,7 +365,7 @@ impl<T> Frozen<T> {
         let mut left = 0;
         let mut right = l;
         while left < right {
-            let mid = (left + right) / 2;
+            let mid = usize::midpoint(left, right);
             if cmp(self.get(mid).unwrap()) < value {
                 left = mid + 1;
             } else {
@@ -385,7 +385,7 @@ impl<T: Ord> Frozen<T> {
         let this = mem::take(self);
         let mut v = this.into_iter().collect::<Vec<_>>();
         v.sort();
-        *self = Frozen::from_iter(v);
+        *self = Self::from_iter(v);
     }
 
     pub fn into_sorted(self) -> Self {
@@ -400,7 +400,7 @@ impl<T: Ord> Frozen<T> {
         let mut left = 0;
         let mut right = l;
         while left < right {
-            let mid = (left + right) / 2;
+            let mid = usize::midpoint(left, right);
             if self.get(mid).unwrap() < value {
                 left = mid + 1;
             } else {

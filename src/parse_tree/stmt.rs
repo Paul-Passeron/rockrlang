@@ -37,11 +37,11 @@ pub enum CompoundAssignOp {
 impl CompoundAssignOp {
     pub fn to_binop(self) -> BinaryOperator {
         match self {
-            CompoundAssignOp::Plus => BinaryOperator::Plus,
-            CompoundAssignOp::Minus => BinaryOperator::Minus,
-            CompoundAssignOp::Times => BinaryOperator::Times,
-            CompoundAssignOp::Div => BinaryOperator::Div,
-            CompoundAssignOp::Modulo => BinaryOperator::Modulo,
+            Self::Plus => BinaryOperator::Plus,
+            Self::Minus => BinaryOperator::Minus,
+            Self::Times => BinaryOperator::Times,
+            Self::Div => BinaryOperator::Div,
+            Self::Modulo => BinaryOperator::Modulo,
         }
     }
 }

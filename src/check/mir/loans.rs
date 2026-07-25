@@ -45,7 +45,7 @@ fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     let block = &mir.blocks[blk];
     let live_in_per_stmt = live_in_per_stmt(db, mir, blk);
     block.stmts.iter().enumerate().for_each(|(i, stmt)| {
-        check_stmt(db, blk, stmt, i, loans, &live_in_per_stmt[i], &mut state)
+        check_stmt(db, blk, stmt, i, loans, &live_in_per_stmt[i], &mut state);
     });
     let term_live = &live_in_per_stmt[block.stmts.len()];
     state.retain(|loan_id| term_live.contains(&loans.loans[*loan_id].holder));
@@ -99,9 +99,9 @@ fn check_stmt(
 impl MIROperand {
     pub fn as_access(&self) -> Option<(AccessKind, &MIRPlace)> {
         match self {
-            MIROperand::Constant(_, _) => None,
-            MIROperand::Move(place) => Some((AccessKind::Move, place)),
-            MIROperand::Copy(place) => Some((AccessKind::Copy, place)),
+            Self::Constant(_, _) => None,
+            Self::Move(place) => Some((AccessKind::Move, place)),
+            Self::Copy(place) => Some((AccessKind::Copy, place)),
         }
     }
 }
@@ -113,7 +113,7 @@ fn check_operand(
     loans: &MIRLoanOut,
 ) {
     if let Some((access, place)) = op.as_access() {
-        check_access(db, place, access, state, loans)
+        check_access(db, place, access, state, loans);
     }
 }
 
@@ -141,7 +141,7 @@ fn check_access(
             AccessKind::Copy => loan.mutability.is_mut(),
         };
         if violates {
-            Diag::generic_error("Conflict here (place)!".to_string(), place.span)
+            Diag::generic_error("Conflict here (place)!".to_owned(), place.span)
                 .accumulate(db);
         }
     }
@@ -156,12 +156,12 @@ fn check_terminator(
     match terminator {
         MIRTerminator::Diverge | MIRTerminator::Goto { .. } => (),
         MIRTerminator::Call { arguments: ops, .. } => {
-            ops.iter().for_each(|op| check_operand(db, op, state, loans))
+            ops.iter().for_each(|op| check_operand(db, op, state, loans));
         }
         MIRTerminator::Return { value: Some(op), .. }
         | MIRTerminator::Branch { cond: op, .. }
         | MIRTerminator::Switch { discriminant: op, .. } => {
-            check_operand(db, op, state, loans)
+            check_operand(db, op, state, loans);
         }
         MIRTerminator::Return { .. } => (),
     }
@@ -183,7 +183,7 @@ fn check_rvalue_conflicts(
                     let incompatible =
                         mutability.is_mut() || existing.mutability.is_mut();
                     if incompatible {
-                        Diag::generic_error("Conflict here !".to_string(), rvalue.span)
+                        Diag::generic_error("Conflict here !".to_owned(), rvalue.span)
                             .accumulate(db);
                     }
                 }

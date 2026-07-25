@@ -127,7 +127,7 @@ impl MIR {
         match &self.blocks[blk].terminator {
             MIRTerminator::Return { .. } | MIRTerminator::Diverge => (),
             MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
-                self._compute_reachable(s, *next)
+                self._compute_reachable(s, *next);
             }
             MIRTerminator::Branch { then, else_, .. } => {
                 self._compute_reachable(s, *then);

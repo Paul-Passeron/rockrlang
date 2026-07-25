@@ -42,7 +42,7 @@ pub enum AstNamedPattern {
     Mut { name: Spanned<Symbol> },
     Bare(Symbol),
     Constructor { name: Symbol, args: AstConstructFields },
-    NameResolved { from: Spanned<Symbol>, to: Box<AstNamedPattern> },
+    NameResolved { from: Spanned<Symbol>, to: Box<Self> },
     Tuple { fields: Vec<AstPattern> },
 }
 

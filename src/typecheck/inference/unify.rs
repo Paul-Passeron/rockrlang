@@ -25,14 +25,14 @@ use super::{InferTy, InferVar, UnificationError, UnifyValue};
 impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
         match self {
-            InferTy::Var(this_var) => *this_var == var,
-            InferTy::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
-            InferTy::Param(_) => false,
+            Self::Var(this_var) => *this_var == var,
+            Self::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
+            Self::Param(_) => false,
         }
     }
 
     fn unify(&self, other: &Self) -> Result<Self, UnificationError> {
-        fn _unify(
+        fn unify_aux(
             a: &InferTy,
             b: &InferTy,
             flag: bool,
@@ -77,13 +77,13 @@ impl InferTy {
                 (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
                     Err(UnificationError::TemplateConstraining(*p))
                 }
-                _ if !flag => _unify(b, a, true),
+                _ if !flag => unify_aux(b, a, true),
                 _ => panic!(
                     "Infinite recursion detected, You might need to handle more cases explicitely"
                 ),
             }
         }
-        _unify(self, other, false)
+        unify_aux(self, other, false)
     }
 }
 
@@ -95,7 +95,7 @@ impl UnifyValue for InferTy {
     }
 }
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
         let root = self.table.find(a);
         let other = if root == a { b } else { a };
@@ -106,9 +106,10 @@ impl<'db> InferenceCtx<'db> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
-            (InferTy::Var(a), InferTy::Var(b)) => {
-                self.table.unify_var_var(*a, *b).inspect(|_| self.merge_listeners(*a, *b))
-            }
+            (InferTy::Var(a), InferTy::Var(b)) => self
+                .table
+                .unify_var_var(*a, *b)
+                .inspect(|()| self.merge_listeners(*a, *b)),
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
                 let resolved = self.find(value);
                 if resolved.occurs(*infer_var) {

@@ -126,22 +126,22 @@ impl MIRBasicBlock {
 impl MIRTerminator {
     pub fn defs(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIRTerminator::Call { dest, .. } => HashSet::from([*dest]),
+            Self::Call { dest, .. } => HashSet::from([*dest]),
             _ => HashSet::new(),
         }
     }
 
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => HashSet::new(),
-            MIRTerminator::Call { arguments, .. } => {
-                arguments.iter().flat_map(|op| op.uses()).collect()
+            Self::Goto { .. } | Self::Diverge => HashSet::new(),
+            Self::Call { arguments, .. } => {
+                arguments.iter().flat_map(super::operand::MIROperand::uses).collect()
             }
-            MIRTerminator::Return { value: op, .. } => {
-                op.iter().flat_map(|op| op.uses()).collect()
+            Self::Return { value: op, .. } => {
+                op.iter().flat_map(super::operand::MIROperand::uses).collect()
             }
-            MIRTerminator::Switch { discriminant: op, .. }
-            | MIRTerminator::Branch { cond: op, .. } => op.uses(),
+            Self::Switch { discriminant: op, .. }
+            | Self::Branch { cond: op, .. } => op.uses(),
         }
     }
 }

@@ -181,6 +181,6 @@ pub fn impls_in_package<'db>(
         modules_in_package(db, package)
             .iter()
             .flat_map(|module| module_impls(db, module.interned()))
-            .cloned(),
+            .copied(),
     )
 }

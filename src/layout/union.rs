@@ -119,7 +119,7 @@ pub fn tag_value_for_variant(
     source_idx: u32,
 ) -> Option<u128> {
     match db.discriminant_strategy() {
-        DiscriminantStrategyKind::AlwaysTagged => Some(source_idx as u128),
+        DiscriminantStrategyKind::AlwaysTagged => Some(u128::from(source_idx)),
         DiscriminantStrategyKind::NicheFilling => {
             todo!()
         }

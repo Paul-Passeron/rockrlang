@@ -30,7 +30,7 @@ fn add_package_root_from_disk(
     let root = root.canonicalize().map_err(|_| CompilerError::NoFileFoundAt(root))?;
     let path_to_file =
         if root.is_dir() { root.join(ANCHOR_FILE_NAME) } else { root.clone() };
-    let package_name = root.file_name().unwrap().to_str().unwrap().to_string(); // Should not fail on well-formed canonicalized paths
+    let package_name = root.file_name().unwrap().to_str().unwrap().to_owned(); // Should not fail on well-formed canonicalized paths
     let root_file =
         read_source_file(db, &path_to_file).ok_or(CompilerError::NoFileFoundAt(root))?;
     let root = PackageRoot::new(db, package_name, root_file);
@@ -80,7 +80,7 @@ pub fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError
                         true
                     }
                 })
-                .map(|e| e.into_path())
+                .map(walkdir::DirEntry::into_path)
                 .try_for_each(|p| walk(db, p))?;
         } else if db.find_source_file(&p).is_none() {
             read_source_file(db, &p)

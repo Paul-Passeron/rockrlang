@@ -261,10 +261,9 @@ fn _templates_of_owner<'db>(
             .iter()
             .next()
             .unwrap()
-            .templates(db)
-            .to_vec(),
+            .templates(db).clone(),
         ScopeOwnerId::Interface(interface_ref) => {
-            interface_item(db, interface_ref.def(db).interned()).template_args.to_vec()
+            interface_item(db, interface_ref.def(db).interned()).template_args.clone()
         }
     }
 }

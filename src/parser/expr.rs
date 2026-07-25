@@ -83,7 +83,7 @@ fn token_to_binop(kind: &TokenKind) -> Option<BinaryOperator> {
     }
 }
 
-impl<'db> Parser<'db> {
+impl Parser<'_> {
     pub(super) fn parse_expr(&mut self) -> Result<AstExpr, ParseError> {
         self.parse_binop(0)
     }
@@ -131,7 +131,7 @@ impl<'db> Parser<'db> {
                 if op_kind == TokenKind::As {
                     let ty = self.parse_type_expr()?;
                     let span = lhs.span.start().span(self.get_end());
-                    lhs = Spanned::new(AstExprDesc::As { expr: Box::new(lhs), ty }, span)
+                    lhs = Spanned::new(AstExprDesc::As { expr: Box::new(lhs), ty }, span);
                 }
                 continue;
             }
@@ -197,13 +197,13 @@ impl<'db> Parser<'db> {
 
         loop {
             match self.peek_n(0).map(|t| t.kind) {
-                Some(TokenKind::Dot)
-                | Some(TokenKind::OpenSqr)
-                | Some(TokenKind::AddressOf)
-                | Some(TokenKind::Deref)
-                | Some(TokenKind::OpenBra)
-                    if path_segment =>
-                {
+                Some(
+                    TokenKind::Dot
+                    | TokenKind::OpenSqr
+                    | TokenKind::AddressOf
+                    | TokenKind::Deref
+                    | TokenKind::OpenBra,
+                ) if path_segment => {
                     break;
                 }
                 Some(TokenKind::AddressOf) => {
@@ -259,8 +259,7 @@ impl<'db> Parser<'db> {
                         _ => {
                             return Err(self.parse_error(
                                 ParseErrorKind::ExpectedSymbol(
-                                    "`(` or `::` after turbofish type arguments"
-                                        .to_string(),
+                                    "`(` or `::` after turbofish type arguments".to_owned(),
                                 ),
                             ));
                         }

@@ -29,7 +29,7 @@ pub const ANCHOR_FILE_NAME: &str = "main.rkr";
 #[derive(Debug, Clone)]
 pub struct DiscoveredModule {
     pub path: PathBuf,
-    pub submodules: Vec<DiscoveredModule>,
+    pub submodules: Vec<Self>,
 }
 
 pub fn discover_package(p: &Path) -> Option<DiscoveredModule> {

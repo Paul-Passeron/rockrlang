@@ -54,15 +54,15 @@ fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
 impl AstInterfaceItem {
     pub fn name(&self) -> Symbol {
         match self {
-            AstInterfaceItem::Type(arg) => arg.name,
-            AstInterfaceItem::Sig(sig) => sig.data.name.data,
+            Self::Type(arg) => arg.name,
+            Self::Sig(sig) => sig.data.name.data,
         }
     }
 
     pub fn name_span(&self) -> Span {
         match self {
-            AstInterfaceItem::Type(arg) => arg.name_span,
-            AstInterfaceItem::Sig(sig) => sig.data.name.span,
+            Self::Type(arg) => arg.name_span,
+            Self::Sig(sig) => sig.data.name.span,
         }
     }
 }

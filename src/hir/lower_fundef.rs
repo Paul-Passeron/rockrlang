@@ -148,18 +148,15 @@ impl<'db> LowerFundef<'db> {
                 }
             }
             AstExprDesc::NameResolved { from, to } => {
-                match resolve_in_module(self.db, from.data, module) {
-                    Some(Definition::Module(inner)) => {
-                        self.expr_as_place(to, scope, inner)
-                    }
-                    _ => {
-                        let temp = self.lower_expr(expr, scope, module);
-                        self.new_place(
-                            HirPlaceKind::Temporary(temp.boxed()),
-                            expr.span,
-                            false,
-                        )
-                    }
+                if let Some(Definition::Module(inner)) = resolve_in_module(self.db, from.data, module) {
+                    self.expr_as_place(to, scope, inner)
+                } else {
+                    let temp = self.lower_expr(expr, scope, module);
+                    self.new_place(
+                        HirPlaceKind::Temporary(temp.boxed()),
+                        expr.span,
+                        false,
+                    )
                 }
             }
             AstExprDesc::PostfixDeref(inner) | AstExprDesc::PrefixDeref(inner) => {
@@ -232,37 +229,34 @@ impl<'db> LowerFundef<'db> {
                     }
                 }
 
-                match resolve_in_module(self.db, name.data, module) {
-                    Some(resolution) => {
-                        let type_def_id = match resolution {
-                            Definition::Type(type_def_id) => type_def_id,
-                            Definition::Interface(id) => {
-                                todo!("Interface {} here", id.to_string(self.db))
-                            }
-                            other_def => {
-                                todo!("{}", other_def.to_string(self.db))
-                            }
-                        };
+                if let Some(resolution) = resolve_in_module(self.db, name.data, module) {
+                    let type_def_id = match resolution {
+                        Definition::Type(type_def_id) => type_def_id,
+                        Definition::Interface(id) => {
+                            todo!("Interface {} here", id.to_string(self.db))
+                        }
+                        other_def => {
+                            todo!("{}", other_def.to_string(self.db))
+                        }
+                    };
 
-                        let partial_args: Vec<_> = args
-                            .iter()
-                            .map(|arg| self.resolve_any_holed_arg(arg, module))
-                            .collect();
+                    let partial_args: Vec<_> = args
+                        .iter()
+                        .map(|arg| self.resolve_any_holed_arg(arg, module))
+                        .collect();
 
-                        TypeId::new(self.db, type_def_id, partial_args).into()
-                    }
-                    None => {
-                        Diag::generic_error(
-                            format!(
-                                "{}: Could not resolve name {} in scope",
-                                desc.span.start().loc_info(self.db),
-                                name.data.display(self.db),
-                            ),
-                            desc.span,
-                        )
-                        .accumulate(self.db);
-                        TypeRef::Error
-                    }
+                    TypeId::new(self.db, type_def_id, partial_args).into()
+                } else {
+                    Diag::generic_error(
+                        format!(
+                            "{}: Could not resolve name {} in scope",
+                            desc.span.start().loc_info(self.db),
+                            name.data.display(self.db),
+                        ),
+                        desc.span,
+                    )
+                    .accumulate(self.db);
+                    TypeRef::Error
                 }
             }
 
@@ -350,26 +344,21 @@ impl<'db> LowerFundef<'db> {
     ) -> HirExprDesc {
         if let Some(id) = scope.map.get(&symbol) {
             HirExprDesc::Use(self.new_place(HirPlaceKind::Local(*id), span, false))
+        } else if let Some(Definition::Function(_)) = resolve_in_module(self.db, symbol, module) {
+            todo!(
+                "bare function name `{}` used as value expression",
+                symbol.interned().contents(self.db)
+            )
         } else {
-            match resolve_in_module(self.db, symbol, module) {
-                Some(Definition::Function(_)) => {
-                    todo!(
-                        "bare function name `{}` used as value expression",
-                        symbol.interned().contents(self.db)
-                    )
-                }
-                _ => {
-                    Diag::generic_error(
-                        format!(
-                            "Name `{}` not found in the current scope.",
-                            symbol.display(self.db)
-                        ),
-                        span,
-                    )
-                    .accumulate(self.db);
-                    HirExprDesc::Error
-                }
-            }
+            Diag::generic_error(
+                format!(
+                    "Name `{}` not found in the current scope.",
+                    symbol.display(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
+            HirExprDesc::Error
         }
     }
 
@@ -1450,7 +1439,7 @@ pub(super) fn lower_fundef_body<'db>(
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
         ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
-    let template_args = get_templates_of_fun(db, function.into()).to_vec();
+    let template_args = get_templates_of_fun(db, function.into()).clone();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
 }
@@ -1465,7 +1454,7 @@ pub(super) fn lower_method_body<'db>(
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
         ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
-    let template_args = get_templates_of_fun(db, function.into()).to_vec();
+    let template_args = get_templates_of_fun(db, function.into()).clone();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower_method(ast)
 }

@@ -65,13 +65,13 @@ impl<'db> InferenceCtx<'db> {
                             UnificationError::ExpectedPtrLike(def),
                         );
                     }
-                    let Some(field) = fields.iter().next() else {
+                    let Some(field) = fields.first() else {
                         return ConstraintSolveResult::Error(
                             UnificationError::AlreadyDiagnosed,
                         );
                     };
 
-                    self.unify(&target, field).err().map_or(
+                    self.unify(target, field).err().map_or(
                         ConstraintSolveResult::Solved,
                         ConstraintSolveResult::Error,
                     )
@@ -416,7 +416,7 @@ impl<'db> InferenceCtx<'db> {
         };
         let method_templates = templates
             .iter()
-            .map(|var| var.into())
+            .map(Into::into)
             .chain(ast.data.template_args.iter().map(|ast_template| {
                 if !ast_template.constraints.is_empty() {
                     todo!()
@@ -559,11 +559,11 @@ impl<'db> InferenceCtx<'db> {
         if possible_blocks.len() > 1 {
             for possible in possible_blocks {
                 let src = possible.0;
-                println!("Here: {}", src.id(self.db).to_string(self.db))
+                println!("Here: {}", src.id(self.db).to_string(self.db));
             }
             return ConstraintSolveResult::Pending;
         }
-        let (src, PotentialBlockRes { templates, constraints, .. }) =
+        let (src, PotentialBlockRes { templates, constraints,  }) =
             possible_blocks.into_iter().next().unwrap();
         constraints.into_iter().for_each(|constraint| self.emit_constraint(constraint));
 

@@ -31,12 +31,12 @@ pub struct MIRDisplay<'a, T> {
 }
 
 impl MIR {
-    pub fn display<'a>(&'a self, db: &'a dyn Db) -> MIRDisplay<'a, MIR> {
+    pub fn display<'a>(&'a self, db: &'a dyn Db) -> MIRDisplay<'a, Self> {
         MIRDisplay { value: self, db }
     }
 }
 
-impl<'a> fmt::Display for MIRDisplay<'a, MIR> {
+impl fmt::Display for MIRDisplay<'_, MIR> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut w = FmtWriter(f);
         let db = self.db;

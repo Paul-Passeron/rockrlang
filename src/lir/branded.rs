@@ -149,18 +149,18 @@ impl<'ir> InProgressBody<'ir> {
     }
 }
 
-impl<'ir> BrandedBlockData<'ir> {
+impl BrandedBlockData<'_> {
     pub fn finalize(self) -> BlockData {
         BlockData {
             name: self.name,
             params: self.params.into_iter().map(|param| param.idx).collect(),
-            insts: self.insts.into_iter().map(|inst| inst.finalize()).collect(),
+            insts: self.insts.into_iter().map(super::inst::Instruction::finalize).collect(),
             terminator: self.terminator.unwrap().finalize(),
         }
     }
 }
 
-impl<'ir> Instruction<'ir> {
+impl Instruction<'_> {
     pub fn finalize(self) -> FInstruction {
         match self {
             Instruction::Void(kind) => FInstruction::Void(kind.finalize()),
@@ -176,7 +176,7 @@ impl<'ir> Instruction<'ir> {
     }
 }
 
-impl<'ir> ValueInstKind<Branded<'ir>> {
+impl ValueInstKind<Branded<'_>> {
     pub fn finalize(self) -> ValueInstKind<Finalized> {
         match self {
             Self::Const(cst) => ValueInstKind::Const(cst),
@@ -230,7 +230,7 @@ impl<'ir> ValueInstKind<Branded<'ir>> {
     }
 }
 
-impl<'ir> VoidInstKind<Branded<'ir>> {
+impl VoidInstKind<Branded<'_>> {
     pub fn finalize(self) -> VoidInstKind<Finalized> {
         match self {
             VoidInstKind::Store { ptr, value } => {
@@ -246,7 +246,7 @@ impl<'ir> VoidInstKind<Branded<'ir>> {
     }
 }
 
-impl<'ir> Terminator<'ir> {
+impl Terminator<'_> {
     pub fn finalize(self) -> FTerminator {
         match self {
             Terminator::Goto(block_target) => FTerminator::Goto(block_target.finalize()),
@@ -269,7 +269,7 @@ impl<'ir> Terminator<'ir> {
     }
 }
 
-impl<'ir> BlockTarget<Branded<'ir>> {
+impl BlockTarget<Branded<'_>> {
     pub fn finalize(self) -> BlockTarget<Finalized> {
         BlockTarget {
             params: self.params.into_iter().map(|p| p.idx).collect(),
@@ -278,7 +278,7 @@ impl<'ir> BlockTarget<Branded<'ir>> {
     }
 }
 
-impl<'ir> BrandedBlockId<'ir> {
+impl BrandedBlockId<'_> {
     pub fn finalize(self) -> Idx<BlockData> {
         Idx::from_raw(self.idx.raw())
     }

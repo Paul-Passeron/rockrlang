@@ -29,7 +29,7 @@ pub struct Symbol(salsa::Id);
 
 impl<'db> From<InternedSymbol<'db>> for Symbol {
     fn from(s: InternedSymbol<'db>) -> Self {
-        Symbol(s.0)
+        Self(s.0)
     }
 }
 
@@ -43,11 +43,11 @@ impl Symbol {
     }
 
     pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db).to_string()
+        self.interned().contents(db).clone()
     }
 
     pub fn to_string(&self, db: &dyn Db) -> String {
-        self.display(db).to_string()
+        self.display(db)
     }
 }
 
@@ -56,13 +56,13 @@ pub struct InternedStrLit {
     pub contents: String,
 }
 
-/// A 'static-compatible StrLit ID, safe to store anywhere.
+/// A 'static-compatible `StrLit` ID, safe to store anywhere.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StrLit(salsa::Id);
 
 impl<'db> From<InternedStrLit<'db>> for StrLit {
     fn from(s: InternedStrLit<'db>) -> Self {
-        StrLit(s.0)
+        Self(s.0)
     }
 }
 
@@ -76,6 +76,6 @@ impl StrLit {
     }
 
     pub fn display(&self, db: &dyn Db) -> String {
-        self.interned().contents(db).to_string()
+        self.interned().contents(db).clone()
     }
 }

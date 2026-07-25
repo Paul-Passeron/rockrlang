@@ -49,7 +49,7 @@ use crate::{
     },
 };
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         match &expr.data {
             HirExprDesc::IntLit(_) => Ok(self.emit_intlike_constraint().into()),

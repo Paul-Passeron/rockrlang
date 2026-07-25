@@ -306,7 +306,7 @@ impl Module<Declaring> {
     pub fn finish_declarations(self) -> Module<Building> {
         Module {
             sigs: self.sigs,
-            bodies: self.bodies.into_iter().map(|body| body.map(|_| None)).collect(),
+            bodies: self.bodies.into_iter().map(|body| body.map(|()| None)).collect(),
         }
     }
 }
@@ -336,8 +336,8 @@ impl<S: ModulePhase> Body<S> {
         f: impl FnOnce(S::FnBody) -> NewPhase::FnBody,
     ) -> Body<NewPhase> {
         match self {
-            Body::Import { variadic } => Body::Import { variadic },
-            Body::Defined(defined_linkage, val) => Body::Defined(defined_linkage, f(val)),
+            Self::Import { variadic } => Body::Import { variadic },
+            Self::Defined(defined_linkage, val) => Body::Defined(defined_linkage, f(val)),
         }
     }
 }

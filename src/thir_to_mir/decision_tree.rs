@@ -75,7 +75,7 @@ impl<'a> Matrix<'a> {
         let Some(fst) = self.rows.first() else {
             return DecisionTree::Fail;
         };
-        if fst.pats.iter().all(|p| p.is_none_or(|pat| pat.is_wildcard_like())) {
+        if fst.pats.iter().all(|p| p.is_none_or(ThirPattern::is_wildcard_like)) {
             return DecisionTree::Leaf {
                 branch_idx: fst.branch_idx,
                 bindings: self.collect_bindings(fst, ctx),
@@ -185,7 +185,7 @@ impl<'a> Matrix<'a> {
 
         for row in &self.rows {
             let pat = row.pats[col];
-            if pat.is_none_or(|pat| pat.is_wildcard_like()) {
+            if pat.is_none_or(ThirPattern::is_wildcard_like) {
                 let mut new_pats = row.pats.clone();
                 new_pats.remove(col);
                 let mut bindings = row.bindings.clone();
@@ -204,7 +204,7 @@ impl<'a> Matrix<'a> {
         let arity = self.arity_of(col, ctor, ctx);
         let new_places = self.subplaces_for(col, ctor, &arity, ctx);
         let mut cols = self.cols.clone();
-        cols.splice(col..=col, new_places.clone());
+        cols.splice(col..=col, new_places);
         let mut rows = vec![];
 
         for row in &self.rows {
@@ -221,7 +221,7 @@ impl<'a> Matrix<'a> {
                     branch_idx: row.branch_idx,
                     bindings: row.bindings.clone(),
                 });
-            } else if pat.is_none_or(|pat| pat.is_wildcard_like()) {
+            } else if pat.is_none_or(ThirPattern::is_wildcard_like) {
                 let mut new_pats = row.pats.clone();
                 let fresh_wildcards =
                     std::iter::repeat_n(None, arity.len()).collect_vec();
@@ -300,7 +300,7 @@ impl<'a> Matrix<'a> {
         assert!(!self.cols.is_empty());
         for i in 0..self.cols.len() {
             if let Some(row) = self.rows.first()
-                && !row.pats[i].is_none_or(|pat| pat.is_wildcard_like())
+                && !row.pats[i].is_none_or(ThirPattern::is_wildcard_like)
             {
                 return i;
             }
@@ -351,12 +351,12 @@ impl ThirPattern {
     fn constructor(&self) -> Option<Constructor> {
         match &self.kind {
             ThirPatternKind::Constructor { idx, .. } => Some(Constructor::Variant(*idx)),
-            ThirPatternKind::IntLit(val) => Some(Constructor::IntLit(*val as i128)),
+            ThirPatternKind::IntLit(val) => Some(Constructor::IntLit(i128::from(*val))),
             _ => None,
         }
     }
 
-    fn sub_patterns_for(&self, arity: &VariantArity) -> Vec<Option<&ThirPattern>> {
+    fn sub_patterns_for(&self, arity: &VariantArity) -> Vec<Option<&Self>> {
         match &self.kind {
             ThirPatternKind::Constructor { args, .. } => match (args, arity) {
                 (ThirConstructorArgs::Tuple(items), VariantArity::Tuple(n)) => {
@@ -415,14 +415,14 @@ enum VariantArity {
 impl VariantArity {
     pub(super) fn len(&self) -> usize {
         match self {
-            VariantArity::None => 0,
-            VariantArity::Tuple(n) => *n,
-            VariantArity::Struct(symbols) => symbols.len(),
+            Self::None => 0,
+            Self::Tuple(n) => *n,
+            Self::Struct(symbols) => symbols.len(),
         }
     }
 }
 
-impl<'a> ThirToMIR<'a> {
+impl ThirToMIR<'_> {
     fn deref_through_refs(&self, base: &MIRPlace) -> (Vec<MIRProjection>, TypeRef) {
         let mut projections = base.projections.clone();
         let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);

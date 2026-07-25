@@ -30,10 +30,7 @@ pub enum LatticeChange {
 
 impl From<bool> for LatticeChange {
     fn from(changed: bool) -> Self {
-        match changed {
-            true => Self::Changed,
-            false => Self::Unchanged,
-        }
+        if changed { Self::Changed } else { Self::Unchanged }
     }
 }
 
@@ -52,7 +49,7 @@ impl Lattice for LatticeChange {
     }
 
     fn join(&self, other: &Self) -> Self {
-        if self != other { Self::Changed } else { *self }
+        if self == other { *self } else { Self::Changed }
     }
 }
 
@@ -124,16 +121,16 @@ impl<K: Eq + Hash, V> MapLike for HashMap<K, V> {
     type Key = K;
     type Value = V;
     fn new_empty() -> Self {
-        HashMap::new()
+        Self::new()
     }
     fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        HashMap::get_mut(self, key)
+        Self::get_mut(self, key)
     }
     fn insert(&mut self, key: K, value: V) {
-        HashMap::insert(self, key, value);
+        Self::insert(self, key, value);
     }
     fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        HashMap::iter(self)
+        Self::iter(self)
     }
 }
 
@@ -142,16 +139,16 @@ impl<K: Ord, V> MapLike for BTreeMap<K, V> {
     type Value = V;
 
     fn new_empty() -> Self {
-        BTreeMap::new()
+        Self::new()
     }
     fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        BTreeMap::get_mut(self, key)
+        Self::get_mut(self, key)
     }
     fn insert(&mut self, key: K, value: V) {
-        BTreeMap::insert(self, key, value);
+        Self::insert(self, key, value);
     }
     fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        BTreeMap::iter(self)
+        Self::iter(self)
     }
 }
 
@@ -419,7 +416,7 @@ pub enum Flat<T: Clone + PartialEq + Eq> {
 
 impl<T: Clone + PartialEq + Eq> Lattice for Flat<T> {
     fn bottom() -> Self {
-        Flat::Bottom
+        Self::Bottom
     }
 
     fn join(&self, other: &Self) -> Self {
@@ -441,7 +438,7 @@ impl<T: Clone + PartialEq + Eq> Lattice for Flat<T> {
 impl<T: Clone + PartialEq + Eq> Flat<T> {
     pub fn value(&self) -> Option<&T> {
         match self {
-            Flat::Value(v) => Some(v),
+            Self::Value(v) => Some(v),
             _ => None,
         }
     }

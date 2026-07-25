@@ -154,13 +154,13 @@ impl<'db> Parser<'db> {
     }
 
     pub fn expect(&self, kind: TokenKind) -> Result<(), ParseError> {
-        if self.current_token()?.kind != kind {
+        if self.current_token()?.kind == kind {
+            Ok(())
+        } else {
             Err(self.parse_error(ParseErrorKind::ExpectedToken {
                 expected: kind,
                 found: self.current_token()?.kind,
             }))
-        } else {
-            Ok(())
         }
     }
 
@@ -199,12 +199,12 @@ impl<'db> Parser<'db> {
             match &t.kind {
                 _ if depth == 0 && is_sync_point(&t.kind) => break,
                 TokenKind::OpenBra | TokenKind::OpenPar | TokenKind::OpenSqr => {
-                    depth += 1
+                    depth += 1;
                 }
                 TokenKind::CloseBra | TokenKind::ClosePar | TokenKind::CloseSqr
                     if depth > 0 =>
                 {
-                    depth -= 1
+                    depth -= 1;
                 }
                 _ => {}
             }
@@ -214,7 +214,7 @@ impl<'db> Parser<'db> {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn parse_file<'db>(db: &'db dyn Db, file: SourceFile) -> Ast<'db> {
+pub fn parse_file(db: &dyn Db, file: SourceFile) -> Ast<'_> {
     let lex_res = lex_file(db, file);
     let tokens = match lex_res {
         Ok(tokens) => tokens,

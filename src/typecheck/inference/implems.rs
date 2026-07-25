@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-use super::*;
+use super::{Arc, Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 
 #[derive(Debug)]
 pub struct PotentialBlockRes {
@@ -68,7 +68,7 @@ impl<'a> InferenceCtx<'a> {
                 }
                 TypeRef::Param(id) => Some(vec![InferenceConstraintKind::Unify {
                     a: ty.clone(),
-                    b: ctx.get_template(id.0)?.clone(),
+                    b: ctx.get_template(id.0)?,
                 }]),
                 TypeRef::Unknown | TypeRef::Error => None,
                 TypeRef::Associated(_) | TypeRef::Zelf => None,
@@ -77,7 +77,7 @@ impl<'a> InferenceCtx<'a> {
                 if let TypeRef::Param(id) = matcher {
                     Some(vec![InferenceConstraintKind::Unify {
                         a: ty.clone(),
-                        b: ctx.get_template(id.0)?.clone(),
+                        b: ctx.get_template(id.0)?,
                     }])
                 } else {
                     None

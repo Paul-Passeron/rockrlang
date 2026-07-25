@@ -34,7 +34,7 @@ impl MIR {
     }
 }
 
-impl<'a> fmt::Display for MIRDotDisplay<'a> {
+impl fmt::Display for MIRDotDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut w = FmtWriter(f);
         let db = self.db;

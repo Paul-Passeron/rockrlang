@@ -397,19 +397,16 @@ fn any_type_expr_at(
     resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
-    match any.as_known() {
-        Some(ty) => type_expr_at(db, ctx, &ty, resolved, loc),
-        None => {
-            any.span.encloses(loc).then_some(())?;
-            let ty =
-                resolved.filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))?;
-            Some(TypeNode { ty, span: any.span })
-        }
+    if let Some(ty) = any.as_known() { type_expr_at(db, ctx, &ty, resolved, loc) } else {
+        any.span.encloses(loc).then_some(())?;
+        let ty =
+            resolved.filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))?;
+        Some(TypeNode { ty, span: any.span })
     }
 }
 
 fn project(db: &dyn Db, resolved: Option<TypeRef>, idx: usize) -> Option<TypeRef> {
-    resolved.and_then(|r| r.as_type_id()).and_then(|id| id.args(db).get(idx).copied())
+    resolved.and_then(TypeRef::as_type_id).and_then(|id| id.args(db).get(idx).copied())
 }
 
 fn type_expr_children_at(

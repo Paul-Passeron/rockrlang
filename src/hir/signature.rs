@@ -85,21 +85,21 @@ pub struct FunctionSignature {
 impl AstReceiver {
     pub fn as_zelf_arg(&self) -> Option<ZelfArg> {
         let mutability = match self {
-            AstReceiver::None => {
+            Self::None => {
                 return None;
             }
-            AstReceiver::MutZelf(_)
-            | AstReceiver::MutRefZelf(_)
-            | AstReceiver::MutPtrZelf(_) => Mutability::Mutable,
+            Self::MutZelf(_)
+            | Self::MutRefZelf(_)
+            | Self::MutPtrZelf(_) => Mutability::Mutable,
             _ => Mutability::Const,
         };
         let kind = match self {
-            AstReceiver::None => {
+            Self::None => {
                 return None;
             }
-            AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
-            AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
-            AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
+            Self::Zelf(_) | Self::MutZelf(_) => ZelfKind::Zelf,
+            Self::RefZelf(_) | Self::MutRefZelf(_) => ZelfKind::RefZelf,
+            Self::PtrZelf(_) | Self::MutPtrZelf(_) => ZelfKind::PtrZelf,
         };
         Some(ZelfArg { mutability, kind })
     }
@@ -133,7 +133,7 @@ pub fn get_sig_of_function(
         .map(|t| {
             t.constraints
                 .iter()
-                .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                .filter_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                 .collect()
         })
         .collect();
@@ -144,7 +144,7 @@ pub fn get_sig_of_function(
             .map(|t| {
                 t.constraints
                     .iter()
-                    .flat_map(|constraint| ctx.resolve_interface(db, &constraint.data))
+                    .filter_map(|constraint| ctx.resolve_interface(db, &constraint.data))
                     .collect_vec()
             })
             .collect_vec();

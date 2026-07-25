@@ -75,7 +75,7 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
 impl fmt::Display for MIRLivenessResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "live-in:")?;
-        for (bb, live) in self.live_in.iter() {
+        for (bb, live) in &self.live_in {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",
@@ -84,7 +84,7 @@ impl fmt::Display for MIRLivenessResult {
             )?;
         }
         writeln!(f, "live-out:")?;
-        for (bb, live) in self.live_out.iter() {
+        for (bb, live) in &self.live_out {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",

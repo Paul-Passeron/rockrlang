@@ -84,9 +84,9 @@ impl ThirStmt {
 
     pub fn ifte(
         cond: ThirExprWithSetup,
-        then: Vec<ThirStmt>,
+        then: Vec<Self>,
         then_scope: ScopeId,
-        else_: Option<Vec<ThirStmt>>,
+        else_: Option<Vec<Self>>,
         else_scope: Option<ScopeId>,
         span: Span,
         is_synthetic: bool,

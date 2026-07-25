@@ -40,7 +40,7 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
             match stmt {
                 Stmt::Assign { dest, rvalue } => {
                     if let Some(place) = rvalue.inner_place() {
-                        place.check(db, &mut state);
+                        place.check(db, &state);
                     }
                     rvalue.for_each_operand(|op| op.check(db, &mut state));
                     dest.for_each_operand(|op| op.check(db, &mut state));
@@ -55,16 +55,16 @@ pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
 impl MIRTerminator {
     fn check(&self, db: &dyn Db, state: &mut MoveMap) {
         match self {
-            MIRTerminator::Goto { .. } | MIRTerminator::Diverge => (),
-            MIRTerminator::Call { arguments, dest, .. } => {
+            Self::Goto { .. } | Self::Diverge => (),
+            Self::Call { arguments, dest, .. } => {
                 arguments.iter().for_each(|op| op.check(db, state));
                 init_key(&MoveKey { base: *dest, projections: vec![] }, state);
             }
-            MIRTerminator::Return { value, .. } => {
-                value.iter().for_each(|op| op.check(db, state))
+            Self::Return { value, .. } => {
+                value.iter().for_each(|op| op.check(db, state));
             }
-            MIRTerminator::Branch { cond: op, .. }
-            | MIRTerminator::Switch { discriminant: op, .. } => op.check(db, state),
+            Self::Branch { cond: op, .. }
+            | Self::Switch { discriminant: op, .. } => op.check(db, state),
         }
     }
 }
@@ -72,11 +72,11 @@ impl MIRTerminator {
 impl MIROperand {
     fn check(&self, db: &dyn Db, m: &mut MoveMap) {
         match self {
-            MIROperand::Move(p) => {
+            Self::Move(p) => {
                 p.check(db, m);
                 uninit_key(&p.as_move_key(), m);
             }
-            MIROperand::Copy(p) => {
+            Self::Copy(p) => {
                 p.check(db, m);
             }
             _ => (),
@@ -105,11 +105,11 @@ impl MIRPlace {
         match state {
             InitState::Init => (),
             InitState::Maybe => {
-                Diag::generic_error("Use after move (maybe)".to_string(), self.span)
-                    .accumulate(db)
+                Diag::generic_error("Use after move (maybe)".to_owned(), self.span)
+                    .accumulate(db);
             }
             InitState::Uninit => {
-                Diag::generic_error("Use after move".to_string(), self.span)
+                Diag::generic_error("Use after move".to_owned(), self.span)
                     .accumulate(db);
             }
         }

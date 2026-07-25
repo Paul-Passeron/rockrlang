@@ -32,10 +32,10 @@ impl std::fmt::Display for Severity {
             f,
             "{}",
             match self {
-                Severity::Error => "error",
-                Severity::Warning => "warning",
-                Severity::Note => "note",
-                Severity::Help => "help",
+                Self::Error => "error",
+                Self::Warning => "warning",
+                Self::Note => "note",
+                Self::Help => "help",
             }
         )
     }
@@ -69,19 +69,19 @@ impl Diag {
 
         let primary = DiagLabel::new(
             first.name_span(db).unwrap(),
-            Some("Defined here".to_string()),
+            Some("Defined here".to_owned()),
         );
         let secondary = others
             .into_iter()
             .map(|def| {
                 DiagLabel::new(
                     def.name_span(db).unwrap(),
-                    Some("Defined here".to_string()),
+                    Some("Defined here".to_owned()),
                 )
             })
             .collect();
 
-        Diag::new(
+        Self::new(
             Severity::Error,
             format!(
                 "name `{}` is defined multiple times at top-level.",
@@ -97,9 +97,9 @@ impl Diag {
     pub fn todo(message: String, span: Span) -> Self {
         let primary = DiagLabel::new(span, Some(message));
 
-        Diag::new(
+        Self::new(
             Severity::Warning,
-            "not yet implemented.".to_string(),
+            "not yet implemented.".to_owned(),
             primary,
             vec![],
             vec![],
@@ -110,13 +110,13 @@ impl Diag {
     pub fn generic_error(message: String, span: Span) -> Self {
         let primary = DiagLabel::new(span, None);
 
-        Diag::new(Severity::Error, message, primary, vec![], vec![], vec![])
+        Self::new(Severity::Error, message, primary, vec![], vec![], vec![])
     }
 
     pub fn generic_warning(message: String, span: Span) -> Self {
         let primary = DiagLabel::new(span, None);
 
-        Diag::new(Severity::Warning, message, primary, vec![], vec![], vec![])
+        Self::new(Severity::Warning, message, primary, vec![], vec![], vec![])
     }
 
     pub fn new(

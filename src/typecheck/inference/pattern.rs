@@ -27,9 +27,9 @@ use crate::{
     resolved::{EnumId, ScopeOwnerId},
 };
 
-use super::*;
+use super::{InferenceCtx, InferTy, UnificationError, PatternId, LocalId, Itertools, Symbol, ImplicitContext, TypeDefId, HashMap, Definition, StructId};
 
-impl<'a> InferenceCtx<'a> {
+impl InferenceCtx<'_> {
     pub fn infer_pattern(
         &mut self,
         pattern: &HirPattern,
@@ -119,28 +119,25 @@ impl<'a> InferenceCtx<'a> {
         span: Span,
     ) -> Vec<InferTy> {
         let variant = self.get_enum_variant(enum_id, name);
-        match variant.as_ref().map(|v| &v.kind) {
-            Some(AstEnumVariantKind::TupleLike(tys)) => {
-                let ctx = self.get_ctx_for_enum(enum_id, template_tys);
-                tys.iter()
-                    .map(|ty| {
-                        self.allocate_ast_type_expr(&ty.data, &ctx)
-                            .unwrap_or_else(|| self.fresh_var().into())
-                    })
-                    .collect()
-            }
-            _ => {
-                Diag::generic_error(
-                    format!(
-                        "Expected variant `{}` to be tuple for enum `{}`",
-                        name.to_string(self.db),
-                        enum_id.name(self.db).to_string(self.db)
-                    ),
-                    span,
-                )
-                .accumulate(self.db);
-                vec![]
-            }
+        if let Some(AstEnumVariantKind::TupleLike(tys)) = variant.as_ref().map(|v| &v.kind) {
+            let ctx = self.get_ctx_for_enum(enum_id, template_tys);
+            tys.iter()
+                .map(|ty| {
+                    self.allocate_ast_type_expr(&ty.data, &ctx)
+                        .unwrap_or_else(|| self.fresh_var().into())
+                })
+                .collect()
+        } else {
+            Diag::generic_error(
+                format!(
+                    "Expected variant `{}` to be tuple for enum `{}`",
+                    name.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
+            vec![]
         }
     }
 
@@ -153,29 +150,26 @@ impl<'a> InferenceCtx<'a> {
     ) -> HashMap<Symbol, InferTy> {
         let ctx = self.get_ctx_for_enum(enum_id, template_tys);
         let variant = self.get_enum_variant(enum_id, name);
-        match variant.as_ref().map(|v| &v.kind) {
-            Some(AstEnumVariantKind::StructLike(fields)) => fields
-                .iter()
-                .map(|field| {
-                    (
-                        field.name,
-                        self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                            .unwrap_or_else(|| self.fresh_var().into()),
-                    )
-                })
-                .collect(),
-            _ => {
-                Diag::generic_error(
-                    format!(
-                        "Expected variant `{}` to be struct-like for enum `{}`",
-                        name.to_string(self.db),
-                        enum_id.name(self.db).to_string(self.db)
-                    ),
-                    span,
-                )
-                .accumulate(self.db);
-                HashMap::new()
-            }
+        if let Some(AstEnumVariantKind::StructLike(fields)) = variant.as_ref().map(|v| &v.kind) { fields
+        .iter()
+        .map(|field| {
+            (
+                field.name,
+                self.allocate_ast_type_expr(&field.ty.data, &ctx)
+                    .unwrap_or_else(|| self.fresh_var().into()),
+            )
+        })
+        .collect() } else {
+            Diag::generic_error(
+                format!(
+                    "Expected variant `{}` to be struct-like for enum `{}`",
+                    name.to_string(self.db),
+                    enum_id.name(self.db).to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
+            HashMap::new()
         }
     }
 
@@ -239,7 +233,7 @@ impl<'a> InferenceCtx<'a> {
     fn apply_binds_like(&mut self, like: Option<&InferTy>, target: InferTy) -> InferTy {
         if let Some(ty) = like {
             let var = self.fresh_var();
-            self.unify(&ty, &var.into()).unwrap();
+            self.unify(ty, &var.into()).unwrap();
             self.emit_binds_like_constraint(var, target).into()
         } else {
             target
@@ -346,7 +340,7 @@ impl<'a> InferenceCtx<'a> {
             self.get_templates_for(Definition::Type(TypeDefId::Struct(*struct_id)));
         let struct_ty = InferTy::Adt {
             def: TypeDefId::Struct(*struct_id),
-            fields: infer_templates.to_vec(),
+            fields: infer_templates.clone(),
         };
         let ctx = ImplicitContext::new(
             self.db,
@@ -400,7 +394,7 @@ impl<'a> InferenceCtx<'a> {
                                 field.name().to_string(self.db),
                                 err.display(self.db),
                             ), span)
-                                .accumulate(self.db)
+                                .accumulate(self.db);
                         }
                     }
                 }

@@ -194,15 +194,15 @@ impl FloatKind {
 impl MangleType {
     pub fn mangle(&self) -> String {
         match self {
-            MangleType::Ptr(t) => format!("P{}", t.mangle()),
-            MangleType::Array(t) => format!("A{}", t.mangle()),
-            MangleType::Tuple(ts) => {
+            Self::Ptr(t) => format!("P{}", t.mangle()),
+            Self::Array(t) => format!("A{}", t.mangle()),
+            Self::Tuple(ts) => {
                 let inner: String = ts.iter().map(Self::mangle).collect();
                 format!("T{inner}E")
             }
-            MangleType::Int(k) => k.mangle(),
-            MangleType::Float(k) => format!("f{}", k.mangle()),
-            MangleType::Adt { path, name, parameters } => {
+            Self::Int(k) => k.mangle(),
+            Self::Float(k) => format!("f{}", k.mangle()),
+            Self::Adt { path, name, parameters } => {
                 let idents: String = path
                     .iter()
                     .map(|s| mangle_ident(s))
@@ -211,9 +211,9 @@ impl MangleType {
                 let params: String = parameters.iter().map(Self::mangle).collect();
                 format!("N{idents}E{params}E")
             }
-            MangleType::Never => "z".to_string(),
-            MangleType::Error => "X".to_string(),
-            MangleType::Bool => "b".to_string(),
+            Self::Never => "z".to_owned(),
+            Self::Error => "X".to_owned(),
+            Self::Bool => "b".to_owned(),
         }
     }
 }
@@ -229,13 +229,13 @@ impl MangleSig {
 impl MangleFun {
     pub fn mangle(&self) -> String {
         match self {
-            MangleFun::Extern(name) => name.clone(),
-            MangleFun::Method { is_static, ty, sig, templates } => {
+            Self::Extern(name) => name.clone(),
+            Self::Method { is_static, ty, sig, templates } => {
                 let kind = if *is_static { 's' } else { 'm' };
                 let tpls: String = templates.iter().map(MangleType::mangle).collect();
                 format!("_ZM{kind}{}{}G{tpls}E", ty.mangle(), sig.mangle())
             }
-            MangleFun::Function { path, sig, templates } => {
+            Self::Function { path, sig, templates } => {
                 let p: String = path.iter().map(|s| mangle_ident(s)).collect();
                 let tpls: String = templates.iter().map(MangleType::mangle).collect();
                 format!("_ZF{p}E{}G{tpls}E", sig.mangle())

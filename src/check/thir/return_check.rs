@@ -40,7 +40,7 @@ pub fn check_return(db: &dyn Db, thir: &Thir) {
                 .into(),
             span,
         )
-        .accumulate(db)
+        .accumulate(db);
     }
 }
 
@@ -104,7 +104,7 @@ pub fn check_stmts(db: &dyn Db, thir: &Thir, stmts: &[ThirStmt]) -> Completeness
             if i < stmts.len() - 1 {
                 let next_stmt = &stmts[i + 1];
                 Diag::generic_warning(
-                    "This statement is unreachable".to_string(),
+                    "This statement is unreachable".to_owned(),
                     next_stmt.span,
                 )
                 .accumulate(db);
@@ -233,6 +233,6 @@ impl Thir {
 
 impl Completeness {
     pub fn always_returns(self) -> bool {
-        self == Completeness::AlwaysReturns
+        self == Self::AlwaysReturns
     }
 }

@@ -171,9 +171,9 @@ pub enum ScopeOwnerId {
 impl ScopeOwnerId {
     pub fn get_canonical_zelf(&self, db: &dyn Db) -> Option<TypeRef> {
         match self {
-            ScopeOwnerId::Module(_) => None,
-            ScopeOwnerId::Impl(impl_id) => Some(impl_id.implemented(db)),
-            ScopeOwnerId::Interface(_) => Some(TypeRef::Zelf),
+            Self::Module(_) => None,
+            Self::Impl(impl_id) => Some(impl_id.implemented(db)),
+            Self::Interface(_) => Some(TypeRef::Zelf),
         }
     }
 }

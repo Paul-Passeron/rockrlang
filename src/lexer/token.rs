@@ -119,14 +119,14 @@ impl TokenKind {
     }
 }
 
-impl<'db> fmt::Display for TokenKindDisplay<'db, '_> {
+impl fmt::Display for TokenKindDisplay<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             TokenKind::Identifier(name) => {
                 write!(f, "{}", name.interned().contents(self.db))
             }
-            TokenKind::IntLit(value) => write!(f, "{}", value),
-            TokenKind::CharLit(c) => write!(f, "{}", c),
+            TokenKind::IntLit(value) => write!(f, "{value}"),
+            TokenKind::CharLit(c) => write!(f, "{c}"),
             TokenKind::StrLit(s) => {
                 write!(f, "\"{}\"", s.interned().contents(self.db))
             }

@@ -74,7 +74,7 @@ struct FnCtx<'ctx> {
     values: HashMap<Idx<LIRDef>, BasicValueEnum<'ctx>>,
 }
 
-impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
+impl<'ctx> Ctx<'_, '_, 'ctx> {
     fn run(mut self) -> IModule<'ctx> {
         self.lir.functions().for_each(|func| self.declare_lir(func));
         self.lir.functions().for_each(|func| self.lower_lir(func));
@@ -90,7 +90,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
             .signature
             .params
             .iter()
-            .flat_map(|layout| {
+            .filter_map(|layout| {
                 if layout.is_zst(self.db) {
                     None
                 } else {
@@ -101,10 +101,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                 }
             })
             .collect_vec();
-        let fn_ty = if !sig.signature.ret.is_zst(self.db) {
-            self.basic(sig.signature.ret.layout).fn_type(&params, is_variadic)
-        } else {
+        let fn_ty = if sig.signature.ret.is_zst(self.db) {
             self.ctx.void_type().fn_type(&params, is_variadic)
+        } else {
+            self.basic(sig.signature.ret.layout).fn_type(&params, is_variadic)
         };
 
         let f = self.m.add_function(
@@ -213,7 +213,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                     }
                 }
                 for (blk, data) in &body.blocks {
-                    self.terminate_block(blk, &data.terminator, &mut fn_ctx);
+                    self.terminate_block(blk, &data.terminator, &fn_ctx);
                 }
             }
         }
@@ -292,7 +292,7 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
                                     .build_store(
                                         ptr,
                                         self.get_int_ty(kind)
-                                            .const_int(*idx as u64, false),
+                                            .const_int(u64::from(*idx), false),
                                     )
                                     .unwrap();
                             } else {

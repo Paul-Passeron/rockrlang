@@ -57,30 +57,30 @@ impl Definition {
 
     pub fn name(self, db: &dyn Db) -> Symbol {
         match self {
-            Definition::Function(func) => func.name(db),
-            Definition::Type(def) => def.name(db),
-            Definition::Interface(iface) => iface.name(db),
-            Definition::Module(module) => module.name(db),
+            Self::Function(func) => func.name(db),
+            Self::Type(def) => def.name(db),
+            Self::Interface(iface) => iface.name(db),
+            Self::Module(module) => module.name(db),
         }
     }
 
     pub fn name_span(self, db: &dyn Db) -> Option<Span> {
         match self {
-            Definition::Function(function_id) => Some(function_id.name_span(db)),
-            Definition::Interface(interface_id) => Some(interface_id.name_span(db)),
-            Definition::Module(module_id) => module_id.name_span(db),
-            Definition::Type(type_def_id) => type_def_id.name_span(db),
+            Self::Function(function_id) => Some(function_id.name_span(db)),
+            Self::Interface(interface_id) => Some(interface_id.name_span(db)),
+            Self::Module(module_id) => module_id.name_span(db),
+            Self::Type(type_def_id) => type_def_id.name_span(db),
         }
     }
 
     pub fn span(self, db: &dyn Db) -> Option<Span> {
         match self {
-            Definition::Function(function_id) => Some(function_id.span(db)),
-            Definition::Interface(interface_id) => {
+            Self::Function(function_id) => Some(function_id.span(db)),
+            Self::Interface(interface_id) => {
                 Some(interface_item(db, interface_id.interned()).span)
             }
-            Definition::Module(module_id) => module_id.name_span(db),
-            Definition::Type(type_def_id) => type_def_id.span(db),
+            Self::Module(module_id) => module_id.name_span(db),
+            Self::Type(type_def_id) => type_def_id.span(db),
         }
     }
 }
@@ -107,33 +107,33 @@ impl ModuleId {
 impl TypeDefId {
     pub fn name(&self, db: &dyn Db) -> Symbol {
         match self {
-            TypeDefId::Builtin(builtin) => builtin.name(db),
-            TypeDefId::Struct(struct_id) => struct_id.name(db),
-            TypeDefId::Enum(enum_id) => enum_id.name(db),
+            Self::Builtin(builtin) => builtin.name(db),
+            Self::Struct(struct_id) => struct_id.name(db),
+            Self::Enum(enum_id) => enum_id.name(db),
         }
     }
 
     pub fn parent(&self, db: &dyn Db) -> ModuleId {
         match self {
-            TypeDefId::Builtin(_) => builtin_module(db),
-            TypeDefId::Struct(struct_id) => struct_id.parent(db),
-            TypeDefId::Enum(enum_id) => enum_id.parent(db),
+            Self::Builtin(_) => builtin_module(db),
+            Self::Struct(struct_id) => struct_id.parent(db),
+            Self::Enum(enum_id) => enum_id.parent(db),
         }
     }
 
     pub fn name_span(&self, db: &dyn Db) -> Option<Span> {
         match self {
-            TypeDefId::Builtin(_) => None,
-            TypeDefId::Struct(struct_id) => Some(struct_id.name_span(db)),
-            TypeDefId::Enum(enum_id) => Some(enum_id.name_span(db)),
+            Self::Builtin(_) => None,
+            Self::Struct(struct_id) => Some(struct_id.name_span(db)),
+            Self::Enum(enum_id) => Some(enum_id.name_span(db)),
         }
     }
 
     pub fn span(&self, db: &dyn Db) -> Option<Span> {
         match self {
-            TypeDefId::Builtin(_) => None,
-            TypeDefId::Struct(struct_id) => Some(struct_id.span(db)),
-            TypeDefId::Enum(enum_id) => Some(enum_id.span(db)),
+            Self::Builtin(_) => None,
+            Self::Struct(struct_id) => Some(struct_id.span(db)),
+            Self::Enum(enum_id) => Some(enum_id.span(db)),
         }
     }
 }
@@ -177,10 +177,10 @@ impl FunctionId {
 impl FunctionLikeAst {
     pub fn name_span(&self) -> Span {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => spanned.data.name.span,
-            FunctionLikeAst::Fundef(spanned) => spanned.data.name.span,
-            FunctionLikeAst::Method(spanned) => spanned.data.name.span,
-            FunctionLikeAst::TraitMethod(spanned) => spanned.data.name.span,
+            Self::ExternDef(spanned, _) => spanned.data.name.span,
+            Self::Fundef(spanned) => spanned.data.name.span,
+            Self::Method(spanned) => spanned.data.name.span,
+            Self::TraitMethod(spanned) => spanned.data.name.span,
         }
     }
 }
@@ -257,9 +257,9 @@ pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
 impl AstIncludePathDesc {
     pub fn to_segments(&self) -> Option<NonEmpty<Symbol>> {
         let (hd, tl) = match self {
-            AstIncludePathDesc::Symbol(symbol) => Some((*symbol, None)),
-            AstIncludePathDesc::NameResolved { from, to } => Some((*from, Some(to))),
-            AstIncludePathDesc::Error => None,
+            Self::Symbol(symbol) => Some((*symbol, None)),
+            Self::NameResolved { from, to } => Some((*from, Some(to))),
+            Self::Error => None,
         }?;
         fn _to_segments(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
             match this {
@@ -304,8 +304,8 @@ pub fn module_definitions<'db>(
             items.iter().for_each(|item| {
                 definition_of_item(db, module, item).into_iter().for_each(|def| {
                     res.push((def.name(db), def));
-                })
-            })
+                });
+            });
         });
 
         res

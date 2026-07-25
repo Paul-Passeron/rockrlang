@@ -51,7 +51,7 @@ pub mod types;
 pub fn check(db: &dyn Db, ws: Workspace) {
     let pkgs = workspace_packages(db, ws);
     for &pkg in pkgs.iter() {
-        check_package(db, pkg)
+        check_package(db, pkg);
     }
 }
 

@@ -55,7 +55,7 @@ impl Module<Building> {
         id: LIRFunctionId,
         f: impl FnOnce(&mut FunctionBuilder<'_, '_>),
     ) -> Result<(), VerifyError> {
-        let Module { sigs, bodies } = self;
+        let Self { sigs, bodies } = self;
         assert!(matches!(sigs[id.0].kind, SigKind::Defined(_)));
         generativity::make_guard!(guard);
         let mut builder = FunctionBuilder {
@@ -91,7 +91,7 @@ pub struct BlockBuilder<'ir, 'b> {
     db: &'b dyn Db,
 }
 
-impl<'ir, 'b> BlockBuilder<'ir, 'b> {
+impl<'ir> BlockBuilder<'ir, '_> {
     pub fn terminate(self, term: Terminator<'ir>) -> Terminated<()> {
         let block = &mut self.body.blocks[self.id.idx];
         block.insts = self.insts;
@@ -104,7 +104,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     }
 }
 
-impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
+impl<'ir> FunctionBuilder<'ir, '_> {
     pub fn build_block<'b, T>(
         &'b mut self,
         id: BrandedBlockId<'ir>,
@@ -121,7 +121,7 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
     }
 }
 
-impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
+impl<'ir> FunctionBuilder<'ir, '_> {
     pub fn new_block(&self, name: Option<Symbol>) -> BrandedBlockId<'ir> {
         self.body.new_block(name)
     }
@@ -179,7 +179,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             self.body.defs[ptr.idx].ty.class(self.db),
             ValueClass::Scalar(ScalarKind::Ptr)
         );
-        self.push_void(VoidInstKind::Store { ptr, value })
+        self.push_void(VoidInstKind::Store { ptr, value });
     }
 
     pub fn store_typed<V: ValueKind>(
@@ -188,7 +188,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         value: Typed<'ir, V>,
     ) {
         debug_assert_eq!(ptr.pointee.layout, value.ty.layout);
-        self.store(ptr.erase(), value.erase())
+        self.store(ptr.erase(), value.erase());
     }
 
     pub fn memcpy(&mut self, src: ValueId<'ir>, dst: ValueId<'ir>, ty: LIRTy) {
@@ -577,7 +577,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             Some(def)
         };
 
-        let res = dest.as_ref().map(|d| d.id());
+        let res = dest.as_ref().map(ValueDef::id);
 
         let params = self.get_params(f);
 
@@ -642,7 +642,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         let ret_ty = self.get_ret_ty(self.body.id);
         match value {
             Some(v) => {
-                assert_eq!(self.body.defs[v.idx].ty.layout, ret_ty.layout)
+                assert_eq!(self.body.defs[v.idx].ty.layout, ret_ty.layout);
             }
             None => assert!(ret_ty.is_zst(self.db)),
         }
@@ -682,12 +682,12 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
 impl<T> Terminated<T> {
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Terminated<U> {
-        let Terminated(value) = self;
+        let Self(value) = self;
         Terminated(f(value))
     }
 
     pub fn take(self) -> (T, Terminated<()>) {
-        let Terminated(t) = self;
+        let Self(t) = self;
         (t, Terminated(()))
     }
 }
@@ -744,19 +744,19 @@ impl LIRTy {
     }
 }
 
-impl<'ir> TypedPtr<'ir, Aggregate> {
+impl TypedPtr<'_, Aggregate> {
     pub fn layout(self, db: &dyn Db) -> &AggregateLayout {
         self.pointee.aggregate_layout(db).unwrap()
     }
 }
 
-impl<'ir> TypedPtr<'ir, Union> {
+impl TypedPtr<'_, Union> {
     pub fn layout(self, db: &dyn Db) -> &VariantsLayout {
         self.pointee.union_layout(db).unwrap()
     }
 }
 
-impl<'ir> TypedPtr<'ir, Scalar<Int>> {
+impl TypedPtr<'_, Scalar<Int>> {
     pub fn layout(self, db: &dyn Db) -> IntWidth {
         match self.pointee.layout.data(db) {
             LayoutData::Scalar(ScalarKind::Int(width)) => *width,
@@ -765,7 +765,7 @@ impl<'ir> TypedPtr<'ir, Scalar<Int>> {
     }
 }
 
-impl<'ir> IntValue<'ir> {
+impl IntValue<'_> {
     pub fn width(&self, db: &dyn Db) -> IntWidth {
         match self.ty.layout.data(db) {
             LayoutData::Scalar(ScalarKind::Int(width)) => *width,
@@ -787,7 +787,7 @@ impl<'ir> InProgressBody<'ir> {
                 _brand: PhantomData,
             })
             .collect();
-        let ids = defs.iter().map(|d| d.id()).collect();
+        let ids = defs.iter().map(ValueDef::id).collect();
         let idx = self.blocks.insert(BrandedBlockData {
             name,
             params: defs,
@@ -799,7 +799,7 @@ impl<'ir> InProgressBody<'ir> {
     }
 }
 
-impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
+impl<'ir> FunctionBuilder<'ir, '_> {
     pub fn param(&self, i: usize) -> (LIRTy, ValueId<'ir>) {
         let def = &self.body.blocks[self.body.entry.idx].params[i];
         (self.body.defs[def.idx].ty, def.id())
@@ -822,7 +822,7 @@ impl<'ir, 'm> FunctionBuilder<'ir, 'm> {
     }
 }
 
-impl<'ir, S: ScalarMarker> Typed<'ir, Scalar<S>>
+impl<S: ScalarMarker> Typed<'_, Scalar<S>>
 where
     Scalar<S>: ValueKind,
 {

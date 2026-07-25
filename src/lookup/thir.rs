@@ -45,13 +45,13 @@ pub enum ThirNode<'thir> {
 }
 
 impl Thir {
-    fn local_at<'a>(&'a self, local: LocalId, loc: Location) -> Option<ThirNode<'a>> {
+    fn local_at(&self, local: LocalId, loc: Location) -> Option<ThirNode<'_>> {
         let thir_loc = &self.locals[local];
         thir_loc.span.encloses(loc).then_some(())?;
         thir_loc.is_synthetic.not().then_some(ThirNode::Local(local))
     }
 
-    fn place_at<'a>(&'a self, place: PlaceId, loc: Location) -> Option<ThirNode<'a>> {
+    fn place_at(&self, place: PlaceId, loc: Location) -> Option<ThirNode<'_>> {
         // TODO: handle projections
         let pl = &self.places[place];
         pl.span.encloses(loc).then_some(())?;
@@ -62,7 +62,7 @@ impl Thir {
         }
     }
 
-    fn expr_at<'a>(&'a self, expr: ExprId, loc: Location) -> Option<ThirNode<'a>> {
+    fn expr_at(&self, expr: ExprId, loc: Location) -> Option<ThirNode<'_>> {
         let e = &self.exprs[expr];
         e.span.encloses(loc).then_some(())?;
         let res = match &e.kind {

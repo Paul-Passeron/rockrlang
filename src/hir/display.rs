@@ -37,22 +37,22 @@ impl<'db> HirBody<'db> {
 impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            BinaryOperator::Plus => write!(f, "+"),
-            BinaryOperator::Minus => write!(f, "-"),
-            BinaryOperator::Times => write!(f, "*"),
-            BinaryOperator::Div => write!(f, "/"),
-            BinaryOperator::Modulo => write!(f, "%"),
-            BinaryOperator::Eq => write!(f, "=="),
-            BinaryOperator::Diff => write!(f, "!="),
-            BinaryOperator::Lt => write!(f, "<"),
-            BinaryOperator::Leq => write!(f, "<="),
-            BinaryOperator::Gt => write!(f, ">"),
-            BinaryOperator::Geq => write!(f, ">="),
-            BinaryOperator::And => write!(f, "&&"),
-            BinaryOperator::Or => write!(f, "||"),
-            BinaryOperator::BitAnd => write!(f, "&"),
-            BinaryOperator::BitOr => write!(f, "|"),
-            BinaryOperator::BitXor => write!(f, "^"),
+            Self::Plus => write!(f, "+"),
+            Self::Minus => write!(f, "-"),
+            Self::Times => write!(f, "*"),
+            Self::Div => write!(f, "/"),
+            Self::Modulo => write!(f, "%"),
+            Self::Eq => write!(f, "=="),
+            Self::Diff => write!(f, "!="),
+            Self::Lt => write!(f, "<"),
+            Self::Leq => write!(f, "<="),
+            Self::Gt => write!(f, ">"),
+            Self::Geq => write!(f, ">="),
+            Self::And => write!(f, "&&"),
+            Self::Or => write!(f, "||"),
+            Self::BitAnd => write!(f, "&"),
+            Self::BitOr => write!(f, "|"),
+            Self::BitXor => write!(f, "^"),
         }
     }
 }
@@ -239,7 +239,7 @@ fn write_pattern(
                 HirPatternConstructorArgs::None => Ok(()),
                 HirPatternConstructorArgs::StructFields(hir_struct_field_patterns) => {
                     writeln!(f, "{{")?;
-                    for p in hir_struct_field_patterns.iter() {
+                    for p in hir_struct_field_patterns {
                         write_indent(f, depth + 2)?;
                         match p {
                             HirStructFieldPattern::Rebind { name, pattern, .. } => {
@@ -282,7 +282,7 @@ fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::R
         }
         HirPlaceKind::TupleField { base, index } => {
             write_place(f, base, db)?;
-            write!(f, ".{}", index)
+            write!(f, ".{index}")
         }
         HirPlaceKind::Deref(base) => {
             write!(f, "*")?;
@@ -304,11 +304,11 @@ fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::R
 
 fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Result {
     match &expr.data {
-        HirExprDesc::IntLit(n) => write!(f, "{}", n),
-        HirExprDesc::CharLit(c) => write!(f, "'{}'", c),
+        HirExprDesc::IntLit(n) => write!(f, "{n}"),
+        HirExprDesc::CharLit(c) => write!(f, "'{c}'"),
         HirExprDesc::StrLit(s) => write!(f, "\"{}\"", s.display(db)),
         HirExprDesc::CStrLit(s) => write!(f, "c\"{}\"", s.display(db)),
-        HirExprDesc::BoolLit(b) => write!(f, "{}", b),
+        HirExprDesc::BoolLit(b) => write!(f, "{b}"),
 
         HirExprDesc::Use(place) => write_place(f, place, db),
         HirExprDesc::AddressOf { place, mutability } => {
@@ -369,38 +369,35 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             write!(f, ")")
         }
         HirExprDesc::CallMethod { receiver, method, args, interface_hint, type_args } => {
-            match interface_hint {
-                Some(id) => {
-                    write!(f, "{}::{}", id.to_string(db), method.display(db))?;
-                    if !type_args.is_empty() {
-                        write!(f, "::<")?;
-                        for (i, arg) in type_args.iter().enumerate() {
-                            if i > 0 {
-                                write!(f, ", ")?;
-                            }
-                            write!(f, "{}", arg.to_string(db))?;
-                        }
-                        write!(f, ">")?;
-                    }
-                    write!(f, "(")?;
-                    write_expr(f, receiver, db)?;
-                    for arg in args {
-                        write!(f, ", ")?;
-                        write_expr(f, arg, db)?;
-                    }
-                    write!(f, ")")
-                }
-                None => {
-                    write_expr(f, receiver, db)?;
-                    write!(f, ".{}(", method.display(db))?;
-                    for (i, arg) in args.iter().enumerate() {
+            if let Some(id) = interface_hint {
+                write!(f, "{}::{}", id.to_string(db), method.display(db))?;
+                if !type_args.is_empty() {
+                    write!(f, "::<")?;
+                    for (i, arg) in type_args.iter().enumerate() {
                         if i > 0 {
                             write!(f, ", ")?;
                         }
-                        write_expr(f, arg, db)?;
+                        write!(f, "{}", arg.to_string(db))?;
                     }
-                    write!(f, ")")
+                    write!(f, ">")?;
                 }
+                write!(f, "(")?;
+                write_expr(f, receiver, db)?;
+                for arg in args {
+                    write!(f, ", ")?;
+                    write_expr(f, arg, db)?;
+                }
+                write!(f, ")")
+            } else {
+                write_expr(f, receiver, db)?;
+                write!(f, ".{}(", method.display(db))?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write_expr(f, arg, db)?;
+                }
+                write!(f, ")")
             }
         }
 
@@ -430,7 +427,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
         HirExprDesc::BinOp { lhs, op, rhs } => {
             write!(f, "(")?;
             write_expr(f, lhs, db)?;
-            write!(f, " {} ", op)?; // assumes BinaryOperator: Display
+            write!(f, " {op} ")?; // assumes BinaryOperator: Display
             write_expr(f, rhs, db)?;
             write!(f, ")")
         }
@@ -491,7 +488,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", hint.to_string(db))?
+                    write!(f, "{}", hint.to_string(db))?;
                 }
                 write!(f, ">")?;
             }

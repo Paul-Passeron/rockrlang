@@ -31,7 +31,7 @@ use crate::{
 impl FieldOrderingKind {
     pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {
         match self {
-            FieldOrderingKind::SourceOrder => (0..fields.len() as u32).collect(),
+            Self::SourceOrder => (0..fields.len() as u32).collect(),
         }
     }
 }

@@ -33,7 +33,7 @@ use crate::{
     },
 };
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     pub fn void_ty(&self) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::void(self.db)),
@@ -95,21 +95,8 @@ impl<'db> InferenceCtx<'db> {
         self.ptr_of(self.char_ty())
     }
 
-    pub fn as_builtin<'ty>(
-        &self,
-        ty: &'ty InferTy,
-    ) -> Option<(BuiltinTypeId, &'ty [InferTy])> {
-        let InferTy::Adt { def, fields } = ty else {
-            return None;
-        };
-        let TypeDefId::Builtin(builtin) = def else {
-            return None;
-        };
-        Some((*builtin, fields))
-    }
-
     pub fn is_slice(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = self.as_builtin(ty)?;
+        let (builtin, fields) = ty.as_builtin()?;
         match builtin.kind(self.db) {
             BuiltinTypeKind::Slice => Some(fields[0].clone()),
             _ => None,
@@ -117,7 +104,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_ref(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = self.as_builtin(ty)?;
+        let (builtin, fields) = ty.as_builtin()?;
         match builtin.kind(self.db) {
             BuiltinTypeKind::Ref { .. } => {
                 assert_eq!(fields.len(), 1);
@@ -132,7 +119,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_ptr(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = self.as_builtin(ty)?;
+        let (builtin, fields) = ty.as_builtin()?;
         match builtin.kind(self.db) {
             BuiltinTypeKind::Ptr { .. } => {
                 assert_eq!(fields.len(), 1);
@@ -143,7 +130,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn is_tuple<'a>(&self, ty: &'a InferTy) -> Option<&'a [InferTy]> {
-        let (builtin, fields) = self.as_builtin(ty)?;
+        let (builtin, fields) = ty.as_builtin()?;
         match builtin.kind(self.db) {
             BuiltinTypeKind::Tuple => Some(fields),
             _ => None,
@@ -165,10 +152,12 @@ impl<'db> InferenceCtx<'db> {
                     .collect::<Option<_>>()?,
             }),
             TypeRef::Param(type_param_id) => ctx.get_template(type_param_id.0),
-            TypeRef::Error => None,
             TypeRef::Zelf => ctx.zelf().cloned(),
-            TypeRef::Associated(_symbol) => todo!(),
-            TypeRef::Unknown => None,
+            TypeRef::Associated(_symbol) => {
+                eprintln!("TODO: Deal with associated types");
+                None
+            }
+            TypeRef::Error | TypeRef::Unknown => None,
         }
     }
 
@@ -188,10 +177,9 @@ impl<'db> InferenceCtx<'db> {
                     .collect(),
             },
             TypeRef::Param(type_param_id) => match ctx.get_template(type_param_id.0) {
-                Some(res) => res.clone(),
+                Some(res) => res,
                 None => self.fresh_var().into(),
             },
-            TypeRef::Error => self.fresh_var().into(),
             TypeRef::Zelf => {
                 if let Some(zelf) = ctx.zelf() {
                     zelf.clone()
@@ -203,7 +191,7 @@ impl<'db> InferenceCtx<'db> {
                 // TODO
                 self.fresh_var().into()
             }
-            TypeRef::Unknown => self.fresh_var().into(),
+            TypeRef::Error | TypeRef::Unknown => self.fresh_var().into(),
         }
     }
 
@@ -224,7 +212,9 @@ impl<'db> InferenceCtx<'db> {
                 TypeDefId::Struct(struct_id) => {
                     let templates = fields;
                     let ast = struct_item(self.db, struct_id.interned());
-                    let templates = if templates.len() != ast.template_args.len() {
+                    let templates = if templates.len() == ast.template_args.len() {
+                        templates.iter().cloned().collect::<Arc<_>>()
+                    } else {
                         ast.template_args
                             .iter()
                             .enumerate()
@@ -235,8 +225,6 @@ impl<'db> InferenceCtx<'db> {
                                     .unwrap_or_else(|| InferTy::Var(self.fresh_var()))
                             })
                             .collect::<Arc<_>>()
-                    } else {
-                        templates.iter().cloned().collect::<Arc<_>>()
                     };
                     let module = struct_id.parent(self.db);
                     let ctx = ImplicitContext::new(
@@ -265,7 +253,7 @@ impl<'db> InferenceCtx<'db> {
                         None
                     }
                 }
-                _ => None,
+                TypeDefId::Enum(_) => None,
             }
         } else {
             None
@@ -274,7 +262,7 @@ impl<'db> InferenceCtx<'db> {
 }
 
 impl InferTy {
-    pub fn ptr_like(&self, db: &dyn Db) -> Option<(Mutability, &InferTy)> {
+    pub fn ptr_like(&self, db: &dyn Db) -> Option<(Mutability, &Self)> {
         self.as_adt().and_then(|(def, vals)| {
             let kind = def.is_ptr_like(db)?;
             Some((kind.mutability(), &vals[0]))

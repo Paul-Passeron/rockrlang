@@ -27,15 +27,15 @@ use crate::{
     },
 };
 
-use super::*;
+use super::{InternedModuleId, ModuleId, Db, Symbol, SourceFile, FileModule, Package, InternedFunctionId, FunctionId, ScopeOwnerId, InternedStructId, StructId, InternedImplId, ImplId, TypeRef, InterfaceRef, Set, InternedInterfaceId, InterfaceId, InternedTypeId, TypeId, TypeDefId, BuiltinTypeId, BuiltinTypeDef, BuiltinTypeKind, IntWidth, InternedInterfaceRef, InternedEnumId, EnumId};
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
     fn from(v: InternedModuleId<'db>) -> Self {
-        ModuleId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<ModuleId> for InternedModuleId<'db> {
+impl From<ModuleId> for InternedModuleId<'_> {
     fn from(v: ModuleId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -45,7 +45,7 @@ impl ModuleId {
     pub fn new<'db>(
         db: &'db dyn Db,
         name: Symbol,
-        parent: Option<ModuleId>,
+        parent: Option<Self>,
         file: Option<SourceFile>,
         file_submodules: Vec<FileModule<'db>>,
         package: Option<Package<'db>>,
@@ -61,7 +61,7 @@ impl ModuleId {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn Db) -> Option<ModuleId> {
+    pub fn parent(self, db: &dyn Db) -> Option<Self> {
         *self.interned().parent(db)
     }
 
@@ -81,11 +81,11 @@ impl ModuleId {
 
 impl<'db> From<InternedFunctionId<'db>> for FunctionId {
     fn from(v: InternedFunctionId<'db>) -> Self {
-        FunctionId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<FunctionId> for InternedFunctionId<'db> {
+impl From<FunctionId> for InternedFunctionId<'_> {
     fn from(v: FunctionId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -112,11 +112,11 @@ impl FunctionId {
 
 impl<'db> From<InternedStructId<'db>> for StructId {
     fn from(v: InternedStructId<'db>) -> Self {
-        StructId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<StructId> for InternedStructId<'db> {
+impl From<StructId> for InternedStructId<'_> {
     fn from(v: StructId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -142,11 +142,11 @@ impl StructId {
 
 impl<'db> From<InternedImplId<'db>> for ImplId {
     fn from(v: InternedImplId<'db>) -> Self {
-        ImplId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<ImplId> for InternedImplId<'db> {
+impl From<ImplId> for InternedImplId<'_> {
     fn from(v: ImplId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -187,11 +187,11 @@ impl ImplId {
 
 impl<'db> From<InternedInterfaceId<'db>> for InterfaceId {
     fn from(v: InternedInterfaceId<'db>) -> Self {
-        InterfaceId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<InterfaceId> for InternedInterfaceId<'db> {
+impl From<InterfaceId> for InternedInterfaceId<'_> {
     fn from(v: InterfaceId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -217,11 +217,11 @@ impl InterfaceId {
 
 impl<'db> From<InternedTypeId<'db>> for TypeId {
     fn from(v: InternedTypeId<'db>) -> Self {
-        TypeId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<TypeId> for InternedTypeId<'db> {
+impl From<TypeId> for InternedTypeId<'_> {
     fn from(v: TypeId) -> Self {
         Self(v.0, PhantomData)
     }
@@ -257,13 +257,13 @@ impl From<TypeId> for TypeRef {
     }
 }
 
-impl<'a> From<BuiltinTypeDef<'a>> for BuiltinTypeId {
+impl From<BuiltinTypeDef<'_>> for BuiltinTypeId {
     fn from(value: BuiltinTypeDef) -> Self {
         Self(value.0)
     }
 }
 
-impl<'db> BuiltinTypeDef<'db> {
+impl BuiltinTypeDef<'_> {
     fn name(self, db: &dyn Db) -> Symbol {
         let as_str = match *self.kind(db) {
             BuiltinTypeKind::Void => "void".into(),
@@ -482,7 +482,7 @@ impl BuiltinTypeId {
 impl TypeDefId {
     pub fn is_ptr_like(self, db: &dyn Db) -> Option<PtrKind> {
         match self {
-            TypeDefId::Builtin(ty) => ty.is_ptr_like(db),
+            Self::Builtin(ty) => ty.is_ptr_like(db),
             _ => None,
         }
     }
@@ -497,7 +497,7 @@ pub enum PtrKind {
 impl PtrKind {
     pub fn mutability(&self) -> Mutability {
         match self {
-            PtrKind::Ref(m) | PtrKind::RawPtr(m) => *m,
+            Self::Ref(m) | Self::RawPtr(m) => *m,
         }
     }
 }
@@ -593,7 +593,7 @@ impl<'db> From<InternedInterfaceRef<'db>> for InterfaceRef {
     }
 }
 
-impl<'db> From<InterfaceRef> for InternedInterfaceRef<'db> {
+impl From<InterfaceRef> for InternedInterfaceRef<'_> {
     fn from(v: InterfaceRef) -> Self {
         Self(v.0, PhantomData)
     }
@@ -619,11 +619,11 @@ impl InterfaceRef {
 
 impl<'db> From<InternedEnumId<'db>> for EnumId {
     fn from(v: InternedEnumId<'db>) -> Self {
-        EnumId(v.0)
+        Self(v.0)
     }
 }
 
-impl<'db> From<EnumId> for InternedEnumId<'db> {
+impl From<EnumId> for InternedEnumId<'_> {
     fn from(v: EnumId) -> Self {
         Self(v.0, PhantomData)
     }

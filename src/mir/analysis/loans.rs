@@ -112,7 +112,7 @@ impl MIRLoanAnalysis {
                 (
                     *blk,
                     ids.iter()
-                        .flat_map(|local| Some(by_holder.get(local)?.iter().copied()))
+                        .filter_map(|local| Some(by_holder.get(local)?.iter().copied()))
                         .flatten()
                         .collect(),
                 )

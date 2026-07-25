@@ -177,10 +177,9 @@ impl<'db> SanityChecker<'db> {
                 }
             }
             ThirPatternKind::IntLit(_) => {
-                if !expected_ty
+                if expected_ty
                     .as_type_id()
-                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
-                    .is_some()
+                    .and_then(|ty| ty.def(self.db).is_int_like(self.db)).is_none()
                 {
                     self.check_types(expected_ty, int_id(self.db).into(), pat.span);
                 }
@@ -212,7 +211,7 @@ impl<'db> SanityChecker<'db> {
                 infos.span,
             ),
             ExprKind::StrLit(_) => {
-                self.check_types(TypeRef::Concrete(str_id(self.db)), infos.ty, infos.span)
+                self.check_types(TypeRef::Concrete(str_id(self.db)), infos.ty, infos.span);
             }
             ExprKind::CStrLit(_) => self.check_types(
                 TypeRef::Concrete(const_ptr_of(
@@ -253,7 +252,7 @@ impl<'db> SanityChecker<'db> {
                 let params = called.params(self.db);
                 params.into_iter().zip(args_ty).for_each(
                     |((_, param), (arg_ty, arg))| {
-                        self.check_types(param, arg_ty, self.thir.exprs[arg].span)
+                        self.check_types(param, arg_ty, self.thir.exprs[arg].span);
                     },
                 );
                 self.check_types(ret, infos.ty, infos.span);
@@ -426,7 +425,7 @@ impl<'db> SanityChecker<'db> {
                 self.check_expr(*expr);
                 self.check_types(*type_ref, infos.ty, infos.span);
             }
-        };
+        }
         infos.ty
     }
 
@@ -482,14 +481,11 @@ impl<'db> SanityChecker<'db> {
     pub fn check_return(&mut self, expr: Option<ExprId>, span: Span) {
         let ret_ty = self.thir.get_ret_ty(self.db);
 
-        match expr {
-            Some(expr) => {
-                self.check_expr_with_expected_type(expr, ret_ty);
-            }
-            None => {
-                let void_ty = TypeRef::Concrete(void_id(self.db));
-                self.check_types(ret_ty, void_ty, span);
-            }
+        if let Some(expr) = expr {
+            self.check_expr_with_expected_type(expr, ret_ty);
+        } else {
+            let void_ty = TypeRef::Concrete(void_id(self.db));
+            self.check_types(ret_ty, void_ty, span);
         }
     }
 
@@ -642,16 +638,16 @@ pub enum ConstructorType {
 impl ConstructorType {
     pub fn with_substitution(&self, db: &dyn Db, sub: &[TypeRef]) -> Self {
         match self {
-            ConstructorType::Tuple(type_refs) => ConstructorType::Tuple(
+            Self::Tuple(type_refs) => Self::Tuple(
                 type_refs.iter().map(|ty| ty.with_substitution(db, sub)).collect(),
             ),
-            ConstructorType::Struct(items) => ConstructorType::Struct(
+            Self::Struct(items) => Self::Struct(
                 items
                     .iter()
                     .map(|(name, ty)| (*name, ty.with_substitution(db, sub)))
                     .collect(),
             ),
-            ConstructorType::None => ConstructorType::None,
+            Self::None => Self::None,
         }
     }
 }

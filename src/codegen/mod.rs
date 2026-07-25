@@ -67,19 +67,19 @@ impl<'db, 'ctx> CGState<'db> for LIRToLLVM<'db, 'ctx> {
     type Out = IModule<'ctx>;
 }
 
-impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
+impl<'db> Codegen<'db, MIRToLIRDeclare<'db, '_>> {
     pub fn lir(&mut self) -> &mut Module<Declaring> {
         &mut self.lir
     }
 }
 
-impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
+impl<'db> Codegen<'db, MIRToLIRBuild<'db, '_>> {
     pub fn lir(&mut self) -> &mut Module<Building> {
         &mut self.lir
     }
 }
 
-impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
+impl<'db> Codegen<'db, LIRToLLVM<'db, '_>> {
     pub fn lir(&self) -> &Module<Complete> {
         &self.lir
     }

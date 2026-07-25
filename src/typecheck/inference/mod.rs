@@ -305,7 +305,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 write!(f, "Field count mismatch: {x} != {y}")
             }
             UnificationError::RecursiveDefinition(infer_var) => {
-                write!(f, "Recursive definition: {infer_var}",)
+                write!(f, "Recursive definition: {infer_var}")
             }
             UnificationError::UnmetConstraint(
                 inference_constraint,
@@ -424,7 +424,7 @@ impl InferenceCtx<'_> {
     }
 
     pub fn solve(&mut self, ty: &InferTy) -> Option<TypeRef> {
-        let ty = self.find(&ty);
+        let ty = self.find(ty);
         match ty {
             InferTy::Var(_) => None,
             InferTy::Adt { def, fields } => Some(TypeRef::Concrete(TypeId::new(

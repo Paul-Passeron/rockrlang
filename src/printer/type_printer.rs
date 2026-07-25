@@ -147,11 +147,11 @@ impl TypePrinter {
                     && let Some(id) = Self::is_def_builtin(def)
                     && let Some((prefix, suffix)) = Self::is_builtin_pretty_print(db, id)
                 {
-                    format!("{}{}{}", prefix, fields_str, suffix)
+                    format!("{prefix}{fields_str}{suffix}")
                 } else if no_fields {
-                    self.type_def_id_to_string(db, def).to_string()
+                    self.type_def_id_to_string(db, def)
                 } else {
-                    format!("{}<{fields_str}>", self.type_def_id_to_string(db, def),)
+                    format!("{}<{fields_str}>", self.type_def_id_to_string(db, def))
                 }
             }
             InferTy::Param(type_param_id) => format!("T{}", type_param_id.0),
@@ -208,11 +208,11 @@ impl TypePrinter {
             && let Some(id) = Self::is_def_builtin(def)
             && let Some((prefix, suffix)) = Self::is_builtin_pretty_print(db, id)
         {
-            format!("{}{}{}", prefix, fields_str, suffix)
+            format!("{prefix}{fields_str}{suffix}")
         } else if no_fields {
-            self.type_def_id_to_string(db, def).to_string()
+            self.type_def_id_to_string(db, def)
         } else {
-            format!("{}<{fields_str}>", self.type_def_id_to_string(db, def),)
+            format!("{}<{fields_str}>", self.type_def_id_to_string(db, def))
         }
     }
 
@@ -229,9 +229,9 @@ impl TypePrinter {
             TypeRef::Param(type_param_id) => {
                 self.type_param_id_to_string(db, type_param_id)
             }
-            TypeRef::Zelf => "Self".to_string(),
-            TypeRef::Error => "<ERROR>".to_string(),
-            TypeRef::Unknown => "<???>".to_string(),
+            TypeRef::Zelf => "Self".to_owned(),
+            TypeRef::Error => "<ERROR>".to_owned(),
+            TypeRef::Unknown => "<???>".to_owned(),
         }
     }
 

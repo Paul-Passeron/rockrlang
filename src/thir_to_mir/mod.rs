@@ -158,9 +158,7 @@ impl FuncInst {
             if *pkg == core_package(db) {
                 continue;
             }
-            if main_pkg.is_some() {
-                panic!("TODO: handle multiple packages for main")
-            }
+            assert!(main_pkg.is_none(), "TODO: handle multiple packages for main");
 
             main_pkg = Some(*pkg);
         }
@@ -174,9 +172,7 @@ impl FuncInst {
         if self.fdef(db) != f_id {
             return false;
         }
-        if !self.subs(db).is_empty() {
-            panic!("Generic main function !");
-        }
+        assert!(self.subs(db).is_empty(), "Generic main function !");
 
         true
     }
@@ -259,7 +255,7 @@ impl<'a> ThirToMIR<'a> {
                 mir = mir
                     .with_name(src.1)
                     .with_thir_src(thir_id)
-                    .with_syn_src(SyntacticSource { span: local.span, id: src.0 })
+                    .with_syn_src(SyntacticSource { span: local.span, id: src.0 });
             }
             let mir_id = self.builder.new_local(mir);
 
@@ -277,12 +273,10 @@ impl<'a> ThirToMIR<'a> {
 
     fn check_substitution(&self) {
         for ty in self.subs {
-            if !self.is_concrete(*ty) {
-                panic!(
-                    "Expecting a valid type in substitution but got {}",
-                    ty.to_string(self.db)
-                )
-            }
+            assert!(self.is_concrete(*ty), 
+                "Expecting a valid type in substitution but got {}",
+                ty.to_string(self.db)
+            );
         }
     }
 
@@ -307,7 +301,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn goto(&mut self, next: MIRBlockID) {
-        self.builder.terminate(MIRTerminator::Goto { next }).unwrap()
+        self.builder.terminate(MIRTerminator::Goto { next }).unwrap();
     }
 
     fn build_stmt(&mut self, stmt: &ThirStmt) {
@@ -319,12 +313,12 @@ impl<'a> ThirToMIR<'a> {
                 self.build_if_stmt(
                     cond,
                     then,
-                    else_.as_ref().map(|x| x.as_slice()),
+                    else_.as_ref().map(Vec::as_slice),
                     stmt.span,
                 );
             }
             StmtKind::While { scope, cond, body } => {
-                self.build_while_stmt(*scope, cond, body, stmt.span)
+                self.build_while_stmt(*scope, cond, body, stmt.span);
             }
             StmtKind::Let { local, init } => {
                 let mir_local = self.local_map[local];
@@ -352,7 +346,7 @@ impl<'a> ThirToMIR<'a> {
                 self.goto(bb);
             }
             StmtKind::Match { scrutinee, branches } => {
-                self.build_match_stmt(scrutinee, branches)
+                self.build_match_stmt(scrutinee, branches);
             }
             StmtKind::Expr(idx) => {
                 let rval = self.build_rvalue(*idx);
@@ -773,11 +767,11 @@ impl<'a> ThirToMIR<'a> {
             }
             // TODO: Handle unicode one day
             ExprKind::Charlit(lit) => Some(MIRConstant::Integer {
-                value: *lit as u8 as u128,
+                value: u128::from(*lit as u8),
                 ty: char_id(self.db).into(),
             }),
             ExprKind::CStrLit(str_lit) => Some(MIRConstant::CString {
-                contents: str_lit.interned().contents(self.db).to_string(),
+                contents: str_lit.interned().contents(self.db).clone(),
                 null_terminated: true,
             }),
             ExprKind::BoolLit(value) => Some(MIRConstant::Bool(*value)),
@@ -806,7 +800,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn build_ret(&mut self, value: Option<MIROperand>, span: Span) {
-        self.build_terminator(MIRTerminator::Return { value, span })
+        self.build_terminator(MIRTerminator::Return { value, span });
     }
 
     fn build_void_ret(&mut self, span: Span) {
@@ -859,7 +853,7 @@ impl TypeRef {
     /// check.
     pub fn is_copy(self, db: &dyn Db) -> bool {
         match self {
-            TypeRef::Concrete(type_id) => type_id.is_copy(db),
+            Self::Concrete(type_id) => type_id.is_copy(db),
             _ => false, // TODO
         }
     }

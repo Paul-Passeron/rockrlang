@@ -122,8 +122,8 @@ impl Mutability {
 impl fmt::Display for Mutability {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Mutability::Const => Ok(()),
-            Mutability::Mutable => write!(f, "mut "),
+            Self::Const => Ok(()),
+            Self::Mutable => write!(f, "mut "),
         }
     }
 }
@@ -321,31 +321,31 @@ pub enum HirStructFieldPattern {
 impl HirStructFieldPattern {
     pub fn span(&self) -> Span {
         match self {
-            HirStructFieldPattern::Rebind { pattern, name_span, .. } => {
+            Self::Rebind { pattern, name_span, .. } => {
                 name_span.start().span(pattern.span.end())
             }
-            HirStructFieldPattern::Name { span, .. } => *span,
+            Self::Name { span, .. } => *span,
         }
     }
 
     pub fn name_span(&self) -> Span {
         match self {
-            HirStructFieldPattern::Rebind { name_span, .. } => *name_span,
-            HirStructFieldPattern::Name { span, .. } => *span,
+            Self::Rebind { name_span, .. } => *name_span,
+            Self::Name { span, .. } => *span,
         }
     }
 
     pub fn pat_span(&self) -> Span {
         match self {
-            HirStructFieldPattern::Rebind { pattern, .. } => pattern.span,
-            HirStructFieldPattern::Name { span, .. } => *span,
+            Self::Rebind { pattern, .. } => pattern.span,
+            Self::Name { span, .. } => *span,
         }
     }
 
     pub fn name(&self) -> Symbol {
         match self {
-            HirStructFieldPattern::Rebind { name, .. }
-            | HirStructFieldPattern::Name { name, .. } => *name,
+            Self::Rebind { name, .. }
+            | Self::Name { name, .. } => *name,
         }
     }
 }
@@ -386,7 +386,7 @@ pub fn interface_items<'db>(
     )
 }
 
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FunctionLikeAst {
     ExternDef(Arc<AstFunsig>, bool),
     Fundef(Arc<AstFundef>),
@@ -397,52 +397,52 @@ pub enum FunctionLikeAst {
 impl FunctionLikeAst {
     pub fn get_span(&self) -> Span {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => spanned.span,
-            FunctionLikeAst::Fundef(spanned) => spanned.span,
-            FunctionLikeAst::Method(spanned) => spanned.span,
-            FunctionLikeAst::TraitMethod(spanned) => spanned.span,
+            Self::ExternDef(spanned, _) => spanned.span,
+            Self::Fundef(spanned) => spanned.span,
+            Self::Method(spanned) => spanned.span,
+            Self::TraitMethod(spanned) => spanned.span,
         }
     }
 
     pub fn body_span(&self) -> Option<Span> {
         match self {
-            FunctionLikeAst::Fundef(spanned) => Some(spanned.data.body_span),
-            FunctionLikeAst::Method(spanned) => Some(spanned.data.body_span),
+            Self::Fundef(spanned) => Some(spanned.data.body_span),
+            Self::Method(spanned) => Some(spanned.data.body_span),
             _ => None,
         }
     }
 
     pub fn get_args(&self) -> &[AstFundefArg] {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.args,
-            FunctionLikeAst::Fundef(spanned) => &spanned.data.args,
-            FunctionLikeAst::Method(spanned) => &spanned.data.args,
-            FunctionLikeAst::TraitMethod(spanned) => &spanned.data.args,
+            Self::ExternDef(spanned, _) => &spanned.data.args,
+            Self::Fundef(spanned) => &spanned.data.args,
+            Self::Method(spanned) => &spanned.data.args,
+            Self::TraitMethod(spanned) => &spanned.data.args,
         }
     }
 
     pub fn receiver(&self) -> Option<AstReceiver> {
         match self {
-            FunctionLikeAst::ExternDef(_, _) => None,
-            FunctionLikeAst::Fundef(_) => None,
-            FunctionLikeAst::Method(spanned) => Some(spanned.data.receiver.clone()),
-            FunctionLikeAst::TraitMethod(spanned) => Some(spanned.data.receiver.clone()),
+            Self::ExternDef(_, _) => None,
+            Self::Fundef(_) => None,
+            Self::Method(spanned) => Some(spanned.data.receiver.clone()),
+            Self::TraitMethod(spanned) => Some(spanned.data.receiver.clone()),
         }
     }
 
     pub fn get_ret(&self) -> &AstTypeExpr {
         match self {
-            FunctionLikeAst::ExternDef(spanned, _) => &spanned.data.return_type,
-            FunctionLikeAst::Fundef(spanned) => &spanned.data.return_type,
-            FunctionLikeAst::Method(spanned) => &spanned.data.return_type,
-            FunctionLikeAst::TraitMethod(spanned) => &spanned.data.return_type,
+            Self::ExternDef(spanned, _) => &spanned.data.return_type,
+            Self::Fundef(spanned) => &spanned.data.return_type,
+            Self::Method(spanned) => &spanned.data.return_type,
+            Self::TraitMethod(spanned) => &spanned.data.return_type,
         }
     }
 
     pub fn has_body(&self) -> bool {
         !matches!(
             self,
-            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
+            Self::ExternDef(_, _) | Self::TraitMethod(_)
         )
     }
 }
@@ -512,7 +512,7 @@ pub fn function_ast<'db>(
     panic!("[INTERNAL COMPILER ERROR] FunctionId's Ast not found")
 }
 
-pub fn hir_body<'db>(db: &'db dyn Db, function: FunctionId) -> Option<HirBody<'db>> {
+pub fn hir_body(db: &dyn Db, function: FunctionId) -> Option<HirBody<'_>> {
     _hir_body(db, function.interned())
 }
 

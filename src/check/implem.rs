@@ -179,22 +179,22 @@ fn check_interface_conformance<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
 fn describe_receiver(zelf: Option<ZelfArg>) -> String {
     match zelf {
         Some(z) => z.to_string(),
-        None => "no receiver".to_string(),
+        None => "no receiver".to_owned(),
     }
 }
 
 impl AstImplItem {
     pub fn name(&self) -> Symbol {
         match self {
-            AstImplItem::Type { name, .. } => *name,
-            AstImplItem::Fundef(fdef) => fdef.data.name.data,
+            Self::Type { name, .. } => *name,
+            Self::Fundef(fdef) => fdef.data.name.data,
         }
     }
 
     pub fn name_span(&self) -> Span {
         match self {
-            AstImplItem::Type { name_span, .. } => *name_span,
-            AstImplItem::Fundef(fdef) => fdef.data.name.span,
+            Self::Type { name_span, .. } => *name_span,
+            Self::Fundef(fdef) => fdef.data.name.span,
         }
     }
 }

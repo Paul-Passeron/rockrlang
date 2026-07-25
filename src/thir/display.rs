@@ -75,10 +75,10 @@ impl<'a> ThirPrinter<'a> {
                         self.line(&format!(
                             "{lbl} (Destructuring `{}`): {{",
                             struct_ref.clone().as_type_ref(self.db).to_string(self.db)
-                        ))
+                        ));
                     }
                     Some(BlockSemanticInfo::ForLoop) => {
-                        self.line(&format!("{lbl} (for-loop): {{",))
+                        self.line(&format!("{lbl} (for-loop): {{"));
                     }
 
                     None => self.line(&format!("{lbl}: {{")),
@@ -294,7 +294,7 @@ impl<'a> ThirPrinter<'a> {
                 format!("{name}{targs}::#{idx}{body}")
             }
 
-            ExprKind::Error => "<error>".to_string(),
+            ExprKind::Error => "<error>".to_owned(),
             ExprKind::Metadata(id) => {
                 format!("@metadata({})", self.render_expr(*id))
             }
@@ -342,7 +342,7 @@ impl<'a> ThirPrinter<'a> {
             match proj {
                 Projection::Deref => s = format!("(*{s})"),
                 Projection::Field(sym, _) => {
-                    s = format!("{s}.{}", sym.to_string(self.db))
+                    s = format!("{s}.{}", sym.to_string(self.db));
                 }
                 Projection::TupleField(n, _) => s = format!("{s}.{n}"),
                 Projection::Index(e) => s = format!("{s}[{}]", self.render_expr(*e)),
@@ -353,7 +353,7 @@ impl<'a> ThirPrinter<'a> {
 
     fn render_pattern(&self, pat: &ThirPattern) -> String {
         match &pat.kind {
-            ThirPatternKind::Any => "_".to_string(),
+            ThirPatternKind::Any => "_".to_owned(),
             ThirPatternKind::Bind { local, mutable } => {
                 let m = if *mutable { "mut " } else { "" };
                 format!("{m}{}", self.local_name(*local))
@@ -393,7 +393,7 @@ impl<'a> ThirPrinter<'a> {
                 format!("{name}{targs}::#{idx}{body}")
             }
             ThirPatternKind::IntLit(n) => n.to_string(),
-            ThirPatternKind::Error => "<error pat>".to_string(),
+            ThirPatternKind::Error => "<error pat>".to_owned(),
         }
     }
 

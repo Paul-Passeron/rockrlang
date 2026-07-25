@@ -81,27 +81,27 @@ struct GeneralSignature<'a> {
 }
 
 impl FunctionLikeAst {
-    fn general_sig<'a>(&'a self) -> GeneralSignature<'a> {
+    fn general_sig(&self) -> GeneralSignature<'_> {
         match self {
-            FunctionLikeAst::ExternDef(ast, _) => GeneralSignature {
+            Self::ExternDef(ast, _) => GeneralSignature {
                 name: &ast.data.name,
                 ret_ty: &ast.data.return_type,
                 args: &ast.data.args,
                 templates: &ast.data.template_args,
             },
-            FunctionLikeAst::Fundef(ast) => GeneralSignature {
+            Self::Fundef(ast) => GeneralSignature {
                 name: &ast.data.name,
                 ret_ty: &ast.data.return_type,
                 args: &ast.data.args,
                 templates: &ast.data.template_args,
             },
-            FunctionLikeAst::Method(ast) => GeneralSignature {
+            Self::Method(ast) => GeneralSignature {
                 name: &ast.data.name,
                 ret_ty: &ast.data.return_type,
                 args: &ast.data.args,
                 templates: &ast.data.template_args,
             },
-            FunctionLikeAst::TraitMethod(ast) => GeneralSignature {
+            Self::TraitMethod(ast) => GeneralSignature {
                 name: &ast.data.name,
                 ret_ty: &ast.data.return_type,
                 args: &ast.data.args,
@@ -259,12 +259,12 @@ fn templ_at(
 impl SigNode {
     pub fn span(&self) -> Span {
         match self {
-            SigNode::ParamType(function_param) => function_param.ty_span,
-            SigNode::ParamName(function_param) => function_param.name_span,
-            SigNode::ReturnTy(return_ty) => return_ty.span,
-            SigNode::TemplateParam { param, .. } => param.span,
-            SigNode::FunctionName { span, .. } => *span,
-            SigNode::TemplateConstraint { constraint, .. } => constraint.span,
+            Self::ParamType(function_param) => function_param.ty_span,
+            Self::ParamName(function_param) => function_param.name_span,
+            Self::ReturnTy(return_ty) => return_ty.span,
+            Self::TemplateParam { param, .. } => param.span,
+            Self::FunctionName { span, .. } => *span,
+            Self::TemplateConstraint { constraint, .. } => constraint.span,
         }
     }
 }

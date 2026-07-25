@@ -28,7 +28,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
-impl<'db> Parser<'db> {
+impl Parser<'_> {
     pub(super) fn parse_pattern(&mut self) -> Result<AstPattern, ParseError> {
         let start = self.get_start();
 

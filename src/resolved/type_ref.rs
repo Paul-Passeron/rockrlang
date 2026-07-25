@@ -19,7 +19,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //! API used throughout the pipeline (peeling refs/ptrs/slices, substituting
 //! params, wrapping in references, etc.).
 
-use super::*;
+use super::{
+    BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of,
+    slice_of, usize_id,
+};
 use crate::{Db, hir::Mutability, printer::type_printer::TypePrinter};
 
 impl TypeRef {
@@ -29,12 +32,12 @@ impl TypeRef {
 
     pub fn as_type_id(self) -> Option<TypeId> {
         match self {
-            TypeRef::Concrete(type_id) => Some(type_id),
+            Self::Concrete(type_id) => Some(type_id),
             _ => None,
         }
     }
 
-    pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[TypeRef])> {
+    pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[Self])> {
         let id = self.as_type_id()?;
         match id.def(db) {
             TypeDefId::Builtin(bid) => Some((bid, id.args(db))),
@@ -47,7 +50,7 @@ impl TypeRef {
         matches!(b.kind(db), BuiltinTypeKind::Tuple).then(|| args.to_vec())
     }
 
-    pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+    pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, Self)> {
         let type_id = self.as_type_id()?;
         let ptr_kind = type_id.def(db).is_ptr_like(db)?;
         match ptr_kind {
@@ -56,7 +59,7 @@ impl TypeRef {
         }
     }
 
-    pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+    pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, Self)> {
         let type_id = self.as_type_id()?;
         let ptr_kind = type_id.def(db).is_ptr_like(db)?;
         match ptr_kind {
@@ -65,7 +68,7 @@ impl TypeRef {
         }
     }
 
-    pub fn as_ptr_like(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
+    pub fn as_ptr_like(self, db: &dyn Db) -> Option<(Mutability, Self)> {
         let type_id = self.as_type_id()?;
         let mutability = type_id.def(db).is_ptr_like(db)?.mutability();
         Some((mutability, type_id.args(db)[0]))
@@ -87,7 +90,7 @@ impl TypeRef {
     }
 
     pub fn ref_slice_of(db: &dyn Db, inner: Self) -> Self {
-        TypeRef::Concrete(slice_of(db, TypeRef::Concrete(slice_of(db, inner))))
+        Self::Concrete(slice_of(db, Self::Concrete(slice_of(db, inner))))
     }
 
     pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
@@ -106,31 +109,26 @@ impl TypeRef {
                 type_id.args(db).iter().map(|t| t.with_substitution(db, sub)).collect(),
             )),
             Self::Param(id) => sub[id.0],
-            Self::Associated(_) | Self::Zelf | Self::Error | TypeRef::Unknown => self,
+            Self::Associated(_) | Self::Zelf | Self::Error | Self::Unknown => self,
         }
     }
 
     pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
-            TypeRef::Error | TypeRef::Unknown => self,
-            _ => TypeRef::Concrete(ref_of(db, self, mutable)),
+            Self::Error | Self::Unknown => self,
+            _ => Self::Concrete(ref_of(db, self, mutable)),
         }
     }
 
-    pub fn instantiate(
-        self,
-        db: &dyn Db,
-        subs: &[TypeRef],
-        zelf: Option<TypeRef>,
-    ) -> TypeRef {
+    pub fn instantiate(self, db: &dyn Db, subs: &[Self], zelf: Option<Self>) -> Self {
         match self {
-            TypeRef::Concrete(id) => TypeRef::Concrete(TypeId::new(
+            Self::Concrete(id) => Self::Concrete(TypeId::new(
                 db,
                 id.def(db),
                 id.args(db).iter().map(|t| t.instantiate(db, subs, zelf)).collect(),
             )),
-            TypeRef::Param(p) => subs[p.0], // callee-space param
-            TypeRef::Zelf => {
+            Self::Param(p) => subs[p.0], // callee-space param
+            Self::Zelf => {
                 zelf.expect("Zelf in signature but no self type on FunctionRef")
             }
             other => other,

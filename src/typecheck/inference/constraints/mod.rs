@@ -91,8 +91,8 @@ impl InferenceConstraintKind {
     pub fn has_default_behaviour(&self) -> bool {
         matches!(
             self,
-            InferenceConstraintKind::Deref { .. }
-                | InferenceConstraintKind::IntLike { .. }
+            Self::Deref { .. }
+                | Self::IntLike { .. }
         )
     }
 }
@@ -104,7 +104,7 @@ enum ConstraintSolveResult {
     Error(UnificationError),
 }
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     fn is_builtin_indexed_by_int(&self, ty: &InferTy) -> Option<InferTy> {
         self.is_slice(ty).or_else(|| self.is_ref_to_slice(ty)).or_else(|| self.is_ptr(ty))
     }
@@ -213,7 +213,7 @@ impl<'db> InferenceCtx<'db> {
             is_static,
             ..
         } = method_constraint;
-        assert!(sig.data.receiver.is_static() == *is_static);
+        assert_eq!(sig.data.receiver.is_static(), *is_static);
         let ref_args =
             implem.templates.iter().map(|a| self.infer_to_ref(a)).collect::<Vec<_>>();
         if ref_args.iter().any(|a| matches!(a, TypeRef::Error)) {
@@ -321,7 +321,7 @@ impl<'db> InferenceCtx<'db> {
             return false;
         }
         for implem in
-            self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>().iter()
+            &self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>()
         {
             let implem_ty = self.find(&implem.ty);
             let implem_templates =
@@ -348,14 +348,13 @@ impl<'db> InferenceCtx<'db> {
                 templates,
             })));
         } else {
-            for implem in self
+            for implem in &self
                 .implements
                 .get(&id)
                 .unwrap()
                 .iter()
                 .cloned()
                 .collect::<Box<[_]>>()
-                .iter()
             {
                 let implem_ty = self.find(&implem.ty);
                 let implem_templates =
@@ -376,11 +375,9 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         constraint: &InferenceConstraint,
     ) -> ConstraintSolveResult {
-        if !constraint.kind.has_default_behaviour() {
-            panic!(
-                "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
-            )
-        }
+        assert!(constraint.kind.has_default_behaviour(), 
+            "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
+        );
         match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
                 match self.unify(&res_ty.into(), &self.int_ty()) {
@@ -506,8 +503,8 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
                         .map(|a| self.ctx.find_const(a).to_string(self.db))
                         .join(", "),
                     match interface_hint {
-                        Some(hint) => hint.to_string(self.db).to_string(),
-                        None => "".to_string(),
+                        Some(hint) => hint.to_string(self.db),
+                        None => String::new(),
                     }
                 )
             }
@@ -548,13 +545,12 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
                 self.ctx.find_const(ref_ty).to_string(self.db)
             ),
             InferenceConstraintKind::FatPtr { fat_ptr_var } => {
-                write!(f, "FatPtr {{ fat_ptr_var: {} }}", fat_ptr_var)
+                write!(f, "FatPtr {{ fat_ptr_var: {fat_ptr_var} }}")
             }
             InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
                 write!(
                     f,
-                    "MetadataOfFatPtr {{ fat_ptr_var: {}, metadata_var: {} }}",
-                    fat_ptr_var, metadata_var
+                    "MetadataOfFatPtr {{ fat_ptr_var: {fat_ptr_var}, metadata_var: {metadata_var} }}"
                 )
             }
         }
@@ -571,11 +567,11 @@ impl InferenceConstraint {
 impl InferTy {
     pub fn listeners(&self) -> HashSet<InferVar> {
         match self {
-            InferTy::Var(var) => [*var].into(),
-            InferTy::Adt { fields, .. } => {
-                fields.iter().flat_map(|f| f.listeners()).collect()
+            Self::Var(var) => [*var].into(),
+            Self::Adt { fields, .. } => {
+                fields.iter().flat_map(Self::listeners).collect()
             }
-            InferTy::Param(_) => HashSet::new(),
+            Self::Param(_) => HashSet::new(),
         }
     }
 }
@@ -583,39 +579,39 @@ impl InferTy {
 impl InferenceConstraintKind {
     pub fn listeners(&self, ctx: &mut InferenceCtx) -> HashSet<InferVar> {
         match self {
-            InferenceConstraintKind::Deref { var, target } => ctx
+            Self::Deref { var, target } => ctx
                 .find(target)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(&var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::BindsLike { ty, inner, like } => ctx
+            Self::BindsLike { ty, inner, like } => ctx
                 .find(inner)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(&ty.into()).listeners())
                 .chain(ctx.find(&like.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::IndexedBy { elem_var, base_ty, index_ty } => ctx
+            Self::IndexedBy { elem_var, base_ty, index_ty } => ctx
                 .find(base_ty)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(index_ty).listeners())
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::Tuple { elem_var, tuple_ty, .. } => ctx
+            Self::Tuple { elem_var, tuple_ty, .. } => ctx
                 .find(tuple_ty)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::StructField { elem_var, struct_ty, .. } => ctx
+            Self::StructField { elem_var, struct_ty, .. } => ctx
                 .find(struct_ty)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::Method(MethodConstraint {
+            Self::Method(MethodConstraint {
                 ret_var,
                 ty,
                 args,
@@ -628,38 +624,38 @@ impl InferenceConstraintKind {
                 .chain(ty.listeners())
                 .chain(ctx.find(&ret_var.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::Implements { ty, args, .. } => args
+            Self::Implements { ty, args, .. } => args
                 .iter()
                 .flat_map(|t| ctx.find(t).listeners())
                 .collect::<Box<_>>()
                 .into_iter()
                 .chain(ctx.find(ty).listeners())
                 .collect(),
-            InferenceConstraintKind::Unify { a, b } => ctx
+            Self::Unify { a, b } => ctx
                 .find(a)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(b).listeners())
                 .collect(),
-            InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, .. } => lhs_ty
+            Self::Binop { res_ty, lhs_ty, rhs_ty, .. } => lhs_ty
                 .listeners()
                 .into_iter()
                 .chain(rhs_ty.listeners())
                 .chain(ctx.find(&res_ty.into()).listeners())
                 .collect(),
-            InferenceConstraintKind::IntLike { res_ty } => {
+            Self::IntLike { res_ty } => {
                 ctx.find(&res_ty.into()).listeners()
             }
-            InferenceConstraintKind::IsInner { inner, ref_ty } => ctx
+            Self::IsInner { inner, ref_ty } => ctx
                 .find(inner)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(ref_ty).listeners())
                 .collect(),
-            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
+            Self::FatPtr { fat_ptr_var } => {
                 ctx.find(&fat_ptr_var.into()).listeners()
             }
-            InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
+            Self::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
                 ctx.find(&fat_ptr_var.into())
                     .listeners()
                     .into_iter()

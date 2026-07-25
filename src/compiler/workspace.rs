@@ -61,7 +61,7 @@ impl Workspace {
         let roots = self.roots(db).clone();
         let new_name = root.name(db);
         let new_file = root.file(db);
-        let ws = Workspace::get(db);
+        let ws = Self::get(db);
         for known in roots.iter() {
             if known.name(db) == new_name {
                 if known.file(db) == new_file {
@@ -112,22 +112,22 @@ pub enum CompilerError {
 impl fmt::Display for CompilerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CompilerError::NoCompilationUnitFound(path_buf) => {
+            Self::NoCompilationUnitFound(path_buf) => {
                 write!(f, "No compilation unit found at `{}`", path_buf.display())
             }
-            CompilerError::STDLibNotFound => {
+            Self::STDLibNotFound => {
                 write!(f, "Standard library (`std`) package not found.")
             }
-            CompilerError::NoFileFoundAt(path_buf) => {
+            Self::NoFileFoundAt(path_buf) => {
                 write!(f, "No file found at {}", path_buf.display())
             }
-            CompilerError::CoreLibNotFound => {
+            Self::CoreLibNotFound => {
                 write!(f, "Core library (`core`) package not found.")
             }
-            CompilerError::CompiledWithErrors => {
+            Self::CompiledWithErrors => {
                 write!(f, "Errors encountered, did not compile.")
             }
-            CompilerError::LinkFailed(msg) => {
+            Self::LinkFailed(msg) => {
                 write!(f, "Linking failed: {msg}")
             }
         }
@@ -165,10 +165,10 @@ pub fn is_file_direct_submodule_of_file(
 }
 
 #[salsa::tracked]
-pub fn submodules_of_file<'db>(
-    db: &'db dyn Db,
+pub fn submodules_of_file(
+    db: &dyn Db,
     file: SourceFile,
-) -> Vec<FileModule<'db>> {
+) -> Vec<FileModule<'_>> {
     if file.path(db).file_name().unwrap() != ANCHOR_FILE_NAME {
         return vec![];
     }
@@ -179,17 +179,17 @@ pub fn submodules_of_file<'db>(
         .iter()
         .map(|sf| *sf)
         .filter(|sf| is_file_direct_submodule_of_file(db, file, *sf))
-        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf).to_vec()))
+        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf).clone()))
         .collect()
 }
 
 #[salsa::tracked]
-pub fn package_of_root<'db>(db: &'db dyn Db, root: PackageRoot) -> Package<'db> {
+pub fn package_of_root(db: &dyn Db, root: PackageRoot) -> Package<'_> {
     let file = *root.file(db);
-    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file).to_vec()))
+    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file).clone()))
 }
 
 #[salsa::tracked]
-pub fn workspace_packages<'db>(db: &'db dyn Db, ws: Workspace) -> Arc<Vec<Package<'db>>> {
+pub fn workspace_packages(db: &dyn Db, ws: Workspace) -> Arc<Vec<Package<'_>>> {
     Arc::new(ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect())
 }

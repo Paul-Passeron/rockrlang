@@ -25,7 +25,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
-impl<'db> Parser<'db> {
+impl Parser<'_> {
     pub(super) fn parse_type_expr(&mut self) -> Result<AstTypeExpr, ParseError> {
         let start = self.get_start();
         let tok = self.current_token()?;
@@ -40,8 +40,7 @@ impl<'db> Parser<'db> {
                 };
                 let two = self
                     .current_token()
-                    .map(|t| matches!(t.kind, TokenKind::And))
-                    .unwrap_or(false);
+                    .is_ok_and(|t| matches!(t.kind, TokenKind::And));
                 self.consume();
                 let mutable = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mut)

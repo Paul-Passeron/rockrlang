@@ -23,11 +23,11 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CanonTy {
     Hole,
-    Adt { id: TypeDefId, args: Box<[CanonTy]> },
+    Adt { id: TypeDefId, args: Box<[Self]> },
     Param(usize),
 }
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     pub fn canonize(&mut self, ty: &InferTy) -> CanonTy {
         match self.find(ty) {
             InferTy::Var(_) => CanonTy::Hole,

@@ -48,7 +48,7 @@ pub struct Lexer<'db, T> {
     pub skip_patterns: Vec<Regex>,
 }
 
-impl<'a, T: fmt::Debug> Iterator for Lexer<'a, T> {
+impl<T: fmt::Debug> Iterator for Lexer<'_, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -58,12 +58,12 @@ impl<'a, T: fmt::Debug> Iterator for Lexer<'a, T> {
 
 impl<'db, T> Lexer<'db, T> {
     fn advance(&mut self) -> Option<char> {
-        if !self.is_done() {
+        if self.is_done() {
+            None
+        } else {
             let c = self.file.content(self.db)[self.offset..].chars().next()?;
             self.offset += 1;
             Some(c)
-        } else {
-            None
         }
     }
 
@@ -106,7 +106,7 @@ impl<'db, T> Lexer<'db, T> {
         db: &'db dyn Db,
         token_patterns: Vec<TokenPattern<'db, T>>,
         skip_patterns: Vec<Regex>,
-    ) -> Lexer<'db, T> {
+    ) -> Self {
         let contents = source.content(db);
         Self { db, offset: 0, file: source, token_patterns, skip_patterns }
     }

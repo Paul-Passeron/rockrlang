@@ -40,10 +40,8 @@ impl Offset {
         self.0
     }
 
-    pub fn bytes_from(self, other: Offset) -> u64 {
-        if self < other {
-            panic!("Cannot get bytes from a bigger offset")
-        }
+    pub fn bytes_from(self, other: Self) -> u64 {
+        assert!(self >= other, "Cannot get bytes from a bigger offset");
         self.0 - other.0
     }
 
@@ -115,7 +113,7 @@ impl<'a> From<Layout<'a>> for LayoutID {
     }
 }
 
-impl<'a> From<LayoutID> for Layout<'a> {
+impl From<LayoutID> for Layout<'_> {
     fn from(value: LayoutID) -> Self {
         Self(value.0, PhantomData)
     }
@@ -185,8 +183,8 @@ impl From<IntWidth> for Align {
 impl From<FloatWidth> for Align {
     fn from(value: FloatWidth) -> Self {
         match value {
-            FloatWidth::F32 => Align::B32,
-            FloatWidth::F64 => Align::B64,
+            FloatWidth::F32 => Self::B32,
+            FloatWidth::F64 => Self::B64,
         }
     }
 }
@@ -220,13 +218,13 @@ impl LayoutID {
 
 impl From<AggregateLayout> for LayoutData {
     fn from(value: AggregateLayout) -> Self {
-        LayoutData::Aggregate(value)
+        Self::Aggregate(value)
     }
 }
 
 impl From<VariantsLayout> for LayoutData {
     fn from(value: VariantsLayout) -> Self {
-        LayoutData::Union(value)
+        Self::Union(value)
     }
 }
 

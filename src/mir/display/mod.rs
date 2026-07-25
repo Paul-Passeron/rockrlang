@@ -42,7 +42,7 @@ pub trait MIRWrite {
 
 pub struct FmtWriter<'a, 'b>(pub &'a mut fmt::Formatter<'b>);
 
-impl<'a, 'b> MIRWrite for FmtWriter<'a, 'b> {
+impl MIRWrite for FmtWriter<'_, '_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.0.write_str(s)
     }

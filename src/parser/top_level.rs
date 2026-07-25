@@ -38,7 +38,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 
-impl<'db> Parser<'db> {
+impl Parser<'_> {
     fn parse_include_path(&mut self) -> Result<AstIncludePath, ParseError> {
         let mut symbols = nonempty![self.parse_symbol()?];
         while self.current_token()?.kind == TokenKind::Access {
@@ -193,7 +193,7 @@ impl<'db> Parser<'db> {
     }
 
     fn parse_receiver(&mut self) -> AstReceiver {
-        self.speculate(|p| p.parse_receiver_aux()).unwrap_or(AstReceiver::None)
+        self.speculate(Parser::parse_receiver_aux).unwrap_or(AstReceiver::None)
     }
 
     fn expect_self(&mut self) -> Result<(), ParseError> {
@@ -450,7 +450,7 @@ impl<'db> Parser<'db> {
         // Check if this is a Call form: `name(arg1, arg2, ...)`
         if self.peek_n(0).is_none_or(|t| t.kind != TokenKind::OpenPar) {
             return Ok(AstAnnotationItem::Flag(name));
-        };
+        }
         self.consume(); // consume `(`
         let args = self.parse_list(
             |p| p.parse_type_expr().map(AstAnnotationArg::Type),
@@ -491,7 +491,7 @@ impl<'db> Parser<'db> {
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
-                let Spanned { data: name, span: name_span, .. } = self.parse_symbol()?;
+                let Spanned { data: name, span: name_span,  } = self.parse_symbol()?;
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;

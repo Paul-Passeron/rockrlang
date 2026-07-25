@@ -113,9 +113,9 @@ pub enum MIRConstructorArgs {
 impl Constant {
     pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
-            MIRConstant::Integer { ty, .. } => *ty,
-            MIRConstant::Bool(_) => bool_id(db).into(),
-            MIRConstant::CString { .. } => ptr_of(db, char_id(db).into(), false).into(),
+            Self::Integer { ty, .. } => *ty,
+            Self::Bool(_) => bool_id(db).into(),
+            Self::CString { .. } => ptr_of(db, char_id(db).into(), false).into(),
         }
     }
 }
@@ -123,8 +123,8 @@ impl Constant {
 impl Operand {
     pub fn ty(&self, db: &dyn Db) -> TypeRef {
         match self {
-            MIROperand::Constant(mirconstant, _) => mirconstant.ty(db),
-            MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => mirplace.ty,
+            Self::Constant(mirconstant, _) => mirconstant.ty(db),
+            Self::Move(mirplace) | Self::Copy(mirplace) => mirplace.ty,
         }
     }
 }
@@ -165,9 +165,9 @@ impl MIRRValue {
             MIRRValueKind::SizeOf(_) => HashSet::new(),
             MIRRValueKind::Constructor { args, .. } => args.uses(),
             MIRRValueKind::StructLit { fields, .. } => {
-                fields.values().flat_map(|op| op.uses()).collect()
+                fields.values().flat_map(MIROperand::uses).collect()
             }
-            MIRRValueKind::Tuple(ops, _) => ops.iter().flat_map(|op| op.uses()).collect(),
+            MIRRValueKind::Tuple(ops, _) => ops.iter().flat_map(MIROperand::uses).collect(),
         }
     }
 }
@@ -175,12 +175,12 @@ impl MIRRValue {
 impl MIRConstructorArgs {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIRConstructorArgs::None => HashSet::new(),
-            MIRConstructorArgs::Tuple(ops) => {
-                ops.iter().flat_map(|op| op.uses()).collect()
+            Self::None => HashSet::new(),
+            Self::Tuple(ops) => {
+                ops.iter().flat_map(MIROperand::uses).collect()
             }
-            MIRConstructorArgs::Struct(fields) => {
-                fields.values().flat_map(|op| op.uses()).collect()
+            Self::Struct(fields) => {
+                fields.values().flat_map(MIROperand::uses).collect()
             }
         }
     }
@@ -189,8 +189,8 @@ impl MIRConstructorArgs {
 impl MIROperand {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIROperand::Constant(_, _) => HashSet::new(),
-            MIROperand::Move(p) | MIROperand::Copy(p) => p.uses(),
+            Self::Constant(_, _) => HashSet::new(),
+            Self::Move(p) | Self::Copy(p) => p.uses(),
         }
     }
 }
@@ -198,7 +198,7 @@ impl MIROperand {
 impl MIRPlace {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         once(self.local)
-            .chain(self.projections.iter().flat_map(|proj| proj.uses()))
+            .chain(self.projections.iter().flat_map(MIRProjection::uses))
             .collect()
     }
 }
@@ -206,11 +206,11 @@ impl MIRPlace {
 impl MIRProjection {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
-            MIRProjection::TupleField { .. }
-            | MIRProjection::Field { .. }
-            | MIRProjection::Downcast { .. }
-            | MIRProjection::Deref => HashSet::new(),
-            MIRProjection::Index { index } => index.uses(),
+            Self::TupleField { .. }
+            | Self::Field { .. }
+            | Self::Downcast { .. }
+            | Self::Deref => HashSet::new(),
+            Self::Index { index } => index.uses(),
         }
     }
 }
@@ -218,8 +218,8 @@ impl MIRProjection {
 impl MIROperand {
     pub fn span(&self) -> Span {
         match self {
-            MIROperand::Constant(_, span) => *span,
-            MIROperand::Move(p) | MIROperand::Copy(p) => p.span,
+            Self::Constant(_, span) => *span,
+            Self::Move(p) | Self::Copy(p) => p.span,
         }
     }
 }

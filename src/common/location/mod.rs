@@ -54,7 +54,7 @@ impl Span {
     pub fn encloses(&self, loc: Location) -> bool {
         if self.file != loc.file {
             return false;
-        };
+        }
         if self.start_offset > loc.offset {
             return false;
         }
@@ -85,9 +85,7 @@ impl Location {
 
     pub fn span(self, other: Self) -> Span {
         let file = self.file;
-        if file != other.file {
-            panic!("Span across different files");
-        }
+        assert!(file == other.file, "Span across different files");
         let (start_offset, end_offset) = if self.offset > other.offset {
             (other.offset, self.offset)
         } else {

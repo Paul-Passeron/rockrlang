@@ -42,10 +42,10 @@ pub mod sig;
 pub mod thir;
 pub mod ty;
 
-fn file_module_of<'db>(
-    db: &'db dyn Db,
+fn file_module_of(
+    db: &dyn Db,
     file: SourceFile,
-) -> Option<(FileModule<'db>, Package<'db>, Option<ModuleId>)> {
+) -> Option<(FileModule<'_>, Package<'_>, Option<ModuleId>)> {
     fn find<'db>(
         db: &'db dyn Db,
         pkg: Package<'db>,

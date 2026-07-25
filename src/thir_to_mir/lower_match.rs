@@ -230,7 +230,7 @@ impl StructRef {
     }
 }
 
-impl<'a> ThirToMIR<'a> {
+impl ThirToMIR<'_> {
     pub fn wrap_ref_to_fit(&mut self, target: TypeRef, place: &MIRPlace) -> MIRRValue {
         let span = self.builder.locals[place.local].span;
         if place.ty == target || target.as_ref(self.db).is_none() {

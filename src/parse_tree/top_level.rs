@@ -107,20 +107,20 @@ pub enum AstReceiver {
 
 impl AstReceiver {
     pub fn is_static(&self) -> bool {
-        matches!(self, AstReceiver::None)
+        matches!(self, Self::None)
     }
 }
 
 impl fmt::Display for AstReceiver {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AstReceiver::None => Ok(()),
-            AstReceiver::Zelf(_) => write!(f, "self"),
-            AstReceiver::MutZelf(_) => write!(f, "mut self"),
-            AstReceiver::RefZelf(_) => write!(f, "&self"),
-            AstReceiver::MutRefZelf(_) => write!(f, "&mut self"),
-            AstReceiver::PtrZelf(_) => write!(f, "*self"),
-            AstReceiver::MutPtrZelf(_) => write!(f, "*mut self"),
+            Self::None => Ok(()),
+            Self::Zelf(_) => write!(f, "self"),
+            Self::MutZelf(_) => write!(f, "mut self"),
+            Self::RefZelf(_) => write!(f, "&self"),
+            Self::MutRefZelf(_) => write!(f, "&mut self"),
+            Self::PtrZelf(_) => write!(f, "*self"),
+            Self::MutPtrZelf(_) => write!(f, "*mut self"),
         }
     }
 }
@@ -170,7 +170,7 @@ impl AstTypeExprDesc {
     }
 }
 
-impl<'a, 'b> fmt::Display for Display<'b, &'a AstFundefArg> {
+impl fmt::Display for Display<'_, &AstFundefArg> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -181,7 +181,7 @@ impl<'a, 'b> fmt::Display for Display<'b, &'a AstFundefArg> {
     }
 }
 
-impl<'a, 'b> fmt::Display for Display<'b, &'a AstTypeExprDesc> {
+impl fmt::Display for Display<'_, &AstTypeExprDesc> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.value {
             AstTypeExprDesc::Named { name, args } => {
@@ -360,15 +360,15 @@ pub struct AstStructDefField {
 impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
-        let Spanned { data: symbol, span, .. } = symbols.pop().unwrap();
+        let Spanned { data: symbol, span,  } = symbols.pop().unwrap();
         let start_loc = span.start();
         symbols.reverse();
 
         symbols.into_iter().fold(
-            AstIncludePath::new(AstIncludePathDesc::Symbol(symbol), span),
+            Self::new(AstIncludePathDesc::Symbol(symbol), span),
             |acc, symb| {
                 let total_span = start_loc.span(symb.span.end());
-                AstIncludePath::new(
+                Self::new(
                     AstIncludePathDesc::NameResolved {
                         from: symb.data,
                         to: Box::new(acc),

@@ -139,7 +139,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
     pub fn run(mut self) -> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
         self.ctx.mir_map.lirs().into_iter().for_each(|lir_id| {
             if let Body::Defined(_, _) = self.lir.get_fn(lir_id).1 {
-                self.lower(lir_id)
+                self.lower(lir_id);
             }
         });
         self.finalize()
@@ -148,15 +148,15 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
     fn lower(&mut self, lir_id: LIRFunctionId) {
         let db = self.db;
         let Self { lir, ctx, .. } = self;
-        lir.build_function(db, lir_id, |b| Self::_lower(b, ctx)).unwrap()
+        lir.build_function(db, lir_id, |b| Self::_lower(b, ctx)).unwrap();
     }
 
-    fn _lower<'ir>(builder: &mut FunctionBuilder<'ir, '_>, ctx: &mut MTLBCtx) {
+    fn _lower(builder: &mut FunctionBuilder<'_, '_>, ctx: &mut MTLBCtx) {
         ctx.lower(builder);
     }
 }
 
-impl<'a> MTLBCtx<'a> {
+impl MTLBCtx<'_> {
     fn add_block<'ir>(
         &self,
         b: &FunctionBuilder<'ir, '_>,
@@ -168,7 +168,7 @@ impl<'a> MTLBCtx<'a> {
         lower.block_map.insert(id, b);
     }
 
-    pub fn lower<'ir>(&mut self, b: &mut FunctionBuilder<'ir, '_>) {
+    pub fn lower(&mut self, b: &mut FunctionBuilder<'_, '_>) {
         let mir = self.mir_map[b.id];
         let mut lower =
             LIRLower { mir, block_map: HashMap::new(), value_map: HashMap::new() };
@@ -176,7 +176,7 @@ impl<'a> MTLBCtx<'a> {
             .iter()
             .for_each(|(blk, data)| self.add_block(b, blk, data, &mut lower));
         let params =
-            b.body.blocks[b.body.entry.idx].params.iter().map(|p| p.id()).collect_vec();
+            b.body.blocks[b.body.entry.idx].params.iter().map(crate::lir::ValueDef::id).collect_vec();
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty);
             if layout.is_zst(self.db) {
@@ -209,8 +209,8 @@ impl<'a> MTLBCtx<'a> {
         });
         mir.blocks.keys().for_each(|blk| {
             b.build_block(lower.block_map[&blk], |bb| {
-                self.lower_block(bb, blk, &mut lower)
-            })
+                self.lower_block(bb, blk, &lower)
+            });
         });
     }
 
@@ -242,7 +242,7 @@ impl<'a> MTLBCtx<'a> {
                     if let Some(value) = self.lower_rvalue(b, rvalue, lower) {
                         b.store(ptr, value);
                     }
-                };
+                }
             }
         }
     }
@@ -337,17 +337,17 @@ impl<'a> MTLBCtx<'a> {
                 MIRConstant::Bool(value) => {
                     let layout = LayoutID::int(self.db, IntWidth::I8);
                     let ty = LIRTy { layout, origin: Some(bool_id(self.db).into()) };
-                    Some(b.const_int(ty, if *value { 1 } else { 0 }).erase())
+                    Some(b.const_int(ty, u128::from(*value)).erase())
                 }
                 MIRConstant::CString { contents, null_terminated } => {
                     Some(b.strlit(contents, *null_terminated))
                 }
             },
             MIROperand::Move(place) | MIROperand::Copy(place) => {
-                if !lower.value_map[&place.local].is_zst() {
-                    Some(self.lower_place(b, place, lower))
-                } else {
+                if lower.value_map[&place.local].is_zst() {
                     None
+                } else {
+                    Some(self.lower_place(b, place, lower))
                 }
             }
         }
@@ -589,10 +589,10 @@ impl<'a> MTLBCtx<'a> {
         match &rvalue.kind {
             MIRRValueKind::Use(op) => self.lower_operand(b, op, lower),
             MIRRValueKind::Ref(place, _) | MIRRValueKind::AddressOf(place, _) => {
-                if !lower.value_map[&place.local].is_zst() {
-                    Some(self.lower_place_as_ptr(b, place, lower))
-                } else {
+                if lower.value_map[&place.local].is_zst() {
                     None
+                } else {
+                    Some(self.lower_place_as_ptr(b, place, lower))
                 }
             }
             MIRRValueKind::BinOp(op, mir_lhs, mir_rhs) => {
@@ -702,7 +702,7 @@ impl<'a> MTLBCtx<'a> {
                             layout: LayoutID::int(self.db, self.db.target_width()),
                             origin: None,
                         },
-                        s as u128,
+                        u128::from(s),
                     )
                     .erase(),
                 )
@@ -743,17 +743,15 @@ impl<'a> MTLBCtx<'a> {
                         unreachable!()
                     }
                     self.lower_operand(b, op, lower)
-                } else {
-                    if let Some(value) = self.lower_operand(b, op, lower) {
-                        match layout_of(self.db, *type_ref).data(self.db) {
-                            LayoutData::Scalar(scalar_kind) => {
-                                Some(b.cast(CastKind::IntTruncate, value, *scalar_kind))
-                            }
-                            _ => todo!(),
+                } else if let Some(value) = self.lower_operand(b, op, lower) {
+                    match layout_of(self.db, *type_ref).data(self.db) {
+                        LayoutData::Scalar(scalar_kind) => {
+                            Some(b.cast(CastKind::IntTruncate, value, *scalar_kind))
                         }
-                    } else {
-                        None
+                        _ => todo!(),
                     }
+                } else {
+                    None
                 }
             }
         }

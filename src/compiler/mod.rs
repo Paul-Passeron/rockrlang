@@ -151,7 +151,7 @@ fn display_ir(db: &dyn Db, w: Workspace) {
         fids.sort_by_key(|id| id.span(db).start().loc_info(db).clone());
         for fid in fids {
             if let Some(thir) = thir_body(db, fid) {
-                println!("{}", thir.display(db))
+                println!("{}", thir.display(db));
             }
         }
     }

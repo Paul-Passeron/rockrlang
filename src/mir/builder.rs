@@ -81,15 +81,13 @@ impl<'a> MIRBuilder<'a> {
 
     pub fn emit(&mut self, stmt: Stmt) {
         // Maybe do these checks only in debug:
-        if self.finalized_blocks.contains(&self.current_block) {
-            panic!(
-                "Writing in a finalized block{}.",
-                match &self.current().name {
-                    Some(s) => format!(" (current block is `{}`", s),
-                    _ => String::new(),
-                }
-            )
-        }
+        assert!(!self.finalized_blocks.contains(&self.current_block), 
+            "Writing in a finalized block{}.",
+            match &self.current().name {
+                Some(s) => format!(" (current block is `{s}`"),
+                _ => String::new(),
+            }
+        );
         self.current_mut().stmts.push(stmt);
     }
 

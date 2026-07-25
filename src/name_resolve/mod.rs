@@ -43,8 +43,8 @@ pub fn builtin_module(db: &dyn Db) -> ModuleId {
     ModuleId::new(db, Symbol::new(db, "@builtin"), None, None, vec![], None)
 }
 
-/// Build the ModuleId hierarchy for a FileModule tree rooted at a package root.
-/// The package root's parent is builtin_module; all submodules are parented to
+/// Build the `ModuleId` hierarchy for a `FileModule` tree rooted at a package root.
+/// The package root's parent is `builtin_module`; all submodules are parented to
 /// it.
 #[salsa::tracked(returns(copy))]
 pub fn file_module_id<'db>(
@@ -114,33 +114,30 @@ pub fn module_items<'db>(
         }
         return Some(ast.items(db).clone());
     }
-    module.parent(db).and_then(|parent| match module_items(db, parent.interned()) {
-        Some(parent_ast) => parent_ast.iter().find_map(|item| match &item.data {
-            AstTopLevelItemDesc::Module(module_ast) => {
-                if module_ast.data.name.data == *module.name(db) {
-                    Some(module_ast.data.items.clone())
-                } else {
-                    None
-                }
+    module.parent(db).and_then(|parent| if let Some(parent_ast) = module_items(db, parent.interned()) { parent_ast.iter().find_map(|item| match &item.data {
+        AstTopLevelItemDesc::Module(module_ast) => {
+            if module_ast.data.name.data == *module.name(db) {
+                Some(module_ast.data.items.clone())
+            } else {
+                None
             }
-            _ => None,
-        }),
-        None => {
-            let file = module_to_file(db, module);
-            let ast: Ast<'db> = parse_file(db, file);
-            let parse_errors: Vec<&ParseError> =
-                parse_file::accumulated::<ParseError>(db, file);
-            for err in parse_errors {
-                let span = Span::new(err.file, err.start, err.end);
-                Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
-            }
-            Some(ast.items(db).clone())
         }
+        _ => None,
+    }) } else {
+        let file = module_to_file(db, module);
+        let ast: Ast<'db> = parse_file(db, file);
+        let parse_errors: Vec<&ParseError> =
+            parse_file::accumulated::<ParseError>(db, file);
+        for err in parse_errors {
+            let span = Span::new(err.file, err.start, err.end);
+            Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
+        }
+        Some(ast.items(db).clone())
     })
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn std_package<'db>(db: &'db dyn Db) -> Option<Package<'db>> {
+pub fn std_package(db: &dyn Db) -> Option<Package<'_>> {
     if db.config().no_std {
         None
     } else {
@@ -163,7 +160,7 @@ pub fn std_module(db: &dyn Db) -> Option<ModuleId> {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn core_package<'db>(db: &'db dyn Db) -> Package<'db> {
+pub fn core_package(db: &dyn Db) -> Package<'_> {
     let ws = Workspace::get(db);
     let packages = workspace_packages(db, ws);
     for pkg in packages.iter() {

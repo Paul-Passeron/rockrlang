@@ -80,15 +80,15 @@ pub struct MoveKey {
 impl MIRProjection {
     fn as_tracked_projection(&self) -> Option<TrackedProjection> {
         match self {
-            MIRProjection::Deref => Some(TrackedProjection::Deref),
-            MIRProjection::Field { name, .. } => {
+            Self::Deref => Some(TrackedProjection::Deref),
+            Self::Field { name, .. } => {
                 Some(TrackedProjection::StructField(*name))
             }
-            MIRProjection::TupleField { index, .. } => {
+            Self::TupleField { index, .. } => {
                 Some(TrackedProjection::TupleField(*index))
             }
-            MIRProjection::Index { .. } => None,
-            MIRProjection::Downcast { variant } => {
+            Self::Index { .. } => None,
+            Self::Downcast { variant } => {
                 Some(TrackedProjection::Downcast(*variant))
             }
         }
@@ -96,16 +96,16 @@ impl MIRProjection {
 }
 
 impl MIROperand {
-    fn for_all_operands(&self, mut f: impl FnMut(&MIROperand)) {
+    fn for_all_operands(&self, mut f: impl FnMut(&Self)) {
         self.for_all_operands_dyn(&mut f);
     }
 
-    fn for_all_operands_dyn(&self, f: &mut dyn FnMut(&MIROperand)) {
+    fn for_all_operands_dyn(&self, f: &mut dyn FnMut(&Self)) {
         f(self);
         match self {
-            MIROperand::Constant(_, _) => (),
-            MIROperand::Move(mirplace) | MIROperand::Copy(mirplace) => {
-                mirplace.for_all_operands_dyn(f)
+            Self::Constant(_, _) => (),
+            Self::Move(mirplace) | Self::Copy(mirplace) => {
+                mirplace.for_all_operands_dyn(f);
             }
         }
     }
@@ -274,7 +274,7 @@ impl MIRInitAnalysis {
                                 uninit_key(&p.as_move_key(), map);
                             };
                         }
-                    })
+                    });
                 });
                 {
                     let place: &MIRPlace = &MIRPlace {
@@ -349,9 +349,9 @@ impl IterOperand for MIRRValue {
 impl IterOperand for MIRConstructorArgs {
     fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
         match self {
-            MIRConstructorArgs::None => vec![],
-            MIRConstructorArgs::Tuple(ops) => ops.iter().collect(),
-            MIRConstructorArgs::Struct(fields) => fields.values().collect(),
+            Self::None => vec![],
+            Self::Tuple(ops) => ops.iter().collect(),
+            Self::Struct(fields) => fields.values().collect(),
         }
         .into_iter()
     }
@@ -359,7 +359,7 @@ impl IterOperand for MIRConstructorArgs {
 
 impl IterOperand for MIRPlace {
     fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
-        self.projections.iter().flat_map(|proj| match proj {
+        self.projections.iter().filter_map(|proj| match proj {
             MIRProjection::Field { .. }
             | MIRProjection::TupleField { .. }
             | MIRProjection::Downcast { .. }
@@ -372,9 +372,9 @@ impl IterOperand for MIRPlace {
 impl fmt::Display for InitState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            InitState::Init => "init",
-            InitState::Maybe => "?",
-            InitState::Uninit => "uninit",
+            Self::Init => "init",
+            Self::Maybe => "?",
+            Self::Uninit => "uninit",
         })
     }
 }
