@@ -38,9 +38,8 @@ impl Parser<'_> {
                 } else {
                     false
                 };
-                let two = self
-                    .current_token()
-                    .is_ok_and(|t| matches!(t.kind, TokenKind::And));
+                let two =
+                    self.current_token().is_ok_and(|t| matches!(t.kind, TokenKind::And));
                 self.consume();
                 let mutable = if let Some(t) = self.peek_n(0)
                     && matches!(t.kind, TokenKind::Mut)

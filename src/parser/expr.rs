@@ -259,7 +259,8 @@ impl Parser<'_> {
                         _ => {
                             return Err(self.parse_error(
                                 ParseErrorKind::ExpectedSymbol(
-                                    "`(` or `::` after turbofish type arguments".to_owned(),
+                                    "`(` or `::` after turbofish type arguments"
+                                        .to_owned(),
                                 ),
                             ));
                         }

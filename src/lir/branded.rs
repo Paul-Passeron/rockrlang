@@ -154,7 +154,11 @@ impl BrandedBlockData<'_> {
         BlockData {
             name: self.name,
             params: self.params.into_iter().map(|param| param.idx).collect(),
-            insts: self.insts.into_iter().map(super::inst::Instruction::finalize).collect(),
+            insts: self
+                .insts
+                .into_iter()
+                .map(super::inst::Instruction::finalize)
+                .collect(),
             terminator: self.terminator.unwrap().finalize(),
         }
     }

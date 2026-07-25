@@ -81,16 +81,10 @@ impl MIRProjection {
     fn as_tracked_projection(&self) -> Option<TrackedProjection> {
         match self {
             Self::Deref => Some(TrackedProjection::Deref),
-            Self::Field { name, .. } => {
-                Some(TrackedProjection::StructField(*name))
-            }
-            Self::TupleField { index, .. } => {
-                Some(TrackedProjection::TupleField(*index))
-            }
+            Self::Field { name, .. } => Some(TrackedProjection::StructField(*name)),
+            Self::TupleField { index, .. } => Some(TrackedProjection::TupleField(*index)),
             Self::Index { .. } => None,
-            Self::Downcast { variant } => {
-                Some(TrackedProjection::Downcast(*variant))
-            }
+            Self::Downcast { variant } => Some(TrackedProjection::Downcast(*variant)),
         }
     }
 }

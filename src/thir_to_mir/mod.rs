@@ -273,7 +273,8 @@ impl<'a> ThirToMIR<'a> {
 
     fn check_substitution(&self) {
         for ty in self.subs {
-            assert!(self.is_concrete(*ty), 
+            assert!(
+                self.is_concrete(*ty),
                 "Expecting a valid type in substitution but got {}",
                 ty.to_string(self.db)
             );

@@ -563,7 +563,7 @@ impl<'db> InferenceCtx<'db> {
             }
             return ConstraintSolveResult::Pending;
         }
-        let (src, PotentialBlockRes { templates, constraints,  }) =
+        let (src, PotentialBlockRes { templates, constraints }) =
             possible_blocks.into_iter().next().unwrap();
         constraints.into_iter().for_each(|constraint| self.emit_constraint(constraint));
 

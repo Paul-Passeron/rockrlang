@@ -360,7 +360,7 @@ pub struct AstStructDefField {
 impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
-        let Spanned { data: symbol, span,  } = symbols.pop().unwrap();
+        let Spanned { data: symbol, span } = symbols.pop().unwrap();
         let start_loc = span.start();
         symbols.reverse();
 

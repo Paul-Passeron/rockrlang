@@ -344,8 +344,7 @@ impl HirStructFieldPattern {
 
     pub fn name(&self) -> Symbol {
         match self {
-            Self::Rebind { name, .. }
-            | Self::Name { name, .. } => *name,
+            Self::Rebind { name, .. } | Self::Name { name, .. } => *name,
         }
     }
 }
@@ -440,10 +439,7 @@ impl FunctionLikeAst {
     }
 
     pub fn has_body(&self) -> bool {
-        !matches!(
-            self,
-            Self::ExternDef(_, _) | Self::TraitMethod(_)
-        )
+        !matches!(self, Self::ExternDef(_, _) | Self::TraitMethod(_))
     }
 }
 

@@ -261,7 +261,8 @@ fn _templates_of_owner<'db>(
             .iter()
             .next()
             .unwrap()
-            .templates(db).clone(),
+            .templates(db)
+            .clone(),
         ScopeOwnerId::Interface(interface_ref) => {
             interface_item(db, interface_ref.def(db).interned()).template_args.clone()
         }

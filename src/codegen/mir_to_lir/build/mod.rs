@@ -175,8 +175,11 @@ impl MTLBCtx<'_> {
         mir.blocks
             .iter()
             .for_each(|(blk, data)| self.add_block(b, blk, data, &mut lower));
-        let params =
-            b.body.blocks[b.body.entry.idx].params.iter().map(crate::lir::ValueDef::id).collect_vec();
+        let params = b.body.blocks[b.body.entry.idx]
+            .params
+            .iter()
+            .map(crate::lir::ValueDef::id)
+            .collect_vec();
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty);
             if layout.is_zst(self.db) {
@@ -208,9 +211,7 @@ impl MTLBCtx<'_> {
             bb.goto(mir_entry_target)
         });
         mir.blocks.keys().for_each(|blk| {
-            b.build_block(lower.block_map[&blk], |bb| {
-                self.lower_block(bb, blk, &lower)
-            });
+            b.build_block(lower.block_map[&blk], |bb| self.lower_block(bb, blk, &lower));
         });
     }
 

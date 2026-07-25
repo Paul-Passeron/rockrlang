@@ -89,11 +89,7 @@ pub struct MethodConstraint {
 
 impl InferenceConstraintKind {
     pub fn has_default_behaviour(&self) -> bool {
-        matches!(
-            self,
-            Self::Deref { .. }
-                | Self::IntLike { .. }
-        )
+        matches!(self, Self::Deref { .. } | Self::IntLike { .. })
     }
 }
 
@@ -348,13 +344,8 @@ impl<'db> InferenceCtx<'db> {
                 templates,
             })));
         } else {
-            for implem in &self
-                .implements
-                .get(&id)
-                .unwrap()
-                .iter()
-                .cloned()
-                .collect::<Box<[_]>>()
+            for implem in
+                &self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>()
             {
                 let implem_ty = self.find(&implem.ty);
                 let implem_templates =
@@ -375,7 +366,8 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         constraint: &InferenceConstraint,
     ) -> ConstraintSolveResult {
-        assert!(constraint.kind.has_default_behaviour(), 
+        assert!(
+            constraint.kind.has_default_behaviour(),
             "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
         );
         match &constraint.kind {
@@ -568,9 +560,7 @@ impl InferTy {
     pub fn listeners(&self) -> HashSet<InferVar> {
         match self {
             Self::Var(var) => [*var].into(),
-            Self::Adt { fields, .. } => {
-                fields.iter().flat_map(Self::listeners).collect()
-            }
+            Self::Adt { fields, .. } => fields.iter().flat_map(Self::listeners).collect(),
             Self::Param(_) => HashSet::new(),
         }
     }
@@ -611,12 +601,7 @@ impl InferenceConstraintKind {
                 .into_iter()
                 .chain(ctx.find(&elem_var.into()).listeners())
                 .collect(),
-            Self::Method(MethodConstraint {
-                ret_var,
-                ty,
-                args,
-                ..
-            }) => args
+            Self::Method(MethodConstraint { ret_var, ty, args, .. }) => args
                 .iter()
                 .flat_map(|t| ctx.find(t).listeners())
                 .collect::<Box<_>>()
@@ -643,25 +628,20 @@ impl InferenceConstraintKind {
                 .chain(rhs_ty.listeners())
                 .chain(ctx.find(&res_ty.into()).listeners())
                 .collect(),
-            Self::IntLike { res_ty } => {
-                ctx.find(&res_ty.into()).listeners()
-            }
+            Self::IntLike { res_ty } => ctx.find(&res_ty.into()).listeners(),
             Self::IsInner { inner, ref_ty } => ctx
                 .find(inner)
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(ref_ty).listeners())
                 .collect(),
-            Self::FatPtr { fat_ptr_var } => {
-                ctx.find(&fat_ptr_var.into()).listeners()
-            }
-            Self::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
-                ctx.find(&fat_ptr_var.into())
-                    .listeners()
-                    .into_iter()
-                    .chain(ctx.find(&metadata_var.into()).listeners())
-                    .collect()
-            }
+            Self::FatPtr { fat_ptr_var } => ctx.find(&fat_ptr_var.into()).listeners(),
+            Self::MetadataOfFatPtr { fat_ptr_var, metadata_var } => ctx
+                .find(&fat_ptr_var.into())
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(&metadata_var.into()).listeners())
+                .collect(),
         }
     }
 }

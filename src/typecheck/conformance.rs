@@ -67,10 +67,14 @@ fn _type_match(
                 a.as_type_id().is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
             })
         }
-        TypeRef::Param(id) => if let Some(prev) = constraints.get(&id.0) { a == *prev } else {
-            constraints.insert(id.0, a);
-            true
-        },
+        TypeRef::Param(id) => {
+            if let Some(prev) = constraints.get(&id.0) {
+                a == *prev
+            } else {
+                constraints.insert(id.0, a);
+                true
+            }
+        }
         TypeRef::Zelf => zelf.is_some_and(|z| a == z),
         _ => false,
     }

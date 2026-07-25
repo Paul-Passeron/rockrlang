@@ -167,7 +167,9 @@ impl MIRRValue {
             MIRRValueKind::StructLit { fields, .. } => {
                 fields.values().flat_map(MIROperand::uses).collect()
             }
-            MIRRValueKind::Tuple(ops, _) => ops.iter().flat_map(MIROperand::uses).collect(),
+            MIRRValueKind::Tuple(ops, _) => {
+                ops.iter().flat_map(MIROperand::uses).collect()
+            }
         }
     }
 }
@@ -176,12 +178,8 @@ impl MIRConstructorArgs {
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::None => HashSet::new(),
-            Self::Tuple(ops) => {
-                ops.iter().flat_map(MIROperand::uses).collect()
-            }
-            Self::Struct(fields) => {
-                fields.values().flat_map(MIROperand::uses).collect()
-            }
+            Self::Tuple(ops) => ops.iter().flat_map(MIROperand::uses).collect(),
+            Self::Struct(fields) => fields.values().flat_map(MIROperand::uses).collect(),
         }
     }
 }

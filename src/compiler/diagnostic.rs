@@ -67,10 +67,8 @@ impl Diag {
             (head, defs)
         };
 
-        let primary = DiagLabel::new(
-            first.name_span(db).unwrap(),
-            Some("Defined here".to_owned()),
-        );
+        let primary =
+            DiagLabel::new(first.name_span(db).unwrap(), Some("Defined here".to_owned()));
         let secondary = others
             .into_iter()
             .map(|def| {

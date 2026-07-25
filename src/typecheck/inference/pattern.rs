@@ -27,7 +27,10 @@ use crate::{
     resolved::{EnumId, ScopeOwnerId},
 };
 
-use super::{InferenceCtx, InferTy, UnificationError, PatternId, LocalId, Itertools, Symbol, ImplicitContext, TypeDefId, HashMap, Definition, StructId};
+use super::{
+    Definition, HashMap, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId,
+    PatternId, StructId, Symbol, TypeDefId, UnificationError,
+};
 
 impl InferenceCtx<'_> {
     pub fn infer_pattern(
@@ -119,7 +122,9 @@ impl InferenceCtx<'_> {
         span: Span,
     ) -> Vec<InferTy> {
         let variant = self.get_enum_variant(enum_id, name);
-        if let Some(AstEnumVariantKind::TupleLike(tys)) = variant.as_ref().map(|v| &v.kind) {
+        if let Some(AstEnumVariantKind::TupleLike(tys)) =
+            variant.as_ref().map(|v| &v.kind)
+        {
             let ctx = self.get_ctx_for_enum(enum_id, template_tys);
             tys.iter()
                 .map(|ty| {
@@ -150,16 +155,20 @@ impl InferenceCtx<'_> {
     ) -> HashMap<Symbol, InferTy> {
         let ctx = self.get_ctx_for_enum(enum_id, template_tys);
         let variant = self.get_enum_variant(enum_id, name);
-        if let Some(AstEnumVariantKind::StructLike(fields)) = variant.as_ref().map(|v| &v.kind) { fields
-        .iter()
-        .map(|field| {
-            (
-                field.name,
-                self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                    .unwrap_or_else(|| self.fresh_var().into()),
-            )
-        })
-        .collect() } else {
+        if let Some(AstEnumVariantKind::StructLike(fields)) =
+            variant.as_ref().map(|v| &v.kind)
+        {
+            fields
+                .iter()
+                .map(|field| {
+                    (
+                        field.name,
+                        self.allocate_ast_type_expr(&field.ty.data, &ctx)
+                            .unwrap_or_else(|| self.fresh_var().into()),
+                    )
+                })
+                .collect()
+        } else {
             Diag::generic_error(
                 format!(
                     "Expected variant `{}` to be struct-like for enum `{}`",

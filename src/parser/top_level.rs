@@ -491,7 +491,7 @@ impl Parser<'_> {
         match self.current_token()?.kind {
             TokenKind::Type => {
                 self.consume();
-                let Spanned { data: name, span: name_span,  } = self.parse_symbol()?;
+                let Spanned { data: name, span: name_span } = self.parse_symbol()?;
                 self.expect(TokenKind::Eq)?;
                 self.consume();
                 let ty = self.parse_type_expr()?;

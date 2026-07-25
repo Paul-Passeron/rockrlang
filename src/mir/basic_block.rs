@@ -140,8 +140,9 @@ impl MIRTerminator {
             Self::Return { value: op, .. } => {
                 op.iter().flat_map(super::operand::MIROperand::uses).collect()
             }
-            Self::Switch { discriminant: op, .. }
-            | Self::Branch { cond: op, .. } => op.uses(),
+            Self::Switch { discriminant: op, .. } | Self::Branch { cond: op, .. } => {
+                op.uses()
+            }
         }
     }
 }

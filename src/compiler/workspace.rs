@@ -165,10 +165,7 @@ pub fn is_file_direct_submodule_of_file(
 }
 
 #[salsa::tracked]
-pub fn submodules_of_file(
-    db: &dyn Db,
-    file: SourceFile,
-) -> Vec<FileModule<'_>> {
+pub fn submodules_of_file(db: &dyn Db, file: SourceFile) -> Vec<FileModule<'_>> {
     if file.path(db).file_name().unwrap() != ANCHOR_FILE_NAME {
         return vec![];
     }

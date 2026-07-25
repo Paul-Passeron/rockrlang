@@ -148,7 +148,9 @@ impl<'db> LowerFundef<'db> {
                 }
             }
             AstExprDesc::NameResolved { from, to } => {
-                if let Some(Definition::Module(inner)) = resolve_in_module(self.db, from.data, module) {
+                if let Some(Definition::Module(inner)) =
+                    resolve_in_module(self.db, from.data, module)
+                {
                     self.expr_as_place(to, scope, inner)
                 } else {
                     let temp = self.lower_expr(expr, scope, module);
@@ -344,7 +346,9 @@ impl<'db> LowerFundef<'db> {
     ) -> HirExprDesc {
         if let Some(id) = scope.map.get(&symbol) {
             HirExprDesc::Use(self.new_place(HirPlaceKind::Local(*id), span, false))
-        } else if let Some(Definition::Function(_)) = resolve_in_module(self.db, symbol, module) {
+        } else if let Some(Definition::Function(_)) =
+            resolve_in_module(self.db, symbol, module)
+        {
             todo!(
                 "bare function name `{}` used as value expression",
                 symbol.interned().contents(self.db)

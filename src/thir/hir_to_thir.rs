@@ -235,7 +235,9 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn handle_break(&self, b: &ThirBuilder, span: Span, is_synthetic: bool) -> ThirStmt {
-        if let Some(scope_id) = self.innermost_loop_scope(b) { ThirStmt::brk(scope_id, span, is_synthetic) } else {
+        if let Some(scope_id) = self.innermost_loop_scope(b) {
+            ThirStmt::brk(scope_id, span, is_synthetic)
+        } else {
             if self.scope_stack.is_empty() {
                 println!("Cannot break at function top-level");
             } else {
@@ -1078,103 +1080,104 @@ impl<'db> ThirTranslator<'db> {
         receiver_ty: TypeRef,
         span: Span,
     ) -> Idx<ThirExpr> {
-        if let typecheck::CallKind::Method { adjustment } = call_infos.call_kind { match adjustment {
-            ReceiverAdjustment::None => {
-                let place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
-                    });
-                b.new_expr(ThirExpr::use_place(place, b, span))
-            }
-            ReceiverAdjustment::Ref => {
-                let place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
-                    });
-                b.new_expr(ThirExpr {
-                    kind: ExprKind::Ref { place, mutability: Mutability::Const },
-                    ty: b.get_place(place).ty.wrap_ref(self.db, false),
-                    span,
-                    is_synthetic: true,
-                })
-            }
-            ReceiverAdjustment::MutRef => {
-                let place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(
-                            b,
-                            stmts,
-                            thir_receiver,
-                            Mutability::Mutable,
-                        )
-                    });
-                b.new_expr(ThirExpr {
-                    kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
-                    ty: receiver_ty.wrap_ref(self.db, true),
-                    span,
-                    is_synthetic: true,
-                })
-            }
-            ReceiverAdjustment::Deref(depth) => {
-                let mut place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
-                    });
-                let mut cur_ty = receiver_ty;
-                for _ in 0..depth {
-                    cur_ty =
-                        cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                    place =
-                        b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+        if let typecheck::CallKind::Method { adjustment } = call_infos.call_kind {
+            match adjustment {
+                ReceiverAdjustment::None => {
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        });
+                    b.new_expr(ThirExpr::use_place(place, b, span))
                 }
-                b.new_expr(ThirExpr::use_place(place, b, span))
-            }
-            ReceiverAdjustment::DerefThenRef(depth) => {
-                let mut place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
-                    });
-                let mut cur_ty = receiver_ty;
-                for _ in 0..depth {
-                    cur_ty =
-                        cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                    place =
-                        b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                ReceiverAdjustment::Ref => {
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        });
+                    b.new_expr(ThirExpr {
+                        kind: ExprKind::Ref { place, mutability: Mutability::Const },
+                        ty: b.get_place(place).ty.wrap_ref(self.db, false),
+                        span,
+                        is_synthetic: true,
+                    })
                 }
-                b.new_expr(ThirExpr {
-                    kind: ExprKind::Ref { place, mutability: Mutability::Const },
-                    ty: cur_ty.wrap_ref(self.db, false),
-                    span,
-                    is_synthetic: true,
-                })
-            }
-            ReceiverAdjustment::DerefThenMutRef(depth) => {
-                let mut place =
-                    self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                        self.spill_to_temp(
-                            b,
-                            stmts,
-                            thir_receiver,
-                            Mutability::Mutable,
-                        )
-                    });
-                let mut cur_ty = receiver_ty;
-                for _ in 0..depth {
-                    cur_ty =
-                        cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                    place =
-                        b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                ReceiverAdjustment::MutRef => {
+                    let place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Mutable,
+                            )
+                        });
+                    b.new_expr(ThirExpr {
+                        kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
+                        ty: receiver_ty.wrap_ref(self.db, true),
+                        span,
+                        is_synthetic: true,
+                    })
                 }
-                b.new_expr(ThirExpr {
-                    kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
-                    ty: cur_ty.wrap_ref(self.db, true),
-                    span,
-                    is_synthetic: true,
-                })
+                ReceiverAdjustment::Deref(depth) => {
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        });
+                    let mut cur_ty = receiver_ty;
+                    for _ in 0..depth {
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                    }
+                    b.new_expr(ThirExpr::use_place(place, b, span))
+                }
+                ReceiverAdjustment::DerefThenRef(depth) => {
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        });
+                    let mut cur_ty = receiver_ty;
+                    for _ in 0..depth {
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                    }
+                    b.new_expr(ThirExpr {
+                        kind: ExprKind::Ref { place, mutability: Mutability::Const },
+                        ty: cur_ty.wrap_ref(self.db, false),
+                        span,
+                        is_synthetic: true,
+                    })
+                }
+                ReceiverAdjustment::DerefThenMutRef(depth) => {
+                    let mut place =
+                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            self.spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Mutable,
+                            )
+                        });
+                    let mut cur_ty = receiver_ty;
+                    for _ in 0..depth {
+                        cur_ty =
+                            cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
+                        place =
+                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                    }
+                    b.new_expr(ThirExpr {
+                        kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
+                        ty: cur_ty.wrap_ref(self.db, true),
+                        span,
+                        is_synthetic: true,
+                    })
+                }
             }
-        } } else {
-            let place =
-                self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
+        } else {
+            let place = self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
             b.new_expr(ThirExpr::use_place(place, b, span))
         }
     }

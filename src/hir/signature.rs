@@ -88,9 +88,9 @@ impl AstReceiver {
             Self::None => {
                 return None;
             }
-            Self::MutZelf(_)
-            | Self::MutRefZelf(_)
-            | Self::MutPtrZelf(_) => Mutability::Mutable,
+            Self::MutZelf(_) | Self::MutRefZelf(_) | Self::MutPtrZelf(_) => {
+                Mutability::Mutable
+            }
             _ => Mutability::Const,
         };
         let kind = match self {

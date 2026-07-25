@@ -179,7 +179,8 @@ impl<'db> SanityChecker<'db> {
             ThirPatternKind::IntLit(_) => {
                 if expected_ty
                     .as_type_id()
-                    .and_then(|ty| ty.def(self.db).is_int_like(self.db)).is_none()
+                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+                    .is_none()
                 {
                     self.check_types(expected_ty, int_id(self.db).into(), pat.span);
                 }
@@ -211,7 +212,11 @@ impl<'db> SanityChecker<'db> {
                 infos.span,
             ),
             ExprKind::StrLit(_) => {
-                self.check_types(TypeRef::Concrete(str_id(self.db)), infos.ty, infos.span);
+                self.check_types(
+                    TypeRef::Concrete(str_id(self.db)),
+                    infos.ty,
+                    infos.span,
+                );
             }
             ExprKind::CStrLit(_) => self.check_types(
                 TypeRef::Concrete(const_ptr_of(

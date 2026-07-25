@@ -27,7 +27,13 @@ use crate::{
     },
 };
 
-use super::{InternedModuleId, ModuleId, Db, Symbol, SourceFile, FileModule, Package, InternedFunctionId, FunctionId, ScopeOwnerId, InternedStructId, StructId, InternedImplId, ImplId, TypeRef, InterfaceRef, Set, InternedInterfaceId, InterfaceId, InternedTypeId, TypeId, TypeDefId, BuiltinTypeId, BuiltinTypeDef, BuiltinTypeKind, IntWidth, InternedInterfaceRef, InternedEnumId, EnumId};
+use super::{
+    BuiltinTypeDef, BuiltinTypeId, BuiltinTypeKind, Db, EnumId, FileModule, FunctionId,
+    ImplId, IntWidth, InterfaceId, InterfaceRef, InternedEnumId, InternedFunctionId,
+    InternedImplId, InternedInterfaceId, InternedInterfaceRef, InternedModuleId,
+    InternedStructId, InternedTypeId, ModuleId, Package, ScopeOwnerId, Set, SourceFile,
+    StructId, Symbol, TypeDefId, TypeId, TypeRef,
+};
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
     fn from(v: InternedModuleId<'db>) -> Self {

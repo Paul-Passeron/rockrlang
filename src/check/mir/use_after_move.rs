@@ -63,8 +63,9 @@ impl MIRTerminator {
             Self::Return { value, .. } => {
                 value.iter().for_each(|op| op.check(db, state));
             }
-            Self::Branch { cond: op, .. }
-            | Self::Switch { discriminant: op, .. } => op.check(db, state),
+            Self::Branch { cond: op, .. } | Self::Switch { discriminant: op, .. } => {
+                op.check(db, state)
+            }
         }
     }
 }

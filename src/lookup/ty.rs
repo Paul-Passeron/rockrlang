@@ -397,10 +397,11 @@ fn any_type_expr_at(
     resolved: Option<TypeRef>,
     loc: Location,
 ) -> Option<TypeNode> {
-    if let Some(ty) = any.as_known() { type_expr_at(db, ctx, &ty, resolved, loc) } else {
+    if let Some(ty) = any.as_known() {
+        type_expr_at(db, ctx, &ty, resolved, loc)
+    } else {
         any.span.encloses(loc).then_some(())?;
-        let ty =
-            resolved.filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))?;
+        let ty = resolved.filter(|r| !matches!(r, TypeRef::Unknown | TypeRef::Error))?;
         Some(TypeNode { ty, span: any.span })
     }
 }
