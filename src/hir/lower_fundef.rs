@@ -1237,7 +1237,7 @@ impl<'db> LowerFundef<'db> {
                 receiver: iterator_candidate.boxed(),
                 method: Symbol::new(self.db, "into_iter"),
                 args: vec![],
-                interface_hint: Some(*into_iter_interface),
+                interface_hint: Some(into_iter_interface),
                 type_args: vec![],
             },
             iterator_span,

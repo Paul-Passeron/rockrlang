@@ -44,11 +44,14 @@ use crate::{
         },
     },
     name_resolve::{
-        core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
+        core_package, file_module_id,
+        interfaces::{core_copy_interface, core_drop_interface},
+        std_package,
+        type_expr::get_templates_of_fun,
     },
     resolved::{
-        BuiltinTypeKind, FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, char_id,
-        never_id, str_def, str_id, void_id,
+        BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
+        TypeRef, char_id, never_id, str_def, str_id, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -58,6 +61,7 @@ use crate::{
         thir_body,
     },
     thir_to_mir::lower_match::MatchLowerer,
+    typecheck::conformance::type_implements,
 };
 
 pub mod decision_tree;
@@ -881,18 +885,49 @@ impl<'a> ThirToMIR<'a> {
 }
 
 impl TypeRef {
-    /// Cheking if a type can be copied. This will be delegated to an interface
-    /// check.
     pub fn is_copy(self, db: &dyn Db) -> bool {
         match self {
-            Self::Concrete(type_id) => type_id.is_copy(db),
-            _ => false, // TODO
+            Self::Concrete(type_id) => {
+                if type_id.is_trivial_copy(db) {
+                    return true;
+                }
+                if !self.is_concrete(db) {
+                    return false;
+                }
+                let interface = core_copy_interface(db);
+                let iref = InterfaceRef::new(db, interface, vec![]);
+                type_implements(db, type_id, iref).is_some()
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_drop(self, db: &dyn Db) -> bool {
+        match self {
+            Self::Concrete(type_id) => {
+                if !self.is_concrete(db) {
+                    return true;
+                }
+                let interface = core_drop_interface(db);
+                let iref = InterfaceRef::new(db, interface, vec![]);
+                type_implements(db, type_id, iref).is_some()
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_concrete(self, db: &dyn Db) -> bool {
+        match self {
+            TypeRef::Concrete(type_id) => {
+                !type_id.args(db).iter().any(|ty| !ty.is_concrete(db))
+            }
+            _ => false,
         }
     }
 }
 
 impl TypeId {
-    pub fn is_copy(self, db: &dyn Db) -> bool {
+    pub fn is_trivial_copy(self, db: &dyn Db) -> bool {
         if let TypeDefId::Builtin(b) = self.def(db) {
             match b.kind(db) {
                 BuiltinTypeKind::Void

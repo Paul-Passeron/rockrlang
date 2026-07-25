@@ -103,10 +103,7 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn needs_drop(&self, ty: TypeRef) -> bool {
-        if ty.is_copy(self.db) {
-            return false;
-        }
-        true
+        ty.is_drop(self.db)
     }
 
     fn add_drops(&mut self, b: &mut ThirBuilder, stmts: &mut Vec<ThirStmt>) {

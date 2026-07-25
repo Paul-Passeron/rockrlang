@@ -90,7 +90,7 @@ pub fn core_iter_interface(db: &dyn Db) -> InterfaceId {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn core_into_iterator_interface(db: &dyn Db) -> InterfaceId {
     let core_iter_module = core_iter_module(db);
     let interface =
@@ -100,6 +100,37 @@ pub fn core_into_iterator_interface(db: &dyn Db) -> InterfaceId {
         _ => panic!("core::iter::IntoIterator interface not found"),
     }
 }
+
+#[salsa::tracked(returns(copy))]
+pub fn core_copy_interface(db: &dyn Db) -> InterfaceId {
+    let core_mem_module = core_mem_module(db);
+    let interface = resolve_in_module(db, Symbol::new(db, "Copy"), *core_mem_module);
+    match interface {
+        Some(Definition::Interface(id)) => id,
+        _ => panic!("core::mem::Copy interface not found"),
+    }
+}
+
+#[salsa::tracked(returns(copy))]
+pub fn core_drop_interface(db: &dyn Db) -> InterfaceId {
+    let core_mem_module = core_mem_module(db);
+    let interface = resolve_in_module(db, Symbol::new(db, "Drop"), *core_mem_module);
+    match interface {
+        Some(Definition::Interface(id)) => id,
+        _ => panic!("core::mem::Copy interface not found"),
+    }
+}
+
+#[salsa::tracked(returns(copy))]
+pub fn core_clone_interface(db: &dyn Db) -> InterfaceId {
+    let core_mem_module = core_mem_module(db);
+    let interface = resolve_in_module(db, Symbol::new(db, "Clone"), *core_mem_module);
+    match interface {
+        Some(Definition::Interface(id)) => id,
+        _ => panic!("core::mem::Copy interface not found"),
+    }
+}
+
 
 #[salsa::tracked(returns(copy))]
 pub fn core_int_iter_struct(db: &dyn Db) -> StructId {
