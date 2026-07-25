@@ -20,8 +20,9 @@ use std::{collections::BTreeMap, panic, sync::Arc};
 use itertools::Itertools;
 use salsa::Accumulator;
 
+use crate::common::location::Span;
 use crate::compiler::diagnostic::Diag;
-use crate::hir::{HirMatchBranch, HirPatternDesc};
+use crate::hir::{HirMatchBranch, HirPatternDesc, HirPlace};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::printer::render_diagnostics;
 use crate::resolved::TypeId;
@@ -115,7 +116,7 @@ pub enum TyRef {
 }
 
 impl<'db> TyCtx<'db> {
-    pub fn new(
+    pub(super) fn new(
         db: &'db dyn Db,
         function: FunctionId,
         locals: &'db [LocalInfo],
@@ -143,14 +144,14 @@ impl<'db> TyCtx<'db> {
             substitution: infos
                 .substitution
                 .into_iter()
-                .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error))
+                .map(|ty| self.inf_ctx.solve(&ty).unwrap_or(TypeRef::Error))
                 .collect_vec()
                 .into_iter()
                 .map(|ty| self.canon_type(ty))
                 .collect(),
             zelf_ty: infos
                 .zelf_ty
-                .map(|ty| self.inf_ctx.solve(ty).unwrap_or(TypeRef::Error)),
+                .map(|ty| self.inf_ctx.solve(&ty).unwrap_or(TypeRef::Error)),
             call_kind: infos.call_kind,
         }
     }
@@ -163,7 +164,9 @@ impl<'db> TyCtx<'db> {
                 type_id.def(db),
                 type_id.args(db).iter().map(|ty| self.canon_type(*ty)).collect(),
             )),
-            TypeRef::Zelf => self.function.parent(db).get_canonical_zelf(db).unwrap(),
+            TypeRef::Zelf => {
+                self.function.parent(db).get_canonical_zelf(db).unwrap_or(TypeRef::Error)
+            }
             _ => ty,
         }
     }
@@ -197,9 +200,9 @@ impl<'db> TyCtx<'db> {
             .into_iter()
             .collect::<Box<[_]>>();
         let node_types = drain
-            .into_iter()
+            .iter()
             .map(|(id, infer_ty)| {
-                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -207,9 +210,9 @@ impl<'db> TyCtx<'db> {
             .into_iter()
             .collect::<Box<[_]>>();
         let pat_types = drain
-            .into_iter()
+            .iter()
             .map(|(id, infer_ty)| {
-                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -217,9 +220,9 @@ impl<'db> TyCtx<'db> {
             .into_iter()
             .collect::<Box<[_]>>();
         let place_types = drain
-            .into_iter()
+            .iter()
             .map(|(id, infer_ty)| {
-                (id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -234,10 +237,7 @@ impl<'db> TyCtx<'db> {
             .locals
             .iter()
             .map(|local| {
-                (
-                    local.id,
-                    self.inf_ctx.solve(InferTy::Var(self.inf_ctx.local_var(local.id))),
-                )
+                (local.id, self.inf_ctx.solve(&self.inf_ctx.local_var(local.id).into()))
             })
             .collect();
 
@@ -302,7 +302,7 @@ impl<'db> TyCtx<'db> {
                         InferTy::Var(self.inf_ctx.fresh_var())
                     }
                 };
-                if let Err(err) = self.inf_ctx.unify(guard_ty, self.inf_ctx.bool_ty()) {
+                if let Err(err) = self.inf_ctx.unify(&guard_ty, &self.inf_ctx.bool_ty()) {
                     // This is safe to do because this can fail only if the one
                     // above didn't.
                     error.1 = Some(err);
@@ -366,18 +366,16 @@ impl<'db> TyCtx<'db> {
                         // Pass-through (Should have already been reported)
                     }
                     _ => {
-                        self.inf_ctx.unify(init_ty.clone(), pattern_ty).unwrap_or_else(
-                            |err| {
-                                Diag::generic_error(
-                                    format!(
-                                        "Could not typecheck pattern: {}",
-                                        err.display(self.db)
-                                    ),
-                                    whole_span,
-                                )
-                                .accumulate(self.db)
-                            },
-                        );
+                        self.inf_ctx.unify(&init_ty, &pattern_ty).unwrap_or_else(|err| {
+                            Diag::generic_error(
+                                format!(
+                                    "Could not typecheck pattern: {}",
+                                    err.display(self.db)
+                                ),
+                                whole_span,
+                            )
+                            .accumulate(self.db);
+                        });
                     }
                 }
                 if let Some(annotation) = ty_annotation
@@ -386,8 +384,7 @@ impl<'db> TyCtx<'db> {
                         &annotation.data,
                         self.inf_ctx.implicit_ctx().as_ref(),
                     )
-                    && let Err(_err) =
-                        self.inf_ctx.unify(init_ty.clone(), annotated.clone())
+                    && let Err(_err) = self.inf_ctx.unify(&init_ty, &annotated)
                 {
                     Diag::generic_error(
                         format!(
@@ -419,42 +416,7 @@ impl<'db> TyCtx<'db> {
                 self.type_check_match(scrutinee, branches);
             }
             HirStmtKind::Assign { lhs, rhs } => {
-                let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
-                if let Some(rhs_err) = rhs_err {
-                    Diag::generic_error(
-                        format!("unification error: `{}`", rhs_err.display(self.db)),
-                        rhs.span,
-                    )
-                    .accumulate(self.db);
-                }
-                match self.inf_ctx.infer_place(lhs) {
-                    Ok(lhs_ty) => match rhs_ty {
-                        TyRef::Inf(rhs_ty) => {
-                            if let Err(err) =
-                                self.inf_ctx.unify(lhs_ty.clone(), rhs_ty.clone())
-                            {
-                                let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
-                                let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
-                                Diag::generic_error(
-                                    format!(
-                                        "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
-                                        err.display(self.db)
-                                    ),
-                                    stmt.span,
-                                )
-                                .accumulate(self.db);
-                            }
-                        }
-                        TyRef::Error => (),
-                    },
-                    Err(err) => {
-                        Diag::generic_error(
-                            format!("unification error: `{}`", err.display(self.db)),
-                            lhs.span,
-                        )
-                        .accumulate(self.db);
-                    }
-                }
+                self.type_check_assign(lhs, rhs, stmt.span);
             }
             HirStmtKind::Expr(hir_expr) => {
                 let (_, err) = self.type_check_expr(hir_expr);
@@ -467,67 +429,13 @@ impl<'db> TyCtx<'db> {
                 }
             }
             HirStmtKind::Return(hir_expr) => {
-                let ret_ty = self.get_ret_ty();
-                if let Some(expr) = &hir_expr {
-                    let (ty, err) = self.type_check_expr(expr);
-                    if let Some(err) = err {
-                        Diag::generic_error(
-                            format!("unification error: `{}`", err.display(self.db)),
-                            expr.span,
-                        )
-                        .accumulate(self.db);
-                    };
-
-                    match ty {
-                        TyRef::Inf(infer_ty) => {
-                            if let Err(err) =
-                                self.inf_ctx.unify(ret_ty.clone(), infer_ty.clone())
-                            {
-                                let _ = err;
-                                Diag::generic_error(
-                                    format!(
-                                        "Cannot return {} form a function expected to return {}",
-                                        self.inf_ctx
-                                            .find(&infer_ty)
-                                            .to_string(self.db),
-                                        self.inf_ctx
-                                            .find(&ret_ty)
-                                            .to_string(self.db)
-                                    ),
-                                    expr.span,
-                                )
-                                .accumulate(self.db);
-                            }
-                        }
-                        TyRef::Error => {
-                            Diag::generic_error(
-                                format!(
-                                    "Cannot return error type form a function expected to return {}",
-                                    self.inf_ctx.find(&ret_ty).to_string(self.db)
-                                ),
-                                expr.span,
-                            )
-                            .accumulate(self.db);
-                        }
-                    }
-                } else {
-                    let void_ty = self.inf_ctx.void_ty();
-                    if ret_ty != void_ty {
-                        Diag::generic_error(
-                            format!(
-                                "Cannot have an empty return from a function expected to return {}",
-                                self.inf_ctx.find(&ret_ty).to_string(self.db)
-                            ),
-                            stmt.span,
-                        )
-                        .accumulate(self.db);
-                    }
-                }
+                self.type_check_ret(hir_expr.as_ref(), stmt.span);
             }
             HirStmtKind::If { cond, then, else_ } => {
                 match self.inf_ctx.infer_expr(cond) {
                     Ok(ty) => {
-                        if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                        if let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty())
+                        {
                             Diag::generic_error(
                                 format!(
                                     "if condition must be of type bool: {}",
@@ -551,7 +459,7 @@ impl<'db> TyCtx<'db> {
             }
             HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
                 Ok(ty) => {
-                    if let Err(err) = self.inf_ctx.unify(ty, self.inf_ctx.bool_ty()) {
+                    if let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty()) {
                         Diag::generic_error(
                             format!(
                                 "while condition must be of type bool: {}",
@@ -574,11 +482,12 @@ impl<'db> TyCtx<'db> {
                 }
             },
             HirStmtKind::Block(stmts, _) => {
-                stmts.iter().for_each(|stmt| self.type_check_stmt(stmt))
+                for stmt in stmts {
+                    self.type_check_stmt(stmt);
+                }
             }
             HirStmtKind::Defer(stmt) => self.type_check_stmt(stmt),
-            HirStmtKind::Break => (),
-            HirStmtKind::Error => (),
+            HirStmtKind::Break | HirStmtKind::Error => (),
         }
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
             Diag::generic_error(
@@ -593,8 +502,100 @@ impl<'db> TyCtx<'db> {
         }
     }
 
+    fn type_check_ret(&mut self, hir_expr: Option<&HirExpr>, span: Span) {
+        let ret_ty = self.get_ret_ty();
+        if let Some(expr) = &hir_expr {
+            let (ty, err) = self.type_check_expr(expr);
+            if let Some(err) = err {
+                Diag::generic_error(
+                    format!("unification error: `{}`", err.display(self.db)),
+                    expr.span,
+                )
+                .accumulate(self.db);
+            }
+
+            match ty {
+                TyRef::Inf(infer_ty) => {
+                    if let Err(err) = self.inf_ctx.unify(&ret_ty, &infer_ty) {
+                        let _ = err;
+                        Diag::generic_error(
+                            format!(
+                                "Cannot return {} form a function expected to return {}",
+                                self.inf_ctx.find(&infer_ty).to_string(self.db),
+                                self.inf_ctx.find(&ret_ty).to_string(self.db)
+                            ),
+                            expr.span,
+                        )
+                        .accumulate(self.db);
+                    }
+                }
+                TyRef::Error => {
+                    Diag::generic_error(
+                        format!(
+                            "Cannot return error type form a function expected to return {}",
+                            self.inf_ctx.find(&ret_ty).to_string(self.db)
+                        ),
+                        expr.span,
+                    )
+                    .accumulate(self.db);
+                }
+            }
+        } else {
+            let void_ty = self.inf_ctx.void_ty();
+            if ret_ty != void_ty {
+                Diag::generic_error(
+                    format!(
+                        "Cannot have an empty return from a function expected to return {}",
+                        self.inf_ctx.find(&ret_ty).to_string(self.db)
+                    ),
+                    span,
+                )
+                .accumulate(self.db);
+            }
+        }
+    }
+
+    fn type_check_assign(&mut self, lhs: &HirPlace, rhs: &HirExpr, span: Span) {
+        let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
+        if let Some(rhs_err) = rhs_err {
+            Diag::generic_error(
+                format!("unification error: `{}`", rhs_err.display(self.db)),
+                rhs.span,
+            )
+            .accumulate(self.db);
+        }
+        match self.inf_ctx.infer_place(lhs) {
+            Ok(lhs_ty) => match rhs_ty {
+                TyRef::Inf(rhs_ty) => {
+                    if let Err(err) = self.inf_ctx.unify(&lhs_ty, &rhs_ty) {
+                        let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
+                        let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
+                        Diag::generic_error(
+                            format!(
+                                "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
+                                err.display(self.db)
+                            ),
+                            span,
+                        )
+                        .accumulate(self.db);
+                    }
+                }
+                TyRef::Error => (),
+            },
+            Err(err) => {
+                Diag::generic_error(
+                    format!("unification error: `{}`", err.display(self.db)),
+                    lhs.span,
+                )
+                .accumulate(self.db);
+            }
+        }
+    }
+
     fn type_check(mut self, stmts: &'db [HirStmt]) -> TypeCheckResults<'db> {
-        stmts.iter().for_each(|stmt| self.type_check_stmt(stmt));
+        for stmt in stmts {
+            self.type_check_stmt(stmt);
+        }
         self.finalize()
     }
 }
@@ -621,9 +622,9 @@ pub fn _type_check_function<'db>(
     hir_body(db, function.into()).map(|hir| type_check_hir(db, hir))
 }
 
-pub fn type_check_function<'db>(
-    db: &'db dyn Db,
+pub fn type_check_function(
+    db: &dyn Db,
     function: FunctionId,
-) -> Option<TypeCheckResults<'db>> {
+) -> Option<TypeCheckResults<'_>> {
     _type_check_function(db, function.interned())
 }

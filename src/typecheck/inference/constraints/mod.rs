@@ -223,7 +223,7 @@ impl<'db> InferenceCtx<'db> {
 
         let zelf_ty = self.peel_receiver(receiver, depth);
 
-        if let Err(e) = self.unify(zelf_ty.clone(), implem.ty.clone()) {
+        if let Err(e) = self.unify(&zelf_ty, &implem.ty) {
             return ConstraintSolveResult::Error(e);
         }
 
@@ -253,13 +253,13 @@ impl<'db> InferenceCtx<'db> {
 
         let ret_ty =
             self.allocate_ast_type_expr(&sig.data.return_type.data, &ctx).unwrap();
-        if let Err(e) = self.unify(ret_var.into(), ret_ty) {
+        if let Err(e) = self.unify(&ret_var.into(), &ret_ty) {
             return ConstraintSolveResult::Error(e);
         }
 
         for (ast_arg, call_arg) in sig.data.args.iter().zip(args) {
             let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
-            if let Err(e) = self.unify(expected, call_arg.clone()) {
+            if let Err(e) = self.unify(&expected, call_arg) {
                 return ConstraintSolveResult::Error(e);
             }
         }
@@ -283,7 +283,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn get_working_impls(
-        &mut self,
+        &self,
         competing_impls: impl IntoIterator<Item = (ImplSource<'db>, PotentialBlockRes)>,
     ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
         let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
@@ -383,7 +383,7 @@ impl<'db> InferenceCtx<'db> {
         }
         match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
-                match self.unify(res_ty.into(), self.int_ty()) {
+                match self.unify(&res_ty.into(), &self.int_ty()) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
                 }
@@ -393,7 +393,7 @@ impl<'db> InferenceCtx<'db> {
                     def: TypeDefId::Builtin(BuiltinTypeId::const_ref(self.db)),
                     fields: vec![target.clone()],
                 };
-                match self.unify(var.into(), adt) {
+                match self.unify(&var.into(), &adt) {
                     Ok(()) => ConstraintSolveResult::Solved,
                     Err(err) => ConstraintSolveResult::Error(err),
                 }

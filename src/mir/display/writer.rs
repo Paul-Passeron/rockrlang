@@ -77,11 +77,7 @@ impl<'a> fmt::Display for MIRDisplay<'a, MIR> {
     }
 }
 
-fn fmt_local<W: super::MIRWrite>(
-    w: &mut W,
-    db: &dyn Db,
-    local: &MIRLocal,
-) -> fmt::Result {
+fn fmt_local<W: MIRWrite>(w: &mut W, db: &dyn Db, local: &MIRLocal) -> fmt::Result {
     if local.mutability.is_mut() {
         w.write_str("mut ")?;
     }

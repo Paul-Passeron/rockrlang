@@ -32,13 +32,13 @@ impl fmt::Display for InferVar {
 
 impl From<InferVar> for InferTy {
     fn from(value: InferVar) -> Self {
-        InferTy::Var(value)
+        Self::Var(value)
     }
 }
 
 impl From<&InferVar> for InferTy {
     fn from(value: &InferVar) -> Self {
-        InferTy::Var(*value)
+        Self::Var(*value)
     }
 }
 
@@ -58,7 +58,7 @@ impl UnifyKey for InferVar {
     }
 }
 
-impl<'a> InferenceCtx<'a> {
+impl InferenceCtx<'_> {
     pub fn fresh_var(&mut self) -> InferVar {
         self.table.new_key(None)
     }

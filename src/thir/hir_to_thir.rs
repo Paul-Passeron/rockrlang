@@ -133,7 +133,7 @@ impl<'db> ThirBuilder<'db> {
     }
 
     fn with_synthetic_projection(
-        &mut self,
+        &self,
         place: PlaceId,
         proj: Projection,
         ty: TypeRef,
@@ -145,7 +145,7 @@ impl<'db> ThirBuilder<'db> {
     }
 
     fn with_projection(
-        &mut self,
+        &self,
         place: PlaceId,
         proj: Projection,
         ty: TypeRef,
@@ -159,7 +159,7 @@ impl<'db> ThirBuilder<'db> {
     }
 
     fn new_synthetic_local(
-        &mut self,
+        &self,
         ty: TypeRef,
         mutability: Mutability,
         span: Span,
@@ -532,7 +532,7 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
-    fn pattern_of_local(&mut self, b: &mut ThirBuilder, id: hir::LocalId) -> ThirPattern {
+    fn pattern_of_local(&self, b: &mut ThirBuilder, id: hir::LocalId) -> ThirPattern {
         let local_id = b.local_map[&id];
         let local = b.get_local(local_id);
         ThirPattern {
@@ -608,7 +608,7 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn place_or_expr_as_expr(
-        &mut self,
+        &self,
         b: &mut ThirBuilder,
         p_or_e: Either<ExprId, PlaceId>,
     ) -> ExprId {
@@ -1054,11 +1054,7 @@ impl<'db> ThirTranslator<'db> {
         })
     }
 
-    fn expr_as_place(
-        &mut self,
-        b: &mut ThirBuilder<'_>,
-        expr: ExprId,
-    ) -> Option<Idx<ThirPlace>> {
+    fn expr_as_place(&self, b: &ThirBuilder<'_>, expr: ExprId) -> Option<Idx<ThirPlace>> {
         match &b.exprs[expr].kind {
             ExprKind::Use(place) => Some(*place),
             _ => None,
@@ -1066,8 +1062,8 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn spill_to_temp(
-        &mut self,
-        b: &mut ThirBuilder<'_>,
+        &self,
+        b: &ThirBuilder<'_>,
         stmts: &mut Vec<ThirStmt>,
         expr: ExprId,
         mutability: Mutability,
@@ -1080,8 +1076,8 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn compute_receiver(
-        &mut self,
-        b: &mut ThirBuilder<'_>,
+        &self,
+        b: &ThirBuilder<'_>,
         stmts: &mut Vec<ThirStmt>,
         call_infos: &typecheck::CallInfos,
         thir_receiver: Idx<ThirExpr>,
@@ -1192,11 +1188,7 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
-    fn auto_deref_place_if_needed(
-        &mut self,
-        b: &mut ThirBuilder,
-        place: PlaceId,
-    ) -> PlaceId {
+    fn auto_deref_place_if_needed(&self, b: &mut ThirBuilder, place: PlaceId) -> PlaceId {
         let (ty, span) = {
             let place = b.get_place(place);
             (place.ty, place.span)

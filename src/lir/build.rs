@@ -162,7 +162,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         kind: ValueInstKind<Branded<'ir>>,
     ) -> ValueId<'ir> {
         let idx = self.body.defs.insert(LIRDef { ty });
-        let dest = ValueDef { idx, _brand: std::marker::PhantomData };
+        let dest = ValueDef { idx, _brand: PhantomData };
         let id = dest.id();
         self.insts.push(Instruction::Value { def: dest, kind });
         id
@@ -573,7 +573,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
             None
         } else {
             let idx = self.body.defs.insert(LIRDef { ty: ret_ty });
-            let def = ValueDef { idx, _brand: std::marker::PhantomData };
+            let def = ValueDef { idx, _brand: PhantomData };
             Some(def)
         };
 

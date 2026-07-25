@@ -66,7 +66,7 @@ impl<'a> fmt::Display for MIRDotDisplay<'a> {
     }
 }
 
-/// Build the DOT record label for a block.  
+/// Build the DOT record label for a block.
 /// Uses `StringWriter` so we can apply `dot_escape_label` to each piece.
 fn build_block_label(
     db: &dyn Db,
@@ -98,7 +98,7 @@ fn build_block_label(
     label
 }
 
-fn fmt_dot_edges<W: super::MIRWrite>(
+fn fmt_dot_edges<W: MIRWrite>(
     w: &mut W,
     from: usize,
     terminator: &MIRTerminator,

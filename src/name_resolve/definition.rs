@@ -105,7 +105,7 @@ impl ModuleId {
 }
 
 impl TypeDefId {
-    pub fn name(&self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(&self, db: &dyn Db) -> Symbol {
         match self {
             TypeDefId::Builtin(builtin) => builtin.name(db),
             TypeDefId::Struct(struct_id) => struct_id.name(db),
@@ -113,7 +113,7 @@ impl TypeDefId {
         }
     }
 
-    pub fn parent(&self, db: &dyn crate::Db) -> ModuleId {
+    pub fn parent(&self, db: &dyn Db) -> ModuleId {
         match self {
             TypeDefId::Builtin(_) => builtin_module(db),
             TypeDefId::Struct(struct_id) => struct_id.parent(db),

@@ -35,11 +35,7 @@ use crate::{
             AstStructDefField, AstTemplateArg, AstTopLevelItem, AstTopLevelItemDesc,
         },
     },
-    parser::{
-        ParseError,
-        ParseErrorKind::{self, UnexpectedEOF},
-        Parser,
-    },
+    parser::{ParseError, ParseErrorKind, Parser},
 };
 
 impl<'db> Parser<'db> {
@@ -205,7 +201,7 @@ impl<'db> Parser<'db> {
         let t = self
             .peek_n(0)
             .map(|t| t.kind)
-            .ok_or_else(|| self.parse_error(UnexpectedEOF))?;
+            .ok_or_else(|| self.parse_error(ParseErrorKind::UnexpectedEOF))?;
         if !matches!(t, TokenKind::Identifier(symbol) if symbol == zelf) {
             return Err(self.parse_error(ParseErrorKind::ExpectedToken {
                 expected: TokenKind::Identifier(zelf),

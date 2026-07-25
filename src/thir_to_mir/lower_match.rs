@@ -44,7 +44,7 @@ pub(super) struct MatchLowerer<'a, 'b> {
 }
 
 impl<'a, 'b> MatchLowerer<'a, 'b> {
-    pub fn new(
+    pub(super) fn new(
         ctx: &'a mut ThirToMIR<'b>,
         scrut: MIRPlace,
         merge_bb: MIRBlockID,
@@ -52,7 +52,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         Self { db: ctx.db, ctx, scrut, merge_bb }
     }
 
-    fn build_match_matrix(&mut self, branches: &'a [ThirMatchBranch]) -> Matrix<'a> {
+    fn build_match_matrix(&self, branches: &'a [ThirMatchBranch]) -> Matrix<'a> {
         let rows = branches
             .iter()
             .enumerate()
@@ -211,7 +211,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         self.ctx.switch_to(self.merge_bb);
     }
 
-    pub fn lower(&mut self, branches: &'a [ThirMatchBranch]) {
+    pub(super) fn lower(&mut self, branches: &'a [ThirMatchBranch]) {
         let matrix = self.build_match_matrix(branches);
         let decision_tree = matrix.compile(self.ctx);
         self.lower_decision_tree(&decision_tree, branches);

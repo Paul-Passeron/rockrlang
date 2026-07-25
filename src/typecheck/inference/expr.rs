@@ -112,12 +112,12 @@ impl<'db> InferenceCtx<'db> {
             }
             HirExprDesc::Neg(hir_expr) => {
                 let ty = self.infer_expr(hir_expr)?;
-                self.unify(ty.clone(), self.int_ty())?;
+                self.unify(&ty, &self.int_ty())?;
                 Ok(ty)
             }
             HirExprDesc::Not(hir_expr) => {
                 let ty = self.infer_expr(hir_expr)?;
-                self.unify(ty.clone(), self.bool_ty())?;
+                self.unify(&ty, &self.bool_ty())?;
                 Ok(ty)
             }
             HirExprDesc::Tuple(exprs) => {
@@ -128,7 +128,7 @@ impl<'db> InferenceCtx<'db> {
                 let elem_var = self.fresh_var();
                 exprs.iter().try_for_each(|expr| {
                     let ty = self.infer_expr(expr)?;
-                    self.unify(elem_var.into(), ty)?;
+                    self.unify(&elem_var.into(), &ty)?;
                     Ok(())
                 })?;
                 Ok(self.slice_of(elem_var.into()))
@@ -154,7 +154,7 @@ impl<'db> InferenceCtx<'db> {
                 let fat_ptr_ty = self.infer_expr(hir_expr)?;
                 let fat_ptr_var = self.emit_fat_ptr_constraint();
                 let metadata_var = self.emit_metadata_of_fat_ptr_constraint(fat_ptr_var);
-                self.unify(fat_ptr_ty, fat_ptr_var.into())?;
+                self.unify(&fat_ptr_ty, &fat_ptr_var.into())?;
                 Ok(metadata_var.into())
             }
             HirExprDesc::As { expr: castee, ty } => {
@@ -166,7 +166,7 @@ impl<'db> InferenceCtx<'db> {
 
                     let casted_to =
                         self.allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
-                    if let Err(err) = self.unify(expr_ty.into(), actual_expr_ty) {
+                    if let Err(err) = self.unify(&expr_ty.into(), &actual_expr_ty) {
                         Diag::generic_error(
                             format!("Invalid cast: {}", err.display(self.db)),
                             expr.span,
@@ -180,7 +180,7 @@ impl<'db> InferenceCtx<'db> {
                 let pointee = self.fresh_var();
                 let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
                 let expr_ty = self.infer_expr(castee)?;
-                if let Err(err) = self.unify(expr_ptr_ty.into(), expr_ty) {
+                if let Err(err) = self.unify(&expr_ptr_ty.into(), &expr_ty) {
                     Diag::generic_error(
                         format!("Unification error in as expr: {}", err.display(self.db)),
                         castee.span,
@@ -212,7 +212,7 @@ impl<'db> InferenceCtx<'db> {
                 let ptr_ty = self.infer_place(hir_place)?;
                 let pointee_var = self.fresh_var();
                 let ptr_var = self.emit_deref_constraint(pointee_var.into());
-                self.unify(ptr_var.into(), ptr_ty)?;
+                self.unify(&ptr_var.into(), &ptr_ty)?;
                 Ok(pointee_var.into())
             }
             HirPlaceKind::Index { base, index } => {
@@ -243,7 +243,7 @@ impl<'db> InferenceCtx<'db> {
         self.local_map[&local_id]
     }
 
-    pub fn infer_local(&mut self, local_id: LocalId) -> InferTy {
+    pub fn infer_local(&self, local_id: LocalId) -> InferTy {
         self.local_var(local_id).into()
     }
 
@@ -281,7 +281,7 @@ impl<'db> InferenceCtx<'db> {
                                     *t_ref,
                                     this.implicit_ctx().as_ref(),
                                 );
-                                this.unify(infer_ty.clone(), t_ref)
+                                this.unify(infer_ty, &t_ref)
                             },
                         )
                     })
@@ -340,14 +340,14 @@ impl<'db> InferenceCtx<'db> {
                     let resolved = this
                         .allocate_ast_type_expr(&ast.ty.data, &ctx)
                         .unwrap_or_else(|| this.fresh_var().into());
-                    this.unify(ty, resolved)
+                    this.unify(&ty, &resolved)
                 })
             })?;
 
             let as_struct =
                 InferTy::Adt { def: TypeDefId::Struct(struct_id), fields: templates };
 
-            self.unify(InferTy::Var(zelf), as_struct.clone())?;
+            self.unify(&zelf.into(), &as_struct)?;
 
             Ok(as_struct)
         } else {
@@ -356,7 +356,7 @@ impl<'db> InferenceCtx<'db> {
     }
 
     fn diagnose_field_mismatches(
-        &mut self,
+        &self,
         enum_id: EnumId,
         variant: Symbol,
         fields: &[HirStructField],
@@ -425,7 +425,7 @@ impl<'db> InferenceCtx<'db> {
                 let var: InferTy = self.fresh_var().into();
                 if let Some(hint) = template_hints.get(i) {
                     let allocated = self.allocate_type_ref(*hint, &self.implicit_ctx());
-                    self.unify(allocated, var.clone())?;
+                    self.unify(&allocated, &var)?;
                 }
                 Ok(var)
             })
@@ -453,7 +453,7 @@ impl<'db> InferenceCtx<'db> {
                     let in_ctx = self
                         .allocate_ast_type_expr(&ast.data, &ctx)
                         .unwrap_or_else(|| self.fresh_var().into());
-                    self.unify(hir_ty, in_ctx)?;
+                    self.unify(&hir_ty, &in_ctx)?;
                 }
             }
             (
@@ -473,7 +473,7 @@ impl<'db> InferenceCtx<'db> {
                         .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
                         .unwrap_or_else(|| self.fresh_var().into());
                     let err = match self.infer_expr(&field.expr) {
-                        Ok(expr_ty) => self.unify(expr_ty, field_ty).err(),
+                        Ok(expr_ty) => self.unify(&expr_ty, &field_ty).err(),
                         Err(err) => Some(err),
                     };
                     if let Some(err) = err {
@@ -497,7 +497,7 @@ impl<'db> InferenceCtx<'db> {
             def: TypeDefId::Enum(enum_def),
             fields: templates.iter().cloned().collect(),
         };
-        self.unify(InferTy::Var(zelf), as_enum.clone())?;
+        self.unify(&zelf.into(), &as_enum)?;
         Ok(InferTy::Var(zelf))
     }
 
@@ -620,8 +620,8 @@ impl<'db> InferenceCtx<'db> {
             .map(|arg| self.infer_expr(arg))
             .collect::<Result<Box<[_]>, _>>()?;
         inferred_ast_args
-            .into_iter()
-            .zip(inferred_args)
+            .iter()
+            .zip(&inferred_args)
             .try_for_each(|(a, b)| self.unify(a, b))?;
 
         self.call_infos.insert(

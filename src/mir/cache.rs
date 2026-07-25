@@ -40,7 +40,7 @@ pub(super) struct MIRCache {
 }
 
 impl MIRCache {
-    pub fn empty() -> Self {
+    pub(super) fn empty() -> Self {
         Self {
             liveness: OnceLock::new(),
             init_tracking: OnceLock::new(),

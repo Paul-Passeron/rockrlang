@@ -41,7 +41,7 @@ pub struct FileModule<'db> {
 }
 
 impl<'db> FileModule<'db> {
-    pub fn name(&self, db: &'db dyn crate::Db) -> Symbol {
+    pub fn name(&self, db: &'db dyn Db) -> Symbol {
         let path = self.file(db).path(db);
         let stem = path
             .parent()

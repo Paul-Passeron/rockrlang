@@ -442,14 +442,14 @@ impl<'a> ThirToMIR<'a> {
         if place.ty.is_copy(self.db) { place.into_copy() } else { place.into_move() }
     }
 
-    fn struct_ref(&mut self, struct_ref: &StructRef) -> StructRef {
+    fn struct_ref(&self, struct_ref: &StructRef) -> StructRef {
         StructRef {
             def: struct_ref.def,
             args: struct_ref.args.iter().map(|ty| self.ty(*ty)).collect_vec(),
         }
     }
 
-    fn enum_ref(&mut self, enum_ref: &EnumRef) -> EnumRef {
+    fn enum_ref(&self, enum_ref: &EnumRef) -> EnumRef {
         EnumRef {
             def: enum_ref.def,
             args: enum_ref.args.iter().map(|ty| self.ty(*ty)).collect_vec(),
@@ -461,7 +461,7 @@ impl<'a> ThirToMIR<'a> {
         StructRef { def: str_def, args: vec![] }
     }
 
-    fn build_strlit(&mut self, strlit: &str, span: Span) -> MIRRValueKind {
+    fn build_strlit(&self, strlit: &str, span: Span) -> MIRRValueKind {
         let data = MIROperand::Constant(
             MIRConstant::CString { contents: strlit.into(), null_terminated: false },
             span,
@@ -764,7 +764,7 @@ impl<'a> ThirToMIR<'a> {
         self.builder.emit(Stmt::Assign { dest, rvalue });
     }
 
-    fn build_expr_as_constant(&mut self, expr: ExprId) -> Option<MIRConstant> {
+    fn build_expr_as_constant(&self, expr: ExprId) -> Option<MIRConstant> {
         let thir_expr = &self.thir.exprs[expr];
         match &thir_expr.kind {
             ExprKind::IntLit(value) => {
@@ -888,7 +888,9 @@ impl TypeId {
 impl FunctionRef {
     pub fn concretize(mut self, db: &dyn Db, subs: &[TypeRef]) -> Self {
         let zelf = self.self_ty.map(|ty| ty.with_substitution(db, subs));
-        let (id, new_subs) = concretize_fid(db, self.id, &self.args, zelf);
+        let Some((id, new_subs)) = concretize_fid(db, self.id, &self.args, zelf) else {
+            return self;
+        };
         if id != self.id {
             self.id = id;
             self.args = new_subs;

@@ -33,3 +33,42 @@ path = "src/compiler/rockrc.rs"
 
 [workspace]
 members = ["rockr-lsp"]
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+nursery  = { level = "warn", priority = -1 }
+cargo    = { level = "warn", priority = -1 }
+
+undocumented_unsafe_blocks      = "warn"
+unnecessary_safety_comment      = "warn"
+dbg_macro                       = "warn"
+todo                            = "warn"
+unwrap_used                     = "warn"
+unwrap_in_result                = "warn"
+semicolon_if_nothing_returned   = "warn"
+str_to_string                   = "warn"
+implicit_clone                  = "warn"
+rc_buffer                       = "warn"
+mem_forget                      = "warn"
+empty_drop                      = "warn"
+exit                            = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+lossy_float_literal             = "warn"
+verbose_file_reads              = "warn"
+self_named_module_files         = "warn"
+
+module_name_repetitions  = "allow"
+missing_errors_doc       = "allow"
+missing_panics_doc       = "allow"
+similar_names            = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap       = "allow"
+cast_sign_loss           = "allow"
+must_use_candidate       = "allow"
+missing_const_for_fn     = "allow"  # nursery, extremely churny
+option_if_let_else       = "allow"
+multiple_crate_versions  = "allow"
+
+[lints.rust]
+unused_qualifications    = "warn"
+unsafe_op_in_unsafe_fn   = "warn"

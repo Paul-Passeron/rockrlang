@@ -38,10 +38,10 @@ pub struct LexError {
 }
 
 pub type TokenPattern<'db, T> =
-    (Regex, fn(db: &'db dyn crate::Db, &str, Span) -> Result<T, LexError>);
+    (Regex, fn(db: &'db dyn Db, &str, Span) -> Result<T, LexError>);
 
 pub struct Lexer<'db, T> {
-    pub db: &'db dyn crate::Db,
+    pub db: &'db dyn Db,
     pub file: SourceFile,
     pub offset: usize,
     pub token_patterns: Vec<TokenPattern<'db, T>>,
@@ -73,7 +73,7 @@ impl<'db, T> Lexer<'db, T> {
         }
     }
 
-    pub fn is_done(&mut self) -> bool {
+    pub fn is_done(&self) -> bool {
         self.offset >= self.file.content(self.db).len()
     }
 
@@ -161,7 +161,7 @@ impl<'db, T> Lexer<'db, T> {
 }
 
 impl<'db> Lexer<'db, Token> {
-    pub fn new(db: &'db dyn crate::Db, source: SourceFile) -> Self {
+    pub fn new(db: &'db dyn Db, source: SourceFile) -> Self {
         Self::new_blank(source, db, get_token_rules(), get_skip_rules())
     }
 }

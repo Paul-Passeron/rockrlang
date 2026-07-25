@@ -413,7 +413,7 @@ enum VariantArity {
 }
 
 impl VariantArity {
-    pub fn len(&self) -> usize {
+    pub(super) fn len(&self) -> usize {
         match self {
             VariantArity::None => 0,
             VariantArity::Tuple(n) => *n,
@@ -431,7 +431,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     pub fn project_downcast_tuple_field(
-        &mut self,
+        &self,
         base: &MIRPlace,
         variant_idx: usize,
         tuple_idx: usize,
@@ -455,7 +455,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     pub fn project_downcast_field(
-        &mut self,
+        &self,
         base: &MIRPlace,
         variant_idx: usize,
         field: Symbol,

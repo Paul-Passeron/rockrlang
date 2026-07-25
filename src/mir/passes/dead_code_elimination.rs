@@ -168,7 +168,7 @@ impl<'a> DCECtx<'a> {
         }
     }
 
-    fn compute_paths(&mut self) -> Vec<Vec<OldBlockID>> {
+    fn compute_paths(&self) -> Vec<Vec<OldBlockID>> {
         let mut paths = self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
         while let Some(PathCompressionRes { i, j, reversed }) =
             self.find_next_path_compression(&paths)
@@ -179,7 +179,7 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_path_heads(
-        &mut self,
+        &self,
         paths: &[Vec<OldBlockID>],
     ) -> HashMap<OldBlockID, usize> {
         paths.iter().enumerate().map(|(i, p)| (*p.first().unwrap(), i)).collect()

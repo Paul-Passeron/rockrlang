@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use super::LexError;
 use super::Token;
 use super::TokenKind;
+use crate::Db;
 use crate::common::location::Span;
 use crate::common::symbols::StrLit;
 use crate::common::symbols::Symbol;
@@ -35,7 +36,7 @@ macro_rules! get_simple_rule {
     };
 }
 
-pub fn get_skip_rules() -> Vec<Regex> {
+pub(super) fn get_skip_rules() -> Vec<Regex> {
     vec![
         Regex::new(r"\n").unwrap(),
         Regex::new("[ \n\t\r]+").unwrap(),
@@ -44,11 +45,11 @@ pub fn get_skip_rules() -> Vec<Regex> {
     ]
 }
 
-pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
+pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
     vec![
         (
             Regex::new(r#"c"(\\.|[^"\\])*""#).unwrap(),
-            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, location: Span| {
                 let len = lexeme.len();
                 Ok(Token {
                     location,
@@ -100,7 +101,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("!", TokenKind::Not),
         (
             Regex::new("#[A-Za-z_][A-Za-z0-9_]*").unwrap(),
-            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
                     kind: TokenKind::Hashed(Symbol::new(db, String::from(&lexeme[1..]))),
@@ -110,7 +111,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("#", TokenKind::HashPound),
         (
             Regex::new("@[A-Za-z_][A-Za-z0-9_]*").unwrap(),
-            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
                     kind: TokenKind::Directive(Symbol::new(
@@ -123,7 +124,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("@", TokenKind::AddressOf),
         (
             Regex::new("[A-Za-z_][A-Za-z0-9_]*").unwrap(),
-            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
                     kind: match lexeme {
@@ -157,7 +158,7 @@ pub fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         ),
         (
             Regex::new(r#""(\\.|[^"\\])*""#).unwrap(),
-            |db: &'db dyn crate::Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, location: Span| {
                 let len = lexeme.len();
                 Ok(Token {
                     location,

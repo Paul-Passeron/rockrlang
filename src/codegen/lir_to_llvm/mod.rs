@@ -564,10 +564,10 @@ impl<'db, 'lir, 'ctx> Ctx<'db, 'lir, 'ctx> {
     }
 
     fn terminate_block(
-        &mut self,
+        &self,
         blk: Idx<BlockData>,
         t: &Terminator<Finalized>,
-        ctx: &mut FnCtx<'ctx>,
+        ctx: &FnCtx<'ctx>,
     ) {
         let llvm_block = ctx.blocks[&blk];
         self.b.position_at_end(llvm_block);

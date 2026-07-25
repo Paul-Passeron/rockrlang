@@ -100,7 +100,7 @@ pub fn place_init_state(map: &MoveMap, place: &MIRPlace) -> InitState {
 }
 
 impl MIRPlace {
-    fn check(&self, db: &dyn Db, m: &mut MoveMap) {
+    fn check(&self, db: &dyn Db, m: &MoveMap) {
         let state = place_init_state(m, self);
         match state {
             InitState::Init => (),

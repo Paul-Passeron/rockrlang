@@ -108,7 +108,7 @@ impl<'db> LowerFundef<'db> {
     }
 
     pub fn allocate_local(
-        &mut self,
+        &self,
         scope: &mut Scope,
         name: Symbol,
         mutability: Mutability,
@@ -342,7 +342,7 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_name(
-        &mut self,
+        &self,
         symbol: Symbol,
         span: Span,
         scope: &Scope,
@@ -587,7 +587,7 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn as_enum_with_filled_holes(
-        &mut self,
+        &self,
         ty: &AstTypeExpr,
         module: ModuleId,
     ) -> Option<EnumRef> {
@@ -669,7 +669,7 @@ impl<'db> LowerFundef<'db> {
         }
     }
 
-    fn lower_qualified(&mut self, name: Symbol, ty: &AstTypeExpr) -> HirExprDesc {
+    fn lower_qualified(&self, name: Symbol, ty: &AstTypeExpr) -> HirExprDesc {
         let EnumRef { def: enum_def, args: template_hints } = self
             .as_enum_with_filled_holes(ty, self.module)
             .expect("QualifiedPath with variant: could not resolve enum type");
@@ -759,7 +759,7 @@ impl<'db> LowerFundef<'db> {
     }
 
     fn lower_constructor_or_static_call(
-        &mut self,
+        &self,
         type_def_id: TypeDefId,
         symbol: Symbol,
         type_args: Vec<TypeRef>,
@@ -1296,7 +1296,7 @@ impl<'db> LowerFundef<'db> {
         self.iterator_id.fresh()
     }
 
-    fn collect_args(&mut self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {
+    fn collect_args(&self, args: &[AstFundefArg], scope: &mut Scope) -> Vec<LocalId> {
         args.iter()
             .map(|arg| {
                 self.allocate_local(

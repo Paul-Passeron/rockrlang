@@ -22,7 +22,7 @@ use salsa::Setter;
 
 use crate::{
     SourceFile,
-    compiler::{self, CompilerError, Config, Workspace},
+    compiler::{CompilerError, Config, Workspace},
     layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth},
 };
 
@@ -35,7 +35,7 @@ pub struct RockrDb {
 
 #[salsa::db]
 pub trait Db: salsa::Database {
-    fn config(&self) -> &compiler::Config {
+    fn config(&self) -> &Config {
         Workspace::get(self).config(self)
     }
 
@@ -65,7 +65,7 @@ impl RockrDb {
 impl salsa::Database for RockrDb {}
 
 impl dyn Db {
-    pub fn open_workspace(&mut self, config: Config) -> Workspace {
+    pub fn open_workspace(&self, config: Config) -> Workspace {
         Workspace::initialize(self, config)
     }
 

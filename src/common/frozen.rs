@@ -81,17 +81,12 @@ impl<T> Frozen<T> {
         if bucket_idx == data.len() - 1 && idx >= next_bucket_idx {
             return None;
         }
-        Some(unsafe {
-            data[bucket_idx]
-                .as_ptr()
-                .wrapping_add(idx)
-                .as_ref()
-                .unwrap()
-                .assume_init_ref()
-        })
+
+        let as_ref = unsafe { data[bucket_idx].as_ptr().wrapping_add(idx).as_ref() };
+        Some(unsafe { as_ref.unwrap().assume_init_ref() })
     }
 
-    pub fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
+    pub fn get_mut(&self, idx: usize) -> Option<&mut T> {
         let bucket_idx = idx / BUCKET_SIZE;
         let data = self.data.lock().unwrap();
         let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
@@ -259,7 +254,7 @@ impl<T> IntoIterator for Frozen<T> {
             return FrozenIntoIter { elems: vec![] };
         }
         let mut owned_data = vec![];
-        std::mem::swap(data.as_mut(), &mut owned_data);
+        mem::swap(data.as_mut(), &mut owned_data);
         let last_item = self.next_bucket_idx.load(Ordering::Relaxed);
         let mut res = vec![];
         let last_box = owned_data.len() - 1;

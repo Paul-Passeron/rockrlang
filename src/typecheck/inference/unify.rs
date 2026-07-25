@@ -137,9 +137,10 @@ impl<'db> InferenceCtx<'db> {
                 {
                     Err(UnificationError::FieldCountMismatch(len_a, len_b))
                 } else {
-                    fields_a.iter().zip(fields_b).try_for_each(|(field_a, field_b)| {
-                        self.unify(field_a.clone(), field_b.clone())
-                    })
+                    fields_a
+                        .iter()
+                        .zip(fields_b)
+                        .try_for_each(|(field_a, field_b)| self.unify(field_a, field_b))
                 }
             }
             (InferTy::Param(pa), InferTy::Param(pb)) => {
@@ -151,15 +152,15 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn unify(&mut self, a: InferTy, b: InferTy) -> Result<(), UnificationError> {
-        self.snapshot(|this| this.try_unify(&a, &b))
+    pub fn unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
+        self.snapshot(|this| this.try_unify(a, b))
     }
 
     pub fn find(&mut self, ty: &InferTy) -> InferTy {
         match ty {
             InferTy::Var(infer_var) => {
                 let infer_var = self.table.find(*infer_var);
-                self.table.probe_value(infer_var).unwrap_or(ty.clone())
+                self.table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
             }
             InferTy::Adt { def, fields } => InferTy::Adt {
                 def: *def,
@@ -170,18 +171,18 @@ impl<'db> InferenceCtx<'db> {
     }
 
     pub fn find_const(&self, ty: &InferTy) -> InferTy {
-        fn _find(
+        fn find(
             ty: &InferTy,
             table: &mut UnificationTable<InPlace<InferVar>>,
         ) -> InferTy {
             match ty {
                 InferTy::Var(infer_var) => {
                     let infer_var = table.find(*infer_var);
-                    table.probe_value(infer_var).unwrap_or(ty.clone())
+                    table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
                 }
                 InferTy::Adt { def, fields } => InferTy::Adt {
                     def: *def,
-                    fields: fields.iter().map(|ty| _find(ty, table)).collect(),
+                    fields: fields.iter().map(|ty| find(ty, table)).collect(),
                 },
                 InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
             }
@@ -190,6 +191,6 @@ impl<'db> InferenceCtx<'db> {
         // being mutable for path-compression reason I believe. We might
         // want to find an alternative.
         let mut tbl = self.table.clone();
-        _find(ty, &mut tbl)
+        find(ty, &mut tbl)
     }
 }

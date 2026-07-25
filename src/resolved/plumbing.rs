@@ -43,7 +43,7 @@ impl<'db> From<ModuleId> for InternedModuleId<'db> {
 
 impl ModuleId {
     pub fn new<'db>(
-        db: &'db dyn crate::Db,
+        db: &'db dyn Db,
         name: Symbol,
         parent: Option<ModuleId>,
         file: Option<SourceFile>,
@@ -57,23 +57,23 @@ impl ModuleId {
         InternedModuleId(self.0, PhantomData)
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> Option<ModuleId> {
+    pub fn parent(self, db: &dyn Db) -> Option<ModuleId> {
         *self.interned().parent(db)
     }
 
-    pub fn file_submodules(self, db: &dyn crate::Db) -> &[FileModule<'_>] {
+    pub fn file_submodules(self, db: &dyn Db) -> &[FileModule<'_>] {
         self.interned().file_submodules(db)
     }
 
-    pub fn package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
+    pub fn package(self, db: &dyn Db) -> Option<Package<'_>> {
         *self.interned().package(db)
     }
 
-    pub fn owning_package(self, db: &dyn crate::Db) -> Option<Package<'_>> {
+    pub fn owning_package(self, db: &dyn Db) -> Option<Package<'_>> {
         self.package(db)
             .or_else(|| self.parent(db).and_then(|parent| parent.owning_package(db)))
     }
@@ -93,7 +93,7 @@ impl<'db> From<FunctionId> for InternedFunctionId<'db> {
 
 #[allow(dead_code)]
 impl FunctionId {
-    pub fn new(db: &dyn crate::Db, name: Symbol, parent: ScopeOwnerId) -> Self {
+    pub fn new(db: &dyn Db, name: Symbol, parent: ScopeOwnerId) -> Self {
         InternedFunctionId::new(db, name, parent).into()
     }
 
@@ -101,11 +101,11 @@ impl FunctionId {
         InternedFunctionId(self.0, PhantomData)
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> ScopeOwnerId {
+    pub fn parent(self, db: &dyn Db) -> ScopeOwnerId {
         *self.interned().parent(db)
     }
 }
@@ -123,7 +123,7 @@ impl<'db> From<StructId> for InternedStructId<'db> {
 }
 
 impl StructId {
-    pub fn new(db: &dyn crate::Db, name: Symbol, parent: ModuleId) -> Self {
+    pub fn new(db: &dyn Db, name: Symbol, parent: ModuleId) -> Self {
         InternedStructId::new(db, name, parent).into()
     }
 
@@ -131,11 +131,11 @@ impl StructId {
         InternedStructId(self.0, PhantomData)
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
+    pub fn parent(self, db: &dyn Db) -> ModuleId {
         *self.interned().parent(db)
     }
 }
@@ -155,7 +155,7 @@ impl<'db> From<ImplId> for InternedImplId<'db> {
 #[allow(dead_code)]
 impl ImplId {
     pub fn new(
-        db: &dyn crate::Db,
+        db: &dyn Db,
         parent: ModuleId,
         implemented: TypeRef,
         interface: Option<InterfaceRef>,
@@ -168,19 +168,19 @@ impl ImplId {
         InternedImplId(self.0, PhantomData)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
+    pub fn parent(self, db: &dyn Db) -> ModuleId {
         *self.interned().parent(db)
     }
 
-    pub fn implemented(self, db: &dyn crate::Db) -> TypeRef {
+    pub fn implemented(self, db: &dyn Db) -> TypeRef {
         *self.interned().implemented(db)
     }
 
-    pub fn interface(self, db: &dyn crate::Db) -> Option<InterfaceRef> {
+    pub fn interface(self, db: &dyn Db) -> Option<InterfaceRef> {
         *self.interned().interface(db)
     }
 
-    pub fn templates(self, db: &dyn crate::Db) -> &[Set<InterfaceRef>] {
+    pub fn templates(self, db: &dyn Db) -> &[Set<InterfaceRef>] {
         self.interned().templates(db)
     }
 }
@@ -198,7 +198,7 @@ impl<'db> From<InterfaceId> for InternedInterfaceId<'db> {
 }
 
 impl InterfaceId {
-    pub fn new(db: &dyn crate::Db, name: Symbol, parent: ModuleId) -> Self {
+    pub fn new(db: &dyn Db, name: Symbol, parent: ModuleId) -> Self {
         InternedInterfaceId::new(db, name, parent).into()
     }
 
@@ -206,11 +206,11 @@ impl InterfaceId {
         InternedInterfaceId(self.0, PhantomData)
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
+    pub fn parent(self, db: &dyn Db) -> ModuleId {
         *self.interned().parent(db)
     }
 }
@@ -228,7 +228,7 @@ impl<'db> From<TypeId> for InternedTypeId<'db> {
 }
 
 impl TypeId {
-    pub fn new(db: &dyn crate::Db, def: TypeDefId, args: Vec<TypeRef>) -> Self {
+    pub fn new(db: &dyn Db, def: TypeDefId, args: Vec<TypeRef>) -> Self {
         InternedTypeId::new(db, def, args).into()
     }
 
@@ -236,11 +236,11 @@ impl TypeId {
         InternedTypeId(self.0, PhantomData)
     }
 
-    pub fn def(self, db: &dyn crate::Db) -> TypeDefId {
+    pub fn def(self, db: &dyn Db) -> TypeDefId {
         *self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn crate::Db) -> &[TypeRef] {
+    pub fn args(self, db: &dyn Db) -> &[TypeRef] {
         self.interned().args(db)
     }
 }
@@ -299,36 +299,36 @@ impl BuiltinTypeId {
         BuiltinTypeDef(self.0, PhantomData)
     }
 
-    pub fn ptr(db: &dyn crate::Db, mutability: Mutability) -> Self {
+    pub fn ptr(db: &dyn Db, mutability: Mutability) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Ptr { mutability }).into()
     }
 
-    pub fn const_ptr(db: &dyn crate::Db) -> Self {
+    pub fn const_ptr(db: &dyn Db) -> Self {
         Self::ptr(db, Mutability::Const)
     }
-    pub fn mut_ptr(db: &dyn crate::Db) -> Self {
+    pub fn mut_ptr(db: &dyn Db) -> Self {
         Self::ptr(db, Mutability::Mutable)
     }
 
-    pub fn ref_(db: &dyn crate::Db, mutability: Mutability) -> Self {
+    pub fn ref_(db: &dyn Db, mutability: Mutability) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Ref { mutability }).into()
     }
-    pub fn const_ref(db: &dyn crate::Db) -> Self {
+    pub fn const_ref(db: &dyn Db) -> Self {
         Self::ref_(db, Mutability::Const)
     }
-    pub fn mut_ref(db: &dyn crate::Db) -> Self {
+    pub fn mut_ref(db: &dyn Db) -> Self {
         Self::ref_(db, Mutability::Mutable)
     }
 
-    pub fn tuple(db: &dyn crate::Db) -> Self {
+    pub fn tuple(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Tuple).into()
     }
 
-    pub fn slice(db: &dyn crate::Db) -> Self {
+    pub fn slice(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Slice).into()
     }
 
-    pub fn i8(db: &dyn crate::Db) -> Self {
+    pub fn i8(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I8, signed: true },
@@ -336,7 +336,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn i16(db: &dyn crate::Db) -> Self {
+    pub fn i16(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I16, signed: true },
@@ -344,7 +344,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn i32(db: &dyn crate::Db) -> Self {
+    pub fn i32(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I32, signed: true },
@@ -352,7 +352,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn i64(db: &dyn crate::Db) -> Self {
+    pub fn i64(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
@@ -360,7 +360,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn i128(db: &dyn crate::Db) -> Self {
+    pub fn i128(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
@@ -368,7 +368,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn u8(db: &dyn crate::Db) -> Self {
+    pub fn u8(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I8, signed: false },
@@ -376,7 +376,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn u16(db: &dyn crate::Db) -> Self {
+    pub fn u16(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I16, signed: false },
@@ -384,7 +384,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn u32(db: &dyn crate::Db) -> Self {
+    pub fn u32(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I32, signed: false },
@@ -392,7 +392,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn u64(db: &dyn crate::Db) -> Self {
+    pub fn u64(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
@@ -400,7 +400,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn u128(db: &dyn crate::Db) -> Self {
+    pub fn u128(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
@@ -408,11 +408,11 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn int(db: &dyn crate::Db) -> Self {
+    pub fn int(db: &dyn Db) -> Self {
         Self::i32(db)
     }
 
-    pub fn usize(db: &dyn crate::Db) -> Self {
+    pub fn usize(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: db.target_width(), signed: false },
@@ -420,7 +420,7 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn isize(db: &dyn crate::Db) -> Self {
+    pub fn isize(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
             BuiltinTypeKind::Int { width: db.target_width(), signed: true },
@@ -428,27 +428,27 @@ impl BuiltinTypeId {
         .into()
     }
 
-    pub fn bool(db: &dyn crate::Db) -> Self {
+    pub fn bool(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Bool).into()
     }
 
-    pub fn char(db: &dyn crate::Db) -> Self {
+    pub fn char(db: &dyn Db) -> Self {
         Self::u8(db)
     }
 
-    pub fn void(db: &dyn crate::Db) -> Self {
+    pub fn void(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Void).into()
     }
 
-    pub fn never(db: &dyn crate::Db) -> Self {
+    pub fn never(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Never).into()
     }
 
-    pub fn kind(&self, db: &dyn crate::Db) -> BuiltinTypeKind {
+    pub fn kind(&self, db: &dyn Db) -> BuiltinTypeKind {
         *self.interned().kind(db)
     }
 
-    pub fn template_count(&self, db: &dyn crate::Db) -> usize {
+    pub fn template_count(&self, db: &dyn Db) -> usize {
         match self.kind(db) {
             BuiltinTypeKind::Void
             | BuiltinTypeKind::Never
@@ -461,7 +461,7 @@ impl BuiltinTypeId {
         }
     }
 
-    pub fn is_ptr_like(self, db: &dyn crate::Db) -> Option<PtrKind> {
+    pub fn is_ptr_like(self, db: &dyn Db) -> Option<PtrKind> {
         match self.kind(db) {
             BuiltinTypeKind::Ref { mutability } => Some(PtrKind::Ref(mutability)),
             BuiltinTypeKind::Ptr { mutability } => Some(PtrKind::RawPtr(mutability)),
@@ -480,7 +480,7 @@ impl BuiltinTypeId {
 }
 
 impl TypeDefId {
-    pub fn is_ptr_like(self, db: &dyn crate::Db) -> Option<PtrKind> {
+    pub fn is_ptr_like(self, db: &dyn Db) -> Option<PtrKind> {
         match self {
             TypeDefId::Builtin(ty) => ty.is_ptr_like(db),
             _ => None,
@@ -502,52 +502,52 @@ impl PtrKind {
     }
 }
 
-pub fn ptr_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
+pub fn ptr_of(db: &dyn Db, ty: TypeRef, mutable: bool) -> TypeId {
     if mutable { mut_ptr_of(db, ty) } else { const_ptr_of(db, ty) }
 }
 
-pub fn const_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn const_ptr_of(db: &dyn Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::const_ptr(db).into(), vec![ty])
 }
 
-pub fn mut_ptr_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn mut_ptr_of(db: &dyn Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::mut_ptr(db).into(), vec![ty])
 }
 
-pub fn const_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn const_ref_of(db: &dyn Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::const_ref(db).into(), vec![ty])
 }
 
-pub fn mut_ref_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn mut_ref_of(db: &dyn Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::mut_ref(db).into(), vec![ty])
 }
 
-pub fn ref_of(db: &dyn crate::Db, ty: TypeRef, mutable: bool) -> TypeId {
+pub fn ref_of(db: &dyn Db, ty: TypeRef, mutable: bool) -> TypeId {
     if mutable { mut_ref_of(db, ty) } else { const_ref_of(db, ty) }
 }
 
-pub fn slice_of(db: &dyn crate::Db, ty: TypeRef) -> TypeId {
+pub fn slice_of(db: &dyn Db, ty: TypeRef) -> TypeId {
     TypeId::new(db, BuiltinTypeId::slice(db).into(), vec![ty])
 }
 
-pub fn tuple_of(db: &dyn crate::Db, tys: Vec<TypeRef>) -> TypeId {
+pub fn tuple_of(db: &dyn Db, tys: Vec<TypeRef>) -> TypeId {
     TypeId::new(db, BuiltinTypeId::tuple(db).into(), tys)
 }
 
-pub fn int_id(db: &dyn crate::Db) -> TypeId {
+pub fn int_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::int(db).into(), vec![])
 }
 
-pub fn usize_id(db: &dyn crate::Db) -> TypeId {
+pub fn usize_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::usize(db).into(), vec![])
 }
 
-pub fn char_id(db: &dyn crate::Db) -> TypeId {
+pub fn char_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::char(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
+pub fn str_def(db: &dyn Db) -> TypeDefId {
     // in std::io
     let Definition::Type(def) = resolve_path(
         db,
@@ -568,22 +568,22 @@ pub fn str_def(db: &dyn crate::Db) -> TypeDefId {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn str_id(db: &dyn crate::Db) -> TypeId {
+pub fn str_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, str_def(db), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn void_id(db: &dyn crate::Db) -> TypeId {
+pub fn void_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn bool_id(db: &dyn crate::Db) -> TypeId {
+pub fn bool_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::bool(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn never_id(db: &dyn crate::Db) -> TypeId {
+pub fn never_id(db: &dyn Db) -> TypeId {
     TypeId::new(db, BuiltinTypeId::never(db).into(), vec![])
 }
 
@@ -600,7 +600,7 @@ impl<'db> From<InterfaceRef> for InternedInterfaceRef<'db> {
 }
 
 impl InterfaceRef {
-    pub fn new(db: &dyn crate::Db, def: InterfaceId, args: Vec<TypeRef>) -> Self {
+    pub fn new(db: &dyn Db, def: InterfaceId, args: Vec<TypeRef>) -> Self {
         InternedInterfaceRef::new(db, def, args).into()
     }
 
@@ -608,11 +608,11 @@ impl InterfaceRef {
         InternedInterfaceRef(self.0, PhantomData)
     }
 
-    pub fn def(self, db: &dyn crate::Db) -> InterfaceId {
+    pub fn def(self, db: &dyn Db) -> InterfaceId {
         *self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn crate::Db) -> &[TypeRef] {
+    pub fn args(self, db: &dyn Db) -> &[TypeRef] {
         self.interned().args(db)
     }
 }
@@ -630,7 +630,7 @@ impl<'db> From<EnumId> for InternedEnumId<'db> {
 }
 
 impl EnumId {
-    pub fn new(db: &dyn crate::Db, name: Symbol, parent: ModuleId) -> Self {
+    pub fn new(db: &dyn Db, name: Symbol, parent: ModuleId) -> Self {
         InternedEnumId::new(db, name, parent).into()
     }
 
@@ -638,11 +638,11 @@ impl EnumId {
         InternedEnumId(self.0, PhantomData)
     }
 
-    pub fn name(self, db: &dyn crate::Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         *self.interned().name(db)
     }
 
-    pub fn parent(self, db: &dyn crate::Db) -> ModuleId {
+    pub fn parent(self, db: &dyn Db) -> ModuleId {
         *self.interned().parent(db)
     }
 }

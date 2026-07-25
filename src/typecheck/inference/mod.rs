@@ -62,17 +62,17 @@ use crate::{
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
 use salsa::Accumulator;
-use var::*;
+use var::InferVar;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferTy {
     Var(InferVar),
-    Adt { def: TypeDefId, fields: Vec<InferTy> },
+    Adt { def: TypeDefId, fields: Vec<Self> },
     Param(TypeParamId),
 }
 
 impl InferTy {
-    pub fn to_string<'a>(&'a self, db: &'a dyn crate::Db) -> String {
+    pub fn to_string<'a>(&'a self, db: &'a dyn Db) -> String {
         TypePrinter::new().infer_ty_to_string(db, self.clone(), None)
     }
 }
@@ -146,12 +146,12 @@ impl<'db> InferenceCtx<'db> {
             infer_templates.iter().take(l).cloned().collect(),
             None,
         )
-        .unwrap();
+        .expect("ImplicitCtx failing is a bug in the compiler");
 
-        let zelf_ty = func
-            .parent(db)
-            .get_canonical_zelf(db)
-            .map(|ty| Self::static_allocate_type_ref(db, &ty, &owner_ctx).unwrap());
+        let zelf_ty = func.parent(db).get_canonical_zelf(db).map(|ty| {
+            Self::static_allocate_type_ref(db, &ty, &owner_ctx)
+                .unwrap_or_else(|| table.new_key(None).into())
+        });
 
         let ctx =
             ImplicitContext::from_function(db, func, infer_templates.clone(), zelf_ty.clone())
@@ -186,7 +186,7 @@ impl<'db> InferenceCtx<'db> {
             let ty = this.implicit_ctx().resolve_err(this.db, &ast.ty.data);
             let ty = this.allocate_type_ref(ty, &this.implicit_ctx());
             let local_ty = this.infer_local(*local);
-            this.unify(local_ty, ty)
+            this.unify(&local_ty, &ty)
                 .expect("First local type unification should not fail");
         }
 
@@ -196,7 +196,7 @@ impl<'db> InferenceCtx<'db> {
                 let local_ty = this.local_var(
                     zelf.expect("function has a receiver but no self local was provided"),
                 );
-                this.unify(ty, InferTy::Var(local_ty))
+                this.unify(&ty, &local_ty.into())
                     .expect("seeding self's declared type should not fail");
             }
             (Some(_), None) => panic!(
@@ -268,7 +268,7 @@ pub enum UnificationError {
     TypeDefIdMismatch(TypeDefId, TypeDefId),
     FieldCountMismatch(usize, usize),
     RecursiveDefinition(InferVar),
-    UnmetConstraint(Arc<InferenceConstraint>, Box<UnificationError>),
+    UnmetConstraint(Arc<InferenceConstraint>, Box<Self>),
     ExpectedPtrLike(TypeDefId),
     MinTupleLengthMismatch { expected: usize, got: usize },
     ExpectedStructWithField { def: TypeDefId, field: Symbol },
@@ -302,10 +302,10 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 )
             }
             UnificationError::FieldCountMismatch(x, y) => {
-                write!(f, "Field count mismatch: {} != {}", x, y)
+                write!(f, "Field count mismatch: {x} != {y}")
             }
             UnificationError::RecursiveDefinition(infer_var) => {
-                write!(f, "Recursive definition: {}", infer_var)
+                write!(f, "Recursive definition: {infer_var}",)
             }
             UnificationError::UnmetConstraint(
                 inference_constraint,
@@ -348,7 +348,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
             }
 
             UnificationError::NonStructForStructLit(partial_type_ref) => {
-                write!(f, "Non struct for struct-lit: {:?}", partial_type_ref)
+                write!(f, "Non struct for struct-lit: {partial_type_ref:?}")
             }
             UnificationError::TemplateDereferencing(type_param_id) => {
                 write!(f, "Template T{} dereferenced", type_param_id.0)
@@ -393,7 +393,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
     }
 }
 
-impl<'db> InferenceCtx<'db> {
+impl InferenceCtx<'_> {
     pub fn snapshot<T>(
         &mut self,
         f: impl Fn(&mut Self) -> Result<T, UnificationError>,
@@ -423,7 +423,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn solve(&mut self, ty: InferTy) -> Option<TypeRef> {
+    pub fn solve(&mut self, ty: &InferTy) -> Option<TypeRef> {
         let ty = self.find(&ty);
         match ty {
             InferTy::Var(_) => None,
@@ -431,7 +431,7 @@ impl<'db> InferenceCtx<'db> {
                 self.db,
                 def,
                 fields
-                    .into_iter()
+                    .iter()
                     .map(|field| self.solve(field))
                     .collect::<Option<Vec<_>>>()?,
             ))),
@@ -468,37 +468,37 @@ impl<'db> InferenceCtx<'db> {
 
 impl InferTy {
     pub fn is_adt(&self) -> bool {
-        matches!(self, InferTy::Adt { .. })
+        matches!(self, Self::Adt { .. })
     }
 
-    pub fn as_adt(&self) -> Option<(TypeDefId, &[InferTy])> {
+    pub fn as_adt(&self) -> Option<(TypeDefId, &[Self])> {
         match self {
-            InferTy::Adt { def, fields } => Some((*def, fields)),
+            Self::Adt { def, fields } => Some((*def, fields)),
             _ => None,
         }
     }
 
-    pub fn as_builtin(&self) -> Option<(BuiltinTypeId, &[InferTy])> {
+    pub fn as_builtin(&self) -> Option<(BuiltinTypeId, &[Self])> {
         match self {
-            InferTy::Adt { def: TypeDefId::Builtin(def), fields } => Some((*def, fields)),
+            Self::Adt { def: TypeDefId::Builtin(def), fields } => Some((*def, fields)),
             _ => None,
         }
     }
 
-    pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
+    pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a Self)> {
         let (def, args) = self.as_adt()?;
         let mutability = def.is_ptr_like(db)?.mutability();
         assert_eq!(args.len(), 1);
         Some((mutability, &args[0]))
     }
 
-    pub fn as_ref_slice<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a InferTy)> {
+    pub fn as_ref_slice<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a Self)> {
         let (muta, ty) = self.as_ref(db)?;
         let as_slice = ty.as_slice(db)?;
         Some((muta, as_slice))
     }
 
-    pub fn as_slice<'a>(&'a self, db: &dyn Db) -> Option<&'a InferTy> {
+    pub fn as_slice<'a>(&'a self, db: &dyn Db) -> Option<&'a Self> {
         let (def, args) = self.as_builtin()?;
         match def.kind(db) {
             BuiltinTypeKind::Slice => Some(&args[0]),
@@ -507,17 +507,11 @@ impl InferTy {
     }
 
     pub fn as_concrete(&self, db: &dyn Db) -> Option<TypeId> {
-        match self {
-            InferTy::Var(_) => None,
-            InferTy::Adt { def, fields } => {
-                let fields: Option<Vec<_>> = fields
-                    .iter()
-                    .map(|ty| ty.as_concrete(db).map(|ty| ty.into()))
-                    .collect();
-                let fields = fields?;
-                Some(TypeId::new(db, *def, fields))
-            }
-            InferTy::Param(_) => None,
-        }
+        let Self::Adt { def, fields } = self else {
+            return None;
+        };
+        let fields: Option<Vec<_>> =
+            fields.iter().map(|ty| ty.as_concrete(db).map(Into::into)).collect();
+        Some(TypeId::new(db, *def, fields?))
     }
 }

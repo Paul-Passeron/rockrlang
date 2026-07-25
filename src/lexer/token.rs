@@ -20,9 +20,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::fmt;
 
-use crate::common::{
-    location::Span,
-    symbols::{StrLit, Symbol},
+use crate::{
+    Db,
+    common::{
+        location::Span,
+        symbols::{StrLit, Symbol},
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -107,14 +110,11 @@ pub enum TokenKind {
 
 pub struct TokenKindDisplay<'db, 'a> {
     pub kind: &'a TokenKind,
-    pub db: &'db dyn crate::Db,
+    pub db: &'db dyn Db,
 }
 
 impl TokenKind {
-    pub fn display<'a, 'db>(
-        &'a self,
-        db: &'db dyn crate::Db,
-    ) -> TokenKindDisplay<'db, 'a> {
+    pub fn display<'a, 'db>(&'a self, db: &'db dyn Db) -> TokenKindDisplay<'db, 'a> {
         TokenKindDisplay { kind: self, db }
     }
 }

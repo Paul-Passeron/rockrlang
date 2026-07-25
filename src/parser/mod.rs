@@ -153,7 +153,7 @@ impl<'db> Parser<'db> {
         }
     }
 
-    pub fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+    pub fn expect(&self, kind: TokenKind) -> Result<(), ParseError> {
         if self.current_token()?.kind != kind {
             Err(self.parse_error(ParseErrorKind::ExpectedToken {
                 expected: kind,

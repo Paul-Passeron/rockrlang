@@ -56,8 +56,8 @@ pub struct MTLBCtx<'a> {
     pub mir_map: MIRMap<'a>,
 }
 
-#[allow(unused)]
-pub enum LocalSlot<'ir> {
+#[allow(unused, reason = "WIP")]
+enum LocalSlot<'ir> {
     Zst,
     Ptr { ptr: ValueId<'ir>, ty: LIRTy },
     Value(ValueId<'ir>), /* TODO: analysis that figures out which locals we
@@ -70,7 +70,6 @@ struct LIRLower<'ir, 'db> {
     value_map: HashMap<MIRLocalID, LocalSlot<'ir>>,
 }
 
-#[allow(unused)]
 enum ProjKind<'a> {
     Regular(&'a MIRProjection),
     DowncastThen { variant: u32, next: &'a MIRProjection },
@@ -159,8 +158,8 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
 
 impl<'a> MTLBCtx<'a> {
     fn add_block<'ir>(
-        &mut self,
-        b: &mut FunctionBuilder<'ir, '_>,
+        &self,
+        b: &FunctionBuilder<'ir, '_>,
         id: MIRBlockID,
         data: &MIRBasicBlock,
         lower: &mut LIRLower<'ir, '_>,
@@ -219,7 +218,7 @@ impl<'a> MTLBCtx<'a> {
         &mut self,
         mut b: BlockBuilder<'ir, '_>,
         blk: MIRBlockID,
-        lower: &mut LIRLower<'ir, '_>,
+        lower: &LIRLower<'ir, '_>,
     ) -> Terminated<()> {
         let mir = lower.mir;
         let data = &mir.blocks[blk];
@@ -252,7 +251,7 @@ impl<'a> MTLBCtx<'a> {
         &mut self,
         mut b: BlockBuilder<'ir, '_>,
         t: &MIRTerminator,
-        lower: &mut LIRLower<'ir, '_>,
+        lower: &LIRLower<'ir, '_>,
     ) -> Terminated<()> {
         match t {
             MIRTerminator::Diverge => b.diverge(),

@@ -22,6 +22,7 @@ use rockr::compiler::build_from_disk;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CliArgs {
     file: Option<PathBuf>,
 
@@ -62,7 +63,12 @@ fn main() -> std::process::ExitCode {
         compile_only: args.compile_only,
         output: args.output,
     };
-    let root = args.file.unwrap_or_else(|| std::env::current_dir().unwrap());
+    let Some(root) = args.file.or_else(|| {
+        std::env::current_dir().inspect_err(|io_err| eprintln!("io error: {io_err}")).ok()
+    }) else {
+        return std::process::ExitCode::FAILURE;
+    };
+
     match build_from_disk(root, cfg) {
         Ok(()) => {
             // println!("Compilation finished :)");

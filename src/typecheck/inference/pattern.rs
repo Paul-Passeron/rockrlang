@@ -41,7 +41,7 @@ impl<'a> InferenceCtx<'a> {
             Ok(ty)
         })
     }
-    fn _infer_bind_pattern(&mut self, id: LocalId) -> InferTy {
+    fn _infer_bind_pattern(&self, id: LocalId) -> InferTy {
         let var = self.local_map[&id];
         InferTy::Var(var)
     }
@@ -70,7 +70,7 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    fn get_unit_type_or_diagnose(&mut self, enum_id: EnumId, name: Symbol, span: Span) {
+    fn get_unit_type_or_diagnose(&self, enum_id: EnumId, name: Symbol, span: Span) {
         match self.get_enum_variant(enum_id, name).as_ref().map(|v| &v.kind) {
             Some(AstEnumVariantKind::Unit) => (),
             _ => Diag::generic_error(
@@ -91,7 +91,7 @@ impl<'a> InferenceCtx<'a> {
     }
 
     fn get_ctx_for_enum(
-        &mut self,
+        &self,
         enum_id: EnumId,
         template_tys: &[InferTy],
     ) -> ImplicitContext {
@@ -239,7 +239,7 @@ impl<'a> InferenceCtx<'a> {
     fn apply_binds_like(&mut self, like: Option<&InferTy>, target: InferTy) -> InferTy {
         if let Some(ty) = like {
             let var = self.fresh_var();
-            self.unify(ty.clone(), var.into()).unwrap();
+            self.unify(&ty, &var.into()).unwrap();
             self.emit_binds_like_constraint(var, target).into()
         } else {
             target
@@ -311,7 +311,7 @@ impl<'a> InferenceCtx<'a> {
         match data {
             Some(HirPatternDesc::Any | HirPatternDesc::Bind { .. }) => {
                 let adjusted = self.apply_binds_like(binds_like, inner_ty);
-                if let Err(err) = self.unify(adjusted.clone(), pot_ref_ty.clone()) {
+                if let Err(err) = self.unify(&adjusted, &pot_ref_ty) {
                     let span = pattern.as_ref().unwrap().span;
                     Diag::generic_error(
                         format!("Unification error: {}", err.display(self.db)),
@@ -411,7 +411,7 @@ impl<'a> InferenceCtx<'a> {
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
                     let adjusted = self.apply_binds_like(binds_like.as_ref(), field_ty);
-                    if let Err(err) = self.unify(adjusted, local_ty) {
+                    if let Err(err) = self.unify(&adjusted, &local_ty) {
                         Diag::generic_error(
                             format!(
                                 "Unification error in field pattern: {}",

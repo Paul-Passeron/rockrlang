@@ -21,9 +21,9 @@ pub mod token;
 pub use lexer_impl::*;
 pub use token::{Token, TokenKind};
 
-use crate::SourceFile;
+use crate::{Db, SourceFile};
 
-pub fn lex_file(db: &dyn crate::Db, file: SourceFile) -> Result<Vec<Token>, LexError> {
+pub fn lex_file(db: &dyn Db, file: SourceFile) -> Result<Vec<Token>, LexError> {
     let mut lexer = Lexer::new(db, file);
     let mut v = vec![];
     while !lexer.is_done() {
