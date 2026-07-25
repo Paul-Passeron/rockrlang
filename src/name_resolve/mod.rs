@@ -77,15 +77,18 @@ pub fn root_module<'db>(
     package: Package<'db>,
 ) -> ModuleId {
     let file = file_module.file(db);
-    let full_name = if file.path(db).file_name().unwrap() == "main.rkr" {
-        file.path(db).parent().unwrap().file_name().unwrap().to_string_lossy().to_string()
-    } else {
+    let file_name =
+        file.path(db).file_name().expect("The file module of a path should have a name");
+    let full_name = if file_name == "main.rkr" {
         file.path(db)
-            .with_extension("")
+            .parent()
+            .expect("We should not be in /")
             .file_name()
-            .unwrap()
+            .expect("We are in a dir with a name")
             .to_string_lossy()
             .to_string()
+    } else {
+        file_name.to_string_lossy().to_string()
     };
     let name = Symbol::new(db, full_name);
     ModuleId::new(
@@ -142,18 +145,16 @@ pub fn module_items<'db>(
 
 #[salsa::tracked(returns(copy))]
 pub fn std_package(db: &dyn Db) -> Option<Package<'_>> {
-    if db.config().no_std {
-        None
-    } else {
+    if !db.config().no_std {
         let ws = Workspace::get(db);
         let packages = workspace_packages(db, ws);
-        for pkg in packages.iter() {
+        for pkg in packages {
             if pkg.root(db).name(db).to_string(db) == "std" {
                 return Some(*pkg);
             }
         }
-        None
     }
+    None
 }
 
 #[salsa::tracked(returns(copy))]
@@ -167,7 +168,7 @@ pub fn std_module(db: &dyn Db) -> Option<ModuleId> {
 pub fn core_package(db: &dyn Db) -> Package<'_> {
     let ws = Workspace::get(db);
     let packages = workspace_packages(db, ws);
-    for pkg in packages.iter() {
+    for pkg in packages {
         if pkg.root(db).name(db).to_string(db) == "core" {
             return *pkg;
         }

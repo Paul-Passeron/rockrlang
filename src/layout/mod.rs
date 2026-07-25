@@ -157,17 +157,14 @@ fn _layout_of<'db>(db: &'db dyn Db, ty: InternedTRef<'db>) -> Layout<'db> {
 
 fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> LayoutID {
     match builtin_id.kind(db) {
-        BuiltinTypeKind::Void => LayoutID::zst(db),
-        BuiltinTypeKind::Never => LayoutID::zst(db),
+        BuiltinTypeKind::Tuple if args.is_empty() => LayoutID::zst(db),
+        BuiltinTypeKind::Void | BuiltinTypeKind::Never => LayoutID::zst(db),
         BuiltinTypeKind::Bool => LayoutID::int(db, IntWidth::I8),
         BuiltinTypeKind::Int { width, .. } => LayoutID::int(db, width),
         BuiltinTypeKind::Ref { .. } | BuiltinTypeKind::Ptr { .. } => LayoutID::ptr(db),
         BuiltinTypeKind::Tuple => {
-            if args.is_empty() {
-                return LayoutID::zst(db);
-            }
             let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
-            finish_aggregate(db, layouts)
+            finish_aggregate(db, &layouts)
         }
         BuiltinTypeKind::Slice => todo!(),
     }
@@ -184,7 +181,7 @@ impl LIRTy {
 }
 
 impl LayoutID {
-    pub fn is_zst(&self, db: &dyn Db) -> bool {
+    pub fn is_zst(self, db: &dyn Db) -> bool {
         matches!(self.data(db), LayoutData::ZeroSized)
     }
 }

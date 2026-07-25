@@ -263,7 +263,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
     pub fn strlit(
         &mut self,
-        contents: impl ToString,
+        contents: &impl ToString,
         null_terminated: bool,
     ) -> ValueId<'ir> {
         // This is a ptr to the start of the strlit
@@ -459,7 +459,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         let rhs_ty = self.body.defs[rhs.idx].ty;
         debug_assert_eq!(lhs_ty.layout, rhs_ty.layout);
         debug_assert!(lhs_ty.is_int(self.db));
-        let ty = self.combine(lhs_ty, rhs_ty);
+        let ty = Self::combine(lhs_ty, rhs_ty);
         self.push_value(ty, ValueInstKind::Arith { op, lhs, rhs })
     }
 
@@ -553,8 +553,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     {
         let kind = match value.kind(self.db) {
             ScalarKind::Int(_) => CastKind::IntToPtr,
-            ScalarKind::Ptr => CastKind::Bitcast,
-            ScalarKind::Float(_) => CastKind::Bitcast,
+            ScalarKind::Ptr | ScalarKind::Float(_) => CastKind::Bitcast,
         };
         self.cast(kind, value.erase(), ScalarKind::Ptr)
             .typed_ptr(pointee, self.db)
@@ -595,7 +594,6 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     // Block utils
 
     pub fn target(
-        &self,
         block: BrandedBlockId<'ir>,
         params: Vec<ValueId<'ir>>,
     ) -> BlockTarget<Branded<'ir>> {
@@ -665,7 +663,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         }
     }
 
-    fn combine(&self, a: LIRTy, b: LIRTy) -> LIRTy {
+    fn combine(a: LIRTy, b: LIRTy) -> LIRTy {
         debug_assert_eq!(a.layout, b.layout);
         let origin = a.origin.or(b.origin);
         LIRTy { layout: a.layout, origin }

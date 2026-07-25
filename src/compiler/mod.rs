@@ -130,7 +130,7 @@ fn display_ir(db: &dyn Db, w: Workspace) {
     let packages = workspace_packages(db, w);
     let mut seen: HashSet<MIRKey> = HashSet::new();
     let mut instances: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
-    for pkg in packages.iter() {
+    for pkg in packages {
         let module = file_module_id(db, *pkg.root(db), None, *pkg);
         for root in collect_module_functions(db, module.interned()) {
             for (fdef, subs) in reachable_mir_instances(db, root) {
@@ -178,11 +178,11 @@ fn display_ir(db: &dyn Db, w: Workspace) {
 }
 
 pub fn write_object_file(
-    m: Module<'_>,
+    m: &Module<'_>,
     path: &Path,
-    machine: TargetMachine,
+    machine: &TargetMachine,
 ) -> Result<(), String> {
-    machine.write_to_file(&m, FileType::Object, path).map_err(|e| e.to_string())
+    machine.write_to_file(m, FileType::Object, path).map_err(|e| e.to_string())
 }
 
 fn link_executable(obj: &Path, out: &Path) -> Result<(), CompilerError> {
@@ -287,7 +287,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     }
 
     let write_object = |path: &Path| {
-        write_object_file(llvm_module, path, machine).map_err(|err| {
+        write_object_file(&llvm_module, path, &machine).map_err(|err| {
             eprintln!("LLVM errors:\n{err}");
             CompilerError::CompiledWithErrors
         })

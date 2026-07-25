@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-use super::{Arc, Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
+use super::{Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 
 #[derive(Debug)]
 pub struct PotentialBlockRes {
@@ -70,8 +70,10 @@ impl<'a> InferenceCtx<'a> {
                     a: ty.clone(),
                     b: ctx.get_template(id.0)?,
                 }]),
-                TypeRef::Unknown | TypeRef::Error => None,
-                TypeRef::Associated(_) | TypeRef::Zelf => None,
+                TypeRef::Associated(_)
+                | TypeRef::Zelf
+                | TypeRef::Unknown
+                | TypeRef::Error => None,
             },
             InferTy::Param(_) => {
                 if let TypeRef::Param(id) = matcher {
@@ -100,12 +102,10 @@ impl<'a> InferenceCtx<'a> {
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Impl(*source.id(self.db)),
-            Arc::new([]),
+            &[],
             mapped_templates.iter().cloned().collect(),
             Some(ty.clone()),
-        )
-        .inspect_err(|err| println!("{err:#?}"))
-        .ok()?;
+        );
 
         let mut constraints =
             self.matches_ty(ty, source.id(self.db).implemented(self.db), &ctx)?;

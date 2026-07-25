@@ -139,7 +139,7 @@ impl<'db> InferenceCtx<'db> {
                     method_constraint,
                     depth,
                     iface_id,
-                    implem,
+                    &implem,
                     &sig,
                 ));
             }
@@ -197,7 +197,7 @@ impl<'db> InferenceCtx<'db> {
         method_constraint: &MethodConstraint,
         depth: usize,
         iface_id: InterfaceId,
-        implem: InterfaceImplem,
+        implem: &InterfaceImplem,
         sig: &AstMethodsig,
     ) -> ConstraintSolveResult {
         let MethodConstraint {
@@ -241,20 +241,18 @@ impl<'db> InferenceCtx<'db> {
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Interface(iface_ref),
-            Arc::new([]),
+            &[],
             method_templates.clone(),
             Some(zelf_ty.clone()),
-        )
-        .unwrap();
+        );
 
-        let ret_ty =
-            self.allocate_ast_type_expr(&sig.data.return_type.data, &ctx).unwrap();
+        let ret_ty = self.allocate_ast_type_expr(&sig.data.return_type.data, &ctx);
         if let Err(e) = self.unify(&ret_var.into(), &ret_ty) {
             return ConstraintSolveResult::Error(e);
         }
 
         for (ast_arg, call_arg) in sig.data.args.iter().zip(args) {
-            let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx).unwrap();
+            let expected = self.allocate_ast_type_expr(&ast_arg.ty.data, &ctx);
             if let Err(e) = self.unify(&expected, call_arg) {
                 return ConstraintSolveResult::Error(e);
             }
@@ -316,8 +314,12 @@ impl<'db> InferenceCtx<'db> {
         if !self.implements.contains_key(&id) {
             return false;
         }
-        for implem in
-            &self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>()
+        for implem in &self
+            .implements
+            .get(&id)
+            .iter()
+            .flat_map(|the_impl| the_impl.iter().cloned())
+            .collect::<Box<[_]>>()
         {
             let implem_ty = self.find(&implem.ty);
             let implem_templates =
@@ -332,10 +334,10 @@ impl<'db> InferenceCtx<'db> {
     pub(super) fn add_implementation(
         &mut self,
         id: InterfaceId,
-        ty: InferTy,
+        ty: &InferTy,
         templates: &[InferTy],
     ) {
-        let ty = self.find(&ty);
+        let ty = self.find(ty);
         let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if let Entry::Vacant(e) = self.implements.entry(id) {
             e.insert(HashSet::from_iter(once(InterfaceImplem {
@@ -344,17 +346,19 @@ impl<'db> InferenceCtx<'db> {
                 templates,
             })));
         } else {
-            for implem in
-                &self.implements.get(&id).unwrap().iter().cloned().collect::<Box<[_]>>()
+            for implem in self.implements.get(&id).iter().flat_map(|implem| implem.iter())
             {
-                let implem_ty = self.find(&implem.ty);
-                let implem_templates =
-                    implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+                let implem_ty = self.find_const(&implem.ty);
+                let implem_templates = implem
+                    .templates
+                    .iter()
+                    .map(|t| self.find_const(t))
+                    .collect::<Box<[_]>>();
                 if ty == implem_ty && templates == implem_templates {
                     return;
                 }
             }
-            self.implements.get_mut(&id).unwrap().insert(InterfaceImplem {
+            self.implements.entry(id).or_default().insert(InterfaceImplem {
                 interface: id,
                 ty,
                 templates,
@@ -550,7 +554,6 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
 }
 
 impl InferenceConstraint {
-    #[inline(always)]
     pub fn listeners(&self, ctx: &mut InferenceCtx) -> HashSet<InferVar> {
         self.kind.listeners(ctx)
     }

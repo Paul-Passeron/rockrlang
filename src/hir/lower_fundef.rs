@@ -886,10 +886,10 @@ impl<'db> LowerFundef<'db> {
         scope: &mut Scope,
         locals: &mut Vec<LocalId>,
         module: ModuleId,
-        name: &Symbol,
+        name: Symbol,
         args: &AstConstructFields,
     ) -> HirPattern {
-        let Some(resolution) = resolve_in_module(self.db, *name, module) else {
+        let Some(resolution) = resolve_in_module(self.db, name, module) else {
             Diag::generic_error(
                 format!(
                     "Unresolved name {} in module {}",
@@ -964,7 +964,7 @@ impl<'db> LowerFundef<'db> {
                         false,
                     )
                 }
-                _ => todo!(),
+                AstConstructFields::TupleFields(_) => todo!(),
             },
             TypeDefId::Enum(_enum_id) => match args {
                 AstConstructFields::TupleFields(_spanneds) => todo!(),
@@ -972,7 +972,7 @@ impl<'db> LowerFundef<'db> {
                     todo!()
                 }
             },
-            _ => todo!(),
+            TypeDefId::Builtin(_) => todo!(),
         }
     }
 
@@ -981,7 +981,7 @@ impl<'db> LowerFundef<'db> {
         pat: &AstPattern,
         scope: &mut Scope,
     ) -> (HirPattern, Vec<LocalId>) {
-        fn _lower(
+        fn aux(
             this: &mut LowerFundef<'_>,
             pat: &AstPattern,
             scope: &mut Scope,
@@ -1034,7 +1034,7 @@ impl<'db> LowerFundef<'db> {
                     }
                     AstNamedPattern::Constructor { name, args } => this
                         .lower_constructor_pattern(
-                            pat, scope, locals, module, name, args,
+                            pat, scope, locals, module, *name, args,
                         ),
                     AstNamedPattern::NameResolved { from, to } => {
                         match resolve_in_module(this.db, from.data, module) {
@@ -1043,7 +1043,7 @@ impl<'db> LowerFundef<'db> {
                                     AstPatternDesc::Named(*to.clone()),
                                     pat.span,
                                 );
-                                _lower(this, &inner_pat, scope, locals, id)
+                                aux(this, &inner_pat, scope, locals, id)
                             }
                             Some(Definition::Type(TypeDefId::Enum(resolution))) => {
                                 let (name, fields) = this
@@ -1080,7 +1080,7 @@ impl<'db> LowerFundef<'db> {
                         data: HirPatternDesc::Tuple(
                             fields
                                 .iter()
-                                .map(|x| _lower(this, x, scope, locals, this.module))
+                                .map(|x| aux(this, x, scope, locals, this.module))
                                 .collect(),
                         ),
                         span: pat.span,
@@ -1109,7 +1109,7 @@ impl<'db> LowerFundef<'db> {
         }
 
         let mut v = vec![];
-        let pat = _lower(self, pat, scope, &mut v, self.module);
+        let pat = aux(self, pat, scope, &mut v, self.module);
         (pat, v)
     }
 
@@ -1325,8 +1325,7 @@ impl<'db> LowerFundef<'db> {
 
     fn lower_method(&mut self, ast: &AstMethodDef) -> HirBody<'db> {
         let mut s = Scope::new();
-        let mut zelf = None;
-        if let Some((mutability, span)) = match &ast.data.receiver {
+        let zelf = if let Some((mutability, span)) = match &ast.data.receiver {
             AstReceiver::None => None,
             AstReceiver::Zelf(span)
             | AstReceiver::RefZelf(span)
@@ -1335,15 +1334,17 @@ impl<'db> LowerFundef<'db> {
             | AstReceiver::MutRefZelf(span)
             | AstReceiver::MutPtrZelf(span) => Some((Mutability::Mutable, span)),
         } {
-            zelf = Some(self.allocate_local(
+            Some(self.allocate_local(
                 &mut s,
                 Symbol::new(self.db, "self"),
                 mutability,
                 None,
                 *span,
                 false,
-            ));
-        }
+            ))
+        } else {
+            None
+        };
         let params = self.collect_args(&ast.data.args, &mut s);
         let stmts = ast
             .data
@@ -1443,7 +1444,7 @@ pub(super) fn lower_fundef_body<'db>(
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
         ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
-    let template_args = get_templates_of_fun(db, function.into()).clone();
+    let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower(ast)
 }
@@ -1458,7 +1459,7 @@ pub(super) fn lower_method_body<'db>(
         ScopeOwnerId::Impl(impl_id) => impl_id.parent(db),
         ScopeOwnerId::Interface(interface_ref) => interface_ref.def(db).parent(db),
     };
-    let template_args = get_templates_of_fun(db, function.into()).clone();
+    let template_args = get_templates_of_fun(db, function.into()).to_vec();
     let mut ctx = LowerFundef::new(db, function, module, template_args);
     ctx.lower_method(ast)
 }

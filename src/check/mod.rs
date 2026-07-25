@@ -50,7 +50,7 @@ pub mod types;
 #[salsa::tracked]
 pub fn check(db: &dyn Db, ws: Workspace) {
     let pkgs = workspace_packages(db, ws);
-    for &pkg in pkgs.iter() {
+    for &pkg in pkgs {
         check_package(db, pkg);
     }
 }

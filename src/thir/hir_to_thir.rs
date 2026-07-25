@@ -199,18 +199,18 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn canonicalize_type(&self, ty: TypeRef) -> TypeRef {
-        fn _aux(db: &dyn Db, owner: ScopeOwnerId, ty: TypeRef) -> TypeRef {
+        fn aux(db: &dyn Db, owner: ScopeOwnerId, ty: TypeRef) -> TypeRef {
             match ty {
                 TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
                     db,
                     type_id.def(db),
-                    type_id.args(db).iter().map(|ty| _aux(db, owner, *ty)).collect(),
+                    type_id.args(db).iter().map(|ty| aux(db, owner, *ty)).collect(),
                 )),
                 TypeRef::Zelf => owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error),
                 _ => ty,
             }
         }
-        _aux(self.db, self.scope_owner(), ty)
+        aux(self.db, self.scope_owner(), ty)
     }
 
     pub fn translate(mut self) -> Thir {
@@ -604,7 +604,6 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn place_or_expr_as_expr(
-        &self,
         b: &mut ThirBuilder,
         p_or_e: Either<ExprId, PlaceId>,
     ) -> ExprId {
@@ -626,7 +625,7 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
-    fn _destructure_pattern_init(
+    fn destructure_pattern_init_aux(
         &mut self,
         b: &mut ThirBuilder,
         pat: &HirPattern,
@@ -640,14 +639,14 @@ impl<'db> ThirTranslator<'db> {
                 // Better span maybe
                 v.push(ThirStmt::let_(
                     thir_local,
-                    self.place_or_expr_as_expr(b, value),
+                    Self::place_or_expr_as_expr(b, value),
                     span,
                     true,
                 ));
             }
             HirPatternDesc::Any => {
                 // Just compute the expression
-                let expr = self.place_or_expr_as_expr(b, value);
+                let expr = Self::place_or_expr_as_expr(b, value);
                 v.push(ThirStmt::expr(expr, span, true));
             }
             HirPatternDesc::Tuple(hir_patterns) => {
@@ -675,7 +674,7 @@ impl<'db> ThirTranslator<'db> {
                         Projection::TupleField(idx as u32, ty),
                         ty,
                     );
-                    self._destructure_pattern_init(
+                    self.destructure_pattern_init_aux(
                         b,
                         pat,
                         Either::Right(idx_place),
@@ -784,7 +783,7 @@ impl<'db> ThirTranslator<'db> {
                                 HirStructFieldPattern::Rebind {
                                     pattern: pat, ..
                                 } => {
-                                    this._destructure_pattern_init(
+                                    this.destructure_pattern_init_aux(
                                         b,
                                         pat,
                                         Either::Left(field_value),
@@ -829,7 +828,7 @@ impl<'db> ThirTranslator<'db> {
         span: Span,
     ) -> Vec<ThirStmt> {
         let mut v = vec![];
-        self._destructure_pattern_init(b, pat, value, span, &mut v);
+        self.destructure_pattern_init_aux(b, pat, value, span, &mut v);
         v
     }
 
@@ -868,7 +867,6 @@ impl<'db> ThirTranslator<'db> {
                 let place = self.place(b, place, stmts);
                 ExprKind::Ref { place, mutability: *mutability }
             }
-            HirExprDesc::UnresolvedCallDirect { .. } => ExprKind::Error,
             HirExprDesc::BinOp { lhs, op, rhs } => {
                 let lhs = self.expr(b, lhs, stmts);
                 let rhs = self.expr(b, rhs, stmts);
@@ -1029,7 +1027,7 @@ impl<'db> ThirTranslator<'db> {
                 };
                 ExprKind::Call { called: fref, args: thir_args }
             }
-            HirExprDesc::Error => ExprKind::Error,
+
             HirExprDesc::Metadata(fat_ptr) => {
                 let thir_fat_ptr = self.expr(b, fat_ptr, stmts);
                 ExprKind::Metadata(thir_fat_ptr)
@@ -1041,6 +1039,9 @@ impl<'db> ThirTranslator<'db> {
                 let expr = self.expr(b, expr, stmts);
                 ExprKind::Cast(expr, ty)
             }
+            HirExprDesc::UnresolvedCallDirect { .. } | HirExprDesc::Error => {
+                ExprKind::Error
+            }
         };
         b.new_expr(ThirExpr {
             kind,
@@ -1050,7 +1051,7 @@ impl<'db> ThirTranslator<'db> {
         })
     }
 
-    fn expr_as_place(&self, b: &ThirBuilder<'_>, expr: ExprId) -> Option<Idx<ThirPlace>> {
+    fn expr_as_place(b: &ThirBuilder<'_>, expr: ExprId) -> Option<Idx<ThirPlace>> {
         match &b.exprs[expr].kind {
             ExprKind::Use(place) => Some(*place),
             _ => None,
@@ -1058,7 +1059,6 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn spill_to_temp(
-        &self,
         b: &ThirBuilder<'_>,
         stmts: &mut Vec<ThirStmt>,
         expr: ExprId,
@@ -1084,15 +1084,25 @@ impl<'db> ThirTranslator<'db> {
             match adjustment {
                 ReceiverAdjustment::None => {
                     let place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Const,
+                            )
                         });
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
                 ReceiverAdjustment::Ref => {
                     let place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Const,
+                            )
                         });
                     b.new_expr(ThirExpr {
                         kind: ExprKind::Ref { place, mutability: Mutability::Const },
@@ -1103,8 +1113,8 @@ impl<'db> ThirTranslator<'db> {
                 }
                 ReceiverAdjustment::MutRef => {
                     let place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
                                 b,
                                 stmts,
                                 thir_receiver,
@@ -1120,8 +1130,13 @@ impl<'db> ThirTranslator<'db> {
                 }
                 ReceiverAdjustment::Deref(depth) => {
                     let mut place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Const,
+                            )
                         });
                     let mut cur_ty = receiver_ty;
                     for _ in 0..depth {
@@ -1134,8 +1149,13 @@ impl<'db> ThirTranslator<'db> {
                 }
                 ReceiverAdjustment::DerefThenRef(depth) => {
                     let mut place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const)
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
+                                b,
+                                stmts,
+                                thir_receiver,
+                                Mutability::Const,
+                            )
                         });
                     let mut cur_ty = receiver_ty;
                     for _ in 0..depth {
@@ -1153,8 +1173,8 @@ impl<'db> ThirTranslator<'db> {
                 }
                 ReceiverAdjustment::DerefThenMutRef(depth) => {
                     let mut place =
-                        self.expr_as_place(b, thir_receiver).unwrap_or_else(|| {
-                            self.spill_to_temp(
+                        Self::expr_as_place(b, thir_receiver).unwrap_or_else(|| {
+                            Self::spill_to_temp(
                                 b,
                                 stmts,
                                 thir_receiver,
@@ -1177,7 +1197,7 @@ impl<'db> ThirTranslator<'db> {
                 }
             }
         } else {
-            let place = self.spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
+            let place = Self::spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
             b.new_expr(ThirExpr::use_place(place, b, span))
         }
     }
@@ -1375,8 +1395,7 @@ impl StructRef {
             db,
             ScopeOwnerId::Module(self.def.parent(db)),
             templates_of_struct(db, self.def.into()),
-        )
-        .unwrap();
+        );
         let resolution = ctx.resolve(db, &found.ty.data)?;
         Some(resolution.with_substitution(db, &self.args))
     }

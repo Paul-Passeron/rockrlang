@@ -139,7 +139,6 @@ pub fn resolve_type_expr_desc<'db>(
     }
 }
 
-#[inline(always)]
 pub fn resolve_type_expr<'db>(
     db: &'db dyn Db,
     type_expr: &'db AstTypeExpr,
@@ -207,15 +206,15 @@ pub fn get_template_param_count(db: &dyn Db, ty: TypeDefId) -> usize {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn templates_of_enum<'db>(
     db: &'db dyn Db,
     enum_id: InternedEnumId<'db>,
-) -> Arc<Vec<AstTemplateArg>> {
-    Arc::new(enum_item(db, enum_id).template_args.clone())
+) -> Vec<AstTemplateArg> {
+    enum_item(db, enum_id).template_args.clone()
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn get_templates_of_fun_only<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
@@ -233,7 +232,7 @@ pub fn get_templates_of_fun_only<'db>(
     res
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn get_templates_of_fun<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
@@ -250,7 +249,7 @@ struct InternedScopeOwnerId {
     inner: ScopeOwnerId,
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 fn _templates_of_owner<'db>(
     db: &'db dyn Db,
     scope_owner: InternedScopeOwnerId<'db>,
@@ -260,11 +259,11 @@ fn _templates_of_owner<'db>(
         ScopeOwnerId::Impl(impl_id) => impl_sources(db, impl_id.interned())
             .iter()
             .next()
-            .unwrap()
+            .expect("An impl id should not exist without impls in source")
             .templates(db)
             .clone(),
         ScopeOwnerId::Interface(interface_ref) => {
-            interface_item(db, interface_ref.def(db).interned()).template_args.clone()
+            interface_item(db, interface_ref.def(db).interned()).template_args
         }
     }
 }

@@ -21,7 +21,7 @@ use crate::{
     Db,
     common::arena::Arena,
     mir::{
-        BasicBlock, BlockID, Local, LocalID, MIR, Terminator, basic_block::Stmt,
+        BasicBlock, BlockID, Local, LocalID, Mir, Terminator, basic_block::Stmt,
         cache::MIRCache,
     },
     thir_to_mir::FuncInst,
@@ -116,7 +116,7 @@ impl<'a> MIRBuilder<'a> {
         Some(())
     }
 
-    pub fn finalize(mut self, func: FuncInst) -> Option<MIR> {
+    pub fn finalize(mut self, func: FuncInst) -> Option<Mir> {
         if self.finalized_blocks.len() != self.blocks.len() {
             eprintln!("Not all blocks were finalized: ");
             for (id, bl) in self.blocks.iter() {
@@ -130,7 +130,7 @@ impl<'a> MIRBuilder<'a> {
 
         let parameters = self.parameters.take()?;
 
-        Some(MIR {
+        Some(Mir {
             func,
             blocks: self.blocks,
             locals: self.locals,

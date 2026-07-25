@@ -50,11 +50,11 @@ use crate::{
 };
 
 impl InferenceCtx<'_> {
-    fn _infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
+    fn infer_expr_aux(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         match &expr.data {
             HirExprDesc::IntLit(_) => Ok(self.emit_intlike_constraint().into()),
             HirExprDesc::CharLit(_) => Ok(self.char_ty()),
-            HirExprDesc::StrLit(_) => Ok(self.str_ty()),
+            HirExprDesc::StrLit(_) | HirExprDesc::TypeName(_) => Ok(self.str_ty()),
             HirExprDesc::CStrLit(_) => Ok(self.cstr_ty()),
             HirExprDesc::BoolLit(_) => Ok(self.bool_ty()),
             HirExprDesc::Use(place) => self.infer_place(place),
@@ -134,14 +134,13 @@ impl InferenceCtx<'_> {
                 Ok(self.slice_of(elem_var.into()))
             }
             HirExprDesc::SizeOf(_) => Ok(self.usize_ty()),
-            HirExprDesc::TypeName(_) => Ok(self.str_ty()),
             HirExprDesc::Constructor { enum_def, name, args, template_hints } => {
                 self.infer_constructor(*enum_def, *name, args, template_hints, expr.span)
             }
             HirExprDesc::UnresolvedCallDirect { args, .. } => {
-                args.iter().for_each(|arg| {
-                    let _ = self._infer_expr(arg);
-                });
+                for arg in args {
+                    let _ = self.infer_expr_aux(arg);
+                }
                 Diag::generic_error(
                     "function not found in current scope".into(),
                     expr.span,
@@ -157,45 +156,52 @@ impl InferenceCtx<'_> {
                 self.unify(&fat_ptr_ty, &fat_ptr_var.into())?;
                 Ok(metadata_var.into())
             }
-            HirExprDesc::As { expr: castee, ty } => {
-                if let Some((id, _)) = ty.as_builtin(self.db)
-                    && id.is_int_like(self.db).is_some()
-                {
-                    let expr_ty = self.emit_intlike_constraint();
-                    let actual_expr_ty = self.infer_expr(castee)?;
-
-                    let casted_to =
-                        self.allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
-                    if let Err(err) = self.unify(&expr_ty.into(), &actual_expr_ty) {
-                        Diag::generic_error(
-                            format!("Invalid cast: {}", err.display(self.db)),
-                            expr.span,
-                        )
-                        .accumulate(self.db);
-                    }
-                    return Ok(casted_to);
-                }
-                // For the moment, this only works on pointer types.
-                // This can do ref -> ptr but not ptr -> ref
-                let pointee = self.fresh_var();
-                let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
-                let expr_ty = self.infer_expr(castee)?;
-                if let Err(err) = self.unify(&expr_ptr_ty.into(), &expr_ty) {
-                    Diag::generic_error(
-                        format!("Unification error in as expr: {}", err.display(self.db)),
-                        castee.span,
-                    )
-                    .accumulate(self.db);
-                }
-
-                let actual_ty = self.allocate_type_ref(*ty, &self.implicit_ctx());
-
-                Ok(actual_ty)
-            }
+            HirExprDesc::As { expr: castee, ty } => self.infer_as_cast(expr, castee, ty),
         }
     }
 
-    fn _infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
+    fn infer_as_cast(
+        &mut self,
+        expr: &HirExpr,
+        castee: &HirExpr,
+        ty: &TypeRef,
+    ) -> Result<InferTy, UnificationError> {
+        if let Some((id, _)) = ty.as_builtin(self.db)
+            && id.is_int_like(self.db).is_some()
+        {
+            let expr_ty = self.emit_intlike_constraint();
+            let actual_expr_ty = self.infer_expr(castee)?;
+
+            let casted_to =
+                self.allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
+            if let Err(err) = self.unify(&expr_ty.into(), &actual_expr_ty) {
+                Diag::generic_error(
+                    format!("Invalid cast: {}", err.display(self.db)),
+                    expr.span,
+                )
+                .accumulate(self.db);
+            }
+            return Ok(casted_to);
+        }
+        // For the moment, this only works on pointer types.
+        // This can do ref -> ptr but not ptr -> ref
+        let pointee = self.fresh_var();
+        let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
+        let expr_ty = self.infer_expr(castee)?;
+        if let Err(err) = self.unify(&expr_ptr_ty.into(), &expr_ty) {
+            Diag::generic_error(
+                format!("Unification error in as expr: {}", err.display(self.db)),
+                castee.span,
+            )
+            .accumulate(self.db);
+        }
+
+        let actual_ty = self.allocate_type_ref(*ty, &self.implicit_ctx());
+
+        Ok(actual_ty)
+    }
+
+    fn infer_place_aux(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
         let val = match &place.kind {
             HirPlaceKind::Local(local_id) => Ok(self.infer_local(*local_id)),
             HirPlaceKind::Field { base, field } => {
@@ -228,12 +234,12 @@ impl InferenceCtx<'_> {
     }
 
     pub fn infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
-        self.snapshot(|this| this._infer_place(place))
+        self.snapshot(|this| this.infer_place_aux(place))
     }
 
     pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
-            let ty = this._infer_expr(expr)?;
+            let ty = this.infer_expr_aux(expr)?;
             this.inferred_exprs.insert(ExprId(expr.id), ty.clone());
             Ok(ty)
         })
@@ -307,12 +313,8 @@ impl InferenceCtx<'_> {
                 .map(|field| self.infer_expr(&field.expr).map(|res| (field.field, res)))
                 .collect::<Result<HashMap<_, _>, _>>()?;
 
-            if !diagnose_bad_struct_fields(
-                self.db,
-                span,
-                struct_id,
-                &inferred_fields.keys().copied().collect(),
-            ) {
+            let field_keys: HashSet<_> = inferred_fields.keys().copied().collect();
+            if !diagnose_bad_struct_fields(self.db, span, struct_id, &field_keys) {
                 return Err(UnificationError::AlreadyDiagnosed);
             }
 
@@ -322,14 +324,10 @@ impl InferenceCtx<'_> {
             let ctx = ImplicitContext::new(
                 self.db,
                 ScopeOwnerId::Module(module),
-                templates_of_struct(self.db, struct_id.interned())
-                    .iter()
-                    .cloned()
-                    .collect(),
+                templates_of_struct(self.db, struct_id.interned()),
                 templates.iter().cloned().collect(),
                 Some(InferTy::Var(zelf)),
-            )
-            .unwrap();
+            );
 
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
@@ -337,9 +335,7 @@ impl InferenceCtx<'_> {
                         .get(&ast.name)
                         .cloned()
                         .unwrap_or_else(|| this.fresh_var().into());
-                    let resolved = this
-                        .allocate_ast_type_expr(&ast.ty.data, &ctx)
-                        .unwrap_or_else(|| this.fresh_var().into());
+                    let resolved = this.allocate_ast_type_expr(&ast.ty.data, &ctx);
                     this.unify(&ty, &resolved)
                 })
             })?;
@@ -436,11 +432,10 @@ impl InferenceCtx<'_> {
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(enum_def.parent(self.db)),
-            enum_templates.iter().cloned().collect(),
+            enum_templates,
             templates.clone(),
             Some(zelf.into()),
-        )
-        .unwrap();
+        );
 
         match (args, &variant.kind) {
             (
@@ -450,9 +445,7 @@ impl InferenceCtx<'_> {
                 assert_eq!(hir_exprs.len(), spanneds.len());
                 for (hir, ast) in hir_exprs.iter().zip(spanneds) {
                     let hir_ty = self.infer_expr(hir)?;
-                    let in_ctx = self
-                        .allocate_ast_type_expr(&ast.data, &ctx)
-                        .unwrap_or_else(|| self.fresh_var().into());
+                    let in_ctx = self.allocate_ast_type_expr(&ast.data, &ctx);
                     self.unify(&hir_ty, &in_ctx)?;
                 }
             }
@@ -469,9 +462,11 @@ impl InferenceCtx<'_> {
                 );
                 for field in fields {
                     let ast = ast_fields.iter().find(|ast| ast.name == field.field);
-                    let field_ty = ast
-                        .and_then(|ast| self.allocate_ast_type_expr(&ast.ty.data, &ctx))
-                        .unwrap_or_else(|| self.fresh_var().into());
+                    let field_ty = if let Some(ast) = ast {
+                        self.allocate_ast_type_expr(&ast.ty.data, &ctx)
+                    } else {
+                        self.fresh_var().into()
+                    };
                     let err = match self.infer_expr(&field.expr) {
                         Ok(expr_ty) => self.unify(&expr_ty, &field_ty).err(),
                         Err(err) => Some(err),
@@ -571,11 +566,9 @@ impl InferenceCtx<'_> {
             target,
             templates.iter().cloned().collect(),
             zelf.cloned(),
-        )
-        .unwrap();
+        );
 
         self.allocate_ast_type_expr(&ast_ret_ty.data, &ctx)
-            .unwrap_or_else(|| self.fresh_var().into())
     }
 
     fn infer_direct(
@@ -605,15 +598,11 @@ impl InferenceCtx<'_> {
             target,
             inferred_templates.clone(),
             None,
-        )
-        .unwrap();
+        );
 
         let inferred_ast_args = ast_args
             .iter()
-            .map(|arg| {
-                self.allocate_ast_type_expr(&arg.ty.data, &ctx)
-                    .unwrap_or_else(|| self.fresh_var().into())
-            })
+            .map(|arg| self.allocate_ast_type_expr(&arg.ty.data, &ctx))
             .collect::<Box<[_]>>();
         let inferred_args = args
             .iter()

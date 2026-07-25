@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, mir::MIR};
+use crate::{Db, mir::Mir};
 
 pub mod init_tracking;
 pub mod lattice;
@@ -25,5 +25,5 @@ pub mod loans;
 pub trait MIRAnalysis<'db, 'mir> {
     type Out;
 
-    fn run(&self, db: &'db dyn Db, mir: &'mir MIR) -> Self::Out;
+    fn run(&self, db: &'db dyn Db, mir: &'mir Mir) -> Self::Out;
 }

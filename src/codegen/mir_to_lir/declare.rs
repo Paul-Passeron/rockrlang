@@ -25,7 +25,7 @@ use crate::{
     layout::{LIRTy, layout_of},
     lir::{DefinedLinkage::Export, Module, Signature},
     mangle::fun_mangle,
-    mir::MIR,
+    mir::Mir,
     resolved::TypeRef,
     thir_to_mir::FuncInst,
 };
@@ -66,7 +66,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
         self.ctx.mir_map.add_import(inst, id);
     }
 
-    pub fn declare_mir(&mut self, mir: &'db MIR) {
+    pub fn declare_mir(&mut self, mir: &'db Mir) {
         let params = mir
             .func
             .params(self.db)

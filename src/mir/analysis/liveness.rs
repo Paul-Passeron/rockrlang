@@ -25,7 +25,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     mir::{
-        MIR, MIRBlockID, MIRLocalID,
+        Mir, MIRBlockID, MIRLocalID,
         analysis::{
             MIRAnalysis,
             lattice::{Direction, FixedPointBlockRes},
@@ -54,7 +54,7 @@ impl From<FixedPointBlockRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
 impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
     type Out = MIRLivenessResult;
 
-    fn run(&self, _db: &dyn Db, mir: &MIR) -> Self::Out {
+    fn run(&self, _db: &dyn Db, mir: &Mir) -> Self::Out {
         mir.fixed_point_iter::<HashSet<_>>(
             Direction::Backward,
             |blk, old_out| {

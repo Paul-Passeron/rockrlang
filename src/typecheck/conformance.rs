@@ -45,7 +45,7 @@ pub struct CandidateImpl {
     pub subs: Vec<Option<TypeId>>,
 }
 
-fn _type_match(
+fn type_match_aux(
     db: &dyn Db,
     a: TypeId,
     b: TypeRef,
@@ -64,7 +64,7 @@ fn _type_match(
                 return false;
             }
             a_args.iter().zip(b_args).all(|(a, b)| {
-                a.as_type_id().is_some_and(|a| _type_match(db, a, *b, zelf, constraints))
+                a.as_type_id().is_some_and(|a| type_match_aux(db, a, *b, zelf, constraints))
             })
         }
         TypeRef::Param(id) => {
@@ -87,7 +87,7 @@ fn type_match(
     n_templates: usize,
 ) -> Option<Vec<Option<TypeId>>> {
     let mut m = HashMap::new();
-    if _type_match(db, a, b, None, &mut m) {
+    if type_match_aux(db, a, b, None, &mut m) {
         Some((0..n_templates).map(|i| m.get(&i).copied()).collect())
     } else {
         None
@@ -190,7 +190,7 @@ fn _type_implements<'db>(
         }
         for (req, pat) in req_args.iter().zip(pat_args) {
             let req = req.as_type_id()?;
-            if !_type_match(db, req, *pat, Some(self_ty), &mut m) {
+            if !type_match_aux(db, req, *pat, Some(self_ty), &mut m) {
                 return None;
             }
         }
@@ -258,7 +258,7 @@ fn _method_impl_for<'db>(
                 }
                 Some(FunctionId::new(db, method, ScopeOwnerId::Impl(id)))
             }
-            _ => None,
+            AstImplItem::Type { .. } => None,
         })?;
         Some(MethodImpl { impl_id: id, method_id: fid, subs })
     })
@@ -371,7 +371,7 @@ pub fn interface_conformance_errors(
 
     let mut required_methods: HashSet<Symbol> = HashSet::new();
     let mut required_types: HashSet<Symbol> = HashSet::new();
-    for item in interface_items(db, interface_id.interned()).iter() {
+    for item in interface_items(db, interface_id.interned()) {
         match item {
             AstInterfaceItem::Sig(sig) => {
                 required_methods.insert(sig.data.name.data);

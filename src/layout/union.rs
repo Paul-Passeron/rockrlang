@@ -40,7 +40,7 @@ fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
         }
         ConstructorType::None => return LayoutID::zst(db),
     };
-    finish_aggregate(db, source_ordered)
+    finish_aggregate(db, &source_ordered)
 }
 
 pub(super) fn enum_layout(db: &dyn Db, enum_id: EnumId, args: &[TypeRef]) -> LayoutID {

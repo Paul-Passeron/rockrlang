@@ -450,20 +450,20 @@ impl BuiltinTypeId {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Never).into()
     }
 
-    pub fn kind(&self, db: &dyn Db) -> BuiltinTypeKind {
+    pub fn kind(self, db: &dyn Db) -> BuiltinTypeKind {
         *self.interned().kind(db)
     }
 
-    pub fn template_count(&self, db: &dyn Db) -> usize {
+    pub fn template_count(self, db: &dyn Db) -> usize {
         match self.kind(db) {
             BuiltinTypeKind::Void
             | BuiltinTypeKind::Never
             | BuiltinTypeKind::Bool
+            | BuiltinTypeKind::Tuple
             | BuiltinTypeKind::Int { .. } => 0,
             BuiltinTypeKind::Ref { .. }
             | BuiltinTypeKind::Ptr { .. }
             | BuiltinTypeKind::Slice => 1,
-            BuiltinTypeKind::Tuple => 0,
         }
     }
 
@@ -501,9 +501,9 @@ pub enum PtrKind {
 }
 
 impl PtrKind {
-    pub fn mutability(&self) -> Mutability {
+    pub fn mutability(self) -> Mutability {
         match self {
-            Self::Ref(m) | Self::RawPtr(m) => *m,
+            Self::Ref(m) | Self::RawPtr(m) => m,
         }
     }
 }

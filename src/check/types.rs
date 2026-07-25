@@ -43,8 +43,7 @@ fn check_struct(db: &dyn Db, struct_id: StructId) {
         db,
         ScopeOwnerId::Module(struct_id.parent(db)),
         &item.template_args,
-    )
-    .unwrap();
+    );
     let mut names: HashSet<Symbol> = HashSet::new();
     for field in &item.fields {
         if !names.insert(field.name) {
@@ -82,8 +81,7 @@ fn check_enum(db: &dyn Db, enum_id: EnumId) {
         db,
         ScopeOwnerId::Module(enum_id.parent(db)),
         &item.template_args,
-    )
-    .unwrap();
+    );
     let mut names: HashSet<Symbol> = HashSet::new();
     for variant in &item.variants {
         if !names.insert(variant.name) {

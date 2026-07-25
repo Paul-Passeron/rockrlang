@@ -58,7 +58,7 @@ impl Thir {
         match pl.base {
             PlaceBase::Local(idx) => self
                 .local_at(idx, loc)
-                .or(pl.is_synthetic.not().then_some(ThirNode::Place(place))),
+                .or_else(|| pl.is_synthetic.not().then_some(ThirNode::Place(place))),
         }
     }
 
@@ -111,7 +111,9 @@ impl Thir {
                 ThirConstructorArgs::None => None,
             },
         };
-        res.or(e.is_synthetic.not().then_some(ThirNode::Expr { id: expr, setup: None }))
+        res.or_else(|| {
+            e.is_synthetic.not().then_some(ThirNode::Expr { id: expr, setup: None })
+        })
     }
 
     fn expr_with_setup_at<'a>(
@@ -140,7 +142,6 @@ impl Thir {
     ) -> Option<ThirNode<'a>> {
         pat.span.encloses(loc).then_some(())?;
         let res = match &pat.kind {
-            ThirPatternKind::Any => None,
             ThirPatternKind::Bind { local, .. } => self.local_at(*local, loc),
             ThirPatternKind::Tuple(pats) => {
                 pats.iter().find_map(|pat| self.pattern_at(pat, loc))
@@ -157,10 +158,11 @@ impl Thir {
                 }
                 ThirConstructorArgs::None => None,
             },
-            ThirPatternKind::IntLit(_) => None,
-            ThirPatternKind::Error => None,
+            ThirPatternKind::Any
+            | ThirPatternKind::IntLit(_)
+            | ThirPatternKind::Error => None,
         };
-        res.or(pat.is_synthetic.not().then_some(ThirNode::Pattern(pat)))
+        res.or_else(|| pat.is_synthetic.not().then_some(ThirNode::Pattern(pat)))
     }
 
     fn branch_at<'a>(
@@ -170,13 +172,12 @@ impl Thir {
         loc: Location,
     ) -> Option<ThirNode<'a>> {
         branch.get_whole_span(self).encloses(loc).then_some(())?;
-
-        let res = self
-            .pattern_at(&branch.pattern, loc)
+        self.pattern_at(&branch.pattern, loc)
             .or_else(|| self.expr_with_setup_at(db, branch.guard.as_ref()?, loc))
-            .or_else(|| branch.body.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)));
-
-        res.or(branch.is_synthetic.not().then_some(ThirNode::MatchBranch(branch)))
+            .or_else(|| branch.body.iter().find_map(|stmt| self.stmt_at(db, stmt, loc)))
+            .or_else(|| {
+                branch.is_synthetic.not().then_some(ThirNode::MatchBranch(branch))
+            })
     }
 
     fn stmt_at<'a>(
@@ -206,15 +207,14 @@ impl Thir {
                 self.place_at(*place, loc).or_else(|| self.expr_at(*rhs, loc))
             }
             StmtKind::Return(idx) => idx.and_then(|expr| self.expr_at(expr, loc)),
-            StmtKind::Break(_) => None,
-            StmtKind::Continue(_) => None,
+
             StmtKind::Match { scrutinee, branches } => self
                 .expr_with_setup_at(db, scrutinee, loc)
                 .or_else(|| branches.iter().find_map(|br| self.branch_at(db, br, loc))),
             StmtKind::Expr(idx) => self.expr_at(*idx, loc),
-            StmtKind::Error => None,
+            StmtKind::Break(_) | StmtKind::Continue(_) | StmtKind::Error => None,
         };
-        res.or(stmt.is_synthetic.not().then_some(ThirNode::Stmt(stmt)))
+        res.or_else(|| stmt.is_synthetic.not().then_some(ThirNode::Stmt(stmt)))
     }
 
     pub fn node_at<'a>(&'a self, db: &dyn Db, loc: Location) -> Option<ThirNode<'a>> {

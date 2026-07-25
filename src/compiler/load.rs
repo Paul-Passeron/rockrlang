@@ -65,7 +65,7 @@ pub fn compute_package_roots(
 }
 
 pub fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError> {
-    fn walk(db: &mut dyn Db, p: PathBuf) -> Result<(), CompilerError> {
+    fn walk(db: &mut dyn Db, p: &PathBuf) -> Result<(), CompilerError> {
         if p.is_dir() {
             WalkDir::new(p.clone())
                 .into_iter()
@@ -81,9 +81,9 @@ pub fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError
                     }
                 })
                 .map(walkdir::DirEntry::into_path)
-                .try_for_each(|p| walk(db, p))?;
-        } else if db.find_source_file(&p).is_none() {
-            read_source_file(db, &p)
+                .try_for_each(|p| walk(db, &p))?;
+        } else if db.find_source_file(p).is_none() {
+            read_source_file(db, p)
                 .ok_or_else(|| CompilerError::NoFileFoundAt(p.clone()))?;
         }
 
@@ -92,16 +92,14 @@ pub fn compute_all_files_from_roots(db: &mut dyn Db) -> Result<(), CompilerError
     let ws = Workspace::get(db);
     for root in ws.roots(db).clone().iter() {
         let path = root.file(db).path(db).clone();
-        walk(
-            db,
-            if path.is_file()
-                && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME
-            {
-                path.parent().unwrap().to_path_buf()
-            } else {
-                path
-            },
-        )?;
+        let buf = if path.is_file()
+            && path.file_name().unwrap().to_str().unwrap() == ANCHOR_FILE_NAME
+        {
+            path.parent().unwrap().to_path_buf()
+        } else {
+            path
+        };
+        walk(db, &buf)?;
     }
     Ok(())
 }

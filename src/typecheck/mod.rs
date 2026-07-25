@@ -382,7 +382,7 @@ impl<'db> TyCtx<'db> {
                 }
                 if let Some(annotation) = ty_annotation
                     && let Some(annotation) = annotation.as_known()
-                    && let Some(annotated) = self.inf_ctx.allocate_ast_type_expr(
+                    && let annotated = self.inf_ctx.allocate_ast_type_expr(
                         &annotation.data,
                         self.inf_ctx.implicit_ctx().as_ref(),
                     )

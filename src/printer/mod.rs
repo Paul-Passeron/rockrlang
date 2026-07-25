@@ -34,10 +34,10 @@ pub fn render_diagnostics<'db, 'diag>(
     diags: impl Iterator<Item = &'diag Diag>,
 ) {
     let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    _render_diagnostics(db, diags, &mut stderr).unwrap();
+    render_diagnostics_aux(db, diags, &mut stderr).unwrap();
 }
 
-pub fn _render_diagnostics<'a, W: WriteColor>(
+pub fn render_diagnostics_aux<'a, W: WriteColor>(
     db: &dyn Db,
     diags: impl Iterator<Item = &'a Diag>,
     out: &mut W,

@@ -37,7 +37,7 @@ use crate::{
     },
 };
 use nonempty::NonEmpty;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Definition {
@@ -428,15 +428,12 @@ fn _resolve_path<'db>(
     })
 }
 
-#[salsa::tracked]
-pub fn get_module_pretty_name<'db>(
-    db: &'db dyn Db,
-    id: InternedModuleId<'db>,
-) -> Arc<String> {
+#[salsa::tracked(returns(deref))]
+pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -> String {
     let prefix = if let Some(parent) = id.parent(db) {
         format!("{}::", get_module_pretty_name(db, parent.interned()))
     } else {
         String::new()
     };
-    Arc::new(format!("{}{}", prefix, id.name(db).interned().contents(db)))
+    format!("{}{}", prefix, id.name(db).interned().contents(db))
 }

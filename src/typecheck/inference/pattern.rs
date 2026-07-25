@@ -109,15 +109,10 @@ impl InferenceCtx<'_> {
         ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(enum_id.parent(self.db)),
-            enum_item(self.db, enum_id.interned())
-                .template_args
-                .iter()
-                .cloned()
-                .collect(),
+            &enum_item(self.db, enum_id.interned()).template_args,
             template_tys.iter().cloned().collect(),
             Some(zelf),
         )
-        .expect("ImplicitContext error during construction is an ICE")
     }
 
     fn get_tuple_fields_or_diagnose(
@@ -132,12 +127,7 @@ impl InferenceCtx<'_> {
             variant.as_ref().map(|v| &v.kind)
         {
             let ctx = self.get_ctx_for_enum(enum_id, template_tys);
-            tys.iter()
-                .map(|ty| {
-                    self.allocate_ast_type_expr(&ty.data, &ctx)
-                        .unwrap_or_else(|| self.fresh_var().into())
-                })
-                .collect()
+            tys.iter().map(|ty| self.allocate_ast_type_expr(&ty.data, &ctx)).collect()
         } else {
             Diag::generic_error(
                 format!(
@@ -167,11 +157,7 @@ impl InferenceCtx<'_> {
             fields
                 .iter()
                 .map(|field| {
-                    (
-                        field.name,
-                        self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                            .unwrap_or_else(|| self.fresh_var().into()),
-                    )
+                    (field.name, self.allocate_ast_type_expr(&field.ty.data, &ctx))
                 })
                 .collect()
         } else {
@@ -366,23 +352,16 @@ impl InferenceCtx<'_> {
         let ctx = ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(struct_id.parent(self.db)),
-            templates.iter().cloned().collect(),
+            templates,
             infer_templates.iter().cloned().collect(),
             Some(struct_ty.clone()),
-        )
-        .expect("Implicit context failing to be created is an internal compiler error");
+        );
         let item = struct_item(self.db, struct_id.interned());
 
         let field_types: HashMap<Symbol, InferTy> = item
             .fields
             .iter()
-            .map(|field| {
-                (
-                    field.name,
-                    self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                        .unwrap_or_else(|| self.fresh_var().into()),
-                )
-            })
+            .map(|field| (field.name, self.allocate_ast_type_expr(&field.ty.data, &ctx)))
             .collect();
         (struct_ty, field_types)
     }

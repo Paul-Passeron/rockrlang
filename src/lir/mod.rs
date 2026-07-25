@@ -59,7 +59,7 @@ pub struct Aggregate;
 pub struct Union;
 
 #[derive(Clone, Copy)]
-pub struct ZST;
+pub struct Zst;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ValueClass {
@@ -98,7 +98,7 @@ impl ValueKind for Union {
     }
 }
 
-impl ValueKind for ZST {
+impl ValueKind for Zst {
     fn matches(class: ValueClass) -> bool {
         class == ValueClass::None
     }

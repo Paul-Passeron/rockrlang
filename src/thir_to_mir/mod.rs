@@ -30,7 +30,7 @@ use crate::{
     compiler::{Workspace, diagnostic::Diag, workspace_packages},
     hir::{Mutability, function_ast, signature::get_sig_of_function},
     mir::{
-        MIR, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
+        Mir, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
@@ -107,7 +107,9 @@ impl FuncInst {
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         let ret_ty = match sig.ret {
-            TypeRef::Zelf => self.fdef(db).parent(db).get_canonical_zelf(db).unwrap(),
+            TypeRef::Zelf => {
+                self.fdef(db).parent(db).get_canonical_zelf(db).unwrap_or(TypeRef::Error)
+            }
             ret => ret,
         };
         ret_ty.with_substitution(db, self.subs(db))
@@ -120,7 +122,7 @@ impl FuncInst {
         let receiver = sig.zelf.map(|arg| {
             (
                 Symbol::new(db, "self"),
-                arg.as_type_ref_for(db, zelf.unwrap())
+                arg.as_type_ref_for(db, zelf.unwrap_or(TypeRef::Error))
                     .with_substitution(db, self.subs(db)),
             )
         });
@@ -130,7 +132,7 @@ impl FuncInst {
                 (
                     *symb,
                     match ty.with_substitution(db, self.subs(db)) {
-                        TypeRef::Zelf => zelf.unwrap(),
+                        TypeRef::Zelf => zelf.expect("We should have a `Self` type here"),
                         ty => ty,
                     },
                 )
@@ -151,7 +153,7 @@ impl FuncInst {
     pub fn is_main(self, db: &dyn Db) -> bool {
         let packages = workspace_packages(db, Workspace::get(db));
         let mut main_pkg = None;
-        for pkg in packages.iter() {
+        for pkg in packages {
             if Some(*pkg) == std_package(db) {
                 continue;
             }
@@ -179,14 +181,14 @@ impl FuncInst {
 }
 
 #[salsa::tracked]
-pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
+pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Mir {
     let Some(thir) = thir_body(db, *key.fdef(db)) else {
         panic!("attempted to lower extern function to MIR")
     };
     ThirToMIR::new(db, thir, key.subs(db)).lower()
 }
 
-pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &MIR {
+pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &Mir {
     _mir(db, MIRKey::new(db, fdef, subs))
 }
 
@@ -209,7 +211,6 @@ impl<'a> ThirToMIR<'a> {
             TypeRef::Concrete(type_id) => {
                 type_id.args(self.db).iter().all(|ty| self.is_concrete(*ty))
             }
-            TypeRef::Param(_) => false,
             TypeRef::Associated(_) => todo!(),
             _ => false,
         }
@@ -268,7 +269,9 @@ impl<'a> ThirToMIR<'a> {
             let mir_id = *self.local_map.get(param).expect("Expected all local thir ids to be found in self.local_map. Maybe try calling `build_thir_locals`.");
             self.params.push(mir_id);
         }
-        self.builder.set_parameters(self.params.clone()).unwrap();
+        self.builder
+            .set_parameters(self.params.clone())
+            .expect("Cannot set parameters multiple times");
     }
 
     fn check_substitution(&self) {
@@ -302,7 +305,9 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn goto(&mut self, next: MIRBlockID) {
-        self.builder.terminate(MIRTerminator::Goto { next }).unwrap();
+        self.builder
+            .terminate(MIRTerminator::Goto { next })
+            .expect("Cannot goto to terminated block");
     }
 
     fn build_stmt(&mut self, stmt: &ThirStmt) {
@@ -539,14 +544,18 @@ impl<'a> ThirToMIR<'a> {
                 let name_len = name.len();
 
                 let tref: TypeRef = str_id(self.db).into();
-                let struct_ref = tref.as_struct_ref(self.db).unwrap();
+                let struct_ref = tref
+                    .as_struct_ref(self.db)
+                    .expect("core::io::str should be a struct");
 
                 let data = MIROperand::Constant(
                     MIRConstant::CString { contents: name, null_terminated: false },
                     span,
                 );
                 let len_symb = Symbol::new(self.db, "len");
-                let len_ty = struct_ref.typeof_field(self.db, len_symb).unwrap();
+                let len_ty = struct_ref
+                    .typeof_field(self.db, len_symb)
+                    .expect("core::io::str struct should have field len");
                 let len = MIROperand::Constant(
                     MIRConstant::Integer { value: name_len as u128, ty: len_ty },
                     span,
@@ -569,16 +578,15 @@ impl<'a> ThirToMIR<'a> {
                 if let Some((muta, _)) = as_ptr_like(*ty) {
                     let expr_val = &self.thir.exprs[*expr];
                     let expr_ty = expr_val.ty;
-                    let (op_m, _) = as_ptr_like(expr_ty).unwrap();
+                    let (op_m, _) = as_ptr_like(expr_ty)
+                        .unwrap_or((Mutability::Const, TypeRef::Error));
                     if muta.is_mut() && !op_m.is_mut() {
                         // const ptr-like to mut ptr-like
                         Diag::generic_error(format!("cannot cast a const pointer/reference type to a mutable pointer/reference type. ({} to {})", expr_ty.to_string(self.db), ty.to_string(self.db)), span)
                             .accumulate(self.db);
                     }
-                    MIRRValueKind::Cast(self.build_operand(*expr), *ty)
-                } else {
-                    MIRRValueKind::Cast(self.build_operand(*expr), *ty)
                 }
+                MIRRValueKind::Cast(self.build_operand(*expr), *ty)
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
@@ -669,7 +677,9 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn switch_to(&mut self, block: MIRBlockID) {
-        self.builder.switch_to_block(block).unwrap();
+        self.builder
+            .switch_to_block(block)
+            .expect("Cannot switch to already terminated block");
     }
 
     fn build_while_stmt(
@@ -797,7 +807,9 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn build_terminator(&mut self, terminator: MIRTerminator) {
-        self.builder.terminate(terminator).unwrap();
+        self.builder
+            .terminate(terminator)
+            .expect("Cannot terminate already terminated block");
     }
 
     fn build_ret(&mut self, value: Option<MIROperand>, span: Span) {
@@ -828,7 +840,7 @@ impl<'a> ThirToMIR<'a> {
         self.build_void_ret(loc.span(loc));
     }
 
-    pub fn lower(mut self) -> MIR {
+    pub fn lower(mut self) -> Mir {
         // Only during debug ?
         self.check_substitution();
 
@@ -872,6 +884,7 @@ impl TypeId {
                 BuiltinTypeKind::Ref { mutability } => !mutability.is_mut(),
                 BuiltinTypeKind::Slice => false,
                 // TODO: allow copy if all elements are copy
+                #[allow(clippy::match_same_arms)]
                 BuiltinTypeKind::Tuple => false,
             }
         } else {
@@ -881,6 +894,7 @@ impl TypeId {
 }
 
 impl FunctionRef {
+    #[must_use]
     pub fn concretize(mut self, db: &dyn Db, subs: &[TypeRef]) -> Self {
         let zelf = self.self_ty.map(|ty| ty.with_substitution(db, subs));
         let Some((id, new_subs)) = concretize_fid(db, self.id, &self.args, zelf) else {

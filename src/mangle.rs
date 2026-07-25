@@ -46,10 +46,10 @@ pub enum MangleType {
     Error,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FloatKind {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IntKind {
     pub width: IntWidth,
     pub signed: bool,
@@ -177,7 +177,7 @@ pub fn mangle_ident(s: &str) -> String {
 }
 
 impl IntKind {
-    pub fn mangle(&self) -> String {
+    pub fn mangle(self) -> String {
         format!("{}{}", if self.signed { "i" } else { "u" }, {
             let s: Size = self.width.into();
             s.bytes()
@@ -186,8 +186,8 @@ impl IntKind {
 }
 
 impl FloatKind {
-    pub fn mangle(&self) -> String {
-        match *self {} // uninhabited
+    pub fn mangle(self) -> String {
+        match self {} // uninhabited
     }
 }
 

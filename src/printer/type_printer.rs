@@ -31,19 +31,15 @@ use crate::{
     typecheck::inference::{InferTy, InferenceCtx},
 };
 
+#[derive(Default)]
 pub struct TypePrinter {
     pub options: TypePrinterOptionSet,
 }
 
-impl Default for TypePrinter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl TypePrinter {
     pub fn new() -> Self {
-        Self { options: Default::default() }
+        Self::default()
     }
 
     #[allow(dead_code)]
@@ -84,8 +80,7 @@ impl TypePrinter {
     }
 
     pub fn module_to_string(&self, db: &dyn Db, module: ModuleId) -> String {
-        let mut res = String::new();
-        fn _aux(
+        fn aux(
             db: &dyn Db,
             opts: &TypePrinterOptionSet,
             s: &mut String,
@@ -96,14 +91,15 @@ impl TypePrinter {
                 return;
             }
             if let Some(parent) = module.parent(db) {
-                _aux(db, opts, s, parent);
+                aux(db, opts, s, parent);
                 if !s.is_empty() {
                     s.push_str("::");
                 }
             }
             s.push_str(&module.name(db).to_string(db));
         }
-        _aux(db, &self.options, &mut res, module);
+        let mut res = String::new();
+        aux(db, &self.options, &mut res, module);
         res
     }
 
@@ -216,7 +212,7 @@ impl TypePrinter {
         }
     }
 
-    pub fn type_param_id_to_string(&self, _db: &dyn Db, type_ref: TypeParamId) -> String {
+    pub fn type_param_id_to_string(type_ref: TypeParamId) -> String {
         format!("T{}", type_ref.0)
     }
 
@@ -226,9 +222,7 @@ impl TypePrinter {
             TypeRef::Associated(symbol) => {
                 format!("Self::{}", symbol.to_string(db))
             }
-            TypeRef::Param(type_param_id) => {
-                self.type_param_id_to_string(db, type_param_id)
-            }
+            TypeRef::Param(type_param_id) => Self::type_param_id_to_string(type_param_id),
             TypeRef::Zelf => "Self".to_owned(),
             TypeRef::Error => "<ERROR>".to_owned(),
             TypeRef::Unknown => "<???>".to_owned(),
@@ -352,6 +346,7 @@ impl TypePrinterOptionSet {
         Self { options: HashSet::from_iter(opts) }
     }
 
+    #[must_use]
     pub fn with(self, opt: TypePrinterOption) -> Self {
         let mut this = self;
         this.options.insert(opt);

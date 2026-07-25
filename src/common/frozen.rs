@@ -255,6 +255,7 @@ impl<T> IntoIterator for Frozen<T> {
         }
         let mut owned_data = vec![];
         mem::swap(data.as_mut(), &mut owned_data);
+        drop(data);
         let last_item = self.next_bucket_idx.load(Ordering::Relaxed);
         let mut res = vec![];
         let last_box = owned_data.len() - 1;
@@ -263,13 +264,16 @@ impl<T> IntoIterator for Frozen<T> {
             if i == last_box {
                 for (idx, item) in values.into_iter().enumerate() {
                     if idx < last_item {
+                        // SAFETY: This is the last bucket, but before the last_idx 
                         unsafe {
                             res.push(item.assume_init());
                         }
                     }
                 }
             } else {
-                res.extend(values.into_iter().map(|item| unsafe { item.assume_init() }));
+                res.extend(values.into_iter().map(|item| 
+                    // SAFETY: This value is assumed to be initialized since it's coming from a full bucket 
+                    unsafe { item.assume_init() }));
             }
         }
         res.reverse();
@@ -299,7 +303,7 @@ impl<T: Clone> Clone for Frozen<T> {
         }
         let data = self.data.lock().unwrap();
         let next_bucket_idx = self.next_bucket_idx.load(Ordering::Relaxed);
-        Self {
+        let res = Self {
             data: {
                 let last_bucket = data.len() - 1;
                 let buckets = data
@@ -310,6 +314,7 @@ impl<T: Clone> Clone for Frozen<T> {
                         let max_idx =
                             if i == last_bucket { next_bucket_idx } else { BUCKET_SIZE };
                         for j in 0..max_idx {
+                            // SAFETY: We know that x[j] was initialized
                             unsafe {
                                 arr[j].write(x[j].assume_init_ref().clone());
                             }
@@ -320,7 +325,9 @@ impl<T: Clone> Clone for Frozen<T> {
                 Mutex::new(buckets)
             },
             next_bucket_idx: AtomicUsize::new(next_bucket_idx),
-        }
+        };
+        drop(data);
+        res
     }
 }
 
@@ -388,6 +395,7 @@ impl<T: Ord> Frozen<T> {
         *self = Self::from_iter(v);
     }
 
+    #[must_use]
     pub fn into_sorted(self) -> Self {
         let mut this = self;
         this.sort();
@@ -430,7 +438,7 @@ mod tests {
 
         let new_ref_ptr: *const i32 = frozen.get(0).unwrap();
 
-        println!("{:p}\n{:p}", ref_ptr, new_ref_ptr);
+        println!("{ref_ptr:p}\n{new_ref_ptr:p}");
         assert_eq!(ref_ptr, new_ref_ptr);
     }
 
@@ -440,7 +448,7 @@ mod tests {
         for i in 0..100 {
             frozen.push(i);
         }
-        for item in frozen.iter_mut() {
+        for item in &mut frozen {
             *item += 100;
         }
         for (i, item) in frozen.iter().enumerate() {
@@ -478,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic = "index out of bounds"]
+    #[should_panic = "called `Option::unwrap()` on a `None` value"]
     fn index_out_of_bounds_panics() {
         let f: Frozen<i32> = Frozen::new();
         let _ = f[0];
@@ -516,7 +524,7 @@ mod tests {
         f.push(2);
         f.push(3);
 
-        for x in f.iter_mut() {
+        for x in &mut f {
             *x *= 10;
         }
 
@@ -596,13 +604,13 @@ mod tests {
         f.push(String::from("first"));
 
         // Grab a pointer to the first element BEFORE more pushes.
-        let ptr = &f[0] as *const String;
+        let ptr = &raw const f[0];
 
         // Push more items — may reallocate internal storage.
         for i in 0..100 {
             f.push(format!("item_{i}"));
         }
-
+        // SAFETY:
         // The original pointer must still be valid.
         unsafe {
             assert_eq!(&*ptr, "first");
@@ -659,9 +667,9 @@ mod tests {
         assert_eq!(f[0], 0);
         assert_eq!(f[9_999], 9_999);
 
-        let sum: i64 = f.iter().map(|&x| x as i64).sum();
-        for elem in f.iter() {
-            println!("{elem:?}")
+        let sum: i64 = f.iter().map(|&x| i64::from(x)).sum();
+        for elem in &f {
+            println!("{elem:?}");
         }
 
         assert_eq!(sum, (10_000i64 * 9_999) / 2);

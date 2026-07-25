@@ -69,12 +69,12 @@ impl<'a> ThirPrinter<'a> {
     fn print_stmt(&mut self, stmt: &'a ThirStmt) {
         match &stmt.kind {
             StmtKind::Block { scope, stmts, semantic_infos } => {
-                let lbl = self.scope_label(*scope);
+                let lbl = Self::scope_label(*scope);
                 match semantic_infos {
                     Some(BlockSemanticInfo::StructDestructure(struct_ref)) => {
                         self.line(&format!(
                             "{lbl} (Destructuring `{}`): {{",
-                            struct_ref.clone().as_type_ref(self.db).to_string(self.db)
+                            struct_ref.clone().into_type_ref(self.db).to_string(self.db)
                         ));
                     }
                     Some(BlockSemanticInfo::ForLoop) => {
@@ -91,7 +91,7 @@ impl<'a> ThirPrinter<'a> {
 
             StmtKind::If { cond, then, then_scope, else_, else_scope } => {
                 let c = self.emit_cond(cond);
-                let lbl = self.scope_label(*then_scope);
+                let lbl = Self::scope_label(*then_scope);
                 self.line(&format!("if {c} {lbl}: {{"));
                 self.indent += 1;
                 self.print_stmts(then);
@@ -100,7 +100,7 @@ impl<'a> ThirPrinter<'a> {
                     Some(else_body) => {
                         match else_scope {
                             Some(s) => {
-                                let elbl = self.scope_label(*s);
+                                let elbl = Self::scope_label(*s);
                                 self.line(&format!("}} else {elbl}: {{"));
                             }
                             None => self.line("} else {"),
@@ -116,7 +116,7 @@ impl<'a> ThirPrinter<'a> {
 
             StmtKind::While { scope, cond, body } => {
                 let c = self.emit_cond(cond);
-                let lbl = self.scope_label(*scope);
+                let lbl = Self::scope_label(*scope);
                 self.line(&format!("{lbl}: while {c} {{"));
                 self.indent += 1;
                 self.print_stmts(body);
@@ -125,7 +125,7 @@ impl<'a> ThirPrinter<'a> {
             }
 
             StmtKind::Let { local, init } => {
-                let m = self.mut_prefix(&self.thir.locals[*local].mutability);
+                let m = Self::mut_prefix(self.thir.locals[*local].mutability);
                 let ty = self.thir.locals[*local].ty.to_string(self.db);
                 let nm = self.local_name(*local);
                 let e = self.render_expr(*init);
@@ -147,12 +147,12 @@ impl<'a> ThirPrinter<'a> {
             },
 
             StmtKind::Break(s) => {
-                let l = self.scope_label(*s);
+                let l = Self::scope_label(*s);
                 self.line(&format!("break {l};"));
             }
 
             StmtKind::Continue(s) => {
-                let l = self.scope_label(*s);
+                let l = Self::scope_label(*s);
                 self.line(&format!("continue {l};"));
             }
 
@@ -179,7 +179,7 @@ impl<'a> ThirPrinter<'a> {
     fn print_branch(&mut self, branch: &'a ThirMatchBranch) {
         let pat = self.render_pattern(&branch.pattern);
         let guard_inline = branch.guard.as_ref().map(|g| self.render_expr(g.expr));
-        let lbl = self.scope_label(branch.body_scope);
+        let lbl = Self::scope_label(branch.body_scope);
         let header = match guard_inline {
             Some(g) => format!("{pat} if {g} => {lbl}: {{"),
             None => format!("{pat} => {lbl}: {{"),
@@ -221,11 +221,11 @@ impl<'a> ThirPrinter<'a> {
             ExprKind::Use(p) => self.render_place(*p),
 
             ExprKind::AddressOf { place, mutability } => {
-                let m = self.mut_prefix(mutability);
+                let m = Self::mut_prefix(*mutability);
                 format!("&raw {m}{}", self.render_place(*place))
             }
             ExprKind::Ref { place, mutability } => {
-                let m = self.mut_prefix(mutability);
+                let m = Self::mut_prefix(*mutability);
                 format!("&{m}{}", self.render_place(*place))
             }
 
@@ -284,7 +284,7 @@ impl<'a> ThirPrinter<'a> {
                 format!("sizeof({})", ty.to_string(self.db))
             }
             ExprKind::TypeName(ty) => {
-                format!("sizeof({})", ty.to_string(self.db))
+                format!("typename({})", ty.to_string(self.db))
             }
 
             ExprKind::Constructor { enum_def, idx, args } => {
@@ -433,7 +433,7 @@ impl<'a> ThirPrinter<'a> {
         }
     }
 
-    fn scope_label(&self, s: ScopeId) -> String {
+    fn scope_label(s: ScopeId) -> String {
         format!("'s{}", s.into_raw())
     }
 
@@ -447,7 +447,7 @@ impl<'a> ThirPrinter<'a> {
         }
     }
 
-    fn mut_prefix(&self, m: &Mutability) -> &'static str {
+    fn mut_prefix(m: Mutability) -> &'static str {
         match m {
             Mutability::Const => "",
             Mutability::Mutable => "mut ",

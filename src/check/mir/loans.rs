@@ -23,7 +23,7 @@ use crate::{
     Db,
     compiler::diagnostic::Diag,
     mir::{
-        MIR, MIRBlockID, MIRLocalID,
+        Mir, MIRBlockID, MIRLocalID,
         analysis::{
             init_tracking::IterOperand,
             loans::{LoanID, MIRLoanOut, MIRStmtIndex},
@@ -33,14 +33,14 @@ use crate::{
     },
 };
 
-pub(super) fn check_loans(db: &dyn Db, mir: &MIR) {
+pub(super) fn check_loans(db: &dyn Db, mir: &Mir) {
     let loans = mir.loans(db);
     for idx in mir.blocks.keys() {
         check_block(db, mir, idx, loans);
     }
 }
 
-fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
+fn check_block(db: &dyn Db, mir: &Mir, blk: MIRBlockID, loans: &MIRLoanOut) {
     let mut state = loans.loans_live_in[&blk].clone();
     let block = &mir.blocks[blk];
     let live_in_per_stmt = live_in_per_stmt(db, mir, blk);
@@ -52,7 +52,7 @@ fn check_block(db: &dyn Db, mir: &MIR, blk: MIRBlockID, loans: &MIRLoanOut) {
     check_terminator(db, &block.terminator, loans, &state);
 }
 
-fn live_in_per_stmt(db: &dyn Db, mir: &MIR, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
+fn live_in_per_stmt(db: &dyn Db, mir: &Mir, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
     let block = &mir.blocks[blk];
     let mut seed = mir.liveness(db).live_out[&blk].clone();
     for def in block.terminator.defs() {

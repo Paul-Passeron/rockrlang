@@ -114,7 +114,7 @@ pub enum Mutability {
     Mutable,
 }
 impl Mutability {
-    pub fn is_mut(&self) -> bool {
+    pub fn is_mut(self) -> bool {
         matches!(self, Self::Mutable)
     }
 }
@@ -349,7 +349,7 @@ impl HirStructFieldPattern {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn impl_sources<'db>(
     db: &'db dyn Db,
     impl_id: InternedImplId<'db>,
@@ -361,7 +361,7 @@ pub fn impl_sources<'db>(
         .collect()
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn impl_items<'db>(
     db: &'db dyn Db,
     impl_id: InternedImplId<'db>,
@@ -369,20 +369,18 @@ pub fn impl_items<'db>(
     impl_sources(db, impl_id).iter().flat_map(|impl_| impl_.items(db).clone()).collect()
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn interface_items<'db>(
     db: &'db dyn Db,
     interface_id: InternedInterfaceId<'db>,
-) -> Arc<Vec<AstInterfaceItem>> {
-    Arc::new(
-        module_interfaces(db, interface_id.parent(db).interned())
-            .iter()
-            .find(|interface| interface.name.data == *interface_id.name(db))
-            .cloned()
-            .into_iter()
-            .flat_map(|interface| interface.items)
-            .collect(),
-    )
+) -> Vec<AstInterfaceItem> {
+    module_interfaces(db, interface_id.parent(db).interned())
+        .iter()
+        .find(|interface| interface.name.data == *interface_id.name(db))
+        .cloned()
+        .into_iter()
+        .flat_map(|interface| interface.items)
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -422,8 +420,7 @@ impl FunctionLikeAst {
 
     pub fn receiver(&self) -> Option<AstReceiver> {
         match self {
-            Self::ExternDef(_, _) => None,
-            Self::Fundef(_) => None,
+            Self::ExternDef(_, _) | Self::Fundef(_) => None,
             Self::Method(spanned) => Some(spanned.data.receiver.clone()),
             Self::TraitMethod(spanned) => Some(spanned.data.receiver.clone()),
         }
@@ -493,7 +490,7 @@ pub fn function_ast<'db>(
             }
         }
         ScopeOwnerId::Interface(interface_ref) => {
-            for item in interface_items(db, interface_ref.def(db).interned()).iter() {
+            for item in interface_items(db, interface_ref.def(db).interned()) {
                 if let AstInterfaceItem::Sig(sig) = item
                     && sig.data.name.data == *function.name(db)
                 {
@@ -526,8 +523,7 @@ fn _hir_body<'db>(
         FunctionLikeAst::Method(methoddef) => {
             Some(lower_method_body(db, function.into(), methoddef))
         }
-        FunctionLikeAst::ExternDef(_, _) => None,
-        FunctionLikeAst::TraitMethod(_) => None,
+        FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_) => None,
     }
 }
 
@@ -551,7 +547,7 @@ impl FunctionId {
         }
     }
 
-    pub fn ret_ty<'db>(&'db self, db: &'db dyn Db) -> TypeRef {
+    pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
         let templates = get_templates_of_fun(db, self.interned());
         let owning_module = owning_module(db, self.parent(db));
         let ast = function_ast(db, self.interned()).inner(db);
@@ -564,7 +560,7 @@ impl FunctionId {
         resolve_type_expr(db, type_expr, owning_module.interned(), templates, has_zelf)
     }
 
-    pub fn args<'db>(&'db self, db: &'db dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
+    pub fn args(self, db: &dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
         let ast = function_ast(db, self.interned()).inner(db);
         match ast {
             FunctionLikeAst::ExternDef(spanned, _) => (None, spanned.data.args.clone()),

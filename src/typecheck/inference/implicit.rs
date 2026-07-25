@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #![allow(dead_code)]
 // Implicit context module
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     Db,
@@ -50,24 +50,15 @@ impl AstImplicitContext {
         db: &dyn Db,
         owner: ScopeOwnerId,
         other_templates: &[AstTemplateArg],
-    ) -> ImplResult<Self> {
-        let template_asts = templates_of_owner(db, owner);
-
-        let mut template_names = HashSet::new();
-        for ast in template_asts {
-            if !template_names.insert(ast.name) {
-                return Err(ImplicitCtxCreationError::DuplicateTemplateName(ast.name));
-            }
-        }
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             owner,
-            template_asts: template_asts
+            template_asts: templates_of_owner(db, owner)
                 .iter()
                 .chain(other_templates.iter())
                 .cloned()
                 .collect(),
-        })
+        }
     }
 
     pub fn into_implicit(
@@ -110,12 +101,13 @@ impl ImplicitContext {
     pub fn new(
         db: &dyn Db,
         owner: ScopeOwnerId,
-        other_templates: Arc<[AstTemplateArg]>,
+        other_templates: &[AstTemplateArg],
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
-    ) -> ImplResult<Self> {
-        let ast_impl = AstImplicitContext::new(db, owner, other_templates.as_ref())?;
-        ast_impl.into_implicit(infer_templates, zelf)
+    ) -> Self {
+        AstImplicitContext::new(db, owner, other_templates)
+            .into_implicit(infer_templates, zelf)
+            .expect("Invalid implicit ctx is an ICE")
     }
 
     pub fn from_function(
@@ -123,14 +115,10 @@ impl ImplicitContext {
         func: FunctionId,
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
-    ) -> ImplResult<Self> {
+    ) -> Self {
         let owner = func.parent(db);
         let full_templates = get_templates_of_fun(db, func.interned());
-        let other_templates = full_templates
-            .iter()
-            .skip(templates_of_owner(db, owner).len())
-            .cloned()
-            .collect();
+        let other_templates = &full_templates[templates_of_owner(db, owner).len()..];
         Self::new(db, owner, other_templates, infer_templates, zelf)
     }
 }
@@ -216,17 +204,18 @@ impl AstImplicitContext {
                     Some(InterfaceRef::new(db, def, args))
                 }
                 AstTypeExprDesc::NameResolved { from, to } => {
-                    let new_module = match resolve_in_module(db, from.data, module)? {
-                        Definition::Module(module_id) => module_id,
-                        _ => return None,
+                    let Definition::Module(new_module) =
+                        resolve_in_module(db, from.data, module)?
+                    else {
+                        return None;
                     };
                     resolve(this, db, &to.data, new_module)
                 }
                 AstTypeExprDesc::Tuple(_)
                 | AstTypeExprDesc::Slice { .. }
                 | AstTypeExprDesc::Pointer { .. }
-                | AstTypeExprDesc::Ref { .. } => None,
-                AstTypeExprDesc::Error(_) => None,
+                | AstTypeExprDesc::Ref { .. }
+                | AstTypeExprDesc::Error(_) => None,
             }
         }
         resolve(self, db, ty, self.owning_module(db))

@@ -85,7 +85,7 @@ fn function_type_at(db: &dyn Db, func: FunctionId, loc: Location) -> Option<Type
             [].as_slice(),
         ),
     };
-    let ctx = AstImplicitContext::new(db, func.parent(db), templates).ok()?;
+    let ctx = AstImplicitContext::new(db, func.parent(db), templates);
 
     let resolved = thir_body(db, func).and_then(|t| t.resolved_type_seed_at(db, loc));
 
@@ -271,8 +271,7 @@ fn struct_type_at(
     loc: Location,
 ) -> Option<TypeNode> {
     let ctx =
-        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args)
-            .ok()?;
+        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args);
     ast.fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, None, loc))
 }
 
@@ -283,8 +282,7 @@ fn enum_type_at(
     loc: Location,
 ) -> Option<TypeNode> {
     let ctx =
-        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args)
-            .ok()?;
+        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args);
     ast.variants.iter().find_map(|variant| {
         variant.span.encloses(loc).then_some(())?;
         match &variant.kind {
@@ -309,8 +307,7 @@ fn extern_type_at(
         db,
         ScopeOwnerId::Module(module_id),
         &sig.data.template_args,
-    )
-    .ok()?;
+    );
     sig.data
         .args
         .iter()
@@ -329,7 +326,7 @@ fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode>
                 _ => None,
             }
         })?;
-    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Impl(impl_id), &[]).ok()?;
+    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Impl(impl_id), &[]);
 
     if let Some(iface) = &block.interface
         && let Some(node) = type_expr_at(db, &ctx, iface, None, loc)
@@ -347,7 +344,7 @@ fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode>
 
 fn interface_type_at(db: &dyn Db, iref: InterfaceRef, loc: Location) -> Option<TypeNode> {
     let ast = interface_item(db, iref.def(db).interned());
-    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Interface(iref), &[]).ok()?;
+    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Interface(iref), &[]);
 
     if let Some(node) =
         ast.supers.iter().find_map(|sup| type_expr_at(db, &ctx, sup, None, loc))

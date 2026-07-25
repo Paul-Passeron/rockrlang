@@ -199,8 +199,11 @@ impl InferenceCtx<'_> {
         &mut self,
         type_expr: &AstTypeExprDesc,
         ctx: &ImplicitContext,
-    ) -> Option<InferTy> {
-        Some(self.allocate_type_ref(ctx.resolve(self.db, type_expr)?, ctx))
+    ) -> InferTy {
+        self.allocate_type_ref(
+            ctx.resolve(self.db, type_expr).unwrap_or(TypeRef::Error),
+            ctx,
+        )
     }
 
     pub fn is_struct(
@@ -230,20 +233,19 @@ impl InferenceCtx<'_> {
                     let ctx = ImplicitContext::new(
                         self.db,
                         ScopeOwnerId::Module(module),
-                        ast.template_args.iter().cloned().collect::<Arc<_>>(),
+                        &ast.template_args,
                         templates,
                         None,
-                    )
-                    .inspect_err(|err| println!("{err:#?}"))
-                    .ok()?;
-                    ast.fields
+                    );
+                    let fields = ast
+                        .fields
                         .iter()
                         .map(|field| {
-                            self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                                .map(|ty| (field.name, ty))
+                            let ty = self.allocate_ast_type_expr(&field.ty.data, &ctx);
+                            (field.name, ty)
                         })
-                        .collect::<Option<_>>()
-                        .map(|fields| (struct_id, fields))
+                        .collect();
+                    Some((struct_id, fields))
                 }
                 TypeDefId::Builtin(id) => {
                     if matches!(id.kind(self.db), BuiltinTypeKind::Ref { .. }) {

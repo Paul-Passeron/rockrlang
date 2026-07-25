@@ -20,7 +20,7 @@ use std::{collections::HashSet, sync::OnceLock};
 use crate::{
     Db,
     mir::{
-        MIR, MIRBlockID,
+        Mir, MIRBlockID,
         analysis::{
             MIRAnalysis,
             init_tracking::{MIRInitAnalysis, MIRInitOut},
@@ -51,7 +51,7 @@ impl MIRCache {
     }
 }
 
-impl MIR {
+impl Mir {
     pub fn liveness(&self, db: &dyn Db) -> &MIRLivenessResult {
         self.cache.liveness.get_or_init(|| MIRLivenessAnalysis.run(db, self))
     }

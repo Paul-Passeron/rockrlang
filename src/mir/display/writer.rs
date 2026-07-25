@@ -19,7 +19,7 @@ use super::{FmtWriter, fmt_block, fmt_local_id};
 use crate::{
     Db,
     mir::{
-        MIR, MIRLocal,
+        Mir, MIRLocal,
         display::{MIRWrite, mwrite},
     },
 };
@@ -30,13 +30,13 @@ pub struct MIRDisplay<'a, T> {
     pub db: &'a dyn Db,
 }
 
-impl MIR {
+impl Mir {
     pub fn display<'a>(&'a self, db: &'a dyn Db) -> MIRDisplay<'a, Self> {
         MIRDisplay { value: self, db }
     }
 }
 
-impl fmt::Display for MIRDisplay<'_, MIR> {
+impl fmt::Display for MIRDisplay<'_, Mir> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut w = FmtWriter(f);
         let db = self.db;

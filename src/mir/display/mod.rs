@@ -68,7 +68,7 @@ macro_rules! mwrite {
 
 pub(crate) use mwrite;
 
-pub(crate) fn fmt_binop(op: &BinaryOperator) -> &'static str {
+pub(crate) fn fmt_binop(op: BinaryOperator) -> &'static str {
     match op {
         BinaryOperator::Plus => "+",
         BinaryOperator::Minus => "-",
@@ -178,7 +178,7 @@ pub fn fmt_rvalue<W: MIRWrite>(
         }
         MIRRValueKind::BinOp(op, lhs, rhs) => {
             fmt_operand(w, db, lhs)?;
-            mwrite!(w, " {} ", fmt_binop(op))?;
+            mwrite!(w, " {} ", fmt_binop(*op))?;
             fmt_operand(w, db, rhs)
         }
         MIRRValueKind::UnaryOp(op, operand) => {

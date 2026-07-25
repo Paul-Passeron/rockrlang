@@ -143,22 +143,22 @@ impl<'db> InferenceCtx<'db> {
         let owner_ctx = ImplicitContext::new(
             db,
             func.parent(db),
-            Arc::new([]),
+            &[],
             infer_templates.iter().take(l).cloned().collect(),
             None,
-        )
-        .expect("ImplicitCtx failing is a bug in the compiler");
+        );
 
         let zelf_ty = func.parent(db).get_canonical_zelf(db).map(|ty| {
             Self::static_allocate_type_ref(db, &ty, &owner_ctx)
                 .unwrap_or_else(|| table.new_key(None).into())
         });
 
-        let ctx =
-            ImplicitContext::from_function(db, func, infer_templates.clone(), zelf_ty.clone())
-                .expect(
-                    "Could not create implicit context for inference context. This should not fail",
-                );
+        let ctx = ImplicitContext::from_function(
+            db,
+            func,
+            infer_templates.clone(),
+            zelf_ty.clone(),
+        );
 
         let mut this = Self {
             db,
@@ -221,7 +221,7 @@ impl<'db> InferenceCtx<'db> {
                     this.db,
                     cons,
                     this.implicit_ctx().owner_module(this.db),
-                    templates.as_ref(),
+                    templates,
                     false,
                 ) else {
                     Diag::generic_error("Unknown interface in scope".into(), cons.span)
@@ -237,7 +237,7 @@ impl<'db> InferenceCtx<'db> {
                         this.allocate_type_ref(*t_ref, this.implicit_ctx().as_ref())
                     })
                     .collect::<Box<[_]>>();
-                this.add_implementation(interface_id, infer_ty.clone(), &interface_args);
+                this.add_implementation(interface_id, infer_ty, &interface_args);
             }
         });
 

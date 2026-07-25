@@ -32,7 +32,7 @@ use crate::{
         inst::{CastKind, Terminator},
     },
     mir::{
-        MIR, MIRBlockID, MIRLocalID,
+        MIRBlockID, MIRLocalID, Mir,
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
@@ -47,7 +47,7 @@ use crate::{
 
 pub struct MIRMap<'a> {
     mir_to_lir: HashMap<FuncInst, LIRFunctionId>,
-    mirs: HashMap<FuncInst, &'a MIR>,
+    mirs: HashMap<FuncInst, &'a Mir>,
     lir_to_mir: HashMap<LIRFunctionId, FuncInst>,
 }
 
@@ -65,7 +65,7 @@ enum LocalSlot<'ir> {
 }
 
 struct LIRLower<'ir, 'db> {
-    mir: &'db MIR,
+    mir: &'db Mir,
     block_map: HashMap<MIRBlockID, BrandedBlockId<'ir>>,
     value_map: HashMap<MIRLocalID, LocalSlot<'ir>>,
 }
@@ -98,7 +98,7 @@ impl<'a> MIRMap<'a> {
         }
     }
 
-    pub fn add(&mut self, mir: &'a MIR, id: LIRFunctionId) {
+    pub fn add(&mut self, mir: &'a Mir, id: LIRFunctionId) {
         let inst = mir.func;
         self.mir_to_lir.insert(inst, id);
         self.lir_to_mir.insert(id, inst);
@@ -116,7 +116,7 @@ impl<'a> MIRMap<'a> {
 }
 
 impl<'a> Index<LIRFunctionId> for MIRMap<'a> {
-    type Output = &'a MIR;
+    type Output = &'a Mir;
 
     fn index(&self, index: LIRFunctionId) -> &Self::Output {
         &self[self.lir_to_mir[&index]]
@@ -124,7 +124,7 @@ impl<'a> Index<LIRFunctionId> for MIRMap<'a> {
 }
 
 impl<'a> Index<FuncInst> for MIRMap<'a> {
-    type Output = &'a MIR;
+    type Output = &'a Mir;
 
     fn index(&self, index: FuncInst) -> &Self::Output {
         &self.mirs[&index]
@@ -164,7 +164,7 @@ impl MTLBCtx<'_> {
         data: &MIRBasicBlock,
         lower: &mut LIRLower<'ir, '_>,
     ) {
-        let b = b.new_block(data.name.as_ref().map(|name| Symbol::new(self.db, name)));
+        let b = b.new_block(data.name.as_ref().map(|name| Symbol::new(self.db, name.as_str())));
         lower.block_map.insert(id, b);
     }
 
@@ -207,7 +207,8 @@ impl MTLBCtx<'_> {
                 }
             }
 
-            let mir_entry_target = bb.target(lower.block_map[&mir.entry], vec![]);
+            let mir_entry_target =
+                BlockBuilder::target(lower.block_map[&mir.entry], vec![]);
             bb.goto(mir_entry_target)
         });
         mir.blocks.keys().for_each(|blk| {
@@ -262,7 +263,7 @@ impl MTLBCtx<'_> {
                     .iter()
                     .filter_map(|op| self.lower_operand(&mut b, op, lower))
                     .collect_vec();
-                let next = b.target(next_block, vec![]);
+                let next = BlockBuilder::target(next_block, vec![]);
                 let f = match callee {
                     MIRCallee::Direct(fref) => {
                         let caller_subs = lower.mir.func.subs(self.db);
@@ -291,22 +292,24 @@ impl MTLBCtx<'_> {
                 b.ret(value)
             }
             MIRTerminator::Goto { next } => {
-                let target = b.target(lower.block_map[next], vec![]);
+                let target = BlockBuilder::target(lower.block_map[next], vec![]);
                 b.goto(target)
             }
             MIRTerminator::Branch { cond, then, else_, .. } => {
                 let cond = self.lower_operand(&mut b, cond, lower).unwrap();
-                let if_true = b.target(lower.block_map[then], vec![]);
-                let if_false = b.target(lower.block_map[else_], vec![]);
+                let if_true = BlockBuilder::target(lower.block_map[then], vec![]);
+                let if_false = BlockBuilder::target(lower.block_map[else_], vec![]);
                 b.br(cond, if_true, if_false)
             }
             MIRTerminator::Switch { discriminant, branches, default, .. } => {
                 let on = self.lower_operand(&mut b, discriminant, lower).unwrap();
                 let branches = branches
                     .iter()
-                    .map(|(n, blk)| (*n, b.target(lower.block_map[blk], vec![])))
+                    .map(|(n, blk)| {
+                        (*n, BlockBuilder::target(lower.block_map[blk], vec![]))
+                    })
                     .collect_vec();
-                let default = b.target(lower.block_map[default], vec![]);
+                let default = BlockBuilder::target(lower.block_map[default], vec![]);
                 b.switch(on, branches, default)
             }
         }
@@ -503,7 +506,7 @@ impl MTLBCtx<'_> {
         match &rvalue.kind {
             MIRRValueKind::Constructor { enum_ref, idx, args, .. } => {
                 let variant = *idx as u32;
-                let tref = enum_ref.clone().as_type_ref(self.db);
+                let tref = enum_ref.clone().into_type_ref(self.db);
                 let layout = layout_of(self.db, tref);
                 let ty = LIRTy { layout, origin: Some(tref) };
                 let payload_ptr = b.union_payload_ptr(ptr, ty, variant);
@@ -719,7 +722,7 @@ impl MTLBCtx<'_> {
                         .filter_map(|f| self.lower_operand(b, &fields[&f.name], lower))
                         .collect_vec()
                 };
-                let tref = struct_ref.clone().as_type_ref(self.db);
+                let tref = struct_ref.clone().into_type_ref(self.db);
                 let layout = layout_of(self.db, tref);
                 let ty = LIRTy { layout, origin: Some(tref) };
                 Some(b.make_aggregate(ty, in_src_order).erase())

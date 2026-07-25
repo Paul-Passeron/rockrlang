@@ -23,7 +23,7 @@ use crate::{
 use dashmap::DashSet;
 use itertools::Itertools;
 use salsa::Setter;
-use std::{fmt, path::PathBuf, sync::Arc};
+use std::{fmt, path::PathBuf};
 
 #[salsa::input(singleton)]
 pub struct Workspace {
@@ -164,7 +164,7 @@ pub fn is_file_direct_submodule_of_file(
     false
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn submodules_of_file(db: &dyn Db, file: SourceFile) -> Vec<FileModule<'_>> {
     if file.path(db).file_name().unwrap() != ANCHOR_FILE_NAME {
         return vec![];
@@ -176,17 +176,17 @@ pub fn submodules_of_file(db: &dyn Db, file: SourceFile) -> Vec<FileModule<'_>> 
         .iter()
         .map(|sf| *sf)
         .filter(|sf| is_file_direct_submodule_of_file(db, file, *sf))
-        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf).clone()))
+        .map(|sf| FileModule::new(db, sf, submodules_of_file(db, sf).to_vec()))
         .collect()
 }
 
 #[salsa::tracked]
 pub fn package_of_root(db: &dyn Db, root: PackageRoot) -> Package<'_> {
     let file = *root.file(db);
-    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file).clone()))
+    Package::new(db, FileModule::new(db, file, submodules_of_file(db, file).to_vec()))
 }
 
-#[salsa::tracked]
-pub fn workspace_packages(db: &dyn Db, ws: Workspace) -> Arc<Vec<Package<'_>>> {
-    Arc::new(ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect())
+#[salsa::tracked(returns(deref))]
+pub fn workspace_packages(db: &dyn Db, ws: Workspace) -> Vec<Package<'_>> {
+    ws.roots(db).iter().map(|root| *package_of_root(db, *root)).collect()
 }

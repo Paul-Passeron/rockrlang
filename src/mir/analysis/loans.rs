@@ -27,7 +27,7 @@ use crate::{
     common::arena::{Arena, Idx},
     hir::Mutability,
     mir::{
-        MIR, MIRBlockID, MIRLocalID,
+        MIRBlockID, MIRLocalID, Mir,
         analysis::{
             MIRAnalysis,
             lattice::{BlockMap, LocalMap},
@@ -63,19 +63,19 @@ pub struct Loan {
 impl MIRAnalysis<'_, '_> for MIRLoanAnalysis {
     type Out = MIRLoanOut;
 
-    fn run(&self, db: &dyn Db, mir: &MIR) -> Self::Out {
-        let loans = self.collect_loans(mir);
+    fn run(&self, db: &dyn Db, mir: &Mir) -> Self::Out {
+        let loans = Self::collect_loans(mir);
         let by_holder = loans.by_holder();
         let liveness = mir.liveness(db);
-        let loans_live_in = self.project_liveness(&liveness.live_in, &by_holder);
-        let loans_live_out = self.project_liveness(&liveness.live_out, &by_holder);
+        let loans_live_in = Self::project_liveness(&liveness.live_in, &by_holder);
+        let loans_live_out = Self::project_liveness(&liveness.live_out, &by_holder);
         let indices = loans.iter().map(|(id, loan)| (loan.created_at, id)).collect();
         MIRLoanOut { loans, indices, loans_live_in, loans_live_out }
     }
 }
 
 impl MIRLoanAnalysis {
-    fn collect_loans(&self, mir: &MIR) -> Arena<Loan> {
+    fn collect_loans(mir: &Mir) -> Arena<Loan> {
         let loans = Arena::new();
         for (blk, infos) in &mir.blocks {
             for (idx, stmt) in infos.stmts.iter().enumerate() {
@@ -102,7 +102,6 @@ impl MIRLoanAnalysis {
     // TODO: this over-approximates when a local is reassigned with a different
     // loan
     fn project_liveness(
-        &self,
         liveness: &BlockMap<HashSet<MIRLocalID>>,
         by_holder: &HashMap<MIRLocalID, Vec<LoanID>>,
     ) -> BlockMap<HashSet<LoanID>> {

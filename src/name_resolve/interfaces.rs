@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -113,26 +111,21 @@ pub fn core_int_iter_struct(db: &dyn Db) -> StructId {
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn module_interfaces<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
-) -> Arc<Vec<AstInterface>> {
-    Arc::new(
-        module_items(db, module)
-            .iter()
-            .flatten()
-            .filter_map(|item| match &item.data {
-                AstTopLevelItemDesc::Interface(ast_interface) => {
-                    Some(ast_interface.clone())
-                }
-                _ => None,
-            })
-            .collect(),
-    )
+) -> Vec<AstInterface> {
+    module_items(db, module)
+        .iter()
+        .flatten()
+        .filter_map(|item| match &item.data {
+            AstTopLevelItemDesc::Interface(ast_interface) => Some(ast_interface.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
-#[salsa::tracked]
 pub fn interface_item<'db>(
     db: &'db dyn Db,
     interface: InternedInterfaceId<'db>,
@@ -140,6 +133,6 @@ pub fn interface_item<'db>(
     module_interfaces(db, interface.parent(db).interned())
         .iter()
         .find(|inter| inter.name.data == *interface.name(db))
-        .unwrap()
+        .expect("No interface id without source backing it")
         .clone()
 }

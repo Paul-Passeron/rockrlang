@@ -20,7 +20,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::mir::{MIR, MIRBlockID, MIRLocalID, analysis::loans::MIRStmtIndex};
+use crate::mir::{MIRBlockID, MIRLocalID, Mir, analysis::loans::MIRStmtIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LatticeChange {
@@ -56,6 +56,7 @@ impl Lattice for LatticeChange {
 pub trait Lattice: Eq + Clone {
     fn bottom() -> Self;
 
+    #[must_use]
     fn join(&self, other: &Self) -> Self;
 
     fn join_assign(&mut self, other: &Self) -> LatticeChange {
@@ -212,7 +213,7 @@ where
 pub type FixedPointBlockRes<L> = FixedPointIterRes<MIRBlockID, L>;
 pub type FixedPointStmtRes<L> = FixedPointIterRes<MIRStmtIndex, L>;
 
-impl MIR {
+impl Mir {
     pub fn get_block_bottoms<L: Lattice>(&self) -> impl Iterator<Item = (MIRBlockID, L)> {
         self.blocks.keys().map(|blk| (blk, L::bottom()))
     }
@@ -221,8 +222,8 @@ impl MIR {
         &self,
         direction: Direction,
         transfer: impl Fn(MIRBlockID, &L) -> L,
-        in_seed: Option<BlockMap<L>>,
-        out_seed: Option<BlockMap<L>>,
+        in_seed: Option<&BlockMap<L>>,
+        out_seed: Option<&BlockMap<L>>,
     ) -> FixedPointBlockRes<L> {
         let mut block_in = BlockMap::from_iter(self.get_block_bottoms::<L>());
 
@@ -326,8 +327,8 @@ impl MIR {
         &self,
         direction: Direction,
         transfer: impl Fn(MIRStmtIndex, &L) -> L,
-        in_seed: Option<HashMap<MIRStmtIndex, L>>,
-        out_seed: Option<HashMap<MIRStmtIndex, L>>,
+        in_seed: Option<&HashMap<MIRStmtIndex, L>>,
+        out_seed: Option<&HashMap<MIRStmtIndex, L>>,
     ) -> FixedPointStmtRes<L> {
         let mut stmt_in: HashMap<_, _> = HashMap::from_iter(self.get_stmt_bottoms::<L>());
         let mut stmt_out: HashMap<_, _> =

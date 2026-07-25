@@ -394,7 +394,8 @@ impl<'db> InferenceCtx<'db> {
             } else {
                 let pointee = self.fresh_var();
                 let ptr = self.emit_deref_constraint(pointee.into());
-                self.unify(&zelf_ty, &ptr.into()).unwrap();
+                self.unify(&zelf_ty, &ptr.into())
+                    .expect("Fresh var should never fail unifying");
                 zelf_ty = pointee.into();
             }
         }
@@ -405,16 +406,15 @@ impl<'db> InferenceCtx<'db> {
         &mut self,
         expr_id: ExprId,
         receiver: &InferTy,
-        method_call_infos: MethodCallInfos<'_>,
+        method_call_infos: &MethodCallInfos<'_>,
     ) -> ConstraintSolveResult {
-        let MethodCallInfos { method_id, args, ret_var, is_static, templates, depth } =
-            method_call_infos;
         let FunctionLikeAst::Method(ast) =
-            function_ast(self.db, method_id.interned()).inner(self.db)
+            function_ast(self.db, method_call_infos.method_id.interned()).inner(self.db)
         else {
             unreachable!()
         };
-        let method_templates = templates
+        let method_templates = method_call_infos
+            .templates
             .iter()
             .map(Into::into)
             .chain(ast.data.template_args.iter().map(|ast_template| {
@@ -425,42 +425,47 @@ impl<'db> InferenceCtx<'db> {
             }))
             .collect_vec();
 
-        let zelf_ty = self.peel_receiver(receiver, depth);
+        let zelf_ty = self.peel_receiver(receiver, method_call_infos.depth);
 
         let method_ctx = ImplicitContext::from_function(
             self.db,
-            method_id,
+            method_call_infos.method_id,
             method_templates.iter().cloned().collect(),
             Some(zelf_ty.clone()),
-        )
-        .unwrap();
+        );
 
-        if let Err(err) = args.iter().zip(&ast.data.args).try_for_each(|(arg, ast_ty)| {
-            let arg_ty =
-                self.allocate_ast_type_expr(&ast_ty.ty.data, &method_ctx).unwrap();
-            self.unify(arg, &arg_ty)
-        }) {
+        if let Err(err) = method_call_infos.args.iter().zip(&ast.data.args).try_for_each(
+            |(arg, ast_ty)| {
+                let arg_ty = self.allocate_ast_type_expr(&ast_ty.ty.data, &method_ctx);
+                self.unify(arg, &arg_ty)
+            },
+        ) {
             return ConstraintSolveResult::Error(err);
         }
 
         let ret_ty = self.allocate_type_ref(
-            method_ctx.resolve(self.db, &ast.data.return_type.data).unwrap(),
+            method_ctx
+                .resolve(self.db, &ast.data.return_type.data)
+                .unwrap_or(TypeRef::Error),
             &method_ctx,
         );
 
-        if let Err(err) = self.unify(&ret_var.into(), &ret_ty) {
+        if let Err(err) = self.unify(&method_call_infos.ret_var.into(), &ret_ty) {
             return ConstraintSolveResult::Error(err);
         }
 
         let call_infos = InferCallInfos {
             expr_id,
-            callee: method_id,
+            callee: method_call_infos.method_id,
             substitution: method_templates,
-            call_kind: if is_static {
+            call_kind: if method_call_infos.is_static {
                 CallKind::Static
             } else {
                 CallKind::Method {
-                    adjustment: self.get_adjustments_for(method_id, depth),
+                    adjustment: self.get_adjustments_for(
+                        method_call_infos.method_id,
+                        method_call_infos.depth,
+                    ),
                 }
             },
             zelf_ty: Some(zelf_ty),
@@ -492,36 +497,18 @@ impl<'db> InferenceCtx<'db> {
             let mut ty = tid;
             let mut depth = 0;
             loop {
-                if let Some(MethodImpl { method_id, subs, .. }) = method_impl_for(
-                    self.db,
-                    ty,
+                if let Some(value) = self.try_known_concrete_impls(
+                    *ret_var,
+                    receiver,
+                    *id,
                     *method,
-                    args.len(),
-                    *is_static,
+                    args,
                     *interface_hint,
+                    *is_static,
+                    ty,
+                    depth,
                 ) {
-                    let templates = subs
-                        .iter()
-                        .map(|tid| {
-                            let infer_ty = concrete_to_infer(self.db, *tid);
-                            let var = self.fresh_var();
-                            self.unify(&infer_ty, &var.into()).unwrap();
-                            var
-                        })
-                        .collect_vec();
-
-                    return self.finish_method_call(
-                        *id,
-                        receiver,
-                        MethodCallInfos {
-                            method_id: *method_id,
-                            args,
-                            ret_var: *ret_var,
-                            is_static: *is_static,
-                            templates: &templates,
-                            depth,
-                        },
-                    );
+                    return value;
                 }
                 match concrete_deref_target(self.db, ty) {
                     Some(inner) => {
@@ -563,9 +550,13 @@ impl<'db> InferenceCtx<'db> {
             }
             return ConstraintSolveResult::Pending;
         }
-        let (src, PotentialBlockRes { templates, constraints }) =
-            possible_blocks.into_iter().next().unwrap();
-        constraints.into_iter().for_each(|constraint| self.emit_constraint(constraint));
+        let (src, PotentialBlockRes { templates, constraints }) = possible_blocks
+            .into_iter()
+            .next()
+            .expect("Earlier conditions ensure that we have exactly one possible block");
+        for constraint in constraints {
+            self.emit_constraint(constraint);
+        }
 
         let method_id =
             FunctionId::new(self.db, *method, ScopeOwnerId::Impl(*src.id(self.db)));
@@ -576,7 +567,9 @@ impl<'db> InferenceCtx<'db> {
                 AstImplItem::Fundef(def) if def.data.name.data == *method => Some(def),
                 _ => None,
             })
-            .unwrap();
+            .expect(
+                "If name lookup is correct, we should find the corresponding AST node",
+            );
 
         if ast.data.receiver.is_static() != *is_static {
             return ConstraintSolveResult::Error(
@@ -594,7 +587,7 @@ impl<'db> InferenceCtx<'db> {
         self.finish_method_call(
             *id,
             receiver,
-            MethodCallInfos {
+            &MethodCallInfos {
                 method_id,
                 args,
                 ret_var: *ret_var,
@@ -603,6 +596,49 @@ impl<'db> InferenceCtx<'db> {
                 depth,
             },
         )
+    }
+
+    fn try_known_concrete_impls(
+        &mut self,
+        ret_var: InferVar,
+        receiver: &InferTy,
+        id: ExprId,
+        method: Symbol,
+        args: &[InferTy],
+        interface_hint: Option<InterfaceId>,
+        is_static: bool,
+        ty: TypeId,
+        depth: usize,
+    ) -> Option<ConstraintSolveResult> {
+        if let Some(MethodImpl { method_id, subs, .. }) =
+            method_impl_for(self.db, ty, method, args.len(), is_static, interface_hint)
+        {
+            let templates = subs
+                .iter()
+                .map(|tid| {
+                    let var = self.fresh_var();
+                    if let Some(infer_ty) = concrete_to_infer(self.db, *tid) {
+                        self.unify(&infer_ty, &var.into())
+                            .expect("A fresh var should never fail to unify");
+                    }
+                    var
+                })
+                .collect_vec();
+
+            return Some(self.finish_method_call(
+                id,
+                receiver,
+                &MethodCallInfos {
+                    method_id: *method_id,
+                    args,
+                    ret_var,
+                    is_static,
+                    templates: &templates,
+                    depth,
+                },
+            ));
+        }
+        None
     }
 
     fn solve_implements_constraint(
@@ -631,7 +667,7 @@ impl<'db> InferenceCtx<'db> {
             }
 
             // TODO: remove implementation when erroring out, maybe
-            self.add_implementation(interface_id, ty.clone(), args);
+            self.add_implementation(interface_id, ty, args);
 
             let impls = self.get_potential_blocks(ty);
 
@@ -655,7 +691,10 @@ impl<'db> InferenceCtx<'db> {
             let competing_impls = self.get_working_impls(competing_impls);
 
             let impl_ = if competing_impls.len() == 1 {
-                let (_, impl_) = competing_impls.into_iter().next().unwrap();
+                let (_, impl_) = competing_impls
+                    .into_iter()
+                    .next()
+                    .expect("We know that competing impls has a single element");
                 impl_
             } else if competing_impls.is_empty() {
                 return ConstraintSolveResult::Error(
@@ -850,7 +889,7 @@ impl<'db> InferenceCtx<'db> {
                         InferTy::Adt { def, fields } => {
                             if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
                                 assert_eq!(fields.len(), 1);
-                                get_ref_inner(ctx, fields.into_iter().next().unwrap())
+                                get_ref_inner(ctx, fields.into_iter().next()?)
                             } else {
                                 Some(InferTy::Adt { def, fields })
                             }
@@ -940,15 +979,15 @@ fn concrete_deref_target(db: &dyn Db, ty: TypeId) -> Option<TypeId> {
     inner.as_type_id()
 }
 
-fn concrete_to_infer(db: &dyn Db, ty: TypeId) -> InferTy {
-    InferTy::Adt {
+fn concrete_to_infer(db: &dyn Db, ty: TypeId) -> Option<InferTy> {
+    Some(InferTy::Adt {
         def: ty.def(db),
         fields: ty
             .args(db)
             .iter()
-            .map(|ty| concrete_to_infer(db, ty.as_type_id().unwrap()))
-            .collect(),
-    }
+            .map(|ty| concrete_to_infer(db, ty.as_type_id()?))
+            .collect::<Option<_>>()?,
+    })
 }
 
 struct MethodCallInfos<'a> {
@@ -959,9 +998,3 @@ struct MethodCallInfos<'a> {
     pub templates: &'a [InferVar],
     pub depth: usize,
 }
-
-// impl TypeRef {
-//     fn ptr_like(self, db: &dyn Db) -> Option<(Mutability, TypeRef)> {
-//         self.as_ptr(db).or_else(|| self.as_ref(db))
-//     }
-// }

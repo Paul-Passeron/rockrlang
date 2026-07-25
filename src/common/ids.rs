@@ -46,7 +46,7 @@ pub struct IdWrapper<T: From<usize>> {
 
 impl<T: From<usize>> IdWrapper<T> {
     pub fn new() -> Self {
-        Self { inner: IdGen::new(), _brand: Default::default() }
+        Self { inner: IdGen::new(), _brand: PhantomData }
     }
 
     pub fn fresh(&self) -> T {

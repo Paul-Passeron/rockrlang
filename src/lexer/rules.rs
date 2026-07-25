@@ -55,7 +55,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                     location,
                     kind: TokenKind::CStrLit(StrLit::new(
                         db,
-                        String::from(&lexeme[2..len - 1]),
+                        &lexeme[2..len - 1],
                     )),
                 })
             },
@@ -164,7 +164,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                     location,
                     kind: TokenKind::StrLit(StrLit::new(
                         db,
-                        String::from(&lexeme[1..len - 1]),
+                        &lexeme[1..len - 1],
                     )),
                 })
             },

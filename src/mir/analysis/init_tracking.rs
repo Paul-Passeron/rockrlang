@@ -24,7 +24,7 @@ use crate::{
     Db,
     common::symbols::Symbol,
     mir::{
-        BlockID, LocalID, MIR,
+        BlockID, LocalID, Mir,
         analysis::{
             MIRAnalysis,
             lattice::{BlockMap, FixedPointBlockRes, Lattice},
@@ -170,7 +170,7 @@ fn collect_leaves(
     }
 }
 
-fn compute_move_key_set(db: &dyn Db, mir: &MIR) -> HashSet<MoveKey> {
+fn compute_move_key_set(db: &dyn Db, mir: &Mir) -> HashSet<MoveKey> {
     let mut set = HashSet::new();
     for local in mir.locals.keys() {
         let ty = mir.locals[local].ty;
@@ -219,7 +219,7 @@ pub fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
 }
 
 impl MIRInitAnalysis {
-    fn get_seed(&self, db: &dyn Db, mir: &MIR) -> BlockMap<MoveMap> {
+    fn get_seed(db: &dyn Db, mir: &Mir) -> BlockMap<MoveMap> {
         let move_keys = compute_move_key_set(db, mir);
         let mut entry = MoveMap::from_iter(
             move_keys.into_iter().map(|key| (key, InitState::bottom())),
@@ -230,7 +230,7 @@ impl MIRInitAnalysis {
         BlockMap::from([(mir.entry, entry)])
     }
 
-    fn granular_transfer(&self, mir: &MIR, blk: BlockID, map: &MoveMap) -> MoveMap {
+    fn granular_transfer(mir: &Mir, blk: BlockID, map: &MoveMap) -> MoveMap {
         let mut res = map.clone();
         let data = &mir.blocks[blk];
         for Stmt::Assign { dest, rvalue } in &data.stmts {
@@ -260,7 +260,7 @@ impl MIRInitAnalysis {
             | MIRTerminator::Goto { .. }
             | MIRTerminator::Diverge => (),
             MIRTerminator::Call { arguments, dest, .. } => {
-                arguments.iter().for_each(|op| {
+                for op in arguments {
                     op.for_all_operands(|value| {
                         if let MIROperand::Move(p) = value {
                             {
@@ -269,7 +269,7 @@ impl MIRInitAnalysis {
                             };
                         }
                     });
-                });
+                }
                 {
                     let place: &MIRPlace = &MIRPlace {
                         local: *dest,
@@ -301,11 +301,11 @@ impl MIRInitAnalysis {
 impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
     type Out = MIRInitOut;
 
-    fn run(&self, db: &'_ dyn Db, mir: &'_ MIR) -> Self::Out {
+    fn run(&self, db: &'_ dyn Db, mir: &'_ Mir) -> Self::Out {
         mir.fixed_point_iter(
             Direction::Forward,
-            |blk, old_in| self.granular_transfer(mir, blk, old_in),
-            Some(self.get_seed(db, mir)),
+            |blk, old_in| Self::granular_transfer(mir, blk, old_in),
+            Some(&Self::get_seed(db, mir)),
             None,
         )
         .into()

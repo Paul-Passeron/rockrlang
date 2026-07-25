@@ -64,18 +64,17 @@ impl Span {
         true
     }
 
-    #[inline(always)]
     pub fn len(&self) -> usize {
         self.end_offset - self.start_offset
     }
 
-    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 }
 
 impl Location {
+    #[must_use]
     pub fn advance(self, offset: usize) -> Self {
         // TODO: maybe verify the validity
         let mut this = self;
@@ -95,7 +94,7 @@ impl Location {
     }
 
     pub fn loc_info(self, db: &dyn Db) -> &LocationInfo {
-        _loc_info(db, self)
+        loc_info_aux(db, self)
     }
 
     pub fn new(file: SourceFile, offset: usize) -> Self {
@@ -111,7 +110,7 @@ fn line_starts(db: &dyn Db, file: SourceFile) -> Vec<usize> {
     starts
 }
 
-fn _loc_info(db: &dyn Db, loc: Location) -> &LocationInfo {
+fn loc_info_aux(db: &dyn Db, loc: Location) -> &LocationInfo {
     #[salsa::interned]
     struct Interned {
         inner: Location,
@@ -167,7 +166,8 @@ impl Ord for LocationInfo {
 impl Display for LocationInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let cwd = std::env::current_dir().unwrap_or_default();
-        let path = pathdiff::diff_paths(&self.file, cwd).unwrap_or(self.file.clone());
+        let path =
+            pathdiff::diff_paths(&self.file, cwd).unwrap_or_else(|| self.file.clone());
         write!(f, "{}:{}:{}", path.display(), self.line, self.column)
     }
 }

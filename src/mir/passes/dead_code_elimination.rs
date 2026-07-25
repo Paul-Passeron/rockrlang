@@ -22,7 +22,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     mir::{
-        MIR, MIRBlockID, MIRLocalID,
+        MIRBlockID, MIRLocalID, Mir,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
@@ -37,7 +37,7 @@ use crate::{
 pub struct DeadCodeElimination;
 
 impl MIRPass for DeadCodeElimination {
-    fn run(&self, db: &dyn Db, mir: &MIR) -> MIR {
+    fn run(&self, db: &dyn Db, mir: &Mir) -> Mir {
         DCECtx::new(db, mir).run()
     }
 }
@@ -46,7 +46,7 @@ type OldBlockID = MIRBlockID;
 type OldLocalID = MIRLocalID;
 
 pub struct DCECtx<'a> {
-    mir: &'a MIR,
+    mir: &'a Mir,
     b: MIRBuilder<'a>,
 
     local_map: HashMap<OldLocalID, MIRLocalID>,
@@ -62,7 +62,7 @@ struct PathCompressionRes {
 }
 
 impl<'a> DCECtx<'a> {
-    pub fn new(db: &'a dyn Db, mir: &'a MIR) -> Self {
+    pub fn new(db: &'a dyn Db, mir: &'a Mir) -> Self {
         let entry_name = mir.blocks[mir.entry].name.clone();
         let b = MIRBuilder::new(db, entry_name);
         Self {
@@ -153,7 +153,6 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compress_paths(
-        &self,
         paths: &mut Vec<Vec<OldBlockID>>,
         i: usize,
         j: usize,
@@ -173,15 +172,12 @@ impl<'a> DCECtx<'a> {
         while let Some(PathCompressionRes { i, j, reversed }) =
             self.find_next_path_compression(&paths)
         {
-            self.compress_paths(&mut paths, i, j, reversed);
+            Self::compress_paths(&mut paths, i, j, reversed);
         }
         paths
     }
 
-    fn compute_path_heads(
-        &self,
-        paths: &[Vec<OldBlockID>],
-    ) -> HashMap<OldBlockID, usize> {
+    fn compute_path_heads(paths: &[Vec<OldBlockID>]) -> HashMap<OldBlockID, usize> {
         paths.iter().enumerate().map(|(i, p)| (*p.first().unwrap(), i)).collect()
     }
 
@@ -199,11 +195,11 @@ impl<'a> DCECtx<'a> {
     }
 
     fn compute_predecessors(&mut self) {
-        self.successors.iter().for_each(|(pred, succs)| {
-            succs.iter().for_each(|succ| {
+        for (pred, succs) in &self.successors {
+            for succ in succs {
                 self.predecessors.entry(*succ).or_default().insert(*pred);
-            });
-        });
+            }
+        }
         self.reachable.iter().for_each(|blk| {
             self.predecessors.entry(*blk).or_default();
         });
@@ -317,7 +313,6 @@ impl<'a> DCECtx<'a> {
     }
 
     fn get_bb(
-        &self,
         old: OldBlockID,
         bbs: &[MIRBlockID],
         path_heads: &HashMap<OldBlockID, usize>,
@@ -341,7 +336,7 @@ impl<'a> DCECtx<'a> {
                         .map(|operand| self.copy_operand(operand))
                         .collect(),
                     dest: self.add_and_get_local_to_mapping(*dest),
-                    next: self.get_bb(*next, bbs, path_heads),
+                    next: Self::get_bb(*next, bbs, path_heads),
                     span: *span,
                 }
             }
@@ -350,12 +345,12 @@ impl<'a> DCECtx<'a> {
                 span: *span,
             },
             MIRTerminator::Goto { next } => {
-                MIRTerminator::Goto { next: self.get_bb(*next, bbs, path_heads) }
+                MIRTerminator::Goto { next: Self::get_bb(*next, bbs, path_heads) }
             }
             MIRTerminator::Branch { cond, then, else_, span } => MIRTerminator::Branch {
                 cond: self.copy_operand(cond),
-                then: self.get_bb(*then, bbs, path_heads),
-                else_: self.get_bb(*else_, bbs, path_heads),
+                then: Self::get_bb(*then, bbs, path_heads),
+                else_: Self::get_bb(*else_, bbs, path_heads),
                 span: *span,
             },
             MIRTerminator::Switch { discriminant, branches, default, span } => {
@@ -363,17 +358,18 @@ impl<'a> DCECtx<'a> {
                     discriminant: self.copy_operand(discriminant),
                     branches: branches
                         .iter()
-                        .map(|br| (*br.0, self.get_bb(*br.1, bbs, path_heads)))
+                        .map(|br| (*br.0, Self::get_bb(*br.1, bbs, path_heads)))
                         .collect(),
-                    default: self.get_bb(*default, bbs, path_heads),
+                    default: Self::get_bb(*default, bbs, path_heads),
                     span: *span,
                 }
             }
         }
     }
 
-    fn compute_path_bodies(&mut self, paths: Vec<Vec<OldBlockID>>) {
-        let path_heads = self.compute_path_heads(&paths);
+    fn compute_path_bodies(&mut self) {
+        let paths = self.compute_paths();
+        let path_heads = Self::compute_path_heads(&paths);
         let bbs = paths
             .iter()
             .map(|p| {
@@ -390,14 +386,10 @@ impl<'a> DCECtx<'a> {
 
         for (p, bb) in paths.iter().zip_eq(&bbs) {
             self.b.switch_to_block(*bb).unwrap();
-            let stmts = p
-                .iter()
-                .flat_map(|blk| self.mir.blocks[*blk].stmts.clone())
-                .collect_vec();
-            stmts.iter().for_each(|stmt| {
+            for stmt in p.iter().flat_map(|blk| &self.mir.blocks[*blk].stmts) {
                 let new_stmt = self.copy_stmt(stmt);
                 self.b.emit(new_stmt);
-            });
+            }
             let terminator = &self.mir.blocks[*p.last().unwrap()].terminator;
             let new_terminator = self.copy_terminator(terminator, &bbs, &path_heads);
             self.b.terminate(new_terminator).unwrap();
@@ -418,25 +410,24 @@ impl<'a> DCECtx<'a> {
         Some(format!("merged-{}", names.iter().join("-")))
     }
 
-    pub fn run(mut self) -> MIR {
+    pub fn run(mut self) -> Mir {
         self.add_parameters();
 
         self.compute_reachable();
         self.compute_successors();
         self.compute_predecessors();
+        self.compute_path_bodies();
 
-        let paths = self.compute_paths();
-        self.compute_path_bodies(paths);
         self.b.finalize(self.mir.func).unwrap()
     }
 }
 
 #[salsa::tracked]
-fn _dce<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> MIR {
+fn _dce<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Mir {
     let mir = _mir(db, key);
     DeadCodeElimination.run(db, mir)
 }
 
-pub fn dce(db: &dyn Db, f: FuncInst) -> &MIR {
+pub fn dce(db: &dyn Db, f: FuncInst) -> &Mir {
     _dce(db, f.interned())
 }

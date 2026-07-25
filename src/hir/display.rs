@@ -387,7 +387,6 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                     write!(f, ", ")?;
                     write_expr(f, arg, db)?;
                 }
-                write!(f, ")")
             } else {
                 write_expr(f, receiver, db)?;
                 write!(f, ".{}(", method.display(db))?;
@@ -397,8 +396,8 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
                     }
                     write_expr(f, arg, db)?;
                 }
-                write!(f, ")")
             }
+            write!(f, ")")
         }
 
         HirExprDesc::CallStatic { ty, method, args, type_args } => {

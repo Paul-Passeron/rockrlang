@@ -122,7 +122,7 @@ impl<'a> Lsp<'a> {
 
     pub fn templates_at_loc(&self, loc: Location) -> Vec<AstTemplateArg> {
         if let Some(func) = enclosing_fun(&self.db, loc) {
-            return get_templates_of_fun(&self.db, func.into()).clone();
+            return get_templates_of_fun(&self.db, func.into()).to_vec();
         }
         match enclosing_scope_owner(&self.db, loc) {
             Some(ScopeOwnerId::Module(module)) => {
@@ -198,9 +198,9 @@ impl<'a> Lsp<'a> {
                 Some(self.goto_span(ast.get_span()))
             }
             ExprKind::StructLit { struct_def, .. } => self
-                .goto_def_ty_at(struct_def.clone().as_type_ref(&self.db), e.span.start()),
+                .goto_def_ty_at(struct_def.clone().into_type_ref(&self.db), e.span.start()),
             ExprKind::Constructor { enum_def, .. } => self
-                .goto_def_ty_at(enum_def.clone().as_type_ref(&self.db), e.span.start()),
+                .goto_def_ty_at(enum_def.clone().into_type_ref(&self.db), e.span.start()),
             _ => None,
         }
     }

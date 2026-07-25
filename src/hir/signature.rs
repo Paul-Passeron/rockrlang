@@ -39,7 +39,7 @@ pub struct ZelfArg {
     kind: ZelfKind,
 }
 impl ZelfArg {
-    pub fn get_zelf_type_for(&self, db: &dyn Db, ty: InferTy) -> InferTy {
+    pub fn get_zelf_type_for(self, db: &dyn Db, ty: InferTy) -> InferTy {
         match self.kind {
             ZelfKind::Zelf => ty,
             ZelfKind::RefZelf => InferTy::Adt {
@@ -53,7 +53,7 @@ impl ZelfArg {
         }
     }
 
-    pub fn as_type_ref_for(&self, db: &dyn Db, ty: TypeRef) -> TypeRef {
+    pub fn as_type_ref_for(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         match self.kind {
             ZelfKind::Zelf => ty,
             ZelfKind::RefZelf => ref_of(db, ty, self.mutability.is_mut()).into(),
@@ -126,8 +126,7 @@ pub fn get_sig_of_function(
     let function_templates: Arc<[AstTemplateArg]> =
         get_templates_of_fun_only(db, function_id).iter().cloned().collect();
     let ctx =
-        AstImplicitContext::new(db, *function_id.parent(db), function_templates.as_ref())
-            .unwrap();
+        AstImplicitContext::new(db, *function_id.parent(db), function_templates.as_ref());
     let added_templates: Vec<Vec<InterfaceRef>> = function_templates
         .iter()
         .map(|t| {

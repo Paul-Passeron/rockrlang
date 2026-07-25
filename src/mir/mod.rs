@@ -72,7 +72,7 @@ pub struct SyntacticSource {
     pub id: hir::LocalId,
 }
 
-pub struct MIR {
+pub struct Mir {
     pub func: FuncInst,
     pub blocks: Arena<BasicBlock>,
     pub locals: Arena<Local>,
@@ -99,18 +99,21 @@ impl MIRLocal {
         Self { ty, mutability, span, name: None, thir_src: None, syn_src: None }
     }
 
+    #[must_use]
     pub fn with_thir_src(self, src: thir::LocalId) -> Self {
         let mut this = self;
         this.thir_src = Some(src);
         this
     }
 
+    #[must_use]
     pub fn with_name(self, name: Symbol) -> Self {
         let mut this = self;
         this.name = Some(name);
         this
     }
 
+    #[must_use]
     pub fn with_syn_src(self, src: SyntacticSource) -> Self {
         let mut this = self;
         this.syn_src = Some(src);
@@ -118,8 +121,8 @@ impl MIRLocal {
     }
 }
 
-impl MIR {
-    fn _compute_reachable(&self, s: &mut HashSet<BlockID>, blk: BlockID) {
+impl Mir {
+    fn compute_reachable_aux(&self, s: &mut HashSet<BlockID>, blk: BlockID) {
         if !s.insert(blk) {
             return;
         }
@@ -127,25 +130,25 @@ impl MIR {
         match &self.blocks[blk].terminator {
             MIRTerminator::Return { .. } | MIRTerminator::Diverge => (),
             MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
-                self._compute_reachable(s, *next);
+                self.compute_reachable_aux(s, *next);
             }
             MIRTerminator::Branch { then, else_, .. } => {
-                self._compute_reachable(s, *then);
-                self._compute_reachable(s, *else_);
+                self.compute_reachable_aux(s, *then);
+                self.compute_reachable_aux(s, *else_);
             }
             MIRTerminator::Switch { branches, default, .. } => {
                 branches
                     .iter()
                     .map(|b| b.1)
                     .chain(once(default))
-                    .for_each(|next| self._compute_reachable(s, *next));
+                    .for_each(|next| self.compute_reachable_aux(s, *next));
             }
         }
     }
 
     pub fn compute_reachable(&self, from: BlockID) -> HashSet<BlockID> {
         let mut res = HashSet::new();
-        self._compute_reachable(&mut res, from);
+        self.compute_reachable_aux(&mut res, from);
         res
     }
 
@@ -175,9 +178,9 @@ impl MIR {
     fn compute_predecessors(&self) -> HashMap<BlockID, HashSet<BlockID>> {
         let mut res: HashMap<BlockID, HashSet<BlockID>> = HashMap::new();
         self.successors().iter().for_each(|(pred, succs)| {
-            succs.iter().for_each(|succ| {
+            for succ in succs {
                 res.entry(*succ).or_default().insert(*pred);
-            });
+            }
         });
         self.blocks.iter().for_each(|(blk, _)| {
             res.entry(blk).or_default();
@@ -186,7 +189,7 @@ impl MIR {
     }
 }
 
-impl PartialEq for MIR {
+impl PartialEq for Mir {
     fn eq(&self, other: &Self) -> bool {
         self.blocks == other.blocks
             && self.locals == other.locals
@@ -195,4 +198,4 @@ impl PartialEq for MIR {
     }
 }
 
-impl Eq for MIR {}
+impl Eq for Mir {}

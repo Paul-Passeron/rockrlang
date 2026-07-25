@@ -128,4 +128,5 @@ where
     }
 }
 
+// SAFETY: Set is just a Vec under the hood
 unsafe impl<T> SalsaValue for Set<T> where T: Eq + Ord + SalsaValue {}

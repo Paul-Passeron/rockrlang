@@ -334,9 +334,8 @@ impl<'a> Matrix<'a> {
                 }) => {
                     bindings.push((ctx.local_map[local], place.clone()));
                 }
-                Some(ThirPattern { kind: ThirPatternKind::Any, .. }) => (),
+                Some(ThirPattern { kind: ThirPatternKind::Any, .. }) | None => (),
                 Some(_) => unreachable!(),
-                None => (), // synthetic wildcard
             }
         }
         bindings

@@ -23,7 +23,7 @@ use crate::{
     Db,
     compiler::diagnostic::Diag,
     mir::{
-        MIR,
+        Mir,
         analysis::init_tracking::{
             InitState, IterOperand, MoveKey, MoveMap, init_key, uninit_key,
         },
@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-pub fn check_use_after_move(db: &dyn Db, mir: &MIR) {
+pub fn check_use_after_move(db: &dyn Db, mir: &Mir) {
     let init = mir.init_tracking(db);
     for (blk, infos) in &mir.blocks {
         let mut state = init.init_in[&blk].clone();
@@ -64,7 +64,7 @@ impl MIRTerminator {
                 value.iter().for_each(|op| op.check(db, state));
             }
             Self::Branch { cond: op, .. } | Self::Switch { discriminant: op, .. } => {
-                op.check(db, state)
+                op.check(db, state);
             }
         }
     }

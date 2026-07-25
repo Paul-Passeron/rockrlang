@@ -39,8 +39,7 @@ pub enum AstAnnotationArg {
 impl AstAnnotationItem {
     pub fn name(&self) -> Symbol {
         match self {
-            Self::Flag(name) => *name,
-            Self::Call { name, .. } => *name,
+            Self::Flag(name) | Self::Call { name, .. } => *name,
         }
     }
 

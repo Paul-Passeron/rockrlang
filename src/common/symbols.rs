@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Deref};
 
 use crate::Db;
 
@@ -34,19 +34,19 @@ impl<'db> From<InternedSymbol<'db>> for Symbol {
 }
 
 impl Symbol {
-    pub fn new(db: &dyn Db, s: impl ToString) -> Self {
+    pub fn new(db: &dyn Db, s: impl Deref<Target = str>) -> Self {
         Self::from(InternedSymbol::new(db, s.to_string()))
     }
 
-    pub fn interned<'db>(&self) -> InternedSymbol<'db> {
+    pub fn interned<'db>(self) -> InternedSymbol<'db> {
         InternedSymbol(self.0, PhantomData)
     }
 
-    pub fn display(&self, db: &dyn Db) -> String {
+    pub fn display(self, db: &dyn Db) -> String {
         self.interned().contents(db).clone()
     }
 
-    pub fn to_string(&self, db: &dyn Db) -> String {
+    pub fn to_string(self, db: &dyn Db) -> String {
         self.display(db)
     }
 }
@@ -67,15 +67,15 @@ impl<'db> From<InternedStrLit<'db>> for StrLit {
 }
 
 impl StrLit {
-    pub fn new(db: &dyn Db, s: impl ToString) -> Self {
-        Self::from(InternedStrLit::new(db, s.to_string()))
+    pub fn new(db: &dyn Db, s: impl Deref<Target = str>) -> Self {
+        Self::from(InternedStrLit::new(db, s.deref().to_owned()))
     }
 
-    pub fn interned(&self) -> InternedStrLit<'_> {
+    pub fn interned<'db>(self) -> InternedStrLit<'db> {
         InternedStrLit(self.0, PhantomData)
     }
 
-    pub fn display(&self, db: &dyn Db) -> String {
+    pub fn display(self, db: &dyn Db) -> String {
         self.interned().contents(db).clone()
     }
 }

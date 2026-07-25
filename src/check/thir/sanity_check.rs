@@ -668,8 +668,7 @@ impl EnumRef {
                     db,
                     ScopeOwnerId::Module(self.def.parent(db)),
                     &item.template_args,
-                )
-                .unwrap();
+                );
                 Some(ConstructorType::Struct(
                     fields
                         .iter()
@@ -682,8 +681,7 @@ impl EnumRef {
                     db,
                     ScopeOwnerId::Module(self.def.parent(db)),
                     &item.template_args,
-                )
-                .unwrap();
+                );
                 Some(ConstructorType::Tuple(
                     spanneds.iter().map(|ast| ctx.resolve_err(db, &ast.data)).collect(),
                 ))
@@ -722,8 +720,7 @@ impl StructRef {
                 db,
                 ScopeOwnerId::Module(self.def.parent(db)),
                 &item.template_args,
-            )
-            .unwrap();
+            );
             let type_ref =
                 ctx.resolve_err(db, &field.ty.data).with_substitution(db, &self.args);
             res.insert(field.name, type_ref);

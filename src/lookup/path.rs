@@ -72,8 +72,8 @@ fn module_path_node_at(
             // nested scope owner
             AstTopLevelItemDesc::Module(_)
             | AstTopLevelItemDesc::Interface(_)
-            | AstTopLevelItemDesc::Impl(_) => None,
-            AstTopLevelItemDesc::Error(_) => None,
+            | AstTopLevelItemDesc::Impl(_)
+            | AstTopLevelItemDesc::Error(_) => None,
             AstTopLevelItemDesc::Fundef(fundef) => fundef_path_node_at(db, fundef, loc),
             AstTopLevelItemDesc::StructDef(struct_def) => {
                 struct_path_node_at(db, struct_def, loc)
@@ -190,10 +190,9 @@ fn stmt_path_node_at(
                 branches.iter().find_map(|br| branch_path_node_at(db, br, module, loc))
             })
         }
-        AstStmtDesc::Break => None,
         AstStmtDesc::Expr(expr) => expr_path_node_at(db, expr, module, loc),
         AstStmtDesc::Defer(stmt) => stmt_path_node_at(db, stmt, loc),
-        AstStmtDesc::Error(_) => None,
+        AstStmtDesc::Break | AstStmtDesc::Error(_) => None,
     }
 }
 

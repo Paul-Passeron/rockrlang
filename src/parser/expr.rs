@@ -44,8 +44,7 @@ fn infix_binding_power(kind: &TokenKind) -> Option<(u8, u8, Assoc)> {
         TokenKind::BitOr => (5, Assoc::Left),
         TokenKind::BitXor => (6, Assoc::Left),
         TokenKind::BitAnd => (7, Assoc::Left),
-        TokenKind::Diff => (8, Assoc::Left),
-        TokenKind::EqEq => (8, Assoc::Left),
+        TokenKind::Diff | TokenKind::EqEq => (8, Assoc::Left),
         TokenKind::Lt | TokenKind::Leq | TokenKind::Gt | TokenKind::Geq => {
             (9, Assoc::Left)
         }

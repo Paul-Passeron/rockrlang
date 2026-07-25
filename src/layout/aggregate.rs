@@ -36,7 +36,7 @@ impl FieldOrderingKind {
     }
 }
 
-pub(super) fn finish_aggregate(db: &dyn Db, source_ordered: Vec<LayoutID>) -> LayoutID {
+pub(super) fn finish_aggregate(db: &dyn Db, source_ordered: &[LayoutID]) -> LayoutID {
     if source_ordered.is_empty() {
         return LayoutID::zst(db);
     }
@@ -65,14 +65,14 @@ pub(super) fn struct_layout(
 
     let layouts = source_ordered_fields.iter().map(|ty| layout_of(db, *ty)).collect_vec();
 
-    finish_aggregate(db, layouts)
+    finish_aggregate(db, &layouts)
 }
 
 /// Seems like this is an NP-hard problem, so the algorithm will probably have
 /// to be "good enough" if we want good perfomance
 pub(super) fn aggregate_layout(
     db: &dyn Db,
-    source_ordered: Vec<LayoutID>,
+    source_ordered: &[LayoutID],
 ) -> AggregateLayout {
     let fields = source_ordered
         .iter()

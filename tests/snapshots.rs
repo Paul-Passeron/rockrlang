@@ -42,8 +42,12 @@ fn run_snapshot_with_args(name: &str, folder: &str, args: &[&str]) {
     let snapshot_path = Path::new("tests/snapshots/").join(format!("{name}.{folder}"));
 
     if std::env::var_os("ROCKR_UPDATE_SNAPSHOTS").is_some() {
-        std::fs::create_dir_all(snapshot_path.parent().unwrap()).unwrap();
-        std::fs::write(&snapshot_path, &actual).unwrap();
+        std::fs::create_dir_all(
+            snapshot_path.parent().expect("Snapshot dir has a parent"),
+        )
+        .expect("Should be able to create the snaphsot dir");
+        std::fs::write(&snapshot_path, &actual)
+            .expect("Writing to snapshot files should not fail");
         return;
     }
 

@@ -41,7 +41,7 @@ pub struct FileModule<'db> {
 }
 
 impl<'db> FileModule<'db> {
-    pub fn name(&self, db: &'db dyn Db) -> Symbol {
+    pub fn name(self, db: &'db dyn Db) -> Symbol {
         let path = self.file(db).path(db);
         let stem = path
             .parent()
@@ -186,8 +186,8 @@ pub enum TypeDefId {
 }
 
 impl TypeDefId {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().type_def_id_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().type_def_id_to_string(db, self)
     }
 
     pub fn is_int_like(self, db: &dyn Db) -> Option<BuiltinTypeId> {
@@ -237,20 +237,20 @@ pub struct ImplId(salsa::Id);
 pub struct InterfaceId(salsa::Id);
 
 impl InterfaceId {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().interface_id_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().interface_id_to_string(db, self)
     }
 }
 
 impl InterfaceRef {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().interface_ref_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().interface_ref_to_string(db, self)
     }
 }
 
 impl ImplId {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().impl_id_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().impl_id_to_string(db, self)
     }
 }
 
@@ -281,8 +281,8 @@ pub fn merge_type_ref(db: &dyn Db, a: TypeRef, b: TypeRef) -> TypeRef {
         }
         (TypeRef::Param(a), _) | (_, TypeRef::Param(a)) => TypeRef::Param(a),
         (TypeRef::Zelf, _) | (_, TypeRef::Zelf) => TypeRef::Zelf,
-        (TypeRef::Error, other) | (other, TypeRef::Error) => other,
-        (TypeRef::Unknown, other) | (other, TypeRef::Unknown) => other,
+        (TypeRef::Error | TypeRef::Unknown, other) |
+(other, TypeRef::Error | TypeRef::Unknown) => other,
         (TypeRef::Associated(s), _) | (_, TypeRef::Associated(s)) => {
             TypeRef::Associated(s)
         }

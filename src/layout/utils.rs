@@ -45,6 +45,7 @@ impl Offset {
         self.0 - other.0
     }
 
+    #[must_use]
     pub fn align_to(self, align: Align) -> Self {
         Self(align_up(self.bytes(), align.bytes()))
     }
@@ -57,6 +58,7 @@ impl Size {
         self.0
     }
 
+    #[must_use]
     pub fn align_to(self, align: Align) -> Self {
         Self(align_up(self.bytes(), align.bytes()))
     }

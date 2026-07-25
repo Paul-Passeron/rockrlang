@@ -192,9 +192,10 @@ impl fmt::Display for Display<'_, &AstTypeExprDesc> {
                         "<{}>",
                         args.iter()
                             .map(|arg| {
-                                arg.as_known().map_or(String::from("_"), |ty| {
-                                    ty.data.display(self.db).to_string()
-                                })
+                                arg.as_known().map_or_else(
+                                    || String::from("_"),
+                                    |ty| ty.data.display(self.db).to_string(),
+                                )
                             })
                             .collect_vec()
                             .join(", ")
@@ -360,7 +361,8 @@ pub struct AstStructDefField {
 impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
     fn from(value: NonEmpty<Spanned<Symbol>>) -> Self {
         let mut symbols = value.into_iter().collect::<Vec<_>>();
-        let Spanned { data: symbol, span } = symbols.pop().unwrap();
+        let Spanned { data: symbol, span } =
+            symbols.pop().expect("We know the vec isn't empty");
         let start_loc = span.start();
         symbols.reverse();
 

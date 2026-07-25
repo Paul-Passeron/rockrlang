@@ -26,8 +26,8 @@ use super::{
 use crate::{Db, hir::Mutability, printer::type_printer::TypePrinter};
 
 impl TypeRef {
-    pub fn to_string(&self, db: &dyn Db) -> String {
-        TypePrinter::new().type_ref_to_string(db, *self)
+    pub fn to_string(self, db: &dyn Db) -> String {
+        TypePrinter::new().type_ref_to_string(db, self)
     }
 
     pub fn as_type_id(self) -> Option<TypeId> {
@@ -55,7 +55,7 @@ impl TypeRef {
         let ptr_kind = type_id.def(db).is_ptr_like(db)?;
         match ptr_kind {
             PtrKind::Ref(mutability) => Some((mutability, type_id.args(db)[0])),
-            _ => None,
+            PtrKind::RawPtr(_) => None,
         }
     }
 
@@ -64,7 +64,7 @@ impl TypeRef {
         let ptr_kind = type_id.def(db).is_ptr_like(db)?;
         match ptr_kind {
             PtrKind::RawPtr(mutability) => Some((mutability, type_id.args(db)[0])),
-            _ => None,
+            PtrKind::Ref(_) => None,
         }
     }
 
@@ -101,6 +101,7 @@ impl TypeRef {
         }
     }
 
+    #[must_use]
     pub fn with_substitution(self, db: &dyn Db, sub: &[Self]) -> Self {
         match self {
             Self::Concrete(type_id) => Self::Concrete(TypeId::new(
@@ -113,6 +114,7 @@ impl TypeRef {
         }
     }
 
+    #[must_use]
     pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
             Self::Error | Self::Unknown => self,
@@ -120,6 +122,7 @@ impl TypeRef {
         }
     }
 
+    #[must_use]
     pub fn instantiate(self, db: &dyn Db, subs: &[Self], zelf: Option<Self>) -> Self {
         match self {
             Self::Concrete(id) => Self::Concrete(TypeId::new(

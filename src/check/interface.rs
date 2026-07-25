@@ -34,7 +34,7 @@ pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
 
 fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
     let mut names: HashMap<Symbol, Span> = HashMap::new();
-    for item in interface_items(db, interface.interned()).iter() {
+    for item in interface_items(db, interface.interned()) {
         let name = item.name();
         if let Entry::Vacant(e) = names.entry(name) {
             e.insert(item.name_span());

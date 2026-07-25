@@ -18,17 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use super::{FmtWriter, MIRWrite, StringWriter, fmt_stmt, fmt_terminator, mwrite};
 use crate::{
     Db,
-    mir::{MIR, basic_block::MIRTerminator},
+    mir::{Mir, basic_block::MIRTerminator},
 };
-use std::fmt;
+use std::fmt::{self, Write};
 
 pub struct MIRDotDisplay<'a> {
-    pub mir: &'a MIR,
+    pub mir: &'a Mir,
     pub db: &'a dyn Db,
     pub name: &'a str,
 }
 
-impl MIR {
+impl Mir {
     pub fn dot<'a>(&'a self, db: &'a dyn Db, name: &'a str) -> MIRDotDisplay<'a> {
         MIRDotDisplay { mir: self, db, name }
     }
@@ -74,10 +74,9 @@ fn build_block_label(
     block: &crate::mir::basic_block::MIRBasicBlock,
 ) -> String {
     let mut label = String::from("\"");
-
-    label.push_str(&format!("{{bb{idx}"));
+    let _ = write!(label, "{{bb{idx}");
     if let Some(name) = &block.name {
-        label.push_str(&format!(" ({name})"));
+        let _ = write!(label, " ({name})");
     }
     label.push('|');
 
@@ -105,9 +104,7 @@ fn fmt_dot_edges<W: MIRWrite>(
 ) -> fmt::Result {
     match terminator {
         MIRTerminator::Diverge | MIRTerminator::Return { .. } => Ok(()),
-        MIRTerminator::Goto { next, .. } => {
-            mwrite!(w, "  bb{from} -> bb{}\n", next.into_raw())
-        }
+
         MIRTerminator::Branch { then, else_, .. } => {
             mwrite!(w, "  bb{from} -> bb{} [label=\"true\"]\n", then.into_raw())?;
             mwrite!(w, "  bb{from} -> bb{} [label=\"false\"]\n", else_.into_raw())
@@ -118,7 +115,7 @@ fn fmt_dot_edges<W: MIRWrite>(
             }
             mwrite!(w, "  bb{from} -> bb{} [label=\"_\"]\n", default.into_raw())
         }
-        MIRTerminator::Call { next, .. } => {
+        MIRTerminator::Goto { next, .. } | MIRTerminator::Call { next, .. } => {
             mwrite!(w, "  bb{from} -> bb{}\n", next.into_raw())
         }
     }

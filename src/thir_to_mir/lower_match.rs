@@ -22,7 +22,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    layout::{IntWidth, LIRTy, layout_of},
+    layout::{Discriminant, IntWidth, LIRTy, layout_of},
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
@@ -69,7 +69,12 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         Matrix { cols: vec![self.scrut.clone()], rows }
     }
 
-    fn _lower_dt(&mut self, dt: &DecisionTree, bbs: &[MIRBlockID], diverge: MIRBlockID) {
+    fn lower_dt_aux(
+        &mut self,
+        dt: &DecisionTree,
+        bbs: &[MIRBlockID],
+        diverge: MIRBlockID,
+    ) {
         match dt {
             DecisionTree::Leaf { branch_idx, bindings } => {
                 for (local, place) in bindings {
@@ -96,9 +101,10 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let layout = layout_of(self.db, ty);
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
                     let vlayout = lir_ty.union_layout(self.db).unwrap();
-                    let discr_width = match vlayout.discriminant {
-                        crate::layout::Discriminant::Tagged { kind, .. } => kind,
-                        _ => todo!(),
+                    let Discriminant::Tagged { kind: discr_width, .. } =
+                        vlayout.discriminant
+                    else {
+                        todo!()
                     };
 
                     let discr_ty: TypeRef =
@@ -124,7 +130,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                             };
                             let next_dec_tree_bb = self.ctx.builder.new_block(None);
                             self.ctx.switch_to(next_dec_tree_bb);
-                            self._lower_dt(next_dec_tree, bbs, diverge);
+                            self.lower_dt_aux(next_dec_tree, bbs, diverge);
                             (*variant_idx as u128, next_dec_tree_bb)
                         })
                         .collect();
@@ -132,7 +138,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let default = if let Some(default) = default {
                         let default_bb = self.ctx.builder.new_block(None);
                         self.ctx.switch_to(default_bb);
-                        self._lower_dt(default, bbs, diverge);
+                        self.lower_dt_aux(default, bbs, diverge);
                         default_bb
                     } else {
                         diverge
@@ -159,7 +165,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                             let Constructor::IntLit(value) = ctor else { unreachable!() };
                             let next_dec_tree_bb = self.ctx.builder.new_block(None);
                             self.ctx.switch_to(next_dec_tree_bb);
-                            self._lower_dt(next_dec_tree, bbs, diverge);
+                            self.lower_dt_aux(next_dec_tree, bbs, diverge);
                             (*value as u128, next_dec_tree_bb)
                         })
                         .collect();
@@ -167,7 +173,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     let default = if let Some(default) = default {
                         let default_bb = self.ctx.builder.new_block(None);
                         self.ctx.switch_to(default_bb);
-                        self._lower_dt(default, bbs, diverge);
+                        self.lower_dt_aux(default, bbs, diverge);
                         default_bb
                     } else {
                         diverge
@@ -198,9 +204,12 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
             .map(|idx| self.ctx.builder.new_block(Some(format!("match-branch-{idx}"))))
             .collect_vec();
         let diverge = self.ctx.builder.new_block(Some("match-diverge".into()));
-        self._lower_dt(dt, &branch_bodies, diverge);
+        self.lower_dt_aux(dt, &branch_bodies, diverge);
         for (bb, branch) in branch_bodies.into_iter().zip(branches) {
-            self.ctx.builder.switch_to_block(bb).unwrap();
+            self.ctx
+                .builder
+                .switch_to_block(bb)
+                .expect("This block should not be terminated");
             self.ctx.build_stmts(&branch.body);
             if !self.ctx.current_block_is_terminated() {
                 self.ctx.goto(self.merge_bb);
@@ -219,13 +228,13 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
 }
 
 impl EnumRef {
-    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
+    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
         TypeId::new(db, TypeDefId::Enum(self.def), self.args).into()
     }
 }
 
 impl StructRef {
-    pub fn as_type_ref(self, db: &dyn Db) -> TypeRef {
+    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
         TypeId::new(db, TypeDefId::Struct(self.def), self.args).into()
     }
 }

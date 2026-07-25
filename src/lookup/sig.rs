@@ -114,10 +114,9 @@ impl FunctionLikeAst {
 impl FunctionId {
     pub fn body_span(self, db: &dyn Db) -> Option<Span> {
         match function_ast(db, self.into()).inner(db) {
-            FunctionLikeAst::ExternDef(_, _) => None,
             FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
             FunctionLikeAst::Method(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::TraitMethod(_) => None,
+            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_) => None,
         }
     }
 }
@@ -134,7 +133,7 @@ pub fn sig_node_at(db: &dyn Db, loc: Location) -> Option<SigNode> {
             .then_some(())?;
 
         let ast = function_ast(db, func.into()).inner(db);
-        general_sig_at(db, func, ast.general_sig(), loc)
+        general_sig_at(db, func, &ast.general_sig(), loc)
     }
     _aux(db, loc.file, loc.offset)
 }
@@ -142,7 +141,7 @@ pub fn sig_node_at(db: &dyn Db, loc: Location) -> Option<SigNode> {
 fn general_sig_at(
     db: &dyn Db,
     func: FunctionId,
-    sig: GeneralSignature<'_>,
+    sig: &GeneralSignature<'_>,
     loc: Location,
 ) -> Option<SigNode> {
     if let Some(node) = fun_name_at(sig.name, loc) {
@@ -150,8 +149,7 @@ fn general_sig_at(
     }
 
     let owner = func.parent(db);
-    let ctx = AstImplicitContext::new(db, owner, sig.templates)
-        .unwrap();
+    let ctx = AstImplicitContext::new(db, owner, sig.templates);
 
     if let Some(node) = ret_ty_at(db, sig.ret_ty, &ctx, loc) {
         return Some(node);
@@ -160,8 +158,10 @@ fn general_sig_at(
     let owner_template_offset = templates_of_owner(db, owner).len();
     for (i, templ) in sig.templates.iter().enumerate() {
         // Bail early in case of error (The `?`)
-        if let Some(node) = templ_at(db, owner_template_offset + i, templ, &ctx, loc)? {
-            return Some(node);
+        match templ_at(db, owner_template_offset + i, templ, &ctx, loc) {
+            TemplAtRes::Found(sig_node) => return Some(sig_node),
+            TemplAtRes::Error => return None,
+            TemplAtRes::NotFound => (),
         }
     }
 
@@ -212,6 +212,12 @@ fn arg_at(
         .or_else(|| arg.ty.span.encloses(loc).then_some(SigNode::ParamType(param)))
 }
 
+enum TemplAtRes {
+    Found(SigNode),
+    NotFound,
+    Error,
+}
+
 /// Returns `None` if an error has occured (Should drop current work)
 /// Returns `Some(None)` if we didn't find anything (no error)
 /// Returns `Some(Some(node))`s if it found something
@@ -221,10 +227,10 @@ fn templ_at(
     templ: &AstTemplateArg,
     ctx: &AstImplicitContext,
     loc: Location,
-) -> Option<Option<SigNode>> {
+) -> TemplAtRes {
     let param = TemplateParam { name: templ.name, idx, span: templ.name_span };
     if !templ.span.encloses(loc) {
-        return Some(None);
+        return TemplAtRes::NotFound;
     }
 
     let resolved_constraints = templ
@@ -234,10 +240,10 @@ fn templ_at(
         .collect_vec();
 
     if templ.name_span.encloses(loc) {
-        return Some(Some(SigNode::TemplateParam {
+        return TemplAtRes::Found(SigNode::TemplateParam {
             param,
             constraints: resolved_constraints,
-        }));
+        });
     }
     for constraint in &templ.constraints {
         if !constraint.span.encloses(loc) {
@@ -246,14 +252,14 @@ fn templ_at(
         let Some(iref) = ctx.resolve_interface(db, &constraint.data) else {
             // Bail if we are in an unresolved interface.
             // This is an error !
-            return None;
+            return TemplAtRes::Error;
         };
-        return Some(Some(SigNode::TemplateConstraint {
+        return TemplAtRes::Found(SigNode::TemplateConstraint {
             param,
             constraint: TypeConstraint { iref, span: constraint.span },
-        }));
+        });
     }
-    Some(None)
+    TemplAtRes::NotFound
 }
 
 impl SigNode {
