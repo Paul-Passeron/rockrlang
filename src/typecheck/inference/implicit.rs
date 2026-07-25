@@ -49,7 +49,7 @@ impl AstImplicitContext {
     pub fn new(
         db: &dyn Db,
         owner: ScopeOwnerId,
-        other_templates: Arc<[AstTemplateArg]>,
+        other_templates: &[AstTemplateArg],
     ) -> ImplResult<Self> {
         let template_asts = templates_of_owner(db, owner);
 
@@ -114,7 +114,7 @@ impl ImplicitContext {
         infer_templates: Arc<[InferTy]>,
         zelf: Option<InferTy>,
     ) -> ImplResult<Self> {
-        let ast_impl = AstImplicitContext::new(db, owner, other_templates)?;
+        let ast_impl = AstImplicitContext::new(db, owner, other_templates.as_ref())?;
         ast_impl.into_implicit(infer_templates, zelf)
     }
 
@@ -157,7 +157,7 @@ impl AstImplicitContext {
         })
     }
 
-    fn _get_associated_type_ast(
+    fn get_associated_type_ast_aux(
         &self,
         db: &dyn Db,
         associated: Symbol,
@@ -173,7 +173,11 @@ impl AstImplicitContext {
         })
     }
 
-    fn _get_associated_type(&self, db: &dyn Db, associated: Symbol) -> Option<TypeRef> {
+    fn get_associated_type_aux(
+        &self,
+        db: &dyn Db,
+        associated: Symbol,
+    ) -> Option<TypeRef> {
         if let Some(ast_ty) = self.get_associated_type_ast(db, associated) {
             self.resolve(db, &ast_ty.data)
         } else {
@@ -189,7 +193,7 @@ impl AstImplicitContext {
         db: &dyn Db,
         ty: &AstTypeExprDesc,
     ) -> Option<InterfaceRef> {
-        fn _resolve(
+        fn resolve(
             this: &AstImplicitContext,
             db: &dyn Db,
             ty: &AstTypeExprDesc,
@@ -200,23 +204,23 @@ impl AstImplicitContext {
                     if this.template_asts.iter().any(|temp| temp.name == name.data) {
                         return None;
                     }
-                    match resolve_in_module(db, name.data, module)? {
-                        Definition::Interface(def) => {
-                            let args = args
-                                .iter()
-                                .map(|arg| this.resolve_any(db, arg))
-                                .collect::<Option<Vec<_>>>()?;
-                            Some(InterfaceRef::new(db, def, args))
-                        }
-                        _ => None,
-                    }
+                    let Definition::Interface(def) =
+                        resolve_in_module(db, name.data, module)?
+                    else {
+                        return None;
+                    };
+                    let args = args
+                        .iter()
+                        .map(|arg| this.resolve_any(db, arg))
+                        .collect::<Option<Vec<_>>>()?;
+                    Some(InterfaceRef::new(db, def, args))
                 }
                 AstTypeExprDesc::NameResolved { from, to } => {
                     let new_module = match resolve_in_module(db, from.data, module)? {
                         Definition::Module(module_id) => module_id,
                         _ => return None,
                     };
-                    _resolve(this, db, &to.data, new_module)
+                    resolve(this, db, &to.data, new_module)
                 }
                 AstTypeExprDesc::Tuple(_)
                 | AstTypeExprDesc::Slice { .. }
@@ -225,7 +229,7 @@ impl AstImplicitContext {
                 AstTypeExprDesc::Error(_) => None,
             }
         }
-        _resolve(self, db, ty, self.owning_module(db))
+        resolve(self, db, ty, self.owning_module(db))
     }
 }
 
@@ -344,9 +348,10 @@ pub trait AsAstImplCtx {
                         None
                     }
                 } else {
-                    let new_module = match resolve_in_module(db, from.data, module)? {
-                        Definition::Module(module_id) => module_id,
-                        _ => return None,
+                    let Definition::Module(new_module) =
+                        resolve_in_module(db, from.data, module)?
+                    else {
+                        return None;
                     };
                     Self::_resolve(this, db, &to.data, new_module)
                 }
@@ -427,7 +432,7 @@ impl AsAstImplCtx for AstImplicitContext {
         db: &dyn Db,
         associated: Symbol,
     ) -> Option<AstTypeExpr> {
-        self._get_associated_type_ast(db, associated)
+        self.get_associated_type_ast_aux(db, associated)
     }
 }
 

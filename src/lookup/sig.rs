@@ -150,7 +150,7 @@ fn general_sig_at(
     }
 
     let owner = func.parent(db);
-    let ctx = AstImplicitContext::new(db, owner, sig.templates.iter().cloned().collect())
+    let ctx = AstImplicitContext::new(db, owner, sig.templates)
         .unwrap();
 
     if let Some(node) = ret_ty_at(db, sig.ret_ty, &ctx, loc) {

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
 use crate::{
     Db, SourceFile,
     common::location::{Location, Span},
@@ -27,8 +25,8 @@ use crate::{
         expr::{AstExpr, AstExprDesc},
         stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
         top_level::{
-            AstEnumDef, AstEnumVariantKind, AstFundefArg, AstFunsig, AstImplItem,
-            AstInterfaceItem, AstStructDef, AstTemplateArg, AstTopLevelItemDesc,
+            AstEnumDef, AstEnumVariantKind, AstFunsig, AstImplItem, AstInterfaceItem,
+            AstStructDef, AstTopLevelItemDesc,
         },
         type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
@@ -61,34 +59,33 @@ pub fn type_node_at(db: &dyn Db, loc: Location) -> Option<TypeNode> {
 
 fn function_type_at(db: &dyn Db, func: FunctionId, loc: Location) -> Option<TypeNode> {
     let ast = function_ast(db, func.into()).inner(db);
-    let (templates, args, ret_ty, body): (
-        &Vec<AstTemplateArg>,
-        &Vec<AstFundefArg>,
-        &AstTypeExpr,
-        &[AstStmt],
-    ) = match &ast {
+    let (templates, args, ret_ty, body) = match &ast {
         FunctionLikeAst::Fundef(a) => (
-            &a.data.template_args,
-            &a.data.args,
+            a.data.template_args.as_slice(),
+            a.data.args.as_slice(),
             &a.data.return_type,
             a.data.body.as_slice(),
         ),
         FunctionLikeAst::Method(a) => (
-            &a.data.template_args,
-            &a.data.args,
+            a.data.template_args.as_slice(),
+            a.data.args.as_slice(),
             &a.data.return_type,
             a.data.body.as_slice(),
         ),
-        FunctionLikeAst::ExternDef(a, _) => {
-            (&a.data.template_args, &a.data.args, &a.data.return_type, &[])
-        }
-        FunctionLikeAst::TraitMethod(a) => {
-            (&a.data.template_args, &a.data.args, &a.data.return_type, &[])
-        }
+        FunctionLikeAst::ExternDef(a, _) => (
+            a.data.template_args.as_slice(),
+            a.data.args.as_slice(),
+            &a.data.return_type,
+            [].as_slice(),
+        ),
+        FunctionLikeAst::TraitMethod(a) => (
+            a.data.template_args.as_slice(),
+            a.data.args.as_slice(),
+            &a.data.return_type,
+            [].as_slice(),
+        ),
     };
-    let ctx =
-        AstImplicitContext::new(db, func.parent(db), templates.iter().cloned().collect())
-            .ok()?;
+    let ctx = AstImplicitContext::new(db, func.parent(db), templates).ok()?;
 
     let resolved = thir_body(db, func).and_then(|t| t.resolved_type_seed_at(db, loc));
 
@@ -273,12 +270,9 @@ fn struct_type_at(
     ast: &AstStructDef,
     loc: Location,
 ) -> Option<TypeNode> {
-    let ctx = AstImplicitContext::new(
-        db,
-        ScopeOwnerId::Module(module_id),
-        ast.template_args.iter().cloned().collect(),
-    )
-    .ok()?;
+    let ctx =
+        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args)
+            .ok()?;
     ast.fields.iter().find_map(|field| type_expr_at(db, &ctx, &field.ty, None, loc))
 }
 
@@ -288,12 +282,9 @@ fn enum_type_at(
     ast: &AstEnumDef,
     loc: Location,
 ) -> Option<TypeNode> {
-    let ctx = AstImplicitContext::new(
-        db,
-        ScopeOwnerId::Module(module_id),
-        ast.template_args.iter().cloned().collect(),
-    )
-    .ok()?;
+    let ctx =
+        AstImplicitContext::new(db, ScopeOwnerId::Module(module_id), &ast.template_args)
+            .ok()?;
     ast.variants.iter().find_map(|variant| {
         variant.span.encloses(loc).then_some(())?;
         match &variant.kind {
@@ -317,7 +308,7 @@ fn extern_type_at(
     let ctx = AstImplicitContext::new(
         db,
         ScopeOwnerId::Module(module_id),
-        sig.data.template_args.iter().cloned().collect(),
+        &sig.data.template_args,
     )
     .ok()?;
     sig.data
@@ -338,8 +329,7 @@ fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode>
                 _ => None,
             }
         })?;
-    let ctx =
-        AstImplicitContext::new(db, ScopeOwnerId::Impl(impl_id), Arc::from([])).ok()?;
+    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Impl(impl_id), &[]).ok()?;
 
     if let Some(iface) = &block.interface
         && let Some(node) = type_expr_at(db, &ctx, iface, None, loc)
@@ -357,8 +347,7 @@ fn impl_type_at(db: &dyn Db, impl_id: ImplId, loc: Location) -> Option<TypeNode>
 
 fn interface_type_at(db: &dyn Db, iref: InterfaceRef, loc: Location) -> Option<TypeNode> {
     let ast = interface_item(db, iref.def(db).interned());
-    let ctx =
-        AstImplicitContext::new(db, ScopeOwnerId::Interface(iref), Arc::from([])).ok()?;
+    let ctx = AstImplicitContext::new(db, ScopeOwnerId::Interface(iref), &[]).ok()?;
 
     if let Some(node) =
         ast.supers.iter().find_map(|sup| type_expr_at(db, &ctx, sup, None, loc))

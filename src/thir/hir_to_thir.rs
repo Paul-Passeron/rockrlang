@@ -1374,7 +1374,7 @@ impl StructRef {
         let ctx = AstImplicitContext::new(
             db,
             ScopeOwnerId::Module(self.def.parent(db)),
-            templates_of_struct(db, self.def.into()).iter().cloned().collect(),
+            templates_of_struct(db, self.def.into()),
         )
         .unwrap();
         let resolution = ctx.resolve(db, &found.ty.data)?;

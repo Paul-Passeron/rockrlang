@@ -126,7 +126,7 @@ pub fn get_sig_of_function(
     let function_templates: Arc<[AstTemplateArg]> =
         get_templates_of_fun_only(db, function_id).iter().cloned().collect();
     let ctx =
-        AstImplicitContext::new(db, *function_id.parent(db), function_templates.clone())
+        AstImplicitContext::new(db, *function_id.parent(db), function_templates.as_ref())
             .unwrap();
     let added_templates: Vec<Vec<InterfaceRef>> = function_templates
         .iter()

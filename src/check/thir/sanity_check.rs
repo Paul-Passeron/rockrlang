@@ -667,7 +667,7 @@ impl EnumRef {
                 let ctx = AstImplicitContext::new(
                     db,
                     ScopeOwnerId::Module(self.def.parent(db)),
-                    item.template_args.iter().cloned().collect(),
+                    &item.template_args,
                 )
                 .unwrap();
                 Some(ConstructorType::Struct(
@@ -681,7 +681,7 @@ impl EnumRef {
                 let ctx = AstImplicitContext::new(
                     db,
                     ScopeOwnerId::Module(self.def.parent(db)),
-                    item.template_args.iter().cloned().collect(),
+                    &item.template_args,
                 )
                 .unwrap();
                 Some(ConstructorType::Tuple(
@@ -721,7 +721,7 @@ impl StructRef {
             let ctx = AstImplicitContext::new(
                 db,
                 ScopeOwnerId::Module(self.def.parent(db)),
-                item.template_args.iter().cloned().collect(),
+                &item.template_args,
             )
             .unwrap();
             let type_ref =

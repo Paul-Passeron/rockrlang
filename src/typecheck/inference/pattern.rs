@@ -39,7 +39,7 @@ impl InferenceCtx<'_> {
         binds_like: Option<&InferTy>,
     ) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
-            let ty = this._infer_pattern(pattern, binds_like)?;
+            let ty = this.infer_pattern_aux(pattern, binds_like)?;
             this.inferred_patterns.insert(PatternId(pattern.id), ty.clone());
             Ok(ty)
         })
@@ -49,7 +49,7 @@ impl InferenceCtx<'_> {
         InferTy::Var(var)
     }
 
-    fn _infer_pattern(
+    fn infer_pattern_aux(
         &mut self,
         pattern: &HirPattern,
         binds_like: Option<&InferTy>,
@@ -117,7 +117,7 @@ impl InferenceCtx<'_> {
             template_tys.iter().cloned().collect(),
             Some(zelf),
         )
-        .unwrap()
+        .expect("ImplicitContext error during construction is an ICE")
     }
 
     fn get_tuple_fields_or_diagnose(
@@ -191,19 +191,16 @@ impl InferenceCtx<'_> {
     fn infer_fields_variants_aux(
         &mut self,
         enum_id: EnumId,
-        name: Symbol,
-        fields: &[HirStructFieldPattern],
-        template_tys: &[InferTy],
-        binds_like: Option<&InferTy>,
+        infos: &VariantInfos<HirStructFieldPattern>,
         span: Span,
     ) {
         let field_types = self.get_field_types_of_variant_or_diagnose(
             enum_id,
-            name,
-            template_tys,
+            infos.name,
+            infos.template_tys,
             span,
         );
-        self.infer_fields_aux(fields, &field_types, binds_like);
+        self.infer_fields_aux(infos.children, &field_types, infos.binds_like);
     }
 
     fn infer_constructor_aux(
@@ -224,10 +221,12 @@ impl InferenceCtx<'_> {
             HirPatternConstructorArgs::StructFields(fields) => {
                 self.infer_fields_variants_aux(
                     enum_id,
-                    name,
-                    fields,
-                    &template_tys,
-                    binds_like,
+                    &VariantInfos {
+                        name,
+                        children: fields,
+                        template_tys: &template_tys,
+                        binds_like,
+                    },
                     span,
                 );
             }

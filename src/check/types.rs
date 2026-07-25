@@ -42,7 +42,7 @@ fn check_struct(db: &dyn Db, struct_id: StructId) {
     let ctx = AstImplicitContext::new(
         db,
         ScopeOwnerId::Module(struct_id.parent(db)),
-        item.template_args.iter().cloned().collect(),
+        &item.template_args,
     )
     .unwrap();
     let mut names: HashSet<Symbol> = HashSet::new();
@@ -81,7 +81,7 @@ fn check_enum(db: &dyn Db, enum_id: EnumId) {
     let ctx = AstImplicitContext::new(
         db,
         ScopeOwnerId::Module(enum_id.parent(db)),
-        item.template_args.iter().cloned().collect(),
+        &item.template_args,
     )
     .unwrap();
     let mut names: HashSet<Symbol> = HashSet::new();
