@@ -4,15 +4,12 @@ interface Clone {
 }
 
 @[builtin]
-interface Copy {} // Marker struct
+interface Copy {}
 
 @[builtin]
 interface Drop {
     fun drop(self): void;
 }
-
-@[orthogonal(Drop)]
-interface NoDrop {} // Marker interface
 
 interface AsRef {
     type T;
