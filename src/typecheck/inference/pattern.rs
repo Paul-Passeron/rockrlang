@@ -36,10 +36,10 @@ impl InferenceCtx<'_> {
     pub fn infer_pattern(
         &mut self,
         pattern: &HirPattern,
-        binds_like: Option<InferTy>,
+        binds_like: Option<&InferTy>,
     ) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
-            let ty = this._infer_pattern(pattern, binds_like.clone())?;
+            let ty = this._infer_pattern(pattern, binds_like)?;
             this.inferred_patterns.insert(PatternId(pattern.id), ty.clone());
             Ok(ty)
         })
@@ -52,7 +52,7 @@ impl InferenceCtx<'_> {
     fn _infer_pattern(
         &mut self,
         pattern: &HirPattern,
-        binds_like: Option<InferTy>,
+        binds_like: Option<&InferTy>,
     ) -> Result<InferTy, UnificationError> {
         match &pattern.data {
             HirPatternDesc::Error | HirPatternDesc::Any => Ok(self.fresh_var().into()),
@@ -60,16 +60,22 @@ impl InferenceCtx<'_> {
             HirPatternDesc::Tuple(pats) => {
                 let tys = pats
                     .iter()
-                    .map(|p| self.infer_pattern(p, binds_like.clone()))
+                    .map(|p| self.infer_pattern(p, binds_like))
                     .try_collect()?;
                 Ok(self.tuple_of(tys))
             }
             HirPatternDesc::IntLit(_) => Ok(InferTy::Var(self.emit_intlike_constraint())),
             HirPatternDesc::DestructureBinding { resolution: struct_id, fields } => {
-                self._infer_destructure_binding(binds_like, struct_id, fields)
+                Ok(self.infer_destructure_binding_aux(binds_like, *struct_id, fields))
             }
-            HirPatternDesc::Constructor { resolution, name, fields } => self
-                ._infer_constructor(*resolution, *name, fields, binds_like, pattern.span),
+            HirPatternDesc::Constructor { resolution, name, fields } => Ok(self
+                .infer_constructor_aux(
+                    *resolution,
+                    *name,
+                    fields,
+                    binds_like,
+                    pattern.span,
+                )),
         }
     }
 
@@ -182,13 +188,13 @@ impl InferenceCtx<'_> {
         }
     }
 
-    fn _infer_fields_variants(
+    fn infer_fields_variants_aux(
         &mut self,
         enum_id: EnumId,
         name: Symbol,
         fields: &[HirStructFieldPattern],
         template_tys: &[InferTy],
-        binds_like: Option<InferTy>,
+        binds_like: Option<&InferTy>,
         span: Span,
     ) {
         let field_types = self.get_field_types_of_variant_or_diagnose(
@@ -197,17 +203,17 @@ impl InferenceCtx<'_> {
             template_tys,
             span,
         );
-        self._infer_fields(fields, &field_types, binds_like);
+        self.infer_fields_aux(fields, &field_types, binds_like);
     }
 
-    fn _infer_constructor(
+    fn infer_constructor_aux(
         &mut self,
         enum_id: EnumId,
         name: Symbol,
         fields: &HirPatternConstructorArgs,
-        binds_like: Option<InferTy>,
+        binds_like: Option<&InferTy>,
         span: Span,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> InferTy {
         let template_tys =
             self.get_templates_for(Definition::Type(TypeDefId::Enum(enum_id)));
 
@@ -216,7 +222,7 @@ impl InferenceCtx<'_> {
                 self.get_unit_type_or_diagnose(enum_id, name, span);
             }
             HirPatternConstructorArgs::StructFields(fields) => {
-                self._infer_fields_variants(
+                self.infer_fields_variants_aux(
                     enum_id,
                     name,
                     fields,
@@ -226,45 +232,50 @@ impl InferenceCtx<'_> {
                 );
             }
             HirPatternConstructorArgs::TupleFields(hir_patterns) => {
-                self._infer_tuple_variant(
+                self.infer_tuple_variant_aux(
                     enum_id,
-                    name,
-                    hir_patterns,
-                    &template_tys,
-                    binds_like,
+                    &VariantInfos {
+                        name,
+                        children: hir_patterns,
+                        template_tys: &template_tys,
+                        binds_like,
+                    },
                     span,
                 );
             }
         }
-        Ok(InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys })
+        InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys }
     }
 
     fn apply_binds_like(&mut self, like: Option<&InferTy>, target: InferTy) -> InferTy {
         if let Some(ty) = like {
             let var = self.fresh_var();
-            self.unify(ty, &var.into()).unwrap();
+            self.unify(ty, &var.into())
+                .expect("binding to a fresh variable should not fail");
             self.emit_binds_like_constraint(var, target).into()
         } else {
             target
         }
     }
 
-    fn _infer_tuple_variant(
+    fn infer_tuple_variant_aux(
         &mut self,
         enum_id: EnumId,
-        name: Symbol,
-        hir_patterns: &[HirPattern],
-        template_tys: &[InferTy],
-        binds_like: Option<InferTy>,
+        infos: &VariantInfos<HirPattern>,
         span: Span,
     ) {
-        let variant_tys =
-            self.get_tuple_fields_or_diagnose(enum_id, name, template_tys.as_ref(), span);
+        let variant_tys = self.get_tuple_fields_or_diagnose(
+            enum_id,
+            infos.name,
+            infos.template_tys,
+            span,
+        );
 
-        let tys: Box<_> = hir_patterns
+        let tys: Box<_> = infos
+            .children
             .iter()
             .map(|pat| {
-                self.infer_pattern(pat, binds_like.clone())
+                self.infer_pattern(pat, infos.binds_like)
                     .unwrap_or_else(|_| self.fresh_var().into())
             })
             .collect();
@@ -273,7 +284,7 @@ impl InferenceCtx<'_> {
             Diag::generic_error(
                 format!(
                     "Mismatched length in tuple variant `{}` for enum `{}`, expected {} but got {}",
-                    name.to_string(self.db),
+                    infos.name.to_string(self.db),
                     enum_id.name(self.db).to_string(self.db),
                     variant_tys.len(),
                     tys.len()
@@ -285,8 +296,8 @@ impl InferenceCtx<'_> {
 
         variant_tys
             .into_iter()
-            .zip_longest(tys.into_iter().zip(hir_patterns))
-            .take(hir_patterns.len())
+            .zip_longest(tys.into_iter().zip(infos.children))
+            .take(infos.children.len())
             .for_each(|zipped| {
                 let (variant_ty, pat_ty, pattern) = match zipped {
                     EitherOrBoth::Both(a, (b, c)) => (a, b, Some(c)),
@@ -294,7 +305,7 @@ impl InferenceCtx<'_> {
                     EitherOrBoth::Right((b, c)) => (self.fresh_var().into(), b, Some(c)),
                 };
                 self.unify_pattern_depending_on_kind(
-                    binds_like.as_ref(),
+                    infos.binds_like,
                     variant_ty,
                     pat_ty,
                     pattern,
@@ -310,15 +321,17 @@ impl InferenceCtx<'_> {
         pot_ref_ty: InferTy,
         pattern: Option<&HirPattern>,
     ) {
-        let data = pattern.map(|pat| &pat.data);
-        match data {
-            Some(HirPatternDesc::Any | HirPatternDesc::Bind { .. }) => {
+        match pattern {
+            Some(HirPattern {
+                data: HirPatternDesc::Any | HirPatternDesc::Bind { .. },
+                span,
+                ..
+            }) => {
                 let adjusted = self.apply_binds_like(binds_like, inner_ty);
                 if let Err(err) = self.unify(&adjusted, &pot_ref_ty) {
-                    let span = pattern.as_ref().unwrap().span;
                     Diag::generic_error(
                         format!("Unification error: {}", err.display(self.db)),
-                        span,
+                        *span,
                     )
                     .accumulate(self.db);
                 }
@@ -329,26 +342,26 @@ impl InferenceCtx<'_> {
         }
     }
 
-    fn _infer_destructure_binding(
+    fn infer_destructure_binding_aux(
         &mut self,
-        binds_like: Option<InferTy>,
-        struct_id: &StructId,
+        binds_like: Option<&InferTy>,
+        struct_id: StructId,
         fields: &[HirStructFieldPattern],
-    ) -> Result<InferTy, UnificationError> {
+    ) -> InferTy {
         let (struct_ty, field_types) = self.fresh_struct_instance(struct_id);
-        self._infer_fields(fields, &field_types, binds_like);
-        Ok(struct_ty)
+        self.infer_fields_aux(fields, &field_types, binds_like);
+        struct_ty
     }
 
     fn fresh_struct_instance(
         &mut self,
-        struct_id: &StructId,
+        struct_id: StructId,
     ) -> (InferTy, HashMap<Symbol, InferTy>) {
         let templates = templates_of_struct(self.db, struct_id.interned());
         let infer_templates =
-            self.get_templates_for(Definition::Type(TypeDefId::Struct(*struct_id)));
+            self.get_templates_for(Definition::Type(TypeDefId::Struct(struct_id)));
         let struct_ty = InferTy::Adt {
-            def: TypeDefId::Struct(*struct_id),
+            def: TypeDefId::Struct(struct_id),
             fields: infer_templates.clone(),
         };
         let ctx = ImplicitContext::new(
@@ -358,7 +371,7 @@ impl InferenceCtx<'_> {
             infer_templates.iter().cloned().collect(),
             Some(struct_ty.clone()),
         )
-        .unwrap();
+        .expect("Implicit context failing to be created is an internal compiler error");
         let item = struct_item(self.db, struct_id.interned());
 
         let field_types: HashMap<Symbol, InferTy> = item
@@ -368,30 +381,30 @@ impl InferenceCtx<'_> {
                 (
                     field.name,
                     self.allocate_ast_type_expr(&field.ty.data, &ctx)
-                        .unwrap_or(InferTy::Var(self.fresh_var())),
+                        .unwrap_or_else(|| self.fresh_var().into()),
                 )
             })
             .collect();
         (struct_ty, field_types)
     }
 
-    fn _infer_fields(
+    fn infer_fields_aux(
         &mut self,
         fields: &[HirStructFieldPattern],
         field_types: &HashMap<Symbol, InferTy>,
-        binds_like: Option<InferTy>,
+        binds_like: Option<&InferTy>,
     ) {
         for field in fields {
             match field {
                 HirStructFieldPattern::Rebind { name, pattern, .. } => {
-                    match self.infer_pattern(pattern, binds_like.clone()) {
+                    match self.infer_pattern(pattern, binds_like) {
                         Ok(inferred) => {
                             let field_ty = field_types
                                 .get(name)
                                 .cloned()
                                 .unwrap_or_else(|| self.fresh_var().into());
                             self.unify_pattern_depending_on_kind(
-                                binds_like.as_ref(),
+                                binds_like,
                                 field_ty,
                                 inferred,
                                 Some(pattern),
@@ -413,7 +426,7 @@ impl InferenceCtx<'_> {
                         .get(name)
                         .cloned()
                         .unwrap_or_else(|| self.fresh_var().into());
-                    let adjusted = self.apply_binds_like(binds_like.as_ref(), field_ty);
+                    let adjusted = self.apply_binds_like(binds_like, field_ty);
                     if let Err(err) = self.unify(&adjusted, &local_ty) {
                         Diag::generic_error(
                             format!(
@@ -428,4 +441,10 @@ impl InferenceCtx<'_> {
             }
         }
     }
+}
+struct VariantInfos<'a, T> {
+    pub name: Symbol,
+    pub children: &'a [T],
+    pub template_tys: &'a [InferTy],
+    pub binds_like: Option<&'a InferTy>,
 }

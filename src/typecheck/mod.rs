@@ -283,7 +283,7 @@ impl<'db> TyCtx<'db> {
         for branch in branches {
             let mut error = (None, None);
             let inferred =
-                self.inf_ctx.infer_pattern(&branch.pattern, Some(typeof_scrut.clone()));
+                self.inf_ctx.infer_pattern(&branch.pattern, Some(&typeof_scrut));
             let pat_ty = match inferred {
                 Ok(ty) => ty,
                 Err(err) => {
@@ -317,7 +317,9 @@ impl<'db> TyCtx<'db> {
         for (err, _branch) in errors.into_iter().zip(branches) {
             match err {
                 (None, None) => (),
-                _ => todo!(),
+                _ => {
+                    eprintln!("TODO: Emit an error");
+                }
             }
         }
     }
@@ -340,7 +342,7 @@ impl<'db> TyCtx<'db> {
                 InferTy::Var(self.inf_ctx.fresh_var())
             }
         };
-        match self.inf_ctx.infer_pattern(pattern, Some(init_ty.clone())) {
+        match self.inf_ctx.infer_pattern(pattern, Some(&init_ty)) {
             Ok(pattern_ty) => {
                 match &pattern.data {
                     HirPatternDesc::Tuple(_)

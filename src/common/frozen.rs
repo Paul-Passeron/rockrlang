@@ -478,7 +478,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic = "index out of bounds"]
     fn index_out_of_bounds_panics() {
         let f: Frozen<i32> = Frozen::new();
         let _ = f[0];

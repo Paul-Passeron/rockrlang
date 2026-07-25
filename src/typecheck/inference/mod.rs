@@ -39,6 +39,7 @@ use crate::{
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
+        interfaces::module_interfaces,
         type_expr::{
             get_templates_of_fun, get_templates_of_fun_only, templates_of_enum,
             templates_of_struct,
@@ -442,7 +443,12 @@ impl InferenceCtx<'_> {
     pub fn get_templates_for(&mut self, def: Definition) -> Vec<InferTy> {
         let asts: &[AstTemplateArg] = match def {
             Definition::Function(func) => get_templates_of_fun(self.db, func.interned()),
-            Definition::Interface(_) => todo!(),
+            Definition::Interface(iface) => {
+                module_interfaces(self.db, iface.parent(self.db).into())
+                    .iter()
+                    .find(|item| item.span.encloses(iface.name_span(self.db).end()))
+                    .map_or(&[], |item| item.template_args.as_slice())
+            }
             Definition::Module(_) => {
                 return Vec::new();
             }
