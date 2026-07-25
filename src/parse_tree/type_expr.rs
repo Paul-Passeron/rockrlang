@@ -51,9 +51,6 @@ impl AstAnyTypeExpr {
 
 impl From<AstTypeExpr> for AstAnyTypeExpr {
     fn from(ty: AstTypeExpr) -> Self {
-        AstAnyTypeExpr {
-            data: AstAnyTypeExprDesc::Known(ty.data),
-            span: ty.span,
-        }
+        AstAnyTypeExpr { data: AstAnyTypeExprDesc::Known(ty.data), span: ty.span }
     }
 }

@@ -294,7 +294,12 @@ pub struct AstImplBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AstImplItem {
-    Type { annotations: Vec<AstAnnotation>, name: Symbol, name_span: Span, ty: AstTypeExpr },
+    Type {
+        annotations: Vec<AstAnnotation>,
+        name: Symbol,
+        name_span: Span,
+        ty: AstTypeExpr,
+    },
     Fundef(Box<AstMethodDef>),
 }
 

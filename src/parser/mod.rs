@@ -66,13 +66,7 @@ pub enum ParseErrorKind {
 
 impl<'db> Parser<'db> {
     pub fn new(db: &'db dyn Db, tokens: &'db [Token], file: SourceFile) -> Self {
-        Self {
-            position: 0,
-            tokens,
-            db,
-            file,
-            restrict_struct_lit: false,
-        }
+        Self { position: 0, tokens, db, file, restrict_struct_lit: false }
     }
 
     pub(super) fn with_struct_lit_restriction<T>(

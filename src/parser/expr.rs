@@ -131,10 +131,7 @@ impl<'db> Parser<'db> {
                 if op_kind == TokenKind::As {
                     let ty = self.parse_type_expr()?;
                     let span = lhs.span.start().span(self.get_end());
-                    lhs = Spanned::new(
-                        AstExprDesc::As { expr: Box::new(lhs), ty },
-                        span,
-                    )
+                    lhs = Spanned::new(AstExprDesc::As { expr: Box::new(lhs), ty }, span)
                 }
                 continue;
             }
@@ -152,19 +149,13 @@ impl<'db> Parser<'db> {
                 self.consume();
                 let operand = self.parse_unary()?;
                 let end = self.get_end();
-                Ok(Spanned::new(
-                    AstExprDesc::Neg(Box::new(operand)),
-                    start.span(end),
-                ))
+                Ok(Spanned::new(AstExprDesc::Neg(Box::new(operand)), start.span(end)))
             }
             TokenKind::Not => {
                 self.consume();
                 let operand = self.parse_unary()?;
                 let end = self.get_end();
-                Ok(Spanned::new(
-                    AstExprDesc::Not(Box::new(operand)),
-                    start.span(end),
-                ))
+                Ok(Spanned::new(AstExprDesc::Not(Box::new(operand)), start.span(end)))
             }
             TokenKind::BitAnd => {
                 self.consume();
@@ -219,20 +210,14 @@ impl<'db> Parser<'db> {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
-                    expr = Spanned::new(
-                        AstExprDesc::AddressOf(Box::new(expr)),
-                        span,
-                    );
+                    expr = Spanned::new(AstExprDesc::AddressOf(Box::new(expr)), span);
                 }
 
                 Some(TokenKind::Deref) => {
                     self.consume();
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
-                    expr = Spanned::new(
-                        AstExprDesc::PostfixDeref(Box::new(expr)),
-                        span,
-                    );
+                    expr = Spanned::new(AstExprDesc::PostfixDeref(Box::new(expr)), span);
                 }
 
                 Some(TokenKind::Access)
@@ -427,10 +412,8 @@ impl<'db> Parser<'db> {
                                 let AstExprDesc::Name(variant_name) = to.data else {
                                     unreachable!()
                                 };
-                                let base_expr = AstExpr::new(
-                                    AstExprDesc::Name(from.data),
-                                    expr.span,
-                                );
+                                let base_expr =
+                                    AstExpr::new(AstExprDesc::Name(from.data), expr.span);
                                 (
                                     self.reinterpret_expr_as_ty(base_expr)?,
                                     Some(variant_name),
@@ -556,10 +539,7 @@ impl<'db> Parser<'db> {
 
                 let end = self.get_end();
 
-                Ok(AstExpr::new(
-                    AstExprDesc::Metadata(Box::new(expr)),
-                    start.span(end),
-                ))
+                Ok(AstExpr::new(AstExprDesc::Metadata(Box::new(expr)), start.span(end)))
             }
 
             TokenKind::Directive(dir) if dir == Symbol::new(self.db, "type_name") => {
@@ -610,10 +590,7 @@ impl<'db> Parser<'db> {
                         let ty_span = start.span(start);
                         let ty = Spanned::new(
                             AstTypeExprDesc::Named {
-                                name: Spanned {
-                                    data: name,
-                                    span: tok.location,
-                                },
+                                name: Spanned { data: name, span: tok.location },
                                 args: vec![],
                             },
                             ty_span,

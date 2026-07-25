@@ -212,10 +212,7 @@ impl<'db> LowerFundef<'db> {
         match &any_ty.data {
             AstAnyTypeExprDesc::Any => TypeRef::Unknown,
             AstAnyTypeExprDesc::Known(desc) => self.resolve_holed_desc(
-                &AstTypeExpr {
-                    data: desc.clone(),
-                    span: any_ty.span,
-                },
+                &AstTypeExpr { data: desc.clone(), span: any_ty.span },
                 module,
             ),
         }

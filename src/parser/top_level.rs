@@ -280,7 +280,8 @@ impl<'db> Parser<'db> {
     ) -> Result<AstMethodsig, ParseError> {
         let (
             AstFunsig {
-                data: AstFunsigDesc { annotations, name, args, template_args, return_type },
+                data:
+                    AstFunsigDesc { annotations, name, args, template_args, return_type },
                 span,
             },
             receiver,
@@ -564,7 +565,14 @@ impl<'db> Parser<'db> {
 
         let span = start.span(self.get_end());
 
-        Ok(AstImplBlock { annotations, template_args, interface, implemented, items, span })
+        Ok(AstImplBlock {
+            annotations,
+            template_args,
+            interface,
+            implemented,
+            items,
+            span,
+        })
     }
 
     fn parse_struct_def_field(&mut self) -> Result<AstStructDefField, ParseError> {
@@ -723,10 +731,7 @@ impl<'db> Parser<'db> {
             TokenKind::Struct => {
                 let struct_def = self.parse_struct_def(annotations)?;
                 let span = struct_def.span;
-                Ok(AstTopLevelItem::new(
-                    AstTopLevelItemDesc::StructDef(struct_def),
-                    span,
-                ))
+                Ok(AstTopLevelItem::new(AstTopLevelItemDesc::StructDef(struct_def), span))
             }
             TokenKind::Enum => {
                 let enum_def = self.parse_enum_def(annotations)?;
