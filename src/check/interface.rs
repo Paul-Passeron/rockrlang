@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use salsa::Accumulator;
 
@@ -36,7 +36,9 @@ fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
     let mut names: HashMap<Symbol, Span> = HashMap::new();
     for item in interface_items(db, interface.interned()).iter() {
         let name = item.name();
-        if names.contains_key(&name) {
+        if let Entry::Vacant(e) = names.entry(name) {
+            e.insert(item.name_span());
+        } else {
             Diag::generic_error(
                 format!(
                     "Cannot define the same name multiple time: `{}`",
@@ -45,8 +47,6 @@ fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
                 item.name_span(),
             )
             .accumulate(db);
-        } else {
-            names.insert(name, item.name_span());
         }
     }
 }
