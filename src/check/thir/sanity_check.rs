@@ -117,7 +117,10 @@ impl<'db> SanityChecker<'db> {
             StmtKind::Expr(expr) => {
                 let _ = self.check_expr(*expr);
             }
-            StmtKind::Break(_) | StmtKind::Continue(_) | StmtKind::Error => (),
+            StmtKind::Drop(_)
+            | StmtKind::Break(_)
+            | StmtKind::Continue(_)
+            | StmtKind::Error => (),
         }
     }
 

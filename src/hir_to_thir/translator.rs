@@ -35,7 +35,7 @@ use crate::{
         Dispatch, ExprId, ExprKind, FunctionRef, PlaceId, Projection, ScopeId, ScopeKind,
         Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirMatchBranch,
         ThirPattern, ThirPatternKind, ThirPlace, ThirScope, ThirStructField,
-        stmt::{BlockSemanticInfo, ThirStmt},
+        stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
     },
     typecheck::{self, PatternId, ReceiverAdjustment, TypeCheckResults},
 };
@@ -83,13 +83,10 @@ impl<'db> ThirTranslator<'db> {
             .copied()
             .chain(self.hir.params(self.db).iter().map(|param| b.local_map[param]))
             .collect_vec();
-        let stmts = self
-            .hir
-            .stmts(self.db)
-            .iter()
-            .flat_map(|stmt| self.handle_stmt(&mut b, stmt))
-            .collect_vec();
-        b.finalize(*self.hir.owner(self.db), params, zelf, stmts)
+        let stmts = self.hir.stmts(self.db);
+        let span = self.hir.owner(self.db).body_span(self.db).unwrap();
+        let stmt = self.handle_block(&mut b, stmts, span, false, None);
+        b.finalize(*self.hir.owner(self.db), params, zelf, vec![stmt])
     }
 
     fn handle_break(&self, b: &ThirBuilder, span: Span, is_synthetic: bool) -> ThirStmt {
@@ -105,6 +102,31 @@ impl<'db> ThirTranslator<'db> {
         }
     }
 
+    fn needs_drop(&self, ty: TypeRef) -> bool {
+        if ty.is_copy(self.db) {
+            return false;
+        }
+        true
+    }
+
+    fn add_drops(&mut self, b: &mut ThirBuilder, stmts: &mut Vec<ThirStmt>) {
+        let owned_locals = stmts
+            .iter()
+            .filter_map(|stmt| {
+                if let StmtKind::Let { local, .. } = &stmt.kind {
+                    self.needs_drop(b.get_local(*local).ty).then_some(*local)
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+        stmts.extend(owned_locals.into_iter().map(|local| ThirStmt {
+            kind: StmtKind::Drop(local),
+            span: b.get_local(local).span,
+            is_synthetic: true,
+        }));
+    }
+
     fn handle_block(
         &mut self,
         b: &mut ThirBuilder,
@@ -114,8 +136,12 @@ impl<'db> ThirTranslator<'db> {
         infos: Option<&HIRBlockSemanticInfo>,
     ) -> ThirStmt {
         let (scope, stmts) = self.scoped(b, span, ScopeKind::Block, |this, b| {
-            stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec()
+            let mut stmts =
+                stmts.iter().flat_map(|stmt| this.handle_stmt(b, stmt)).collect_vec();
+            this.add_drops(b, &mut stmts);
+            stmts
         });
+
         ThirStmt::block(
             scope,
             stmts,

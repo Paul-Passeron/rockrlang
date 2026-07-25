@@ -70,6 +70,7 @@ pub enum StmtKind {
         branches: Vec<ThirMatchBranch>,
     },
     Expr(ExprId),
+    Drop(LocalId),
     Error,
 }
 

@@ -173,6 +173,9 @@ impl<'a> ThirPrinter<'a> {
             }
 
             StmtKind::Error => self.line("<error stmt>;"),
+            StmtKind::Drop(local) => {
+                self.line(&format!("drop {};", self.local_name(*local)))
+            }
         }
     }
 
