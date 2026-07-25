@@ -30,7 +30,7 @@ use crate::{
     compiler::{Workspace, diagnostic::Diag, workspace_packages},
     hir::{Mutability, function_ast, signature::get_sig_of_function},
     mir::{
-        Mir, MIRBlockID, MIRLocal, MIRLocalID, SyntacticSource,
+        MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{

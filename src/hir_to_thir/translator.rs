@@ -15,172 +15,30 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
-
 use itertools::{Either, Itertools};
 use salsa::Accumulator;
 
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    common::{
-        arena::{Arena, Idx},
-        location::Span,
-        symbols::Symbol,
-    },
+    common::{arena::Idx, location::Span},
     compiler::diagnostic::Diag,
     hir::{
         self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
-        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, LocalInfo, Mutability,
+        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
     },
-    name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
-    resolved::{FunctionId, ScopeOwnerId, TypeDefId, TypeId, TypeRef, rehole},
+    hir_to_thir::builder::ThirBuilder,
+    name_resolve::type_expr::enum_item,
+    resolved::{ScopeOwnerId, TypeId, TypeRef, rehole},
     thir::{
-        EnumRef, ExprId, ExprKind, FunctionRef, LocalId, PlaceBase, PlaceId, Projection,
-        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirLocal, ThirMatchBranch, ThirPattern, ThirPlace, ThirScope, ThirStructField,
+        Dispatch, ExprId, ExprKind, FunctionRef, PlaceId, Projection, ScopeId, ScopeKind,
+        Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup, ThirMatchBranch,
+        ThirPattern, ThirPatternKind, ThirPlace, ThirScope, ThirStructField,
         stmt::{BlockSemanticInfo, ThirStmt},
     },
-    typecheck::{
-        self, PatternId, ReceiverAdjustment, TypeCheckResults,
-        inference::implicit::{AsAstImplCtx, AstImplicitContext},
-    },
+    typecheck::{self, PatternId, ReceiverAdjustment, TypeCheckResults},
 };
-
-use super::{Dispatch, ScopeKind, ThirPatternKind};
-
-pub struct ThirBuilder<'db> {
-    db: &'db dyn Db,
-    locals: Arena<ThirLocal>,
-    exprs: Arena<ThirExpr>,
-    places: Arena<ThirPlace>,
-    scopes: Arena<ThirScope>,
-    local_map: HashMap<hir::LocalId, LocalId>,
-}
-
-impl<'db> ThirBuilder<'db> {
-    fn new(db: &'db dyn Db) -> Self {
-        Self {
-            db,
-            locals: Arena::new(),
-            exprs: Arena::new(),
-            places: Arena::new(),
-            scopes: Arena::new(),
-            local_map: HashMap::new(),
-        }
-    }
-
-    pub fn new_local(&self, local: ThirLocal) -> LocalId {
-        self.locals.insert(local)
-    }
-    pub fn new_expr(&self, expr: ThirExpr) -> ExprId {
-        self.exprs.insert(expr)
-    }
-    pub fn new_place(&self, place: ThirPlace) -> PlaceId {
-        self.places.insert(place)
-    }
-    pub fn new_scope(&self, scope: ThirScope) -> ScopeId {
-        self.scopes.insert(scope)
-    }
-
-    pub fn get_local(&self, idx: Idx<ThirLocal>) -> &ThirLocal {
-        &self.locals[idx]
-    }
-    pub fn get_expr(&self, idx: Idx<ThirExpr>) -> &ThirExpr {
-        &self.exprs[idx]
-    }
-    pub fn get_place(&self, idx: Idx<ThirPlace>) -> &ThirPlace {
-        &self.places[idx]
-    }
-    pub fn get_scope(&self, idx: Idx<ThirScope>) -> &ThirScope {
-        &self.scopes[idx]
-    }
-
-    pub fn finalize(
-        self,
-        id: FunctionId,
-        params: Vec<LocalId>,
-        zelf: Option<LocalId>,
-        stmts: Vec<ThirStmt>,
-    ) -> Thir {
-        Thir {
-            id,
-            places: self.places,
-            exprs: self.exprs,
-            locals: self.locals,
-            scopes: self.scopes,
-            params,
-            zelf,
-            root: stmts,
-        }
-    }
-
-    fn register_hir_local(
-        &mut self,
-        infos: &LocalInfo,
-        tc_results: TypeCheckResults<'_>,
-    ) {
-        let local = ThirLocal {
-            ty: tc_results.locals(self.db)[&infos.id].unwrap_or(TypeRef::Unknown),
-            mutability: infos.mutability,
-            span: infos.span,
-            source: Some((infos.id, infos.name)),
-            is_synthetic: infos.is_synthetic,
-        };
-        let res = self.new_local(local);
-        self.local_map.insert(infos.id, res);
-    }
-
-    fn with_synthetic_projection(
-        &self,
-        place: PlaceId,
-        proj: Projection,
-        ty: TypeRef,
-    ) -> PlaceId {
-        let mut place = self.get_place(place).clone();
-        place.projections.push(proj);
-        place.ty = ty;
-        self.new_place(place)
-    }
-
-    fn with_projection(
-        &self,
-        place: PlaceId,
-        proj: Projection,
-        ty: TypeRef,
-        span: Span,
-    ) -> PlaceId {
-        let mut place = self.get_place(place).clone();
-        place.projections.push(proj);
-        place.ty = ty;
-        place.span = span;
-        self.new_place(place)
-    }
-
-    fn new_synthetic_local(
-        &self,
-        ty: TypeRef,
-        mutability: Mutability,
-        span: Span,
-    ) -> LocalId {
-        self.new_local(ThirLocal {
-            ty,
-            mutability,
-            span,
-            source: None,
-            is_synthetic: true,
-        })
-    }
-}
-
-pub fn thir_body_from_hir<'db>(
-    db: &'db dyn Db,
-    hir: HirBody<'db>,
-    tc: TypeCheckResults<'db>,
-) -> Thir {
-    ThirTranslator::new(db, hir, tc).translate()
-}
 
 pub struct ThirTranslator<'db> {
     db: &'db dyn Db,
@@ -1349,54 +1207,5 @@ impl<'db> ThirTranslator<'db> {
         let popped = self.pop_scope();
         assert_eq!(Some(scope), popped);
         (scope, res)
-    }
-}
-
-impl TypeRef {
-    pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
-        let type_id = self.as_type_id()?;
-        match type_id.def(db) {
-            TypeDefId::Struct(struct_id) => {
-                Some(StructRef { def: struct_id, args: type_id.args(db).to_vec() })
-            }
-            _ => None,
-        }
-    }
-
-    pub fn as_enum_ref(self, db: &dyn Db) -> Option<EnumRef> {
-        let type_id = self.as_type_id()?;
-        match type_id.def(db) {
-            TypeDefId::Enum(enum_id) => {
-                Some(EnumRef { def: enum_id, args: type_id.args(db).to_vec() })
-            }
-            _ => None,
-        }
-    }
-}
-
-impl ThirPlace {
-    pub fn local(local: LocalId, b: &ThirBuilder, span: Span) -> Self {
-        let l = b.get_local(local);
-        Self {
-            base: PlaceBase::Local(local),
-            projections: vec![],
-            ty: l.ty,
-            span,
-            is_synthetic: l.is_synthetic,
-        }
-    }
-}
-
-impl StructRef {
-    pub fn typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
-        let item = struct_item(db, self.def.interned());
-        let found = item.fields.iter().find(|f| f.name == field)?;
-        let ctx = AstImplicitContext::new(
-            db,
-            ScopeOwnerId::Module(self.def.parent(db)),
-            templates_of_struct(db, self.def.into()),
-        );
-        let resolution = ctx.resolve(db, &found.ty.data)?;
-        Some(resolution.with_substitution(db, &self.args))
     }
 }

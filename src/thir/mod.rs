@@ -23,15 +23,15 @@ use crate::{
         symbols::{StrLit, Symbol},
     },
     hir::{self, Mutability, function_ast, hir_body},
+    hir_to_thir::thir_body_from_hir,
     parse_tree::expr::BinaryOperator,
     resolved::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
-    thir::{hir_to_thir::thir_body_from_hir, stmt::ThirStmt},
+    thir::stmt::ThirStmt,
     typecheck::type_check_function,
 };
 
 pub mod display;
 pub mod expr;
-pub mod hir_to_thir;
 pub mod stmt;
 
 pub type ExprId = Idx<ThirExpr>;

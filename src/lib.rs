@@ -25,6 +25,7 @@ pub mod compiler;
 pub mod db;
 pub mod driver;
 pub mod hir;
+pub mod hir_to_thir;
 pub mod layout;
 pub mod lexer;
 pub mod lir;
