@@ -10,28 +10,28 @@ impl Foo {
 }
 
 fun f(f: Foo): void {
-    let mut x = f;
-    let r: &_ = &x.x;  
-    x.incr(); // Fine, the loan to r is dropped as r isn't used after
+    let mut f = f;
+    let r = &f.x;  
+    f.incr(); // Fine, the loan to r is dropped as r isn't used after
 }
 
-fun f(f: Foo): void {
-    let mut x = f;
-    let r: &_ = &x.x;
-    x.incr(); // Not fine, the loan to r is still active !
+fun f2(f: Foo): void {
+    let mut f = f;
+    let r = &f;
+    f.incr(); // Conflict here
     let u = r;
 }
 
 
 fun mv_fine(m: Moves): void {
     let x = m;
-    let y = m;
+    let y = m; // Use after move 
 }
 
 fun mv_bad(m: Moves): void {
     let x = m;
-    let y = &m; // No error here when there should be !
-    match m { 
+    let y = &m; // Use after move
+    match m { // Use after move
         m => { core::panic::panic("Panic !"); }
     }
 }
@@ -46,7 +46,7 @@ fun in_loop(m: Moves): void {
 fun in_loop2(m: Moves): void {
     let x = m;
     for _ in 0..100 {
-        let y = x;
+        let y = x; // Maybe moved !
     }
 }
 
