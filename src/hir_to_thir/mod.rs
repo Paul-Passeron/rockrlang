@@ -15,19 +15,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    common::location::Span,
-    hir_to_thir::ThirBuilder,
-    thir::{ExprKind, PlaceId, ThirExpr},
-};
+use crate::{Db, hir::HirBody, thir::Thir, typecheck::TypeCheckResults};
 
-impl ThirExpr {
-    pub fn use_place(place: PlaceId, b: &ThirBuilder, span: Span) -> Self {
-        Self {
-            kind: ExprKind::Use(place),
-            ty: b.get_place(place).ty,
-            span,
-            is_synthetic: b.get_place(place).is_synthetic,
-        }
-    }
+mod builder;
+mod refs;
+mod translator;
+
+pub use builder::ThirBuilder;
+use translator::ThirTranslator;
+
+pub fn thir_body_from_hir<'db>(
+    db: &'db dyn Db,
+    hir: HirBody<'db>,
+    tc: TypeCheckResults<'db>,
+) -> Thir {
+    ThirTranslator::new(db, hir, tc).translate()
 }
