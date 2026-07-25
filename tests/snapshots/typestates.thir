@@ -38,7 +38,7 @@ thir fun typestates::Foo<typestates::C>::next(self): typestates::Foo<typestates:
 
 examples/typestates.rkr:41:1
 thir fun typestates::type_name<T0>(of: &T0): core::io::str {
-    return sizeof(T0);
+    return typename(T0);
 }
 
 examples/typestates.rkr:45:1

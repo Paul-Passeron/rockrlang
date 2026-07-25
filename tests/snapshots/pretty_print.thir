@@ -24,7 +24,7 @@ thir fun <i32 as pretty_print::PrettyPrint>::print(&self): void {
 examples/pretty_print.rkr:20:5
 thir fun <pretty_print::MyStruct<T0> as pretty_print::PrettyPrint>::print<T0: pretty_print::PrettyPrint>(&self): void {
     core::io::printf(c"MyStruct<\0");
-    let _1: core::io::str = sizeof(T0);
+    let _1: core::io::str = typename(T0);
     <core::io::str>::core::io::str::print(&_1);
     core::io::printf(c"> { .x: %d, .y: \0", (*self).x);
     <core::opt::opt<T0>>::<core::opt::opt<T0> as pretty_print::PrettyPrint>::print::<T0>(&(*self).y);
@@ -47,7 +47,7 @@ thir fun <core::opt::opt<T0> as pretty_print::PrettyPrint>::print<T0: pretty_pri
 
 examples/pretty_print.rkr:46:1
 thir fun pretty_print::type_name<T0>(of: &T0): core::io::str {
-    return sizeof(T0);
+    return typename(T0);
 }
 
 examples/pretty_print.rkr:51:1
