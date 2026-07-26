@@ -23,6 +23,13 @@ struct Vec<T> {
     cap: usize;
 }
 
+impl <T> core::mem::Drop for Vec<T> {
+    fun drop(&mut self): void {
+        self.deinit();
+    }
+}
+
+
 impl<T> Vec<T> {
     fun new(): Self {
         return Vec {

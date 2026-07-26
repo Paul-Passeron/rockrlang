@@ -3,6 +3,10 @@ struct str {
     len: int;
 }
 
+impl core::mem::Drop for str {
+    fun drop(&mut self): void {}
+}
+
 impl str {
     fun from_cstr(data: *char): Self {
         let mut len: int = 0;

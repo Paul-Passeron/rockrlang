@@ -8,7 +8,7 @@ interface Copy {}
 
 @[builtin]
 interface Drop {
-    fun drop(self): void;
+    fun drop(&mut self): void;
 }
 
 interface AsRef {
