@@ -378,11 +378,8 @@ impl<'a> ThirToMIR<'a> {
                 let rval = self.build_rvalue(*idx);
                 self.spill_rvalue_if_needed(rval, stmt.span);
             }
-            StmtKind::Error => {} /* Don't crash so the user can still see errors */
-            // afterwards
-            StmtKind::Drop(_) => {
-                Diag::todo("TODO: Handle drops !".into(), stmt.span).accumulate(self.db);
-            }
+            StmtKind::Error => {} /* Don't crash so the user can still see errors
+                                   * afterwards */
         }
     }
 

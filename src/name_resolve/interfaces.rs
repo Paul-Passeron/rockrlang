@@ -131,7 +131,6 @@ pub fn core_clone_interface(db: &dyn Db) -> InterfaceId {
     }
 }
 
-
 #[salsa::tracked(returns(copy))]
 pub fn core_int_iter_struct(db: &dyn Db) -> StructId {
     let core_iter_module = core_iter_module(db);
