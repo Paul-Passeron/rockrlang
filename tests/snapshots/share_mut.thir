@@ -1,4 +1,4 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -9,11 +9,13 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/share_mut.rkr:96:1
 thir fun share_mut::destructure(p: &mut share_mut::Foo): void {
-    's0 (Destructuring `share_mut::Foo`): {
+    's1 (Destructuring `share_mut::Foo`): {
         let x: &mut i32 = &mut (*p).x;
     }
 }

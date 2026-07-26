@@ -1,11 +1,11 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/iter/main.rkr:16:5
 thir fun <core::iter::IntIter as core::iter::Iter>::next(&mut self): core::opt::opt<i32> {
-    if ((*self).start >= (*self).end) 's0: {
+    if ((*self).start >= (*self).end) 's1: {
         return core::opt::opt::<i32>::#0;
     }
     let res: i32 = (*self).start;
@@ -24,20 +24,22 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/for_loop.rkr:1:1
 thir fun for_loop::main(): i32 {
-    's0 (for-loop): {
+    's1 (for-loop): {
         let _2: core::iter::IntIter = core::iter::IntIter { start: 0, end: 1000 };
         let mut @iterator_0: core::iter::IntIter = <core::iter::IntIter>::<core::iter::IntIter as core::iter::IntoIterator>::into_iter(_2);
-        's1: while true {
+        's2: while true {
             match <core::iter::IntIter>::<core::iter::IntIter as core::iter::Iter>::next(&mut @iterator_0) {
-                core::opt::opt::<i32>::#1(i) => 's2: {
+                core::opt::opt::<i32>::#1(i) => 's3: {
                     core::io::printf(c"%d\n\0", i);
                 }
-                _ => 's3: {
-                    break 's1;
+                _ => 's4: {
+                    break 's2;
                 }
             }
         }

@@ -1,4 +1,4 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -9,6 +9,8 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/simple_match.rkr:3:1
@@ -19,10 +21,10 @@ thir fun simple_match::some_opt(): core::opt::opt<i32> {
 examples/simple_match.rkr:7:1
 thir fun simple_match::foo(): i32 {
     match simple_match::some_opt() {
-        core::opt::opt::<i32>::#1(x) => 's0: {
+        core::opt::opt::<i32>::#1(x) => 's1: {
             return x;
         }
-        core::opt::opt::<i32>::#0 => 's1: {
+        core::opt::opt::<i32>::#0 => 's2: {
             return 0;
         }
     }

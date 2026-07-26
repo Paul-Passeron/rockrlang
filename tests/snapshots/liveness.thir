@@ -1,4 +1,4 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -9,6 +9,8 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/liveness.rkr:3:1
@@ -29,7 +31,7 @@ examples/liveness.rkr:15:1
 thir fun liveness::conditional_use(cond: bool): i32 {
     let x: i32 = 1;
     let y: i32 = 2;
-    if cond 's0: {
+    if cond 's1: {
         return x;
     }
     return y;
@@ -46,7 +48,7 @@ examples/liveness.rkr:30:1
 thir fun liveness::loop_carried(n: i32): i32 {
     let mut acc: i32 = 0;
     let mut i: i32 = 0;
-    's0: while (i < n) {
+    's1: while (i < n) {
         acc = (acc + i);
         i = (i + 1);
     }
@@ -56,7 +58,7 @@ thir fun liveness::loop_carried(n: i32): i32 {
 examples/liveness.rkr:40:1
 thir fun liveness::dead_after_loop(n: i32): i32 {
     let mut i: i32 = 0;
-    's0: while (i < n) {
+    's1: while (i < n) {
         i = (i + 1);
     }
     let unused: i32 = 42;
@@ -66,9 +68,9 @@ thir fun liveness::dead_after_loop(n: i32): i32 {
 examples/liveness.rkr:49:1
 thir fun liveness::overwritten_in_branch(cond: bool): i32 {
     let mut x: i32 = 1;
-    if cond 's0: {
+    if cond 's1: {
         x = 2;
-    } else 's1: {
+    } else 's2: {
         x = 3;
     }
     return x;
@@ -77,9 +79,9 @@ thir fun liveness::overwritten_in_branch(cond: bool): i32 {
 examples/liveness.rkr:59:1
 thir fun liveness::live_across_branch(cond: bool): i32 {
     let x: i32 = 10;
-    if cond 's0: {
+    if cond 's1: {
         let y: i32 = 1;
-    } else 's1: {
+    } else 's2: {
         let y: i32 = 2;
     }
     return x;
@@ -89,10 +91,10 @@ examples/liveness.rkr:69:1
 thir fun liveness::match_arm_liveness(o: core::opt::opt<i32>): i32 {
     let fallback: i32 = 99;
     match o {
-        core::opt::opt::<i32>::#1(x) => 's0: {
+        core::opt::opt::<i32>::#1(x) => 's1: {
             return x;
         }
-        core::opt::opt::<i32>::#0 => 's1: {
+        core::opt::opt::<i32>::#0 => 's2: {
             return fallback;
         }
     }

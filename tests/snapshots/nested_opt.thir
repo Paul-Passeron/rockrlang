@@ -1,4 +1,4 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -9,6 +9,8 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/nested_opt.rkr:3:1
@@ -19,13 +21,13 @@ thir fun nested_opt::some_opt(): core::opt::opt<core::opt::opt<i32>> {
 examples/nested_opt.rkr:7:1
 thir fun nested_opt::foo(): i32 {
     match nested_opt::some_opt() {
-        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's0: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's1: {
             return x;
         }
-        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#0) => 's1: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#0) => 's2: {
             return 69;
         }
-        core::opt::opt::<core::opt::opt<i32>>::#0 => 's2: {
+        core::opt::opt::<core::opt::opt<i32>>::#0 => 's3: {
             return 0;
         }
     }
@@ -34,10 +36,10 @@ thir fun nested_opt::foo(): i32 {
 examples/nested_opt.rkr:21:1
 thir fun nested_opt::bar(): i32 {
     match nested_opt::some_opt() {
-        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's0: {
+        core::opt::opt::<core::opt::opt<i32>>::#1(core::opt::opt::<i32>::#1(x)) => 's1: {
             return x;
         }
-        _ => 's1: {
+        _ => 's2: {
             return 0;
         }
     }

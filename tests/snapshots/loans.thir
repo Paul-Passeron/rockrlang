@@ -1,4 +1,4 @@
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -9,6 +9,8 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/loans.rkr:1:1
@@ -39,7 +41,7 @@ examples/loans.rkr:22:1
 thir fun loans::borrow_across_branch(cond: bool): i32 {
     let x: i32 = 5;
     let r: &i32 = &x;
-    if cond 's0: {
+    if cond 's1: {
         return (*r);
     }
     return 0;
@@ -59,7 +61,7 @@ thir fun loans::borrow_in_loop(n: i32): i32 {
     let x: i32 = 5;
     let mut i: i32 = 0;
     let mut acc: i32 = 0;
-    's0: while (i < n) {
+    's1: while (i < n) {
         let r: &i32 = &x;
         acc = (acc + (*r));
         i = (i + 1);

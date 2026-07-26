@@ -1,9 +1,9 @@
-core/io.rkr:26:5
+core/io.rkr:30:5
 thir fun core::io::str::println(&self): void {
     core::io::printf(c"%.*s\n\0", (*self).len, (*self).data);
 }
 
-core/io.rkr:30:5
+core/io.rkr:34:5
 thir fun core::io::str::print(&self): void {
     core::io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
@@ -14,6 +14,8 @@ thir fun core::panic::panic(message: core::io::str): never {
     <core::io::str>::core::io::str::print(&message);
     core::io::printf(c"\'\n\nAborting with code 1...\n\0");
     core::sys::exit(1);
+    drop obligations:
+        drop message;
 }
 
 examples/pretty_print.rkr:9:5
@@ -34,12 +36,12 @@ thir fun <pretty_print::MyStruct<T0> as pretty_print::PrettyPrint>::print<T0: pr
 examples/pretty_print.rkr:30:5
 thir fun <core::opt::opt<T0> as pretty_print::PrettyPrint>::print<T0: pretty_print::PrettyPrint>(&self): void {
     match self {
-        core::opt::opt::<T0>::#1(val) => 's0: {
+        core::opt::opt::<T0>::#1(val) => 's1: {
             core::io::printf(c"Some(\0");
             <T0>::pretty_print::PrettyPrint::print(&(*val));
             core::io::printf(c")\0");
         }
-        _ => 's1: {
+        _ => 's2: {
             core::io::printf(c"None\0");
         }
     }
