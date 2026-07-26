@@ -103,11 +103,13 @@ pub fn check_stmts(db: &dyn Db, thir: &Thir, stmts: &[ThirStmt]) -> Completeness
         if check_stmt(db, thir, stmt).always_returns() {
             if i < stmts.len() - 1 {
                 let next_stmt = &stmts[i + 1];
-                Diag::generic_warning(
-                    "This statement is unreachable".to_owned(),
-                    next_stmt.span,
-                )
-                .accumulate(db);
+                if !next_stmt.is_synthetic {
+                    Diag::generic_warning(
+                        "This statement is unreachable".to_owned(),
+                        next_stmt.span,
+                    )
+                    .accumulate(db);
+                }
             }
             return Completeness::AlwaysReturns;
         }

@@ -905,6 +905,9 @@ impl TypeRef {
     pub fn is_drop(self, db: &dyn Db) -> bool {
         match self {
             Self::Concrete(type_id) => {
+                if type_id.is_trivial_copy(db) {
+                    return false;
+                }
                 if !self.is_concrete(db) {
                     return true;
                 }
