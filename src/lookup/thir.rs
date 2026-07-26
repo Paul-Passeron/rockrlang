@@ -213,7 +213,6 @@ impl Thir {
                 .or_else(|| branches.iter().find_map(|br| self.branch_at(db, br, loc))),
             StmtKind::Expr(idx) => self.expr_at(*idx, loc),
             StmtKind::Break(_) | StmtKind::Continue(_) | StmtKind::Error => None,
-            StmtKind::Drop(_) => None,
         };
         res.or_else(|| stmt.is_synthetic.not().then_some(ThirNode::Stmt(stmt)))
     }

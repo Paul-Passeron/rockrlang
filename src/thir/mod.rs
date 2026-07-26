@@ -49,6 +49,7 @@ pub struct Thir {
     pub scopes: Arena<ThirScope>,
     pub zelf: Option<LocalId>,
     pub root: Vec<ThirStmt>,
+    pub root_scope: ScopeId,
 }
 
 pub struct ThirLocal {
@@ -194,6 +195,7 @@ pub enum ThirPatternKind {
 pub struct ThirScope {
     pub kind: ScopeKind,
     pub span: Span,
+    pub drops: Vec<LocalId>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

@@ -66,6 +66,10 @@ impl<'db> ThirBuilder<'db> {
         self.scopes.insert(scope)
     }
 
+    pub fn set_scope_drops(&mut self, id: ScopeId, drops: Vec<LocalId>) {
+        self.scopes.get_shared_mut(id).drops = drops;
+    }
+
     pub fn get_local(&self, idx: Idx<ThirLocal>) -> &ThirLocal {
         &self.locals[idx]
     }
@@ -85,6 +89,7 @@ impl<'db> ThirBuilder<'db> {
         params: Vec<LocalId>,
         zelf: Option<LocalId>,
         stmts: Vec<ThirStmt>,
+        root_scope: ScopeId,
     ) -> Thir {
         Thir {
             id,
@@ -95,6 +100,7 @@ impl<'db> ThirBuilder<'db> {
             params,
             zelf,
             root: stmts,
+            root_scope,
         }
     }
 

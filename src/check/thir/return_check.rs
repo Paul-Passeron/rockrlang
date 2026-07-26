@@ -196,7 +196,6 @@ fn check_stmt(db: &dyn Db, thir: &Thir, stmt: &ThirStmt) -> Completeness {
                 Completeness::MayFallthrough { span: stmt.span }
             }
         }
-        StmtKind::Drop(_) => Completeness::MayFallthrough { span: stmt.span },
         _ => Completeness::MayFallthrough { span: stmt.span },
     }
 }

@@ -56,6 +56,7 @@ impl<'a> ThirPrinter<'a> {
         self.line(&format!("thir fun {name} {{"));
         self.indent += 1;
         self.print_stmts(&thir.root);
+        self.print_scope_drops(thir.root_scope);
         self.indent -= 1;
         self.line("}");
     }
@@ -85,6 +86,7 @@ impl<'a> ThirPrinter<'a> {
                 }
                 self.indent += 1;
                 self.print_stmts(stmts);
+                self.print_scope_drops(*scope);
                 self.indent -= 1;
                 self.line("}");
             }
@@ -95,6 +97,7 @@ impl<'a> ThirPrinter<'a> {
                 self.line(&format!("if {c} {lbl}: {{"));
                 self.indent += 1;
                 self.print_stmts(then);
+                self.print_scope_drops(*then_scope);
                 self.indent -= 1;
                 match else_ {
                     Some(else_body) => {
@@ -107,6 +110,9 @@ impl<'a> ThirPrinter<'a> {
                         }
                         self.indent += 1;
                         self.print_stmts(else_body);
+                        if let Some(s) = else_scope {
+                            self.print_scope_drops(*s);
+                        }
                         self.indent -= 1;
                         self.line("}");
                     }
@@ -120,6 +126,7 @@ impl<'a> ThirPrinter<'a> {
                 self.line(&format!("{lbl}: while {c} {{"));
                 self.indent += 1;
                 self.print_stmts(body);
+                self.print_scope_drops(*scope);
                 self.indent -= 1;
                 self.line("}");
             }
@@ -173,9 +180,19 @@ impl<'a> ThirPrinter<'a> {
             }
 
             StmtKind::Error => self.line("<error stmt>;"),
-            StmtKind::Drop(local) => {
-                self.line(&format!("drop {};", self.local_name(*local)))
-            }
+        }
+    }
+
+    fn print_scope_drops(&mut self, scope: ScopeId) {
+        let drops = &self.thir.scopes[scope].drops;
+        if drops.is_empty() {
+            return;
+        }
+        self.line("drop obligations:");
+        for local in drops.iter().rev() {
+            self.indent += 1;
+            self.line(&format!("drop {};", self.local_name(*local)));
+            self.indent -= 1;
         }
     }
 
@@ -196,6 +213,7 @@ impl<'a> ThirPrinter<'a> {
             self.print_stmts(&g.stmts);
         }
         self.print_stmts(&branch.body);
+        self.print_scope_drops(branch.body_scope);
         self.indent -= 1;
         self.line("}");
     }

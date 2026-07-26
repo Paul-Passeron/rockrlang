@@ -103,6 +103,10 @@ impl<T> Arena<T> {
     pub fn get_mut(&mut self, idx: Idx<T>) -> &mut T {
         &mut self[idx]
     }
+
+    pub fn get_shared_mut(&mut self, idx: Idx<T>) -> &mut T {
+        self.inner.get_mut(idx.0).expect("index out of bounds")
+    }
 }
 
 impl<T> IndexMut<Idx<T>> for Arena<T> {
