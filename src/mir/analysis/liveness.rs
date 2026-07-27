@@ -80,14 +80,23 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
 
     fn run(&self, _db: &dyn Db, mir: &Mir) -> Self::Out {
         let domain = mir.locals.len();
+
+        let gen_kill: HashMap<MIRBlockID, (BitSet<MIRLocalID>, BitSet<MIRLocalID>)> = mir
+            .blocks
+            .keys()
+            .map(|blk| {
+                let infos = &mir.blocks[blk];
+                (blk, (infos.bitset_uses(mir), infos.bitset_defs(mir)))
+            })
+            .collect();
+
         mir.fixed_point_iter_bottom::<BitSet<_>>(
             Direction::Backward,
             |blk, old_out| {
-                let infos = &mir.blocks[blk];
-                let mut old = old_out.clone();
-                old.substract(&infos.bitset_defs(mir));
-                let mut res = infos.bitset_uses(mir);
-                res.union(&old);
+                let (uses, defs) = &gen_kill[&blk];
+                let mut res = old_out.clone();
+                res.substract(defs);
+                res.union(uses);
                 res
             },
             None,
