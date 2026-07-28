@@ -23,13 +23,23 @@ use crate::{
     Db,
     hir::Mutability,
     hir::signature::{FunctionSignature, get_sig_of_function},
-    name_resolve::{builtin_module, definition::Definition},
+    name_resolve::{
+        builtin_module, core_package, definition::Definition, main_package, std_package,
+    },
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
-        ModuleId, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
+        ModuleId, Package, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },
     typecheck::inference::{InferTy, InferenceCtx},
 };
+
+/// Whether the crate prefix of `pkg` should be elided when printing paths:
+/// true for `core`, `std`, and the current crate.
+fn is_elided_package(db: &dyn Db, pkg: Package) -> bool {
+    pkg == core_package(db)
+        || std_package(db) == Some(pkg)
+        || main_package(db) == Some(pkg)
+}
 
 #[derive(Default)]
 pub struct TypePrinter {
@@ -86,6 +96,17 @@ impl TypePrinter {
             module: ModuleId,
         ) {
             if module == builtin_module(db) && !opts.has(TypePrinterOption::PrintBuiltin)
+            {
+                return;
+            }
+            // Elide the crate prefix (the package-root segment, whose parent is
+            // the builtin module) for `core`, `std`, and the current crate.
+            // Inner modules are still printed.
+            if !opts.has(TypePrinterOption::PrintBuiltin)
+                && module.parent(db) == Some(builtin_module(db))
+                && module
+                    .owning_package(db)
+                    .is_some_and(|pkg| is_elided_package(db, pkg))
             {
                 return;
             }
@@ -298,10 +319,9 @@ impl TypePrinter {
 
     pub fn function_id_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
         let sig = get_sig_of_function(db, function_id.interned());
-        format!(
-            "{}::{}",
+        Self::join_path(
             self.scope_owner_to_string(db, function_id.parent(db)),
-            self.function_sig_to_string(db, sig)
+            self.function_sig_to_string(db, sig),
         )
     }
 
@@ -310,11 +330,20 @@ impl TypePrinter {
         db: &dyn Db,
         function_id: FunctionId,
     ) -> String {
-        format!(
-            "{}::{}",
+        Self::join_path(
             self.scope_owner_to_string(db, function_id.parent(db)),
-            function_id.name(db).display(db)
+            function_id.name(db).display(db).to_string(),
         )
+    }
+
+    /// Joins a scope prefix and a name with `::`, dropping the separator when
+    /// the prefix is empty (e.g. an elided crate root).
+    fn join_path(prefix: String, name: String) -> String {
+        if prefix.is_empty() {
+            name
+        } else {
+            format!("{prefix}::{name}")
+        }
     }
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {

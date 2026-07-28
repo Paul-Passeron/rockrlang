@@ -183,6 +183,19 @@ pub fn core_module(db: &dyn Db) -> ModuleId {
     file_module_id(db, *file_module, Some(builtin_module(db)), package)
 }
 
+/// The package currently being compiled, i.e. the workspace package that is
+/// neither `core` nor `std`. Used to elide the crate prefix when printing.
+#[salsa::tracked(returns(copy))]
+pub fn main_package(db: &dyn Db) -> Option<Package<'_>> {
+    let ws = Workspace::get(db);
+    let core = core_package(db);
+    let std = std_package(db);
+    workspace_packages(db, ws)
+        .iter()
+        .find(|pkg| **pkg != core && Some(**pkg) != std)
+        .copied()
+}
+
 fn collect_modules_in_file_module<'db>(
     db: &'db dyn Db,
     file_module: FileModule<'db>,
