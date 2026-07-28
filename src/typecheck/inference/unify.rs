@@ -99,6 +99,8 @@ impl InferenceCtx<'_> {
     fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
         let root = self.table.find(a);
         let other = if root == a { b } else { a };
+        self.record_listeners(other);
+        self.record_listeners(root);
         let flattened = self.listeners.remove(&other).into_iter().flatten().collect_vec();
         self.listeners.entry(root).or_default().extend(flattened);
     }
@@ -116,15 +118,15 @@ impl InferenceCtx<'_> {
                     return Err(UnificationError::RecursiveDefinition(*infer_var));
                 }
                 self.table.unify_var_value(*infer_var, Some(resolved))?;
-                self.listeners
-                    .remove(&self.table.find(*infer_var))
-                    .into_iter()
-                    .flatten()
-                    .for_each(|l| {
-                        if self.ready_set.insert(l) {
-                            self.ready.push_back(l);
-                        }
-                    });
+                let root = self.table.find(*infer_var);
+                self.record_listeners(root);
+                let woken =
+                    self.listeners.remove(&root).into_iter().flatten().collect_vec();
+                for l in woken {
+                    if self.ready_set_insert(l) {
+                        self.ready_push(l);
+                    }
+                }
                 Ok(())
             }
             (

@@ -772,6 +772,10 @@ impl<'db> InferenceCtx<'db> {
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
+        debug_assert!(
+            !self.in_snapshot(),
+            "solve_constraints must not run inside a snapshot"
+        );
         loop {
             while let Some(id) = self.ready.pop_front() {
                 if self.error_constraints.contains(&id) {

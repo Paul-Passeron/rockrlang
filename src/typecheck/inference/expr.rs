@@ -229,7 +229,7 @@ impl InferenceCtx<'_> {
             }
             HirPlaceKind::Temporary(hir_expr) => self.infer_expr(hir_expr),
         }?;
-        self.inferred_places.insert(PlaceId(place.id), val.clone());
+        self.set_inferred_place(PlaceId(place.id), val.clone());
         Ok(val)
     }
 
@@ -240,7 +240,7 @@ impl InferenceCtx<'_> {
     pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
             let ty = this.infer_expr_aux(expr)?;
-            this.inferred_exprs.insert(ExprId(expr.id), ty.clone());
+            this.set_inferred_expr(ExprId(expr.id), ty.clone());
             Ok(ty)
         })
     }

@@ -109,6 +109,30 @@ pub struct InferenceCtx<'a> {
     pub inferred_places: BTreeMap<PlaceId, InferTy>,
 
     in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
+
+    undo_log: Vec<SnapshotUndo>,
+    snapshot_depth: usize,
+}
+
+#[derive(Clone)]
+enum SnapshotUndo {
+    InferredExpr(ExprId, Option<InferTy>),
+    InferredPattern(PatternId, Option<InferTy>),
+    InferredPlace(PlaceId, Option<InferTy>),
+    Listeners(InferVar, Option<Vec<InferenceConstraintId>>),
+    ReadySet(InferenceConstraintId),
+    ReadyPush(InferenceConstraintId),
+}
+
+fn restore<K: Ord, V>(map: &mut BTreeMap<K, V>, key: K, old: Option<V>) {
+    match old {
+        Some(value) => {
+            map.insert(key, value);
+        }
+        None => {
+            map.remove(&key);
+        }
+    }
 }
 
 impl<'db> InferenceCtx<'db> {
@@ -179,6 +203,8 @@ impl<'db> InferenceCtx<'db> {
             inferred_exprs: BTreeMap::new(),
             inferred_patterns: BTreeMap::new(),
             inferred_places: BTreeMap::new(),
+            undo_log: Vec::new(),
+            snapshot_depth: 0,
         };
 
         let ast = function_ast(this.db, func.interned()).inner(this.db);
@@ -399,29 +425,97 @@ impl InferenceCtx<'_> {
         &mut self,
         f: impl Fn(&mut Self) -> Result<T, UnificationError>,
     ) -> Result<T, UnificationError> {
-        let old_listeners = self.listeners.clone();
-        let old_ready = self.ready.clone();
-        let old_ready_set = self.ready_set.clone();
-        let old_exprs = self.inferred_exprs.clone();
-        let old_patterns = self.inferred_patterns.clone();
-        let old_places = self.inferred_places.clone();
+        let mark = self.undo_log.len();
+        self.snapshot_depth += 1;
         let snapshot = self.table.snapshot();
-        match f(self) {
-            Ok(res) => {
-                self.table.commit(snapshot);
-                Ok(res)
-            }
-            Err(err) => {
+        let res = f(self);
+        self.snapshot_depth -= 1;
+        match &res {
+            Ok(_) => self.table.commit(snapshot),
+            Err(_) => {
                 self.table.rollback_to(snapshot);
-                self.listeners = old_listeners;
-                self.ready = old_ready;
-                self.ready_set = old_ready_set;
-                self.inferred_exprs = old_exprs;
-                self.inferred_patterns = old_patterns;
-                self.inferred_places = old_places;
-                Err(err)
+                self.rollback_undo_log(mark);
             }
         }
+        if self.snapshot_depth == 0 {
+            self.undo_log.clear();
+        }
+        res
+    }
+
+    fn rollback_undo_log(&mut self, mark: usize) {
+        while self.undo_log.len() > mark {
+            match self.undo_log.pop().expect("len > mark") {
+                SnapshotUndo::InferredExpr(id, old) => {
+                    restore(&mut self.inferred_exprs, id, old)
+                }
+                SnapshotUndo::InferredPattern(id, old) => {
+                    restore(&mut self.inferred_patterns, id, old)
+                }
+                SnapshotUndo::InferredPlace(id, old) => {
+                    restore(&mut self.inferred_places, id, old)
+                }
+                SnapshotUndo::Listeners(var, old) => {
+                    restore(&mut self.listeners, var, old)
+                }
+                SnapshotUndo::ReadySet(id) => {
+                    self.ready_set.remove(&id);
+                }
+                SnapshotUndo::ReadyPush(id) => {
+                    let popped = self.ready.pop_back();
+                    debug_assert_eq!(
+                        popped,
+                        Some(id),
+                        "`ready` must be append-only inside a snapshot"
+                    );
+                }
+            }
+        }
+    }
+
+    fn in_snapshot(&self) -> bool {
+        self.snapshot_depth > 0
+    }
+
+    fn push_undo(&mut self, undo: SnapshotUndo) {
+        if self.in_snapshot() {
+            self.undo_log.push(undo);
+        }
+    }
+
+    pub(super) fn record_listeners(&mut self, var: InferVar) {
+        if self.in_snapshot() {
+            let old = self.listeners.get(&var).cloned();
+            self.undo_log.push(SnapshotUndo::Listeners(var, old));
+        }
+    }
+
+    pub(super) fn set_inferred_expr(&mut self, id: ExprId, ty: InferTy) {
+        let old = self.inferred_exprs.insert(id, ty);
+        self.push_undo(SnapshotUndo::InferredExpr(id, old));
+    }
+
+    pub(super) fn set_inferred_pattern(&mut self, id: PatternId, ty: InferTy) {
+        let old = self.inferred_patterns.insert(id, ty);
+        self.push_undo(SnapshotUndo::InferredPattern(id, old));
+    }
+
+    pub(super) fn set_inferred_place(&mut self, id: PlaceId, ty: InferTy) {
+        let old = self.inferred_places.insert(id, ty);
+        self.push_undo(SnapshotUndo::InferredPlace(id, old));
+    }
+
+    pub(super) fn ready_push(&mut self, id: InferenceConstraintId) {
+        self.ready.push_back(id);
+        self.push_undo(SnapshotUndo::ReadyPush(id));
+    }
+
+    pub(super) fn ready_set_insert(&mut self, id: InferenceConstraintId) -> bool {
+        let inserted = self.ready_set.insert(id);
+        if inserted {
+            self.push_undo(SnapshotUndo::ReadySet(id));
+        }
+        inserted
     }
 
     pub fn solve(&mut self, ty: &InferTy) -> Option<TypeRef> {

@@ -40,7 +40,7 @@ impl InferenceCtx<'_> {
     ) -> Result<InferTy, UnificationError> {
         self.snapshot(|this| {
             let ty = this.infer_pattern_aux(pattern, binds_like)?;
-            this.inferred_patterns.insert(PatternId(pattern.id), ty.clone());
+            this.set_inferred_pattern(PatternId(pattern.id), ty.clone());
             Ok(ty)
         })
     }

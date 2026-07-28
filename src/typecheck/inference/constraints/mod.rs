@@ -413,6 +413,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn register_listeners(&mut self, constraint: &InferenceConstraint) {
         for listener in constraint.listeners(self) {
+            self.record_listeners(listener);
             self.listeners.entry(listener).or_default().push(constraint.id);
         }
     }

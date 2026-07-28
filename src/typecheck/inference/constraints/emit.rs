@@ -34,7 +34,7 @@ use crate::{
 impl InferenceCtx<'_> {
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {
         let constraint = Arc::new(self.fresh_constraint(constraint));
-        self.ready.push_back(constraint.id);
+        self.ready_push(constraint.id);
         self.register_listeners(&constraint);
         self.all_constraints.insert(constraint.id, constraint);
     }
