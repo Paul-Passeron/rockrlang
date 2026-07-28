@@ -24,7 +24,10 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    common::arena::{Arena, Idx},
+    common::{
+        arena::{Arena, Idx},
+        bitset::{BitSet, BitSetIdx},
+    },
     hir::Mutability,
     mir::{
         MIRBlockID, MIRLocalID, Mir,
@@ -41,6 +44,16 @@ use crate::{
 pub struct MIRLoanAnalysis;
 
 pub type LoanID = Idx<Loan>;
+
+impl BitSetIdx for LoanID {
+    fn as_idx(&self) -> usize {
+        self.into_raw()
+    }
+
+    fn from_idx(idx: usize) -> Self {
+        Self::from_raw(idx)
+    }
+}
 
 pub struct MIRLoanOut {
     pub loans: Arena<Loan>,
@@ -65,12 +78,26 @@ impl MIRAnalysis<'_, '_> for MIRLoanAnalysis {
 
     fn run(&self, db: &dyn Db, mir: &Mir) -> Self::Out {
         let loans = Self::collect_loans(mir);
+        let loan_count = loans.len();
         let by_holder = loans.by_holder();
         let liveness = mir.liveness(db);
-        let loans_live_in = Self::project_liveness(&liveness.live_in, &by_holder);
-        let loans_live_out = Self::project_liveness(&liveness.live_out, &by_holder);
+        let loans_live_in =
+            Self::project_liveness(&liveness.live_in, &by_holder, loan_count);
+        let loans_live_out =
+            Self::project_liveness(&liveness.live_out, &by_holder, loan_count);
         let indices = loans.iter().map(|(id, loan)| (loan.created_at, id)).collect();
-        MIRLoanOut { loans, indices, loans_live_in, loans_live_out }
+        MIRLoanOut {
+            loans,
+            indices,
+            loans_live_in: loans_live_in
+                .into_iter()
+                .map(|(key, val)| (key, val.iter().collect()))
+                .collect(),
+            loans_live_out: loans_live_out
+                .into_iter()
+                .map(|(key, val)| (key, val.iter().collect()))
+                .collect(),
+        }
     }
 }
 
@@ -99,22 +126,26 @@ impl MIRLoanAnalysis {
         loans
     }
 
-    // TODO: this over-approximates when a local is reassigned with a different
-    // loan
     fn project_liveness(
-        liveness: &BlockMap<HashSet<MIRLocalID>>,
+        liveness: &BlockMap<BitSet<MIRLocalID>>,
         by_holder: &HashMap<MIRLocalID, Vec<LoanID>>,
-    ) -> BlockMap<HashSet<LoanID>> {
+        loan_count: usize,
+    ) -> BlockMap<BitSet<LoanID>> {
         liveness
             .iter()
             .map(|(blk, ids)| {
-                (
-                    *blk,
-                    ids.iter()
-                        .filter_map(|local| Some(by_holder.get(local)?.iter().copied()))
-                        .flatten()
-                        .collect(),
-                )
+                (*blk, {
+                    let mut res = BitSet::new(loan_count);
+                    for id in ids.iter() {
+                        let Some(locals) = by_holder.get(&id) else {
+                            continue;
+                        };
+                        for local in locals {
+                            res.insert(local);
+                        }
+                    }
+                    res
+                })
             })
             .collect()
     }

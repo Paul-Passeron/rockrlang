@@ -28,9 +28,9 @@ use std::{
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
+    common::{bitset::BitSet, location::Span, symbols::Symbol},
     hir::Mutability,
-    mir::{ConstructorArgs, LocalID, MIRLocalID, Operand, Projection, RValueKind},
+    mir::{ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Projection, RValueKind},
     parse_tree::expr::BinaryOperator,
     resolved::{TypeRef, bool_id, char_id, ptr_of},
     thir::{EnumRef, FunctionRef, StructRef},
@@ -172,9 +172,62 @@ impl MIRRValue {
             }
         }
     }
+
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        match &self.kind {
+            MIRRValueKind::Ref(p, _)
+            | MIRRValueKind::AddressOf(p, _)
+            | MIRRValueKind::Discriminant(p) => p.bitset_uses(mir),
+            MIRRValueKind::BinOp(_, l, r) => {
+                let mut res = l.bitset_uses(mir);
+                res.union(&r.bitset_uses(mir));
+                res
+            }
+            MIRRValueKind::Cast(op, _)
+            | MIRRValueKind::Use(op)
+            | MIRRValueKind::UnaryOp(_, op)
+            | MIRRValueKind::Metadata(op) => op.bitset_uses(mir),
+            MIRRValueKind::SizeOf(_) => BitSet::new(domain),
+            MIRRValueKind::Constructor { args, .. } => args.bitset_uses(mir),
+            MIRRValueKind::StructLit { fields, .. } => {
+                let mut res = BitSet::new(domain);
+                fields.values().for_each(|field| {
+                    res.union(&field.bitset_uses(mir));
+                });
+                res
+            }
+            MIRRValueKind::Tuple(ops, _) => {
+                let mut res = BitSet::new(domain);
+                ops.iter().for_each(|field| {
+                    res.union(&field.bitset_uses(mir));
+                });
+                res
+            }
+        }
+    }
 }
 
 impl MIRConstructorArgs {
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        let mut res = BitSet::new(domain);
+        match self {
+            Self::None => (),
+            Self::Tuple(ops) => {
+                ops.iter().for_each(|op| {
+                    res.union(&op.bitset_uses(mir));
+                });
+            }
+            Self::Struct(fields) => {
+                fields.values().for_each(|op| {
+                    res.union(&op.bitset_uses(mir));
+                });
+            }
+        }
+        res
+    }
+
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::None => HashSet::new(),
@@ -185,6 +238,14 @@ impl MIRConstructorArgs {
 }
 
 impl MIROperand {
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        match self {
+            Self::Constant(_, _) => BitSet::new(domain),
+            Self::Move(p) | Self::Copy(p) => p.bitset_uses(mir),
+        }
+    }
+
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::Constant(_, _) => HashSet::new(),
@@ -194,6 +255,15 @@ impl MIROperand {
 }
 
 impl MIRPlace {
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let mut res = BitSet::new(mir.locals.len());
+        res.insert(&self.local);
+        self.projections.iter().for_each(|proj| {
+            res.union(&proj.bitset_uses(mir));
+        });
+        res
+    }
+
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         once(self.local)
             .chain(self.projections.iter().flat_map(MIRProjection::uses))
@@ -202,6 +272,17 @@ impl MIRPlace {
 }
 
 impl MIRProjection {
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        match self {
+            Self::TupleField { .. }
+            | Self::Field { .. }
+            | Self::Downcast { .. }
+            | Self::Deref => BitSet::new(domain),
+            Self::Index { index } => index.bitset_uses(mir),
+        }
+    }
+
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::TupleField { .. }

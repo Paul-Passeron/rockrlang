@@ -20,10 +20,8 @@ use std::collections::HashSet;
 use salsa::Accumulator;
 
 use crate::{
-    Db,
-    compiler::diagnostic::Diag,
-    mir::{
-        Mir, MIRBlockID, MIRLocalID,
+    Db, common::bitset::BitSet, compiler::diagnostic::Diag, mir::{
+        MIRBlockID, MIRLocalID, Mir,
         analysis::{
             init_tracking::IterOperand,
             loans::{LoanID, MIRLoanOut, MIRStmtIndex},
@@ -52,19 +50,19 @@ fn check_block(db: &dyn Db, mir: &Mir, blk: MIRBlockID, loans: &MIRLoanOut) {
     check_terminator(db, &block.terminator, loans, &state);
 }
 
-fn live_in_per_stmt(db: &dyn Db, mir: &Mir, blk: MIRBlockID) -> Vec<HashSet<MIRLocalID>> {
+fn live_in_per_stmt(db: &dyn Db, mir: &Mir, blk: MIRBlockID) -> Vec<BitSet<MIRLocalID>> {
     let block = &mir.blocks[blk];
     let mut seed = mir.liveness(db).live_out[&blk].clone();
     for def in block.terminator.defs() {
         seed.remove(&def);
     }
-    seed.extend(block.terminator.uses());
+    seed.union(&block.terminator.bitset_uses(mir));
     let mut res = vec![seed];
     for stmt in block.stmts.iter().rev() {
         let mut current = res.last().unwrap().clone();
         let Stmt::Assign { dest, rvalue } = stmt;
         current.remove(&dest.local);
-        current.extend(rvalue.uses());
+        current.union(&rvalue.bitset_uses(mir));
         res.push(current);
     }
     res.reverse();
@@ -77,7 +75,7 @@ fn check_stmt(
     stmt: &Stmt,
     stmt_idx: usize,
     loans: &MIRLoanOut,
-    live_in_this_stmt: &HashSet<MIRLocalID>,
+    live_in_this_stmt: &BitSet<MIRLocalID>,
     state: &mut HashSet<LoanID>,
 ) {
     let Stmt::Assign { dest, rvalue } = stmt;

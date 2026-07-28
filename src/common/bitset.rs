@@ -54,14 +54,14 @@ impl<T> Clone for BitSet<T> {
 
 impl<T: BitSetIdx + Debug> Debug for BitSet<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(self.iter().map(T::from_idx)).finish()
+        f.debug_list().entries(self.iter()).finish()
     }
 }
 
 impl<T: BitSetIdx + Display> Display for BitSet<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_list()
-            .entries(self.iter().map(T::from_idx).map(|val| val.to_string()))
+            .entries(self.iter().map(|val| val.to_string()))
             .finish()
     }
 }
@@ -167,10 +167,11 @@ impl<T: BitSetIdx> BitSet<T> {
         changed
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = usize> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = T> + '_ {
         self.words.iter().enumerate().flat_map(|(w, &word)| {
-            (0..WORD_BITS)
-                .filter_map(move |b| (word & (1 << b) != 0).then_some(w * WORD_BITS + b))
+            (0..WORD_BITS).filter_map(move |b| {
+                (word & (1 << b) != 0).then_some(w * WORD_BITS + b).map(T::from_idx)
+            })
         })
     }
 }

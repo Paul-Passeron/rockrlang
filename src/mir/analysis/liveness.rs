@@ -15,20 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
+use std::{collections::HashMap, fmt};
 
 use itertools::Itertools;
 
 use crate::{
     Db,
+    common::bitset::{BitSet, BitSetIdx},
     mir::{
-        Mir, MIRBlockID, MIRLocalID,
+        MIRBlockID, MIRLocalID, Mir,
         analysis::{
             MIRAnalysis,
-            lattice::{Direction, FixedPointBlockRes},
+            lattice::{Direction, FixedPointBlockRes, Lattice, LatticeChange},
         },
     },
 };
@@ -37,14 +35,40 @@ pub struct MIRLivenessAnalysis;
 
 #[derive(PartialEq, Eq)]
 pub struct MIRLivenessResult {
-    pub live_in: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
-    pub live_out: HashMap<MIRBlockID, HashSet<MIRLocalID>>,
+    pub live_in: HashMap<MIRBlockID, BitSet<MIRLocalID>>,
+    pub live_out: HashMap<MIRBlockID, BitSet<MIRLocalID>>,
 }
 
-impl From<FixedPointBlockRes<HashSet<MIRLocalID>>> for MIRLivenessResult {
+impl BitSetIdx for MIRLocalID {
+    fn as_idx(&self) -> usize {
+        self.into_raw()
+    }
+
+    fn from_idx(idx: usize) -> Self {
+        Self::from_raw(idx)
+    }
+}
+
+impl<Idx: BitSetIdx> Lattice for BitSet<Idx> {
+    fn bottom() -> Self {
+        unimplemented!()
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        let mut res = self.clone();
+        res.join_assign(other);
+        res
+    }
+
+    fn join_assign(&mut self, other: &Self) -> LatticeChange {
+        if self.union(other) { LatticeChange::Changed } else { LatticeChange::Unchanged }
+    }
+}
+
+impl From<FixedPointBlockRes<BitSet<MIRLocalID>>> for MIRLivenessResult {
     fn from(
         FixedPointBlockRes { block_in, block_out }: FixedPointBlockRes<
-            HashSet<MIRLocalID>,
+            BitSet<MIRLocalID>,
         >,
     ) -> Self {
         Self { live_in: block_in, live_out: block_out }
@@ -55,17 +79,19 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
     type Out = MIRLivenessResult;
 
     fn run(&self, _db: &dyn Db, mir: &Mir) -> Self::Out {
-        mir.fixed_point_iter::<HashSet<_>>(
+        let domain = mir.locals.len();
+        mir.fixed_point_iter_bottom::<BitSet<_>>(
             Direction::Backward,
             |blk, old_out| {
                 let infos = &mir.blocks[blk];
-                infos
-                    .uses()
-                    .into_iter()
-                    .chain(old_out.difference(&infos.defs()).copied())
-                    .collect()
+                let mut old = old_out.clone();
+                old.substract(&infos.bitset_defs(mir));
+                let mut res = infos.bitset_uses(mir);
+                res.union(&old);
+                res
             },
             None,
+            move || BitSet::new(domain),
         )
         .into()
     }

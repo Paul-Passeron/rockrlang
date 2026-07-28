@@ -280,7 +280,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
         llvm_module.print_to_stderr();
     }
 
-    let machine = optimize(&llvm_module, OptimizationLevel::Aggressive);
+    let machine = optimize(&llvm_module, OptimizationLevel::Less);
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();

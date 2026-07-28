@@ -18,11 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::{BTreeMap, HashSet};
 
 use crate::{
-    common::location::Span,
-    mir::{Callee, MIRLocalID, Place, RValue, Terminator},
+    common::{bitset::BitSet, location::Span},
+    mir::{Callee, MIRLocalID, Mir, Place, RValue, Terminator},
 };
 
-use super::{BlockID, LocalID, Operand};
+use super::{BlockID, LocalID, Operand, operand::MIROperand};
 
 /// Come with me if you want to live
 #[derive(PartialEq, Eq)]
@@ -88,11 +88,41 @@ impl MIRBasicBlock {
 }
 
 impl MIRBasicBlock {
+    pub fn bitset_defs(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let mut res = self.terminator.bitset_defs(mir);
+        self.stmts.iter().for_each(|stmt| match stmt {
+            Stmt::Assign { dest, .. } => {
+                res.insert(&dest.local);
+            }
+        });
+        res
+    }
+
     pub fn defs(&self) -> HashSet<MIRLocalID> {
         let mut res = self.terminator.defs();
         res.extend(self.stmts.iter().map(|stmt| match stmt {
             Stmt::Assign { dest, .. } => dest.local,
         }));
+        res
+    }
+
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        let mut res = BitSet::new(domain);
+        let mut defined_so_far = BitSet::new(domain);
+        for stmt in &self.stmts {
+            match stmt {
+                Stmt::Assign { dest, rvalue } => {
+                    let mut uses = rvalue.bitset_uses(mir);
+                    uses.substract(&defined_so_far);
+                    res.union(&uses);
+                    defined_so_far.insert(&dest.local);
+                }
+            }
+        }
+        let mut term_uses = self.terminator.bitset_uses(mir);
+        term_uses.substract(&defined_so_far);
+        res.union(&term_uses);
         res
     }
 
@@ -124,6 +154,18 @@ impl MIRBasicBlock {
 }
 
 impl MIRTerminator {
+    pub fn bitset_defs(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        let mut res = BitSet::new(domain);
+        match self {
+            Self::Call { dest, .. } => {
+                res.insert(dest);
+            }
+            _ => (),
+        };
+        res
+    }
+
     pub fn defs(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::Call { dest, .. } => HashSet::from([*dest]),
@@ -131,14 +173,38 @@ impl MIRTerminator {
         }
     }
 
+    pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
+        let domain = mir.locals.len();
+        match self {
+            Self::Goto { .. } | Self::Diverge => BitSet::new(domain),
+            Self::Call { arguments, .. } => {
+                let mut res = BitSet::new(domain);
+                arguments.iter().for_each(|op| {
+                    res.union(&op.bitset_uses(mir));
+                });
+                res
+            }
+            Self::Return { value: op, .. } => {
+                let mut res = BitSet::new(domain);
+                op.iter().for_each(|op| {
+                    res.union(&op.bitset_uses(mir));
+                });
+                res
+            }
+            Self::Switch { discriminant: op, .. } | Self::Branch { cond: op, .. } => {
+                op.bitset_uses(mir)
+            }
+        }
+    }
+
     pub fn uses(&self) -> HashSet<MIRLocalID> {
         match self {
             Self::Goto { .. } | Self::Diverge => HashSet::new(),
             Self::Call { arguments, .. } => {
-                arguments.iter().flat_map(super::operand::MIROperand::uses).collect()
+                arguments.iter().flat_map(MIROperand::uses).collect()
             }
             Self::Return { value: op, .. } => {
-                op.iter().flat_map(super::operand::MIROperand::uses).collect()
+                op.iter().flat_map(MIROperand::uses).collect()
             }
             Self::Switch { discriminant: op, .. } | Self::Branch { cond: op, .. } => {
                 op.uses()
