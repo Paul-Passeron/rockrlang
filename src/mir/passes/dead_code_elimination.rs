@@ -55,12 +55,6 @@ pub struct DCECtx<'a> {
     successors: HashMap<OldBlockID, HashSet<OldBlockID>>,
 }
 
-struct PathCompressionRes {
-    i: usize,
-    j: usize,
-    reversed: bool,
-}
-
 impl<'a> DCECtx<'a> {
     pub fn new(db: &'a dyn Db, mir: &'a Mir) -> Self {
         let entry_name = mir.blocks[mir.entry].name.clone();
@@ -101,80 +95,33 @@ impl<'a> DCECtx<'a> {
         self.b.set_parameters(new_params);
     }
 
-    fn can_compress_paths(
-        &self,
-        p1: &[OldBlockID],
-        p2: &[OldBlockID],
-    ) -> Option</* reversed */ bool> {
-        let (p1, p2, reversed) = {
-            let p1_fst = p1.first().unwrap();
-            let p2_last = p2.last().unwrap();
-            if self.successors[p2_last].contains(p1_fst) {
-                (p2, p1, true)
-            } else {
-                (p1, p2, false)
-            }
-        };
-
-        let p1_last = *p1.last().unwrap();
-        let p2_fst = *p2.first().unwrap();
-
-        if !matches!(&self.mir.blocks[p1_last].terminator, MIRTerminator::Goto { .. },) {
-            return None;
-        }
-
-        if self.successors[&p1_last].len() != 1 {
-            return None;
-        }
-
-        if self.predecessors[&p2_fst].len() != 1 {
-            return None;
-        }
-
-        let p1_next = *self.successors[&p1_last].iter().next().unwrap();
-
-        if p1_next != p2_fst {
-            return None;
-        }
-
-        Some(reversed)
-    }
-
-    fn find_next_path_compression(
-        &self,
-        paths: &[Vec<OldBlockID>],
-    ) -> Option<PathCompressionRes> {
-        (0..paths.len()).flat_map(|i| (0..i).map(|j| (i, j)).collect_vec()).find_map(
-            |(i, j)| {
-                let reversed = self.can_compress_paths(&paths[i], &paths[j])?;
-                Some(PathCompressionRes { i, j, reversed })
-            },
-        )
-    }
-
-    fn compress_paths(
-        paths: &mut Vec<Vec<OldBlockID>>,
-        i: usize,
-        j: usize,
-        reversed: bool,
-    ) {
-        if reversed {
-            let p2 = paths.remove(i);
-            paths[j].extend(p2);
-        } else {
-            let p2 = paths.remove(j);
-            paths[i - 1].extend(p2);
-        }
-    }
-
     fn compute_paths(&self) -> Vec<Vec<OldBlockID>> {
-        let mut paths = self.reachable.iter().map(|blk| vec![*blk]).collect_vec();
-        while let Some(PathCompressionRes { i, j, reversed }) =
-            self.find_next_path_compression(&paths)
-        {
-            Self::compress_paths(&mut paths, i, j, reversed);
+        let mut merge_next: HashMap<OldBlockID, OldBlockID> = HashMap::new();
+        let mut has_prev: HashSet<OldBlockID> = HashSet::new();
+        for &a in &self.reachable {
+            if let MIRTerminator::Goto { next } = &self.mir.blocks[a].terminator {
+                let b = *next;
+                if self.successors[&a].len() == 1
+                    && self.predecessors[&b].len() == 1
+                {
+                    merge_next.insert(a, b);
+                    has_prev.insert(b);
+                }
+            }
         }
-        paths
+        self.reachable
+            .iter()
+            .filter(|blk| !has_prev.contains(blk))
+            .map(|&head| {
+                let mut path = vec![head];
+                let mut cur = head;
+                while let Some(&next) = merge_next.get(&cur) {
+                    path.push(next);
+                    cur = next;
+                }
+                path
+            })
+            .collect()
     }
 
     fn compute_path_heads(paths: &[Vec<OldBlockID>]) -> HashMap<OldBlockID, usize> {
