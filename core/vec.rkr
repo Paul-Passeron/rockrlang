@@ -142,3 +142,122 @@ impl<T> IntoIterator for Vec<T> {
         };
     }
 }
+
+impl <T> Vec<T> {
+    fun to_array(self): Array<T> {
+        let contents = realloc(self.contents as *mut void, @sizeof(T) * self.len as usize);
+        return Array {
+            .contents: contents as *mut T,
+            .len: self.len
+        };
+    }
+}
+
+struct Array<T> {
+    contents: *mut T;
+    len: usize;
+}
+
+impl <T> Array<T> {
+    fun new(len: usize): Self {
+        let mut cap = len;
+        if cap == 0 {
+            cap = 1;
+        }
+        let contents = malloc(@sizeof(T) * cap);
+        return Self {
+           .contents: contents as *mut _,
+           .len: cap
+        };
+    }
+
+    fun get(&self, idx: usize):  opt<&T> {
+        if idx < self.len {
+            return opt::Some(&self.contents[idx]);
+        }
+        return opt::None;
+    }
+
+    fun set(&mut self, idx: usize, value: T): void {
+        if idx >= self.len {
+            panic("Cannot set a value beyond the array's length");
+        }
+        self.contents[idx] = value;
+    }
+
+    fun iter(&self): ArrayIterRef<T> {
+        return ArrayIterRef {
+            .arr: self,
+            .idx: 0
+        };
+    }
+
+    fun iter_owned(self): ArrayIter<T> {
+        return ArrayIter {
+            .arr: self,
+            .idx: 0
+        };
+    }
+}
+
+struct ArrayIterRef<T> {
+    arr: &Array<T>;
+    idx: usize;
+}
+
+struct ArrayIter<T> {
+    arr: Array<T>;
+    idx: usize;
+}
+
+impl<T> Iter for ArrayIter<T> {
+    type Item = T;
+
+    fun next(&mut self): opt<T> {
+        let res = self.arr.get(self.idx);
+        match res {
+            opt::Some(r) => {
+                self.idx = self.idx + 1;
+                return opt::Some(*r);
+            }
+            opt::None => {
+                return opt::None;
+            }
+        }
+    }
+}
+
+impl<T> Iter for ArrayIterRef<T> {
+    type Item = &T;
+
+    fun next(&mut self): opt<&T> {
+        let res = self.arr.get(self.idx);
+        match res {
+            opt::Some(_) => {self.idx = self.idx + 1;} 
+            _ => {}
+        }
+        return res;
+    }
+}
+
+impl <T> IntoIterator for Array<T> {
+    type Out = ArrayIter<T>;
+
+    fun into_iter(self): ArrayIter<T> {
+        return self.iter_owned();
+    }
+}
+
+impl <T> IntoIterator for &Array<T> {
+    type Out = ArrayIterRef<T>;
+
+    fun into_iter(self): ArrayIterRef<T> {
+        return self.iter();
+    }
+}
+
+impl <T> core::mem::Drop for Array<T> {
+    fun drop(&mut self): void {
+        free(self.contents as *mut _);
+    }
+}
