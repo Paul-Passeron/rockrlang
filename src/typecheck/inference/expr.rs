@@ -238,11 +238,14 @@ impl InferenceCtx<'_> {
     }
 
     pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
-        self.snapshot(|this| {
+        let prev_span = self.set_current_span(expr.span);
+        let res = self.snapshot(|this| {
             let ty = this.infer_expr_aux(expr)?;
             this.set_inferred_expr(ExprId(expr.id), ty.clone());
             Ok(ty)
-        })
+        });
+        self.set_current_span(prev_span);
+        res
     }
 
     pub fn local_var(&self, local_id: LocalId) -> InferVar {

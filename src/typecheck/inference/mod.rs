@@ -33,7 +33,7 @@ use std::{
 
 use crate::{
     Db,
-    common::symbols::Symbol,
+    common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{LocalId, Mutability, function_ast},
     name_resolve::{
@@ -103,6 +103,8 @@ pub struct InferenceCtx<'a> {
     call_infos: BTreeMap<ExprId, InferCallInfos>,
     next_constraint_id: usize,
     impl_depth: usize,
+
+    current_span: Span,
 
     pub inferred_exprs: BTreeMap<ExprId, InferTy>,
     pub inferred_patterns: BTreeMap<PatternId, InferTy>,
@@ -193,6 +195,7 @@ impl<'db> InferenceCtx<'db> {
             error_constraints: BTreeSet::new(),
             call_infos: BTreeMap::new(),
             next_constraint_id: 0,
+            current_span: func.span(db),
             implements: BTreeMap::new(),
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
@@ -276,6 +279,10 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn implicit_ctx(&self) -> Arc<ImplicitContext> {
         self.implicit_ctx.clone()
+    }
+
+    pub fn set_current_span(&mut self, span: Span) -> Span {
+        mem::replace(&mut self.current_span, span)
     }
 
     pub fn unsolved_constraints(&self) -> Vec<Arc<InferenceConstraint>> {

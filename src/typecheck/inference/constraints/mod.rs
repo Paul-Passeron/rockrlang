@@ -26,7 +26,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    common::symbols::Symbol,
+    common::{location::Span, symbols::Symbol},
     hir::interface_items,
     parse_tree::{
         expr::BinaryOperator,
@@ -57,6 +57,7 @@ pub struct InferenceConstraintId(pub usize);
 pub struct InferenceConstraint {
     pub id: InferenceConstraintId,
     pub kind: InferenceConstraintKind,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -406,6 +407,7 @@ impl<'db> InferenceCtx<'db> {
         let res = InferenceConstraint {
             id: InferenceConstraintId(self.next_constraint_id),
             kind: constraint,
+            span: self.current_span,
         };
         self.next_constraint_id += 1;
         res
