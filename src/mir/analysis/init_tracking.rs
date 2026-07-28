@@ -202,12 +202,11 @@ impl BitSetIdx for MoveKeyId {
     }
 }
 
-pub type MoveMap = HashMap<MoveKey, InitState>;
-
 #[derive(PartialEq, Eq)]
 pub struct MIRInitOut {
-    pub init_in: BlockMap<MoveMap>,
-    pub init_out: BlockMap<MoveMap>,
+    key_of: HashMap<MoveKey, MoveKeyId>,
+    affected: Vec<BitSet<MoveKeyId>>,
+    init_in: BlockMap<IdInitMap>,
 }
 
 impl MoveKey {
@@ -222,23 +221,54 @@ impl MoveKey {
     }
 }
 
-pub fn init_key(key: &MoveKey, map: &mut MoveMap) {
-    map.iter_mut()
-        .filter_map(|(k, state)| (k == key || key.is_strict_prefix(k)).then_some(state))
-        .for_each(|state| *state = InitState::Init);
-}
+impl MIRInitOut {
+    fn mask(&self, key: &MoveKey) -> Option<&BitSet<MoveKeyId>> {
+        self.key_of.get(key).map(|id| &self.affected[id.0])
+    }
 
-pub fn uninit_key(key: &MoveKey, map: &mut MoveMap) {
-    map.iter_mut()
-        .filter_map(|(k, state)| (k == key || key.is_strict_prefix(k)).then_some(state))
-        .for_each(|state| *state = InitState::Uninit);
+    pub fn entry_state(&self, blk: BlockID) -> IdInitMap {
+        self.init_in[&blk].clone()
+    }
+
+    pub fn mark_init(&self, state: &mut IdInitMap, key: &MoveKey) {
+        if let Some(mask) = self.mask(key) {
+            state.init.union(mask);
+            state.uninit.substract(mask);
+        }
+    }
+
+    pub fn mark_uninit(&self, state: &mut IdInitMap, key: &MoveKey) {
+        if let Some(mask) = self.mask(key) {
+            state.uninit.union(mask);
+            state.init.substract(mask);
+        }
+    }
+
+    pub fn query(&self, state: &IdInitMap, key: &MoveKey) -> InitState {
+        let Some(mask) = self.mask(key) else {
+            return InitState::Init;
+        };
+        let (mut init, mut uninit, mut maybe) = (false, false, false);
+        for id in mask.iter() {
+            match (state.init.contains(&id), state.uninit.contains(&id)) {
+                (true, false) => init = true,
+                (false, true) => uninit = true,
+                _ => maybe = true,
+            }
+        }
+        match (init, uninit, maybe) {
+            (false, false, false) | (true, false, false) => InitState::Init,
+            (false, true, false) => InitState::Uninit,
+            _ => InitState::Maybe,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct MoveKeyId(usize);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct IdInitMap {
+pub struct IdInitMap {
     uninit: BitSet<MoveKeyId>,
     init: BitSet<MoveKeyId>,
 }
@@ -271,38 +301,52 @@ impl KeyInterner {
         Self { keys: compute_move_key_set(db, mir).into_iter().collect() }
     }
 
-    fn affected(&self, target: &MoveKey) -> Vec<MoveKeyId> {
+    fn key_of(&self) -> HashMap<MoveKey, MoveKeyId> {
+        self.keys.iter().enumerate().map(|(id, k)| (k.clone(), MoveKeyId(id))).collect()
+    }
+
+    fn affected_masks(&self) -> Vec<BitSet<MoveKeyId>> {
+        let n = self.keys.len();
         self.keys
             .iter()
-            .enumerate()
-            .filter_map(|(id, k)| {
-                (k == target || target.is_strict_prefix(k)).then_some(id)
+            .map(|target| {
+                let mut mask = BitSet::new(n);
+                for (id, k) in self.keys.iter().enumerate() {
+                    if k == target || target.is_strict_prefix(k) {
+                        mask.insert(&MoveKeyId(id));
+                    }
+                }
+                mask
             })
-            .map(MoveKeyId)
             .collect()
     }
 }
 
 enum InitOp {
-    Init(Vec<MoveKeyId>),
-    Uninit(Vec<MoveKeyId>),
+    Init(MoveKeyId),
+    Uninit(MoveKeyId),
 }
 
-fn compute_block_ops(interner: &KeyInterner, mir: &Mir, blk: BlockID) -> Vec<InitOp> {
+fn compute_block_ops(
+    key_of: &HashMap<MoveKey, MoveKeyId>,
+    mir: &Mir,
+    blk: BlockID,
+) -> Vec<InitOp> {
     let mut ops = Vec::new();
+    let moved = |ops: &mut Vec<InitOp>, op: &MIROperand| {
+        if let MIROperand::Move(p) = op
+            && let Some(id) = key_of.get(&p.as_move_key())
+        {
+            ops.push(InitOp::Uninit(*id));
+        }
+    };
     let data = &mir.blocks[blk];
     for Stmt::Assign { dest, rvalue } in &data.stmts {
-        dest.for_all_operands(|op| {
-            if let MIROperand::Move(p) = op {
-                ops.push(InitOp::Uninit(interner.affected(&p.as_move_key())));
-            }
-        });
-        rvalue.for_all_operands(|op| {
-            if let MIROperand::Move(p) = op {
-                ops.push(InitOp::Uninit(interner.affected(&p.as_move_key())));
-            }
-        });
-        ops.push(InitOp::Init(interner.affected(&dest.as_move_key())));
+        dest.for_all_operands(|op| moved(&mut ops, op));
+        rvalue.for_all_operands(|op| moved(&mut ops, op));
+        if let Some(id) = key_of.get(&dest.as_move_key()) {
+            ops.push(InitOp::Init(*id));
+        }
     }
     match &data.terminator {
         MIRTerminator::Return { value: None, .. }
@@ -310,44 +354,36 @@ fn compute_block_ops(interner: &KeyInterner, mir: &Mir, blk: BlockID) -> Vec<Ini
         | MIRTerminator::Diverge => (),
         MIRTerminator::Call { arguments, dest, .. } => {
             for op in arguments {
-                op.for_all_operands(|value| {
-                    if let MIROperand::Move(p) = value {
-                        ops.push(InitOp::Uninit(interner.affected(&p.as_move_key())));
-                    }
-                });
+                op.for_all_operands(|value| moved(&mut ops, value));
             }
-            ops.push(InitOp::Init(
-                interner.affected(&MoveKey { base: *dest, projections: vec![] }),
-            ));
+            if let Some(id) = key_of.get(&MoveKey { base: *dest, projections: vec![] }) {
+                ops.push(InitOp::Init(*id));
+            }
         }
         MIRTerminator::Branch { cond: value, .. }
         | MIRTerminator::Switch { discriminant: value, .. }
         | MIRTerminator::Return { value: Some(value), .. } => {
-            value.for_all_operands(|value| {
-                if let MIROperand::Move(p) = value {
-                    ops.push(InitOp::Uninit(interner.affected(&p.as_move_key())));
-                }
-            });
+            value.for_all_operands(|value| moved(&mut ops, value));
         }
     }
     ops
 }
 
-fn apply_ops(input: &IdInitMap, ops: &[InitOp]) -> IdInitMap {
+fn apply_ops(
+    input: &IdInitMap,
+    ops: &[InitOp],
+    affected: &[BitSet<MoveKeyId>],
+) -> IdInitMap {
     let mut res = input.clone();
     for op in ops {
         match op {
-            InitOp::Init(ids) => {
-                for id in ids {
-                    res.init.insert(id);
-                    res.uninit.remove(id);
-                }
+            InitOp::Init(id) => {
+                res.init.union(&affected[id.0]);
+                res.uninit.substract(&affected[id.0]);
             }
-            InitOp::Uninit(ids) => {
-                for id in ids {
-                    res.init.remove(id);
-                    res.uninit.insert(id);
-                }
+            InitOp::Uninit(id) => {
+                res.uninit.union(&affected[id.0]);
+                res.init.substract(&affected[id.0]);
             }
         };
     }
@@ -360,49 +396,34 @@ impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
     fn run(&self, db: &dyn Db, mir: &Mir) -> Self::Out {
         let interner = KeyInterner::build(db, mir);
         let n = interner.keys.len();
+        let key_of = interner.key_of();
+        let affected = interner.affected_masks();
 
         let block_ops: BlockMap<Vec<InitOp>> = mir
             .blocks
             .keys()
-            .map(|blk| (blk, compute_block_ops(&interner, mir, blk)))
+            .map(|blk| (blk, compute_block_ops(&key_of, mir, blk)))
             .collect();
 
-        // Entry seed: every key Uninit, then parameters marked Init.
         let mut entry = IdInitMap { init: BitSet::new(n), uninit: BitSet::new(n) };
         (0..n).for_each(|i| {
             entry.uninit.insert(&MoveKeyId(i));
         });
         for &param in &mir.parameters {
-            for id in interner.affected(&MoveKey { base: param, projections: vec![] }) {
-                entry.init.insert(&id);
-                entry.uninit.remove(&id);
+            if let Some(id) = key_of.get(&MoveKey { base: param, projections: vec![] }) {
+                entry.init.union(&affected[id.0]);
+                entry.uninit.substract(&affected[id.0]);
             }
         }
 
-        let FixedPointBlockRes { block_in, block_out } = mir.fixed_point_iter_bottom(
+        let FixedPointBlockRes { block_in, .. } = mir.fixed_point_iter_bottom(
             Direction::Forward,
-            |blk, old| apply_ops(old, &block_ops[&blk]),
+            |blk, old| apply_ops(old, &block_ops[&blk], &affected),
             Some(&entry),
             || IdInitMap { init: BitSet::new(n), uninit: BitSet::new(n) },
         );
 
-        let to_move_map = |m: &IdInitMap| -> MoveMap {
-            (0..n)
-                .map(|id| {
-                    let key = MoveKeyId(id);
-                    let state = match (m.init.contains(&key), m.uninit.contains(&key)) {
-                        (true, false) => InitState::Init,
-                        (false, true) => InitState::Uninit,
-                        _ => InitState::Maybe,
-                    };
-                    (interner.keys[id].clone(), state)
-                })
-                .collect()
-        };
-        MIRInitOut {
-            init_in: block_in.iter().map(|(b, m)| (*b, to_move_map(m))).collect(),
-            init_out: block_out.iter().map(|(b, m)| (*b, to_move_map(m))).collect(),
-        }
+        MIRInitOut { key_of, affected, init_in: block_in }
     }
 }
 
