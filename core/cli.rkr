@@ -1,0 +1,30 @@
+@include core::vec
+@include core::io
+
+struct CliArgs {
+    program_name: str;
+    args: Array<str>;
+}
+
+impl CliArgs {
+    fun from_libc_start(argc: int, argv: **char): Self {
+        let program_name = "";
+        if argc > 0 {
+            program_name = str::from_cstr(argv[0]);
+        }
+        let mut arr: Array<str> = Array::new(argc as usize - 1);
+        for i in 1..argc {
+            arr.set(i as usize - 1 , str::from_cstr(argv[i]));
+        }
+        return Self {
+            .program_name: program_name,
+            .args: arr
+        };
+    }
+}
+
+impl core::mem::Drop for CliArgs {
+    fun drop(&mut self): void {
+        self.args.drop();
+    }
+}
