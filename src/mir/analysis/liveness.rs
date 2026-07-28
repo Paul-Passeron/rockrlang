@@ -66,7 +66,6 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
                     .collect()
             },
             None,
-            None,
         )
         .into()
     }

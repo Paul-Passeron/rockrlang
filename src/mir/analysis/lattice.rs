@@ -40,9 +40,6 @@ impl LatticeChange {
     }
 }
 
-// Funny, LatticeChange is actually a lattice too (a very small one, just top
-// and bottom, but still).
-// This is more for fun and fireworks than anything else :)
 impl Lattice for LatticeChange {
     fn bottom() -> Self {
         Self::Changed
@@ -218,34 +215,94 @@ impl Mir {
         self.blocks.keys().map(|blk| (blk, L::bottom()))
     }
 
+    pub fn rpo_ranks(&self) -> HashMap<MIRBlockID, usize> {
+        let succs = self.successors();
+        let mut visited: HashSet<MIRBlockID> = HashSet::new();
+        let mut postorder: Vec<MIRBlockID> = Vec::new();
+
+        let mut stack: Vec<(MIRBlockID, bool)> = vec![(self.entry, false)];
+        while let Some((blk, processed)) = stack.pop() {
+            if processed {
+                postorder.push(blk);
+                continue;
+            }
+            if !visited.insert(blk) {
+                continue;
+            }
+            stack.push((blk, true));
+            for succ in succs.get(&blk).into_iter().flatten() {
+                if !visited.contains(succ) {
+                    stack.push((*succ, false));
+                }
+            }
+        }
+
+        let mut ranks: HashMap<MIRBlockID, usize> = HashMap::new();
+        for (rank, blk) in postorder.iter().rev().enumerate() {
+            ranks.insert(*blk, rank);
+        }
+
+        let mut next = postorder.len();
+        for blk in self.blocks.keys() {
+            ranks.entry(blk).or_insert_with(|| {
+                let r = next;
+                next += 1;
+                r
+            });
+        }
+        ranks
+    }
+
     pub fn fixed_point_iter<L: Lattice>(
         &self,
         direction: Direction,
         transfer: impl Fn(MIRBlockID, &L) -> L,
-        in_seed: Option<&BlockMap<L>>,
-        out_seed: Option<&BlockMap<L>>,
+        entry_seed: Option<&L>,
     ) -> FixedPointBlockRes<L> {
-        let mut block_in = BlockMap::from_iter(self.get_block_bottoms::<L>());
+        self.fixed_point_iter_bottom(direction, transfer, entry_seed, L::bottom)
+    }
 
-        let mut block_out = BlockMap::from_iter(self.get_block_bottoms::<L>());
+    pub fn fixed_point_iter_bottom<L: Lattice>(
+        &self,
+        direction: Direction,
+        transfer: impl Fn(MIRBlockID, &L) -> L,
+        entry_seed: Option<&L>,
+        bottom: impl Fn() -> L,
+    ) -> FixedPointBlockRes<L> {
+        let mut block_in =
+            BlockMap::from_iter(self.blocks.keys().map(|blk| (blk, bottom())));
+
+        let mut block_out =
+            BlockMap::from_iter(self.blocks.keys().map(|blk| (blk, bottom())));
 
         let succs = self.successors();
         let preds = self.predecessors();
 
-        let mut worklist: BTreeSet<_> = BTreeSet::from_iter(self.blocks.keys());
+        let ranks = self.rpo_ranks();
 
-        while let Some(blk) = worklist.pop_last() {
+        let mut worklist: BTreeSet<(usize, MIRBlockID)> =
+            self.blocks.keys().map(|blk| (ranks[&blk], blk)).collect();
+
+        loop {
+            let next = match direction {
+                Direction::Forward => worklist.pop_first(),
+                Direction::Backward => worklist.pop_last(),
+            };
+            let Some((_, blk)) = next else { break };
+
             let propagate = match direction {
                 Direction::Forward => {
                     let from_preds = preds
                         .get(&blk)
                         .into_iter()
                         .flatten()
-                        .fold(L::bottom(), |l, p| l.join(&block_out[p]));
-                    let new_in = match in_seed.as_ref().and_then(|s| s.get(&blk)) {
-                        Some(seed) => from_preds.join(seed),
-                        None => from_preds,
-                    };
+                        .fold(bottom(), |l, p| l.join(&block_out[p]));
+                    let mut new_in = from_preds;
+                    if let Some(entry_seed) = entry_seed
+                        && blk == self.entry
+                    {
+                        new_in.join_assign(entry_seed);
+                    }
                     block_in.get_mut(&blk).unwrap().join_assign(&new_in);
                     let new_out = transfer(blk, &block_in[&blk]);
                     block_out.get_mut(&blk).unwrap().join_assign(&new_out)
@@ -255,21 +312,25 @@ impl Mir {
                         .get(&blk)
                         .into_iter()
                         .flatten()
-                        .fold(L::bottom(), |l, p| l.join(&block_in[p]));
-                    let new_out = match out_seed.as_ref().and_then(|s| s.get(&blk)) {
-                        Some(seed) => from_succs.join(seed),
-                        None => from_succs,
-                    };
+                        .fold(bottom(), |l, p| l.join(&block_in[p]));
+                    let new_out = from_succs;
                     block_out.get_mut(&blk).unwrap().join_assign(&new_out);
-                    let new_in = transfer(blk, &block_out[&blk]);
+                    let mut new_in = transfer(blk, &block_out[&blk]);
+                    if let Some(entry_seed) = entry_seed
+                        && blk == self.entry
+                    {
+                        new_in.join_assign(entry_seed);
+                    }
                     block_in.get_mut(&blk).unwrap().join_assign(&new_in)
                 }
             };
 
             if propagate.change() {
                 match direction {
-                    Direction::Forward => worklist.extend(succs[&blk].iter().copied()),
-                    Direction::Backward => worklist.extend(preds[&blk].iter().copied()),
+                    Direction::Forward => worklist
+                        .extend(succs[&blk].iter().map(|succ| (ranks[succ], *succ))),
+                    Direction::Backward => worklist
+                        .extend(preds[&blk].iter().map(|pred| (ranks[pred], *pred))),
                 }
             }
         }
