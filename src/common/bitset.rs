@@ -60,9 +60,7 @@ impl<T: BitSetIdx + Debug> Debug for BitSet<T> {
 
 impl<T: BitSetIdx + Display> Display for BitSet<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list()
-            .entries(self.iter().map(|val| val.to_string()))
-            .finish()
+        f.debug_list().entries(self.iter().map(|val| val.to_string())).finish()
     }
 }
 

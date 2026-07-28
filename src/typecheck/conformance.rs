@@ -64,7 +64,8 @@ fn type_match_aux(
                 return false;
             }
             a_args.iter().zip(b_args).all(|(a, b)| {
-                a.as_type_id().is_some_and(|a| type_match_aux(db, a, *b, zelf, constraints))
+                a.as_type_id()
+                    .is_some_and(|a| type_match_aux(db, a, *b, zelf, constraints))
             })
         }
         TypeRef::Param(id) => {

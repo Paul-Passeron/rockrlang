@@ -164,7 +164,9 @@ impl MTLBCtx<'_> {
         data: &MIRBasicBlock,
         lower: &mut LIRLower<'ir, '_>,
     ) {
-        let b = b.new_block(data.name.as_ref().map(|name| Symbol::new(self.db, name.as_str())));
+        let b = b.new_block(
+            data.name.as_ref().map(|name| Symbol::new(self.db, name.as_str())),
+        );
         lower.block_map.insert(id, b);
     }
 

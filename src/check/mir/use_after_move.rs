@@ -18,10 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use salsa::Accumulator;
 
 use crate::{
-    Db, compiler::diagnostic::Diag, mir::{
-        Mir, analysis::init_tracking::{
+    Db,
+    compiler::diagnostic::Diag,
+    mir::{
+        Mir,
+        analysis::init_tracking::{
             IdInitMap, InitState, IterOperand, MIRInitOut, MoveKey,
-        }, basic_block::{MIRTerminator, Stmt}, operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
+        },
+        basic_block::{MIRTerminator, Stmt},
+        operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
     },
 };
 

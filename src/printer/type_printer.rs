@@ -36,7 +36,6 @@ pub struct TypePrinter {
     pub options: TypePrinterOptionSet,
 }
 
-
 impl TypePrinter {
     pub fn new() -> Self {
         Self::default()

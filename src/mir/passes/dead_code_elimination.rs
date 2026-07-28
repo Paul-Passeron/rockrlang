@@ -101,9 +101,7 @@ impl<'a> DCECtx<'a> {
         for &a in &self.reachable {
             if let MIRTerminator::Goto { next } = &self.mir.blocks[a].terminator {
                 let b = *next;
-                if self.successors[&a].len() == 1
-                    && self.predecessors[&b].len() == 1
-                {
+                if self.successors[&a].len() == 1 && self.predecessors[&b].len() == 1 {
                     merge_next.insert(a, b);
                     has_prev.insert(b);
                 }

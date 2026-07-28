@@ -19,7 +19,7 @@ use super::{FmtWriter, fmt_block, fmt_local_id};
 use crate::{
     Db,
     mir::{
-        Mir, MIRLocal,
+        MIRLocal, Mir,
         display::{MIRWrite, mwrite},
     },
 };

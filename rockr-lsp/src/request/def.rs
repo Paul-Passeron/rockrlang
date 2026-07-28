@@ -197,8 +197,10 @@ impl<'a> Lsp<'a> {
                 let ast = function_ast(&self.db, called.id.into()).inner(&self.db);
                 Some(self.goto_span(ast.get_span()))
             }
-            ExprKind::StructLit { struct_def, .. } => self
-                .goto_def_ty_at(struct_def.clone().into_type_ref(&self.db), e.span.start()),
+            ExprKind::StructLit { struct_def, .. } => self.goto_def_ty_at(
+                struct_def.clone().into_type_ref(&self.db),
+                e.span.start(),
+            ),
             ExprKind::Constructor { enum_def, .. } => self
                 .goto_def_ty_at(enum_def.clone().into_type_ref(&self.db), e.span.start()),
             _ => None,

@@ -20,7 +20,7 @@ use std::{collections::HashSet, sync::OnceLock};
 use crate::{
     Db,
     mir::{
-        Mir, MIRBlockID,
+        MIRBlockID, Mir,
         analysis::{
             MIRAnalysis,
             init_tracking::{MIRInitAnalysis, MIRInitOut},

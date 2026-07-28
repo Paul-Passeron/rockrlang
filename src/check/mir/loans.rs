@@ -20,7 +20,10 @@ use std::collections::HashSet;
 use salsa::Accumulator;
 
 use crate::{
-    Db, common::bitset::BitSet, compiler::diagnostic::Diag, mir::{
+    Db,
+    common::bitset::BitSet,
+    compiler::diagnostic::Diag,
+    mir::{
         MIRBlockID, MIRLocalID, Mir,
         analysis::{
             init_tracking::IterOperand,

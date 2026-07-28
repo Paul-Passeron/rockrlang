@@ -264,7 +264,7 @@ impl<T> IntoIterator for Frozen<T> {
             if i == last_box {
                 for (idx, item) in values.into_iter().enumerate() {
                     if idx < last_item {
-                        // SAFETY: This is the last bucket, but before the last_idx 
+                        // SAFETY: This is the last bucket, but before the last_idx
                         unsafe {
                             res.push(item.assume_init());
                         }

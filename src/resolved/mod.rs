@@ -281,8 +281,8 @@ pub fn merge_type_ref(db: &dyn Db, a: TypeRef, b: TypeRef) -> TypeRef {
         }
         (TypeRef::Param(a), _) | (_, TypeRef::Param(a)) => TypeRef::Param(a),
         (TypeRef::Zelf, _) | (_, TypeRef::Zelf) => TypeRef::Zelf,
-        (TypeRef::Error | TypeRef::Unknown, other) |
-(other, TypeRef::Error | TypeRef::Unknown) => other,
+        (TypeRef::Error | TypeRef::Unknown, other)
+        | (other, TypeRef::Error | TypeRef::Unknown) => other,
         (TypeRef::Associated(s), _) | (_, TypeRef::Associated(s)) => {
             TypeRef::Associated(s)
         }
