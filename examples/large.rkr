@@ -1,0 +1,902 @@
+@include core::vec
+
+fun main(): int {
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    let mut v = Vec::new();
+    v.push("Hey");
+    v.push("Ho");
+    for x in v {x.println();}
+    
+    return 0;
+}
