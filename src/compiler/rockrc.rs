@@ -47,6 +47,10 @@ pub struct CliArgs {
     #[clap(short = 'c', long, default_value_t = false)]
     compile_only: bool,
 
+    #[clap(long, default_value_t = false)]
+    show_time: bool,
+
+
     #[clap(short = 'o', long)]
     output: Option<PathBuf>,
 }
@@ -57,10 +61,11 @@ fn main() -> std::process::ExitCode {
         no_std: args.no_std,
         skip_core: args.skip_core,
         display_llvm: args.display_llvm,
+        display_opt_llvm: args.display_opt_llvm,
         display_mir: args.display_mir,
         display_thir: args.display_thir,
-        display_opt_llvm: args.display_opt_llvm,
         compile_only: args.compile_only,
+        show_time: args.show_time,
         output: args.output,
     };
     let Some(root) = args.file.or_else(|| {

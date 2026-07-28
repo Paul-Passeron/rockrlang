@@ -26,6 +26,7 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
+    compiler::timing::{Counts, Phase, timed},
     hir::lower_fundef::{lower_fundef_body, lower_method_body},
     name_resolve::{
         implems::module_impls,
@@ -514,17 +515,31 @@ fn _hir_body<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
 ) -> Option<HirBody<'db>> {
-    let ast = function_ast(db, function);
+    timed(
+        db,
+        Phase::NameResolution,
+        || {
+            let ast = function_ast(db, function);
 
-    match ast.inner(db) {
-        FunctionLikeAst::Fundef(fundef) => {
-            Some(lower_fundef_body(db, function.into(), fundef))
-        }
-        FunctionLikeAst::Method(methoddef) => {
-            Some(lower_method_body(db, function.into(), methoddef))
-        }
-        FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_) => None,
-    }
+            match ast.inner(db) {
+                FunctionLikeAst::Fundef(fundef) => {
+                    Some(lower_fundef_body(db, function.into(), fundef))
+                }
+                FunctionLikeAst::Method(methoddef) => {
+                    Some(lower_method_body(db, function.into(), methoddef))
+                }
+                FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_) => {
+                    None
+                }
+            }
+        },
+        |res| Counts {
+            functions: usize::from(res.is_some()),
+            stmts: res.map(|b| b.stmts(db).len()),
+            // HIR keeps expressions as boxed trees (no arena/map to size cheaply).
+            exprs: None,
+        },
+    )
 }
 
 pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {

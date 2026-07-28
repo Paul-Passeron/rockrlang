@@ -23,6 +23,7 @@ use crate::{
         mir::check_mir,
         thir::{checked_thir_body, thir_is_valid},
     },
+    compiler::timing::{Counts, Phase, timed},
     hir::function_ast,
     mir::passes::dead_code_elimination::dce,
     name_resolve::type_expr::get_templates_of_fun,
@@ -33,15 +34,30 @@ use crate::{
 use std::collections::HashSet;
 
 pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
-    checked_thir_body(db, fdef.interned());
+    timed(
+        db,
+        Phase::Checking,
+        || {
+            checked_thir_body(db, fdef.interned());
 
-    for (fdef, subs) in reachable_mir_instances(db, fdef) {
-        if fdef.has_body(db) && thir_is_valid(db, fdef) {
-            let the_mir = mir(db, fdef, subs);
-            let dce = dce(db, the_mir.func);
-            check_mir(db, dce);
-        }
-    }
+            let mut checked = 0;
+            for (fdef, subs) in reachable_mir_instances(db, fdef) {
+                if fdef.has_body(db) && thir_is_valid(db, fdef) {
+                    let the_mir = mir(db, fdef, subs);
+                    let dce = dce(db, the_mir.func);
+                    timed(
+                        db,
+                        Phase::BorrowCheck,
+                        || check_mir(db, dce),
+                        |()| Counts { functions: 1, stmts: None, exprs: None },
+                    );
+                    checked += 1;
+                }
+            }
+            checked
+        },
+        |&checked| Counts { functions: checked, stmts: None, exprs: None },
+    );
 }
 
 pub(crate) fn reachable_mir_instances(

@@ -22,6 +22,7 @@ use crate::{
         location::Span,
         symbols::{StrLit, Symbol},
     },
+    compiler::timing::{Counts, Phase, timed},
     hir::{self, Mutability, function_ast, hir_body},
     hir_to_thir::thir_body_from_hir,
     parse_tree::expr::BinaryOperator,
@@ -227,11 +228,22 @@ pub fn _thir_body<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
 ) -> Option<Thir> {
-    let f_id: FunctionId = function.into();
-    let hir = hir_body(db, function.into())?;
-    let tc = type_check_function(db, f_id)?;
-    let thir = thir_body_from_hir(db, hir, tc);
-    Some(thir)
+    timed(
+        db,
+        Phase::Thir,
+        || {
+            let f_id: FunctionId = function.into();
+            let hir = hir_body(db, function.into())?;
+            let tc = type_check_function(db, f_id)?;
+            let thir = thir_body_from_hir(db, hir, tc);
+            Some(thir)
+        },
+        |res| Counts {
+            functions: usize::from(res.is_some()),
+            stmts: res.as_ref().map(|t| t.root.len()),
+            exprs: res.as_ref().map(|t| t.exprs.len()),
+        },
+    )
 }
 
 fn get_thir_body_span(db: &dyn Db, thir: &Thir) -> Span {

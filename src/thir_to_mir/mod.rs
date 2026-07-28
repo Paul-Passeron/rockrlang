@@ -27,7 +27,7 @@ use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
-    compiler::{Workspace, diagnostic::Diag, workspace_packages},
+    compiler::{Workspace, diagnostic::Diag, timing::{Counts, Phase, timed}, workspace_packages},
     hir::{Mutability, function_ast, signature::get_sig_of_function},
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
@@ -182,10 +182,21 @@ impl FuncInst {
 
 #[salsa::tracked]
 pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Mir {
-    let Some(thir) = thir_body(db, *key.fdef(db)) else {
-        panic!("attempted to lower extern function to MIR")
-    };
-    ThirToMIR::new(db, thir, key.subs(db)).lower()
+    timed(
+        db,
+        Phase::Monomorphization,
+        || {
+            let Some(thir) = thir_body(db, *key.fdef(db)) else {
+                panic!("attempted to lower extern function to MIR")
+            };
+            ThirToMIR::new(db, thir, key.subs(db)).lower()
+        },
+        |mir| Counts {
+            functions: 1,
+            stmts: Some(mir.blocks.iter().map(|(_, b)| b.stmts.len() + 1).sum()),
+            exprs: None,
+        },
+    )
 }
 
 pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &Mir {

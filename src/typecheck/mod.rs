@@ -28,6 +28,7 @@ use crate::printer::render_diagnostics;
 use crate::resolved::TypeId;
 use crate::{
     Db,
+    compiler::timing::{Counts, Phase, timed},
     hir::{
         HirBody, HirExpr, HirId, HirPattern, HirStmt, HirStmtKind, LocalId, LocalInfo,
         hir_body,
@@ -621,7 +622,16 @@ pub fn _type_check_function<'db>(
     db: &'db dyn Db,
     function: InternedFunctionId<'db>,
 ) -> Option<TypeCheckResults<'db>> {
-    hir_body(db, function.into()).map(|hir| type_check_hir(db, hir))
+    timed(
+        db,
+        Phase::TypeChecking,
+        || hir_body(db, function.into()).map(|hir| type_check_hir(db, hir)),
+        |res| Counts {
+            functions: usize::from(res.is_some()),
+            stmts: hir_body(db, function.into()).map(|hir| hir.stmts(db).len()),
+            exprs: res.map(|tc| tc.expr_types(db).len()),
+        },
+    )
 }
 
 pub fn type_check_function(

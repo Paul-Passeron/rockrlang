@@ -97,6 +97,7 @@ pub struct Config {
     pub display_mir: bool,
     pub display_thir: bool,
     pub compile_only: bool,
+    pub show_time: bool,
     pub output: Option<PathBuf>,
 }
 

@@ -29,6 +29,7 @@ use crate::{
         location::{Location, Span},
         symbols::Symbol,
     },
+    compiler::timing::{Counts, Phase, timed},
     lexer::{LexError, Token, TokenKind, lex_file},
     parse_tree::{
         Spanned,
@@ -215,49 +216,71 @@ impl<'db> Parser<'db> {
 
 #[salsa::tracked(returns(copy))]
 pub fn parse_file(db: &dyn Db, file: SourceFile) -> Ast<'_> {
-    let lex_res = lex_file(db, file);
-    let tokens = match lex_res {
-        Ok(tokens) => tokens,
-        Err(lex_error) => {
-            let offset = lex_error.offset;
-            let error = ParseError {
-                kind: ParseErrorKind::LexError(lex_error),
-                file,
-                start: offset,
-                end: offset + 1,
+    timed(
+        db,
+        Phase::Parsing,
+        || {
+            let lex_res = lex_file(db, file);
+            let tokens = match lex_res {
+                Ok(tokens) => tokens,
+                Err(lex_error) => {
+                    let offset = lex_error.offset;
+                    let error = ParseError {
+                        kind: ParseErrorKind::LexError(lex_error),
+                        file,
+                        start: offset,
+                        end: offset + 1,
+                    };
+                    error.accumulate(db);
+                    vec![]
+                }
             };
-            error.accumulate(db);
-            vec![]
-        }
-    };
 
-    let mut parser = Parser::new(db, &tokens, file);
+            let mut parser = Parser::new(db, &tokens, file);
 
-    let mut items = vec![];
-    let mut includes = vec![];
+            let mut items = vec![];
+            let mut includes = vec![];
 
-    while parser.position < tokens.len() {
-        let start = parser.get_start();
-        let item = parser.parse_any_toplevel_item();
-        match item {
-            Ok(item) => match item.data {
-                AstAnyTopLevelItemDesc::Include(include) => {
-                    includes.push(include);
+            while parser.position < tokens.len() {
+                let start = parser.get_start();
+                let item = parser.parse_any_toplevel_item();
+                match item {
+                    Ok(item) => match item.data {
+                        AstAnyTopLevelItemDesc::Include(include) => {
+                            includes.push(include);
+                        }
+                        AstAnyTopLevelItemDesc::Item(x) => {
+                            items.push(Spanned::new(*x, item.span));
+                        }
+                    },
+                    Err(err) => {
+                        err.clone().accumulate(db);
+                        parser.synchronize(Parser::is_top_level_sync_point);
+                        items.push(Spanned::new(
+                            AstTopLevelItemDesc::Error(err),
+                            start.span(parser.get_end()),
+                        ));
+                    }
                 }
-                AstAnyTopLevelItemDesc::Item(x) => {
-                    items.push(Spanned::new(*x, item.span));
-                }
-            },
-            Err(err) => {
-                err.clone().accumulate(db);
-                parser.synchronize(Parser::is_top_level_sync_point);
-                items.push(Spanned::new(
-                    AstTopLevelItemDesc::Error(err),
-                    start.span(parser.get_end()),
-                ));
             }
-        }
-    }
 
-    Ast::new(db, items, includes)
+            Ast::new(db, items, includes)
+        },
+        |ast| Counts {
+            functions: ast
+                .items(db)
+                .iter()
+                .filter(|item| {
+                    matches!(
+                        item.data,
+                        AstTopLevelItemDesc::Fundef(_)
+                            | AstTopLevelItemDesc::ExternDef(_, _)
+                    )
+                })
+                .count(),
+            // The parser produces boxed AST trees (no arena/map to size cheaply).
+            stmts: None,
+            exprs: None,
+        },
+    )
 }

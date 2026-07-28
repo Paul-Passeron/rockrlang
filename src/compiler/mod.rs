@@ -23,6 +23,7 @@ use crate::{
     codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     common::location::LocationInfo,
     compiler::diagnostic::{Diag, Severity},
+    compiler::timing::{PhaseStat, render_timings},
     mir::passes::dead_code_elimination::dce,
     name_resolve::file_module_id,
     printer::render_diagnostics,
@@ -43,10 +44,12 @@ use itertools::Itertools;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
+    time::{Duration, Instant},
 };
 
 pub mod diagnostic;
 mod load;
+pub mod timing;
 mod workspace;
 
 pub use load::*;
@@ -242,6 +245,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
         .flatten();
     let db = load_workspace_from_disk(root, config)?;
     let ws = Workspace::get(&db);
+    let overall = Instant::now();
     check(&db, ws);
     let (has_errors, raw_diags) = program_has_errors(&db);
 
@@ -260,10 +264,22 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
 
     display_ir(&db, ws);
 
+    let report = |llvm: Option<Duration>| {
+        if db.config().show_time {
+            render_timings(
+                &check::accumulated::<PhaseStat>(&db, ws),
+                llvm,
+                overall.elapsed(),
+            );
+        }
+    };
+
     if has_errors {
+        report(None);
         return Err(CompilerError::CompiledWithErrors);
     }
 
+    let t_llvm = Instant::now();
     let llvm_ctx = Context::create();
     let cg = Codegen::<MIRToLIRDeclare>::new(&db);
 
@@ -285,6 +301,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();
     }
+    let llvm_wall = t_llvm.elapsed();
 
     let write_object = |path: &Path| {
         write_object_file(&llvm_module, path, &machine).map_err(|err| {
@@ -298,6 +315,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
             PathBuf::from(format!("{}.o", stem.as_deref().unwrap_or("a")))
         });
         write_object(&obj_path)?;
+        report(Some(llvm_wall));
         return Ok(());
     }
 
@@ -313,5 +331,6 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
     let link_result = link_executable(&obj_path, &exe_path);
     let _ = std::fs::remove_file(&obj_path);
     link_result?;
+    report(Some(llvm_wall));
     Ok(())
 }
