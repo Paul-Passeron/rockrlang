@@ -50,7 +50,6 @@ pub struct CliArgs {
     #[clap(long, default_value_t = false)]
     show_time: bool,
 
-
     #[clap(short = 'o', long)]
     output: Option<PathBuf>,
 }

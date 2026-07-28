@@ -271,7 +271,7 @@ impl<T> IntoIterator for Frozen<T> {
                     }
                 }
             } else {
-                res.extend(values.into_iter().map(|item| 
+                res.extend(values.into_iter().map(|item|
                     // SAFETY: This value is assumed to be initialized since it's coming from a full bucket 
                     unsafe { item.assume_init() }));
             }

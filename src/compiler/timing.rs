@@ -14,7 +14,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
- 
+
 use std::cell::Cell;
 use std::time::{Duration, Instant};
 
@@ -131,8 +131,7 @@ pub fn render_timings(stats: &[&PhaseStat], llvm: Option<Duration>, total: Durat
     let mut accounted: u128 = 0;
 
     for phase in Phase::ORDER {
-        let mut totals =
-            PhaseTotals { functions: 0, stmts: None, exprs: None, nanos: 0 };
+        let mut totals = PhaseTotals { functions: 0, stmts: None, exprs: None, nanos: 0 };
         for stat in stats.iter().filter(|s| s.phase == phase) {
             totals.functions += stat.functions;
             totals.nanos += stat.nanos;

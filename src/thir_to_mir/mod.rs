@@ -27,7 +27,12 @@ use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{location::Span, symbols::Symbol},
-    compiler::{Workspace, diagnostic::Diag, timing::{Counts, Phase, timed}, workspace_packages},
+    compiler::{
+        Workspace,
+        diagnostic::Diag,
+        timing::{Counts, Phase, timed},
+        workspace_packages,
+    },
     hir::{Mutability, function_ast, signature::get_sig_of_function},
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
