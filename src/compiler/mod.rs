@@ -212,7 +212,7 @@ pub fn optimize(module: &Module, opt_level: OptimizationLevel) -> TargetMachine 
             TargetMachine::get_host_cpu_features().to_str().unwrap(),
             opt_level,
             RelocMode::PIC,
-            CodeModel::Default,
+            CodeModel::Small,
         )
         .unwrap();
 
@@ -280,7 +280,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
         llvm_module.print_to_stderr();
     }
 
-    let machine = optimize(&llvm_module, OptimizationLevel::Less);
+    let machine = optimize(&llvm_module, OptimizationLevel::None);
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();
