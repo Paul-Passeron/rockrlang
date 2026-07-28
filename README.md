@@ -13,30 +13,53 @@ cd Rockr
 cargo run -- examples/hello.rkr --skip-core
 ```
 
-
 ## Syntax
-Honestly, the syntax is very prone to change and evolve but shouldn't be hard to pick up if you know some basic Rust, C or C++.
+The syntax is very prone to change and evolve but shouldn't be hard to pick up if you know some basic Rust, C or C++.
 ```rkr
-@include core::io
-
 fun main(): int {
     "Hello, World !".println();
     return 0;
 }
 ```
 
-## Fun stuff
-You can do (what I consider) some pretty fun stuff in Rockr, like:
-```
-@include core::opt
+## What works today
+Rockr already goes all the way from source to a native binary through LLVM:
 
-fun type_name<T>(of: &T): str {
-  return @type_name(T);
+- Type inference and checking, with generics and an interface system
+- Pattern matching and destructuring
+- Borrow checking (partial moves, mutable borrows) and drop
+- MIR-based analyses (borrow/loan checking, all-paths-return)
+- Codegen through its own SSA IR (MIR → LIR → LLVM)
+- A language server (LSP), with a WIP Zed extension
+
+See `TODO.md` for the roadmap and where things are headed.
+
+## Fun stuff
+You can do (what I consider) some pretty fun stuff in Rockr. Here's a
+compile-time state machine: the type carries the state, so illegal transitions
+just don't type-check.
+```rkr
+interface State {}
+struct Locked {}
+struct Open {}
+impl State for Locked {}
+impl State for Open {}
+
+struct Door<S: State> {}
+
+impl Door<Locked> {
+  fun new(): Self { return Self { ._s: PhantomData {} }; }
+  fun unlock(self): Door<Open> { return Door { ._s: PhantomData {} }; }
+}
+
+impl Door<Open> {
+  fun lock(self): Door<Locked> { return Door { ._s: PhantomData {} }; }
 }
 
 fun main(): int {
-  let x = opt::Some("Hello, World !");
-  type_name(&x).println(); // Outputs `core::opt::opt<core::io::str>` as of today
+  let door = Door<Locked>::new();
+  let door = door.unlock(); // now Door<Open>; a second .unlock() would not compile
+  @type_name(Door<Open>).println(); // Outputs `Door<Open>`
   return 0;
 }
 ```
