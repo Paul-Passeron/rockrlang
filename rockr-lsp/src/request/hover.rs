@@ -372,7 +372,7 @@ impl<'a> Lsp<'a> {
 
         let fields = match opt {
             StructDisplayOption::AllFields => {
-                let tys = struct_def.get_fields_ty(&self.db);
+                let tys = struct_def.declared_fields_ty(&self.db);
                 struct_item(&self.db, struct_def.def.into())
                     .fields
                     .iter()
@@ -382,7 +382,10 @@ impl<'a> Lsp<'a> {
             StructDisplayOption::Fields(symbols) => symbols
                 .iter()
                 .map(|field| {
-                    Some(field_str(*field, struct_def.typeof_field(&self.db, *field)?))
+                    Some(field_str(
+                        *field,
+                        struct_def.declared_typeof_field(&self.db, *field)?,
+                    ))
                 })
                 .collect::<Option<Vec<_>>>()?
                 .join(""),

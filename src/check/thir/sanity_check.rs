@@ -712,7 +712,9 @@ pub fn sanity_check(db: &dyn Db, thir: &Thir) {
 }
 
 impl StructRef {
-    pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
+    /// Field types as declared on the struct definition, still referencing the
+    /// struct's own template parameters rather than the concrete `self.args`.
+    pub fn declared_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
         let item = struct_item(db, self.def.interned());
         let mut res = HashMap::new();
         for field in &item.fields {
@@ -721,11 +723,16 @@ impl StructRef {
                 ScopeOwnerId::Module(self.def.parent(db)),
                 &item.template_args,
             );
-            let type_ref =
-                ctx.resolve_err(db, &field.ty.data).with_substitution(db, &self.args);
-            res.insert(field.name, type_ref);
+            res.insert(field.name, ctx.resolve_err(db, &field.ty.data));
         }
         res
+    }
+
+    pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
+        self.declared_fields_ty(db)
+            .into_iter()
+            .map(|(name, ty)| (name, ty.with_substitution(db, &self.args)))
+            .collect()
     }
 }
 

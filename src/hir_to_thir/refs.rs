@@ -61,7 +61,8 @@ impl ThirPlace {
 }
 
 impl StructRef {
-    pub fn typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
+
+    pub fn declared_typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
         let item = struct_item(db, self.def.interned());
         let found = item.fields.iter().find(|f| f.name == field)?;
         let ctx = AstImplicitContext::new(
@@ -69,7 +70,10 @@ impl StructRef {
             ScopeOwnerId::Module(self.def.parent(db)),
             templates_of_struct(db, self.def.into()),
         );
-        let resolution = ctx.resolve(db, &found.ty.data)?;
-        Some(resolution.with_substitution(db, &self.args))
+        ctx.resolve(db, &found.ty.data)
+    }
+
+    pub fn typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
+        Some(self.declared_typeof_field(db, field)?.with_substitution(db, &self.args))
     }
 }
