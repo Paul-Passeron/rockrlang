@@ -25,4 +25,15 @@ impl <T> opt<T> {
             }
         }
     }
+
+    fun get_mut(&mut self): opt<&mut T> {
+        match self {
+            opt::None => {
+                return opt::None;
+            }
+            opt::Some(mut_ref) => {
+                return opt::Some(mut_ref);
+            }
+        }
+    }
 }
