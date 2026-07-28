@@ -1,0 +1,23 @@
+interface State {}
+struct Locked {}
+struct Open {}
+impl State for Locked {}
+impl State for Open {}
+
+struct Door<S: State> {}
+
+impl Door<Locked> {
+  fun new(): Self { return Self { }; }
+  fun unlock(self): Door<Open> { return Door {}; }
+}
+
+impl Door<Open> {
+  fun lock(self): Door<Locked> { return Door {}; }
+}
+
+fun main(): int {
+  let door = Door<Locked>::new();
+  let door = door.unlock(); // now Door<Open>; a second .unlock() would not compile
+  @type_name(Door<Open>).println(); // Outputs `Door<Open>`
+  return 0;
+}
