@@ -1,7 +1,7 @@
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,18 +11,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -34,26 +34,26 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-simple_match::some_opt
+some_opt
 mir {
   locals:
-    _0: core::opt::opt<i32>
+    _0: opt::opt<i32>
 
   params: [
   ]
@@ -65,10 +65,10 @@ mir {
     return move _0
 }
 
-simple_match::foo
+foo
 mir {
   locals:
-    _0: core::opt::opt<i32>
+    _0: opt::opt<i32>
     _1: u8
     _2: x :i32
 
@@ -78,7 +78,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call simple_match::some_opt() -> bb1
+    _0 = call some_opt() -> bb1
 
   bb1:
     _1 = discriminant(_0)

@@ -1,7 +1,7 @@
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,18 +11,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -34,26 +34,26 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-receivers::Foo::mut_self
+Foo::mut_self
 mir {
   locals:
-    _0: mut self :receivers::Foo
+    _0: mut self :Foo
 
   params: [
     _0,
@@ -65,10 +65,10 @@ mir {
     return
 }
 
-receivers::Foo::just_self
+Foo::just_self
 mir {
   locals:
-    _0: self :receivers::Foo
+    _0: self :Foo
 
   params: [
     _0,
@@ -80,10 +80,10 @@ mir {
     return
 }
 
-receivers::Foo::ref_self
+Foo::ref_self
 mir {
   locals:
-    _0: self :&receivers::Foo
+    _0: self :&Foo
 
   params: [
     _0,
@@ -95,10 +95,10 @@ mir {
     return
 }
 
-receivers::Foo::mut_ref_self
+Foo::mut_ref_self
 mir {
   locals:
-    _0: mut self :&mut receivers::Foo
+    _0: mut self :&mut Foo
 
   params: [
     _0,
@@ -110,18 +110,18 @@ mir {
     return
 }
 
-receivers::main
+main
 mir {
   locals:
-    _0: receivers::Foo
+    _0: Foo
     _1: void
-    _2: receivers::Foo
+    _2: Foo
     _3: void
-    _4: receivers::Foo
-    _5: &receivers::Foo
+    _4: Foo
+    _5: &Foo
     _6: void
-    _7: mut receivers::Foo
-    _8: &mut receivers::Foo
+    _7: mut Foo
+    _8: &mut Foo
     _9: void
 
   params: [
@@ -131,21 +131,21 @@ mir {
 
   bb0 (entry):
     _0 = Foo {}
-    _1 = call receivers::Foo::mut_self(move _0) -> bb1
+    _1 = call Foo::mut_self(move _0) -> bb1
 
   bb1:
     _2 = Foo {}
-    _3 = call receivers::Foo::just_self(move _2) -> bb2
+    _3 = call Foo::just_self(move _2) -> bb2
 
   bb2:
     _4 = Foo {}
     _5 = &_4
-    _6 = call receivers::Foo::ref_self(move _5) -> bb3
+    _6 = call Foo::ref_self(move _5) -> bb3
 
   bb3:
     _7 = Foo {}
     _8 = &mut _7
-    _9 = call receivers::Foo::mut_ref_self(move _8) -> bb4
+    _9 = call Foo::mut_ref_self(move _8) -> bb4
 
   bb4:
     return 0_i32

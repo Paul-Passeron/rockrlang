@@ -1,7 +1,7 @@
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,20 +11,20 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-<core::iter::IntIter as core::iter::Iter>::next
+<iter::IntIter as iter::Iter>::next
 mir {
   locals:
-    _0: mut self :&mut core::iter::IntIter
+    _0: mut self :&mut iter::IntIter
     _1: bool
-    _2: core::opt::opt<i32>
+    _2: opt::opt<i32>
     _3: res :i32
-    _4: core::opt::opt<i32>
+    _4: opt::opt<i32>
 
   params: [
     _0,
@@ -47,10 +47,10 @@ mir {
     return move _4
 }
 
-<core::iter::IntIter as core::iter::IntoIterator>::into_iter
+<iter::IntIter as iter::IntoIterator>::into_iter
 mir {
   locals:
-    _0: self :core::iter::IntIter
+    _0: self :iter::IntIter
 
   params: [
     _0,
@@ -62,12 +62,12 @@ mir {
     return move _0
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -79,30 +79,30 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-for_loop::main
+main
 mir {
   locals:
-    _0: core::iter::IntIter
-    _1: core::iter::IntIter
-    _2: mut @iterator_0 :core::iter::IntIter
-    _3: &mut core::iter::IntIter
-    _4: core::opt::opt<i32>
+    _0: iter::IntIter
+    _1: iter::IntIter
+    _2: mut @iterator_0 :iter::IntIter
+    _3: &mut iter::IntIter
+    _4: opt::opt<i32>
     _5: u8
     _6: i :i32
     _7: void
@@ -114,7 +114,7 @@ mir {
 
   bb0 (entry):
     _0 = IntIter {start: 0_i32, end: 1000_i32}
-    _1 = call <core::iter::IntIter as core::iter::IntoIterator>::into_iter(move _0) -> bb1
+    _1 = call <iter::IntIter as iter::IntoIterator>::into_iter(move _0) -> bb1
 
   bb1:
     _2 = move _1
@@ -125,7 +125,7 @@ mir {
 
   bb3 (while-body):
     _3 = &mut _2
-    _4 = call <core::iter::IntIter as core::iter::Iter>::next(move _3) -> bb5
+    _4 = call <iter::IntIter as iter::Iter>::next(move _3) -> bb5
 
   bb4 (while-merge):
     return 0_i32
@@ -136,7 +136,7 @@ mir {
 
   bb6 (match-branch-0):
     _6 = copy _4.downcast#1.0
-    _7 = call core::io::printf(c"%d\n\0", copy _6) -> bb8
+    _7 = call io::printf(c"%d\n\0", copy _6) -> bb8
 
   bb7 (match-branch-1):
     goto bb4

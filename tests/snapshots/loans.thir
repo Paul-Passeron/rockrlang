@@ -1,27 +1,27 @@
 core/io.rkr:34:5
-thir fun core::io::str::print(&self): void {
-    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
+thir fun io::str::print(&self): void {
+    io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
-thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::str::print(&message);
-    core::io::printf(c"\'\n\nAborting with code 1...\n\0");
-    core::sys::exit(1);
+thir fun panic::panic(message: io::str): never {
+    io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
+    <io::str>::io::str::print(&message);
+    io::printf(c"\'\n\nAborting with code 1...\n\0");
+    sys::exit(1);
     drop obligations:
         drop message;
 }
 
 examples/loans.rkr:1:1
-thir fun loans::simple_borrow(): i32 {
+thir fun simple_borrow(): i32 {
     let x: i32 = 5;
     let r: &i32 = &x;
     return (*r);
 }
 
 examples/loans.rkr:7:1
-thir fun loans::two_disjoint_borrows(): i32 {
+thir fun two_disjoint_borrows(): i32 {
     let x: i32 = 1;
     let y: i32 = 2;
     let rx: &i32 = &x;
@@ -30,7 +30,7 @@ thir fun loans::two_disjoint_borrows(): i32 {
 }
 
 examples/loans.rkr:15:1
-thir fun loans::borrow_dead_before_use(): i32 {
+thir fun borrow_dead_before_use(): i32 {
     let x: i32 = 5;
     let r: &i32 = &x;
     let y: i32 = 10;
@@ -38,7 +38,7 @@ thir fun loans::borrow_dead_before_use(): i32 {
 }
 
 examples/loans.rkr:22:1
-thir fun loans::borrow_across_branch(cond: bool): i32 {
+thir fun borrow_across_branch(cond: bool): i32 {
     let x: i32 = 5;
     let r: &i32 = &x;
     if cond 's1: {
@@ -48,7 +48,7 @@ thir fun loans::borrow_across_branch(cond: bool): i32 {
 }
 
 examples/loans.rkr:31:1
-thir fun loans::reassigned_borrow(): i32 {
+thir fun reassigned_borrow(): i32 {
     let a: i32 = 1;
     let b: i32 = 2;
     let mut r: &i32 = &a;
@@ -57,7 +57,7 @@ thir fun loans::reassigned_borrow(): i32 {
 }
 
 examples/loans.rkr:39:1
-thir fun loans::borrow_in_loop(n: i32): i32 {
+thir fun borrow_in_loop(n: i32): i32 {
     let x: i32 = 5;
     let mut i: i32 = 0;
     let mut acc: i32 = 0;

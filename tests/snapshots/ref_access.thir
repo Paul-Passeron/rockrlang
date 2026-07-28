@@ -1,23 +1,23 @@
 core/io.rkr:34:5
-thir fun core::io::str::print(&self): void {
-    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
+thir fun io::str::print(&self): void {
+    io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
-thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::str::print(&message);
-    core::io::printf(c"\'\n\nAborting with code 1...\n\0");
-    core::sys::exit(1);
+thir fun panic::panic(message: io::str): never {
+    io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
+    <io::str>::io::str::print(&message);
+    io::printf(c"\'\n\nAborting with code 1...\n\0");
+    sys::exit(1);
     drop obligations:
         drop message;
 }
 
 examples/ref_access.rkr:7:1
-thir fun ref_access::bar(a: &ref_access::Foo, b: &mut ref_access::Foo): void {
+thir fun bar(a: &Foo, b: &mut Foo): void {
     (*a).x;
     (*b).x;
-    let c: &&ref_access::Foo = &a;
+    let c: &&Foo = &a;
     (*(*c)).x;
 }
 

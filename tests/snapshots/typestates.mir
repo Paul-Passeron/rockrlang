@@ -1,7 +1,7 @@
-core::io::str::println
+io::str::println
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,16 +11,16 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\n\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\n\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -30,18 +30,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -53,27 +53,27 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-typestates::Foo<typestates::A>::new
+Foo<A>::new
 mir {
   locals:
-    _0: typestates::PhantomData<typestates::A>
-    _1: typestates::Foo<typestates::A>
+    _0: PhantomData<A>
+    _1: Foo<A>
 
   params: [
   ]
@@ -86,12 +86,12 @@ mir {
     return move _1
 }
 
-typestates::Foo<typestates::A>::next
+Foo<A>::next
 mir {
   locals:
-    _0: self :typestates::Foo<typestates::A>
-    _1: typestates::PhantomData<typestates::B>
-    _2: typestates::Foo<typestates::B>
+    _0: self :Foo<A>
+    _1: PhantomData<B>
+    _2: Foo<B>
 
   params: [
     _0,
@@ -105,12 +105,12 @@ mir {
     return move _2
 }
 
-typestates::Foo<typestates::B>::next
+Foo<B>::next
 mir {
   locals:
-    _0: self :typestates::Foo<typestates::B>
-    _1: typestates::PhantomData<typestates::C>
-    _2: typestates::Foo<typestates::C>
+    _0: self :Foo<B>
+    _1: PhantomData<C>
+    _2: Foo<C>
 
   params: [
     _0,
@@ -124,12 +124,12 @@ mir {
     return move _2
 }
 
-typestates::Foo<typestates::C>::next
+Foo<C>::next
 mir {
   locals:
-    _0: self :typestates::Foo<typestates::C>
-    _1: typestates::PhantomData<typestates::Last>
-    _2: typestates::Foo<typestates::Last>
+    _0: self :Foo<C>
+    _1: PhantomData<Last>
+    _2: Foo<Last>
 
   params: [
     _0,
@@ -143,11 +143,11 @@ mir {
     return move _2
 }
 
-typestates::type_name
+type_name
 mir {
   locals:
-    _0: of :&typestates::Foo<typestates::A>
-    _1: core::io::str
+    _0: of :&Foo<A>
+    _1: io::str
 
   params: [
     _0,
@@ -156,15 +156,15 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::A>", len: 30_i32}
+    _1 = str {data: c"Foo<A>", len: 6_i32}
     return move _1
 }
 
-typestates::type_name
+type_name
 mir {
   locals:
-    _0: of :&typestates::Foo<typestates::B>
-    _1: core::io::str
+    _0: of :&Foo<B>
+    _1: io::str
 
   params: [
     _0,
@@ -173,15 +173,15 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::B>", len: 30_i32}
+    _1 = str {data: c"Foo<B>", len: 6_i32}
     return move _1
 }
 
-typestates::type_name
+type_name
 mir {
   locals:
-    _0: of :&typestates::Foo<typestates::C>
-    _1: core::io::str
+    _0: of :&Foo<C>
+    _1: io::str
 
   params: [
     _0,
@@ -190,15 +190,15 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::C>", len: 30_i32}
+    _1 = str {data: c"Foo<C>", len: 6_i32}
     return move _1
 }
 
-typestates::type_name
+type_name
 mir {
   locals:
-    _0: of :&typestates::Foo<typestates::Last>
-    _1: core::io::str
+    _0: of :&Foo<Last>
+    _1: io::str
 
   params: [
     _0,
@@ -207,41 +207,41 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = str {data: c"typestates::Foo<typestates::Last>", len: 33_i32}
+    _1 = str {data: c"Foo<Last>", len: 9_i32}
     return move _1
 }
 
-typestates::main
+main
 mir {
   locals:
-    _0: a :typestates::A
-    _1: typestates::Foo<typestates::A>
-    _2: f :typestates::Foo<typestates::A>
-    _3: &typestates::Foo<typestates::A>
-    _4: core::io::str
-    _5: core::io::str
-    _6: &core::io::str
+    _0: a :A
+    _1: Foo<A>
+    _2: f :Foo<A>
+    _3: &Foo<A>
+    _4: io::str
+    _5: io::str
+    _6: &io::str
     _7: void
-    _8: typestates::Foo<typestates::B>
-    _9: f :typestates::Foo<typestates::B>
-    _10: &typestates::Foo<typestates::B>
-    _11: core::io::str
-    _12: core::io::str
-    _13: &core::io::str
+    _8: Foo<B>
+    _9: f :Foo<B>
+    _10: &Foo<B>
+    _11: io::str
+    _12: io::str
+    _13: &io::str
     _14: void
-    _15: typestates::Foo<typestates::C>
-    _16: f :typestates::Foo<typestates::C>
-    _17: &typestates::Foo<typestates::C>
-    _18: core::io::str
-    _19: core::io::str
-    _20: &core::io::str
+    _15: Foo<C>
+    _16: f :Foo<C>
+    _17: &Foo<C>
+    _18: io::str
+    _19: io::str
+    _20: &io::str
     _21: void
-    _22: typestates::Foo<typestates::Last>
-    _23: f :typestates::Foo<typestates::Last>
-    _24: &typestates::Foo<typestates::Last>
-    _25: core::io::str
-    _26: core::io::str
-    _27: &core::io::str
+    _22: Foo<Last>
+    _23: f :Foo<Last>
+    _24: &Foo<Last>
+    _25: io::str
+    _26: io::str
+    _27: &io::str
     _28: void
 
   params: [
@@ -251,56 +251,56 @@ mir {
 
   bb0 (entry):
     _0 = A {}
-    _1 = call typestates::Foo<typestates::A>::new() -> bb1
+    _1 = call Foo<A>::new() -> bb1
 
   bb1:
     _2 = move _1
     _3 = &_2
-    _4 = call typestates::type_name::<typestates::Foo<typestates::A>>(move _3) -> bb2
+    _4 = call type_name::<Foo<A>>(move _3) -> bb2
 
   bb2:
     _5 = move _4
     _6 = &_5
-    _7 = call core::io::str::println(move _6) -> bb3
+    _7 = call io::str::println(move _6) -> bb3
 
   bb3:
-    _8 = call typestates::Foo<typestates::A>::next(move _2) -> bb4
+    _8 = call Foo<A>::next(move _2) -> bb4
 
   bb4:
     _9 = move _8
     _10 = &_9
-    _11 = call typestates::type_name::<typestates::Foo<typestates::B>>(move _10) -> bb5
+    _11 = call type_name::<Foo<B>>(move _10) -> bb5
 
   bb5:
     _12 = move _11
     _13 = &_12
-    _14 = call core::io::str::println(move _13) -> bb6
+    _14 = call io::str::println(move _13) -> bb6
 
   bb6:
-    _15 = call typestates::Foo<typestates::B>::next(move _9) -> bb7
+    _15 = call Foo<B>::next(move _9) -> bb7
 
   bb7:
     _16 = move _15
     _17 = &_16
-    _18 = call typestates::type_name::<typestates::Foo<typestates::C>>(move _17) -> bb8
+    _18 = call type_name::<Foo<C>>(move _17) -> bb8
 
   bb8:
     _19 = move _18
     _20 = &_19
-    _21 = call core::io::str::println(move _20) -> bb9
+    _21 = call io::str::println(move _20) -> bb9
 
   bb9:
-    _22 = call typestates::Foo<typestates::C>::next(move _16) -> bb10
+    _22 = call Foo<C>::next(move _16) -> bb10
 
   bb10:
     _23 = move _22
     _24 = &_23
-    _25 = call typestates::type_name::<typestates::Foo<typestates::Last>>(move _24) -> bb11
+    _25 = call type_name::<Foo<Last>>(move _24) -> bb11
 
   bb11:
     _26 = move _25
     _27 = &_26
-    _28 = call core::io::str::println(move _27) -> bb12
+    _28 = call io::str::println(move _27) -> bb12
 
   bb12:
     return 0_i32

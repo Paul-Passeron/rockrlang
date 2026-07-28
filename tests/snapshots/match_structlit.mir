@@ -1,7 +1,7 @@
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,18 +11,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -34,26 +34,26 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-match_structlit::getIt
+getIt
 mir {
   locals:
-    _0: match_structlit::LooksLikeAStruct
+    _0: LooksLikeAStruct
 
   params: [
   ]
@@ -65,11 +65,11 @@ mir {
     return move _0
 }
 
-match_structlit::main
+main
 mir {
   locals:
-    _0: match_structlit::LooksLikeAStruct
-    _1: it :match_structlit::LooksLikeAStruct
+    _0: LooksLikeAStruct
+    _1: it :LooksLikeAStruct
     _2: u8
     _3: x :i32
     _4: y :i32
@@ -85,7 +85,7 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _0 = call match_structlit::getIt() -> bb1
+    _0 = call getIt() -> bb1
 
   bb1:
     _1 = move _0
@@ -101,15 +101,15 @@ mir {
   bb4 (match-branch-0):
     _3 = copy _1.downcast#0.x
     _4 = copy _1.downcast#0.y
-    _5 = call core::io::printf(c"Got A, x = %d and y = %d\n\0", copy _3, copy _4) -> bb7
+    _5 = call io::printf(c"Got A, x = %d and y = %d\n\0", copy _3, copy _4) -> bb7
 
   bb5 (match-branch-1):
     _6 = copy _1.downcast#1.z
     _7 = copy _1.downcast#1.foo
-    _8 = call core::io::printf(c"Got B, z = %d and foo = %d\n\0", copy _6, copy _7) -> bb8
+    _8 = call io::printf(c"Got B, z = %d and foo = %d\n\0", copy _6, copy _7) -> bb8
 
   bb6 (match-branch-2):
-    _9 = call core::io::printf(c"None\n\0") -> bb9
+    _9 = call io::printf(c"None\n\0") -> bb9
 
   bb7:
     goto bb2

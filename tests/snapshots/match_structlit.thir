@@ -1,35 +1,35 @@
 core/io.rkr:34:5
-thir fun core::io::str::print(&self): void {
-    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
+thir fun io::str::print(&self): void {
+    io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
-thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::str::print(&message);
-    core::io::printf(c"\'\n\nAborting with code 1...\n\0");
-    core::sys::exit(1);
+thir fun panic::panic(message: io::str): never {
+    io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
+    <io::str>::io::str::print(&message);
+    io::printf(c"\'\n\nAborting with code 1...\n\0");
+    sys::exit(1);
     drop obligations:
         drop message;
 }
 
 examples/match_structlit.rkr:7:1
-thir fun match_structlit::getIt(): match_structlit::LooksLikeAStruct {
-    return match_structlit::LooksLikeAStruct::#0 { x: 4, y: 59 };
+thir fun getIt(): LooksLikeAStruct {
+    return LooksLikeAStruct::#0 { x: 4, y: 59 };
 }
 
 examples/match_structlit.rkr:11:1
-thir fun match_structlit::main(): i32 {
-    let it: match_structlit::LooksLikeAStruct = match_structlit::getIt();
+thir fun main(): i32 {
+    let it: LooksLikeAStruct = getIt();
     match it {
-        match_structlit::LooksLikeAStruct::#0 { x: x, y: y } => 's1: {
-            core::io::printf(c"Got A, x = %d and y = %d\n\0", x, y);
+        LooksLikeAStruct::#0 { x: x, y: y } => 's1: {
+            io::printf(c"Got A, x = %d and y = %d\n\0", x, y);
         }
-        match_structlit::LooksLikeAStruct::#1 { z: z, foo: foo } => 's2: {
-            core::io::printf(c"Got B, z = %d and foo = %d\n\0", z, foo);
+        LooksLikeAStruct::#1 { z: z, foo: foo } => 's2: {
+            io::printf(c"Got B, z = %d and foo = %d\n\0", z, foo);
         }
-        match_structlit::LooksLikeAStruct::#2 => 's3: {
-            core::io::printf(c"None\n\0");
+        LooksLikeAStruct::#2 => 's3: {
+            io::printf(c"None\n\0");
         }
     }
     return 0;

@@ -1,30 +1,30 @@
 core/io.rkr:34:5
-thir fun core::io::str::print(&self): void {
-    core::io::printf(c"%.*s\0", (*self).len, (*self).data);
+thir fun io::str::print(&self): void {
+    io::printf(c"%.*s\0", (*self).len, (*self).data);
 }
 
 core/panic.rkr:1:1
-thir fun core::panic::panic(message: core::io::str): never {
-    core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
-    <core::io::str>::core::io::str::print(&message);
-    core::io::printf(c"\'\n\nAborting with code 1...\n\0");
-    core::sys::exit(1);
+thir fun panic::panic(message: io::str): never {
+    io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0");
+    <io::str>::io::str::print(&message);
+    io::printf(c"\'\n\nAborting with code 1...\n\0");
+    sys::exit(1);
     drop obligations:
         drop message;
 }
 
 examples/simple_match.rkr:3:1
-thir fun simple_match::some_opt(): core::opt::opt<i32> {
-    return core::opt::opt::<i32>::#1(8);
+thir fun some_opt(): opt::opt<i32> {
+    return opt::opt::<i32>::#1(8);
 }
 
 examples/simple_match.rkr:7:1
-thir fun simple_match::foo(): i32 {
-    match simple_match::some_opt() {
-        core::opt::opt::<i32>::#1(x) => 's1: {
+thir fun foo(): i32 {
+    match some_opt() {
+        opt::opt::<i32>::#1(x) => 's1: {
             return x;
         }
-        core::opt::opt::<i32>::#0 => 's2: {
+        opt::opt::<i32>::#0 => 's2: {
             return 0;
         }
     }

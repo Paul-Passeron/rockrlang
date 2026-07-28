@@ -1,7 +1,7 @@
-core::io::str::print
+io::str::print
 mir {
   locals:
-    _0: self :&core::io::str
+    _0: self :&io::str
     _1: void
 
   params: [
@@ -11,18 +11,18 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
+    _1 = call io::printf(c"%.*s\0", copy _0.*.len, copy _0.*.data) -> bb1
 
   bb1:
     return
 }
 
-core::panic::panic
+panic::panic
 mir {
   locals:
-    _0: message :core::io::str
+    _0: message :io::str
     _1: void
-    _2: &core::io::str
+    _2: &io::str
     _3: void
     _4: void
     _5: never
@@ -34,23 +34,23 @@ mir {
   entry: bb0
 
   bb0 (entry):
-    _1 = call core::io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
+    _1 = call io::printf(c"Oh no, a panic has occurred!\nmsg: \'\0") -> bb1
 
   bb1:
     _2 = &_0
-    _3 = call core::io::str::print(move _2) -> bb2
+    _3 = call io::str::print(move _2) -> bb2
 
   bb2:
-    _4 = call core::io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
+    _4 = call io::printf(c"\'\n\nAborting with code 1...\n\0") -> bb3
 
   bb3:
-    _5 = call core::sys::exit(1_i32) -> bb4
+    _5 = call sys::exit(1_i32) -> bb4
 
   bb4:
     diverge
 }
 
-liveness::simple_dead
+simple_dead
 mir {
   locals:
     _0: x :i32
@@ -67,7 +67,7 @@ mir {
     return copy _0
 }
 
-liveness::simple_live
+simple_live
 mir {
   locals:
     _0: x :i32
@@ -86,7 +86,7 @@ mir {
     return move _2
 }
 
-liveness::conditional_use
+conditional_use
 mir {
   locals:
     _0: cond :bool
@@ -111,7 +111,7 @@ mir {
     return copy _2
 }
 
-liveness::reassigned_before_use
+reassigned_before_use
 mir {
   locals:
     _0: mut x :i32
@@ -127,7 +127,7 @@ mir {
     return copy _0
 }
 
-liveness::loop_carried
+loop_carried
 mir {
   locals:
     _0: n :i32
@@ -159,7 +159,7 @@ mir {
     return copy _1
 }
 
-liveness::dead_after_loop
+dead_after_loop
 mir {
   locals:
     _0: n :i32
@@ -190,7 +190,7 @@ mir {
     return copy _1
 }
 
-liveness::overwritten_in_branch
+overwritten_in_branch
 mir {
   locals:
     _0: cond :bool
@@ -218,7 +218,7 @@ mir {
     goto bb2
 }
 
-liveness::live_across_branch
+live_across_branch
 mir {
   locals:
     _0: cond :bool
@@ -248,10 +248,10 @@ mir {
     goto bb2
 }
 
-liveness::match_arm_liveness
+match_arm_liveness
 mir {
   locals:
-    _0: o :core::opt::opt<i32>
+    _0: o :opt::opt<i32>
     _1: fallback :i32
     _2: u8
     _3: x :i32
@@ -278,7 +278,7 @@ mir {
     return copy _3
 }
 
-liveness::param_liveness
+param_liveness
 mir {
   locals:
     _0: a :i32
