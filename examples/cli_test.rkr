@@ -1,0 +1,16 @@
+@include core::cli
+
+fun start(args: &CliArgs): void {
+    "Program name: ".print();
+    args.program_name.println();
+    for x in &args.args {
+        "    with arg: ".print();
+        x.println();
+    }
+}
+
+fun main(argc: int, argv: **char): int {
+    let args = CliArgs::from_libc_start(argc, argv);
+    start(&args);
+    return 0;
+}
