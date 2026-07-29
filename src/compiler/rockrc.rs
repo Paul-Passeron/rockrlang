@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use clap::Parser as _;
 use clap_derive::Parser;
 use rockr::compiler::Config;
+use rockr::compiler::OptLevel;
 use rockr::compiler::build_from_disk;
 use std::path::PathBuf;
 
@@ -50,6 +51,9 @@ pub struct CliArgs {
     #[clap(long, default_value_t = false)]
     show_time: bool,
 
+    #[clap(short = 'O', long = "opt-level", value_enum, default_value_t = OptLevel::O2)]
+    opt_level: OptLevel,
+
     #[clap(short = 'o', long)]
     output: Option<PathBuf>,
 }
@@ -65,6 +69,7 @@ fn main() -> std::process::ExitCode {
         display_thir: args.display_thir,
         compile_only: args.compile_only,
         show_time: args.show_time,
+        opt_level: args.opt_level,
         output: args.output,
     };
     let Some(root) = args.file.or_else(|| {

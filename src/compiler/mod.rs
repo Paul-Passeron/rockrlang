@@ -200,6 +200,17 @@ fn link_executable(obj: &Path, out: &Path) -> Result<(), CompilerError> {
     Ok(())
 }
 
+impl OptLevel {
+    fn to_llvm(self) -> OptimizationLevel {
+        match self {
+            Self::O0 => OptimizationLevel::None,
+            Self::O1 => OptimizationLevel::Less,
+            Self::O2 => OptimizationLevel::Default,
+            Self::O3 => OptimizationLevel::Aggressive,
+        }
+    }
+}
+
 pub fn optimize(module: &Module, opt_level: OptimizationLevel) -> TargetMachine {
     module.verify().unwrap();
 
@@ -296,7 +307,7 @@ pub fn build_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerErro
         llvm_module.print_to_stderr();
     }
 
-    let machine = optimize(&llvm_module, OptimizationLevel::None);
+    let machine = optimize(&llvm_module, db.config().opt_level.to_llvm());
 
     if db.config().display_opt_llvm {
         llvm_module.print_to_stderr();

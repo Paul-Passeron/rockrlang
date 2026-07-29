@@ -20,6 +20,7 @@ use crate::{
     driver::ANCHOR_FILE_NAME,
     resolved::{FileModule, Package},
 };
+use clap_derive::ValueEnum;
 use dashmap::DashSet;
 use itertools::Itertools;
 use salsa::Setter;
@@ -88,6 +89,19 @@ impl Workspace {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
+pub enum OptLevel {
+    #[value(name = "0")]
+    O0,
+    #[value(name = "1")]
+    O1,
+    #[default]
+    #[value(name = "2")]
+    O2,
+    #[value(name = "3")]
+    O3,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Config {
     pub no_std: bool,
@@ -98,6 +112,7 @@ pub struct Config {
     pub display_thir: bool,
     pub compile_only: bool,
     pub show_time: bool,
+    pub opt_level: OptLevel,
     pub output: Option<PathBuf>,
 }
 
