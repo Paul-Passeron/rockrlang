@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, ops::Index};
+use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 use itertools::Itertools;
 
@@ -24,7 +24,10 @@ use crate::{
     check::thir::sanity_check::ConstructorType,
     codegen::{Codegen, LIRToLLVM, MIRToLIRBuild},
     common::symbols::Symbol,
-    layout::{IntWidth, LIRTy, LayoutData, LayoutID, layout_of},
+    layout::{
+        IntWidth, LIRTy, LayoutData, LayoutID, ScalarKind, fat_ptr::FAT_PTR_DATA_FIELD,
+        layout_of,
+    },
     lir::{
         ArithBinop, Body, CmpBinop, LIRFunctionId, ValueId,
         branded::BrandedBlockId,
@@ -41,7 +44,7 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id},
+    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id, type_ref::CastClass},
     thir_to_mir::FuncInst,
 };
 
@@ -604,11 +607,7 @@ impl MTLBCtx<'_> {
             MIRRValueKind::BinOp(op, mir_lhs, mir_rhs) => {
                 let lhs = self.lower_operand(b, mir_lhs, lower).unwrap();
                 let rhs = self.lower_operand(b, mir_rhs, lower).unwrap();
-                let ty = mir_lhs.ty(self.db);
-                let is_signed = ty
-                    .as_type_id()
-                    .and_then(|ty| ty.def(self.db).is_int_like(self.db))
-                    .is_some_and(|int_like| int_like.is_signed(self.db));
+                let is_signed = self.is_signed(mir_lhs.ty(self.db));
                 Some(match op {
                     BinaryOperator::Plus => b.arith(
                         if is_signed { ArithBinop::SAdd } else { ArithBinop::UAdd },
@@ -738,29 +737,84 @@ impl MTLBCtx<'_> {
                 let ty = LIRTy { layout, origin: Some(rvalue.ty) };
                 Some(b.make_aggregate(ty, values).erase())
             }
-            MIRRValueKind::Cast(op, type_ref) => {
-                let as_ptr_like =
-                    |ty: TypeRef| ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db));
-                if let Some((muta, _)) = as_ptr_like(*type_ref) {
-                    let operand_ty = op.ty(self.db);
-                    let (op_m, _) = as_ptr_like(operand_ty).unwrap();
-                    if muta.is_mut() && !op_m.is_mut() {
-                        // const ptr-like to mut ptr-like
-                        unreachable!()
-                    }
-                    self.lower_operand(b, op, lower)
-                } else if let Some(value) = self.lower_operand(b, op, lower) {
-                    match layout_of(self.db, *type_ref).data(self.db) {
-                        LayoutData::Scalar(scalar_kind) => {
-                            Some(b.cast(CastKind::IntTruncate, value, *scalar_kind))
-                        }
-                        _ => todo!(),
-                    }
-                } else {
-                    None
-                }
+            MIRRValueKind::Cast(op, to) => {
+                let from = op.ty(self.db);
+                let value = self.lower_operand(b, op, lower)?;
+                Some(self.lower_cast(b, value, from, *to))
             }
         }
+    }
+
+    fn lower_cast<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        value: ValueId<'ir>,
+        from: TypeRef,
+        to: TypeRef,
+    ) -> ValueId<'ir> {
+        let unsupported = || {
+            unreachable!(
+                "cast from `{}` to `{}` should have been rejected in thir_to_mir",
+                from.to_string(self.db),
+                to.to_string(self.db)
+            )
+        };
+        let (Some(from_class), Some(to_class)) =
+            (from.cast_class(self.db), to.cast_class(self.db))
+        else {
+            unsupported()
+        };
+
+        let (value, from_class) = match (from_class, to_class) {
+            (CastClass::FatPtr(muta), CastClass::ThinPtr(_)) => {
+                let ty = LIRTy { layout: layout_of(self.db, from), origin: Some(from) };
+                (b.extract_field(value, ty, FAT_PTR_DATA_FIELD), CastClass::ThinPtr(muta))
+            }
+            _ => (value, from_class),
+        };
+
+        match (from_class, to_class) {
+            (CastClass::ThinPtr(_), CastClass::ThinPtr(_))
+            | (CastClass::FatPtr(_), CastClass::FatPtr(_)) => value,
+            (CastClass::Int, CastClass::ThinPtr(_)) => {
+                b.cast(CastKind::IntToPtr, value, ScalarKind::Ptr)
+            }
+            (CastClass::ThinPtr(_), CastClass::Int) => {
+                b.cast(CastKind::PtrToInt, value, self.scalar_kind_of(to))
+            }
+            (CastClass::Int, CastClass::Int) => {
+                let (ScalarKind::Int(from_w), ScalarKind::Int(to_w)) =
+                    (self.scalar_kind_of(from), self.scalar_kind_of(to))
+                else {
+                    unsupported()
+                };
+                match to_w.cmp(&from_w) {
+                    Ordering::Equal => value,
+                    Ordering::Less => {
+                        b.cast(CastKind::IntTruncate, value, ScalarKind::Int(to_w))
+                    }
+                    Ordering::Greater => b.cast(
+                        CastKind::IntExtend { signed: self.is_signed(from) },
+                        value,
+                        ScalarKind::Int(to_w),
+                    ),
+                }
+            }
+            _ => unsupported(),
+        }
+    }
+
+    fn scalar_kind_of(&self, ty: TypeRef) -> ScalarKind {
+        match layout_of(self.db, ty).data(self.db) {
+            LayoutData::Scalar(kind) => *kind,
+            _ => unreachable!("`{}` is not a scalar", ty.to_string(self.db)),
+        }
+    }
+
+    fn is_signed(&self, ty: TypeRef) -> bool {
+        ty.as_type_id()
+            .and_then(|ty| ty.def(self.db).is_int_like(self.db))
+            .is_some_and(|int_like| int_like.is_signed(self.db))
     }
 }
 

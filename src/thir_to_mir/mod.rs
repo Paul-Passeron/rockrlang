@@ -51,7 +51,7 @@ use crate::{
     },
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
-        TypeRef, char_id, never_id, str_def, str_id, void_id,
+        TypeRef, char_id, never_id, str_def, str_id, type_ref::CastClass, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -593,19 +593,7 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             ExprKind::Cast(expr, ty) => {
-                let as_ptr_like =
-                    |ty: TypeRef| ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db));
-                if let Some((muta, _)) = as_ptr_like(*ty) {
-                    let expr_val = &self.thir.exprs[*expr];
-                    let expr_ty = expr_val.ty;
-                    let (op_m, _) = as_ptr_like(expr_ty)
-                        .unwrap_or((Mutability::Const, TypeRef::Error));
-                    if muta.is_mut() && !op_m.is_mut() {
-                        // const ptr-like to mut ptr-like
-                        Diag::generic_error(format!("cannot cast a const pointer/reference type to a mutable pointer/reference type. ({} to {})", expr_ty.to_string(self.db), ty.to_string(self.db)), span)
-                            .accumulate(self.db);
-                    }
-                }
+                self.check_cast(self.thir.exprs[*expr].ty, *ty, span);
                 MIRRValueKind::Cast(self.build_operand(*expr), *ty)
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
@@ -622,6 +610,45 @@ impl<'a> ThirToMIR<'a> {
             }
         };
         MIRRValue { kind, ty, span }
+    }
+
+    fn check_cast(&self, from: TypeRef, to: TypeRef, span: Span) {
+        let reject = |reason: &str| {
+            Diag::generic_error(
+                format!(
+                    "cannot cast `{}` to `{}`: {reason}",
+                    from.to_string(self.db),
+                    to.to_string(self.db)
+                ),
+                span,
+            )
+            .accumulate(self.db);
+        };
+
+        let (Some(from_class), Some(to_class)) =
+            (from.cast_class(self.db), to.cast_class(self.db))
+        else {
+            reject("only integer and pointer-like types can be cast");
+            return;
+        };
+
+        use CastClass::{FatPtr, Int, ThinPtr};
+        match (from_class, to_class) {
+            (Int, Int) | (Int, ThinPtr(_)) | (ThinPtr(_), Int) => (),
+            (ThinPtr(from_m), ThinPtr(to_m))
+            | (FatPtr(from_m), ThinPtr(to_m))
+            | (FatPtr(from_m), FatPtr(to_m)) => {
+                if to_m.is_mut() && !from_m.is_mut() {
+                    reject("a const pointer/reference cannot be cast to a mutable one");
+                }
+            }
+            (Int, FatPtr(_)) | (ThinPtr(_), FatPtr(_)) => {
+                reject("a fat pointer's metadata cannot be created by a cast")
+            }
+            (FatPtr(_), Int) => {
+                reject("cast the fat pointer to a thin pointer first");
+            }
+        }
     }
 
     fn build_fields(

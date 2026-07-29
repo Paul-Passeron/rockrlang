@@ -25,6 +25,13 @@ use super::{
 };
 use crate::{Db, hir::Mutability, printer::type_printer::TypePrinter};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CastClass {
+    Int,
+    ThinPtr(Mutability),
+    FatPtr(Mutability),
+}
+
 impl TypeRef {
     pub fn to_string(self, db: &dyn Db) -> String {
         TypePrinter::new().type_ref_to_string(db, self)
@@ -72,6 +79,19 @@ impl TypeRef {
         let type_id = self.as_type_id()?;
         let mutability = type_id.def(db).is_ptr_like(db)?.mutability();
         Some((mutability, type_id.args(db)[0]))
+    }
+
+    pub fn cast_class(self, db: &dyn Db) -> Option<CastClass> {
+        if let Some((muta, _)) = self.as_ptr_like(db) {
+            return Some(if self.is_fat_ptr(db) {
+                CastClass::FatPtr(muta)
+            } else {
+                CastClass::ThinPtr(muta)
+            });
+        }
+        let (builtin, _) = self.as_builtin(db)?;
+        matches!(builtin.kind(db), BuiltinTypeKind::Bool | BuiltinTypeKind::Int { .. })
+            .then_some(CastClass::Int)
     }
 
     pub fn as_slice(self, db: &dyn Db) -> Option<Self> {

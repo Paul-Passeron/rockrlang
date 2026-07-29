@@ -40,7 +40,9 @@ use crate::{
     lir::{
         self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
         finalized::{BlockData, FunctionBody, StackSlot},
-        inst::{ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind},
+        inst::{
+            CastKind, ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
+        },
     },
     resolved::never_id,
 };
@@ -519,12 +521,22 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                             .unwrap()
                             .into()
                     }
-                    ValueInstKind::Cast { value, to, .. } => {
+                    ValueInstKind::Cast { kind, value, to } => {
                         let llvm_ty = self.basic(LayoutID::scalar(self.db, *to));
                         let value = ctx.values[value];
-                        self.b
-                            .build_cast(InstructionOpcode::ZExt, value, llvm_ty, "")
-                            .unwrap()
+                        let opcode = match kind {
+                            CastKind::IntTruncate => InstructionOpcode::Trunc,
+                            CastKind::IntExtend { signed: true } => {
+                                InstructionOpcode::SExt
+                            }
+                            CastKind::IntExtend { signed: false } => {
+                                InstructionOpcode::ZExt
+                            }
+                            CastKind::IntToPtr => InstructionOpcode::IntToPtr,
+                            CastKind::PtrToInt => InstructionOpcode::PtrToInt,
+                            CastKind::Bitcast => InstructionOpcode::BitCast,
+                        };
+                        self.b.build_cast(opcode, value, llvm_ty, "").unwrap()
                     }
                     ValueInstKind::IndexPtr { ptr, elem_ty, index } => {
                         let ptr = ctx.values[ptr].into_pointer_value();

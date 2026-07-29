@@ -875,14 +875,19 @@ impl<'db> InferenceCtx<'db> {
                         if def.is_int_like(self.db).is_some() {
                             ConstraintSolveResult::Solved
                         } else {
-                            todo!("Not an int like type: {}", t.to_string(self.db))
+                            ConstraintSolveResult::Error(UnificationError::Custom(
+                                format!(
+                                    "`{}` is not an integer-like type",
+                                    t.to_string(self.db)
+                                ),
+                            ))
                         }
                     }
                     InferTy::Param(type_param_id) => {
-                        todo!(
-                            "Trying to constraint param `T{}` to int like type",
+                        ConstraintSolveResult::Error(UnificationError::Custom(format!(
+                            "type parameter `T{}` is not known to be integer-like",
                             type_param_id.0
-                        )
+                        )))
                     }
                 }
             }

@@ -21,6 +21,9 @@ use crate::{
     resolved::TypeRef,
 };
 
+pub const FAT_PTR_DATA_FIELD: u32 = 0;
+pub const FAT_METADATA_FIELD: u32 = 1;
+
 pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
     let Some((_, id)) = ty.as_ref(db) else {
         panic!("Not a fat ptr");
