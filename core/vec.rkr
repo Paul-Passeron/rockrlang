@@ -159,7 +159,17 @@ struct Array<T> {
 }
 
 impl <T> Array<T> {
+    fun empty(): Self {
+        return Self {
+            .contents: 0 as *mut _,
+            .len: 0
+        };
+    }
+
     fun new(len: usize): Self {
+        if len == 0 {
+            return Self::empty();
+        }
         let mut cap = len;
         if cap == 0 {
             cap = 1;

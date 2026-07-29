@@ -12,6 +12,12 @@ impl CliArgs {
         if argc > 0 {
             program_name = str::from_cstr(argv[0]);
         }
+        if argc == 1 {
+            return Self {
+                .program_name: program_name,
+                .args: Array::empty(),
+            };
+        }
         let mut arr: Array<str> = Array::new(argc as usize - 1);
         for i in 1..argc {
             arr.set(i as usize - 1 , str::from_cstr(argv[i]));
