@@ -104,9 +104,7 @@ impl TypePrinter {
             // Inner modules are still printed.
             if !opts.has(TypePrinterOption::PrintBuiltin)
                 && module.parent(db) == Some(builtin_module(db))
-                && module
-                    .owning_package(db)
-                    .is_some_and(|pkg| is_elided_package(db, pkg))
+                && module.owning_package(db).is_some_and(|pkg| is_elided_package(db, pkg))
             {
                 return;
             }
@@ -339,11 +337,7 @@ impl TypePrinter {
     /// Joins a scope prefix and a name with `::`, dropping the separator when
     /// the prefix is empty (e.g. an elided crate root).
     fn join_path(prefix: String, name: String) -> String {
-        if prefix.is_empty() {
-            name
-        } else {
-            format!("{prefix}::{name}")
-        }
+        if prefix.is_empty() { name } else { format!("{prefix}::{name}") }
     }
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {

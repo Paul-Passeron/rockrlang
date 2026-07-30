@@ -61,7 +61,6 @@ impl ThirPlace {
 }
 
 impl StructRef {
-
     pub fn declared_typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
         let item = struct_item(db, self.def.interned());
         let found = item.fields.iter().find(|f| f.name == field)?;

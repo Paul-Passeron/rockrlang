@@ -207,10 +207,6 @@ impl<'a> Lsp<'a> {
         let sig = get_sig_of_function(&self.db, func.interned());
         let scope = self.scope_owner_to_named_string(&names, func.parent(&self.db));
         let sig_str = self.function_sig_to_named_string(&names, sig);
-        if scope.is_empty() {
-            sig_str
-        } else {
-            format!("{scope}::{sig_str}")
-        }
+        if scope.is_empty() { sig_str } else { format!("{scope}::{sig_str}") }
     }
 }
