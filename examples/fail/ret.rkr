@@ -1,11 +1,11 @@
 fun foo(): void {
-    return "Hey !";
+    return "Hey !";  //~ ERROR Cannot return io::str //~ ERROR Type mismatch: Expected void but got io::str
 }
 
 fun bar(): int {
-    return "Hey !";
+    return "Hey !";  //~ ERROR Cannot return io::str //~ ERROR Type mismatch: Expected i32 but got io::str
 }
 
 fun baz(): int {
-    return;
+    return;  //~ ERROR Cannot have an empty return //~ ERROR Type mismatch: Expected i32 but got void
 }

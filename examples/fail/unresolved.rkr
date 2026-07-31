@@ -1,3 +1,3 @@
 fun foo() : void {
-    let x = bar();
+    let x = bar();  //~ ERROR function not found in current scope
 }

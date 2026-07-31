@@ -1,4 +1,4 @@
 fun foo(): void {
     let mut x: int = 0;
-    x = "Hey !";
+    x = "Hey !";  //~ ERROR Cannot assign value of type io::str //~ ERROR Type mismatch: Expected i32 but got io::str
 }

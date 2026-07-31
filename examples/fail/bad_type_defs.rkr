@@ -1,61 +1,66 @@
+// Every kind of malformed struct / enum definition, in one file.
+//
+// Note what is *not* flagged: `struct Infinite { me: Infinite; }` at the bottom
+// is infinitely sized and currently produces no diagnostic. When that is fixed,
+// annotate it here.
 struct DupField {
     x: int;
     y: str;
-    x: str;
+    x: str;  //~ ERROR Duplicated field name `x` in struct `DupField`
 }
 
 struct TripleDup {
     a: int;
-    a: int;
-    a: int;
+    a: int;  //~ ERROR Duplicated field name `a` in struct `TripleDup`
+    a: int;  //~ ERROR Duplicated field name `a` in struct `TripleDup`
 }
 
 struct BadFieldType {
     x: int;
-    y: Nonexistent;
+    y: Nonexistent;  //~ ERROR Field `y` in struct `BadFieldType` has error type
 }
 
 struct BadPtr {
-    p: *Nonexistent;
-    r: &Missing;
+    p: *Nonexistent;  //~ ERROR Field `p` in struct `BadPtr` has error type
+    r: &Missing;  //~ ERROR Field `r` in struct `BadPtr` has error type
 }
 
 struct DupAndBad {
-    x: Ghost;
-    x: Ghost;
+    x: Ghost;  //~ ERROR Field `x` in struct `DupAndBad` has error type
+    x: Ghost;  //~ ERROR Duplicated field name `x` in struct `DupAndBad` //~ ERROR Field `x` in struct `DupAndBad` has error type
 }
 
 enum DupVariant {
     A,
     B,
-    A,
+    A,  //~ ERROR Duplicated variant name `A` in enum `DupVariant`
 }
 
 enum DupVariantMixed {
     V,
-    V(int),
-    V { x: str },
+    V(int),  //~ ERROR Duplicated variant name `V` in enum `DupVariantMixed`
+    V { x: str },  //~ ERROR Duplicated variant name `V` in enum `DupVariantMixed`
 }
 
 enum VariantDupField {
-    A { x: int; x: str },
+    A { x: int; x: str },  //~ ERROR Duplicated field name `x` in variant `A` of enum `VariantDupField`
 }
 
 enum VariantBadField {
-    A { x: int; y: Nope },
+    A { x: int; y: Nope },  //~ ERROR Field name `y` in variant `A` of enum `VariantBadField` has error type
 }
 
 enum TupleBad {
-    A(int, Nope, str, AlsoNope),
+    A(int, Nope, str, AlsoNope),  //~ ERROR Tuple field in position 1 of variant `A` in enum `TupleBad` has error type //~ ERROR Tuple field in position 3 of variant `A` in enum `TupleBad` has error type
 }
 
 enum AllUnit { A, B, C }
 
 enum Mess {
     Dup,
-    Dup,
-    Tup(int, Ghost, Ghost),
-    Rec { a: int; a: *Ghost; b: Ghost },
+    Dup,  //~ ERROR Duplicated variant name `Dup` in enum `Mess`
+    Tup(int, Ghost, Ghost),  //~ ERROR Tuple field in position 1 of variant `Tup` in enum `Mess` has error type //~ ERROR Tuple field in position 2 of variant `Tup` in enum `Mess` has error type
+    Rec { a: int; a: *Ghost; b: Ghost },  //~ ERROR Duplicated field name `a` in variant `Rec` of enum `Mess` //~ ERROR Field name `a` in variant `Rec` of enum `Mess` has error type //~ ERROR Field name `b` in variant `Rec` of enum `Mess` has error type
 }
 
 enum Tree {

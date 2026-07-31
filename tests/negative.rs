@@ -328,3 +328,17 @@ macro_rules! negative_test {
         }
     };
 }
+
+mod neg {
+    use super::*;
+
+    negative_test!(assign, "examples/fail/assign.rkr");
+    negative_test!(bad_type_defs, "examples/fail/bad_type_defs.rkr");
+    negative_test!(
+        bug_method_call_on_template,
+        "examples/fail/bug_method_call_on_template.rkr"
+    );
+    negative_test!(r#match, "examples/fail/match.rkr");
+    negative_test!(ret, "examples/fail/ret.rkr");
+    negative_test!(unresolved, "examples/fail/unresolved.rkr");
+}

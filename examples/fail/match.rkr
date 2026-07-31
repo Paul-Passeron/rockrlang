@@ -3,9 +3,12 @@ enum Foo {
     bar(str, str)
 }
 
-fun with_ptr(x: *Foo): void {
+// Matching a raw pointer against the pointee's variants is not allowed.
+// The two identical `unsolved constraint` errors on the `fun` line are a known
+// wart: the same constraint is reported once per failed match arm.
+fun with_ptr(x: *Foo): void {  //~ ERROR unsolved constraint: IsInner //~ ERROR unsolved constraint: IsInner
     match x {
-        Foo::foo(y) => {}
-        Foo::bar(a, b) => {}
+        Foo::foo(y) => {}  //~ ERROR Type mismatch: Expected Foo but got *Foo //~ ERROR unification error while solving `IsInner
+        Foo::bar(a, b) => {}  //~ ERROR Type mismatch: Expected Foo but got *Foo //~ ERROR unification error while solving `IsInner
     }
 }

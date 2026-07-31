@@ -1,3 +1,5 @@
+//@ ignore: compiles cleanly now, the method-call-on-template bug looks fixed
+// Kept as a repro. Either delete this file or promote it to examples/.
 interface Foo {
     fun bar(&self): void;
 }
