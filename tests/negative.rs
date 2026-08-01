@@ -249,7 +249,7 @@ fn test_negative_file(path: &Path) {
         return;
     }
 
-    let source = std::fs::read_to_string(&path)
+    let source = std::fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
 
     let mut try_test = || {
@@ -268,7 +268,7 @@ fn test_negative_file(path: &Path) {
         ran += 1;
 
         let outcome =
-            catch_unwind(AssertUnwindSafe(|| diagnostics_for(&path, directives.no_std)));
+            catch_unwind(AssertUnwindSafe(|| diagnostics_for(path, directives.no_std)));
 
         let reported = match outcome {
             Ok(Ok(reported)) => reported,
@@ -300,7 +300,7 @@ fn test_negative_file(path: &Path) {
         }
 
         let (unmet, extra) = compare(&expectations, &reported);
-        if let Some(report) = report_file(&path, &unmet, &extra, directives.allow_extra) {
+        if let Some(report) = report_file(path, &unmet, &extra, directives.allow_extra) {
             failures.push(report);
         }
     };
