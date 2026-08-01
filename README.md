@@ -48,12 +48,12 @@ impl State for Open {}
 struct Door<S: State> {}
 
 impl Door<Locked> {
-  fun new(): Self { return Self { ._s: PhantomData {} }; }
-  fun unlock(self): Door<Open> { return Door { ._s: PhantomData {} }; }
+  fun new(): Self { return Self {}; }
+  fun unlock(self): Door<Open> { return Door {}; }
 }
 
 impl Door<Open> {
-  fun lock(self): Door<Locked> { return Door { ._s: PhantomData {} }; }
+  fun lock(self): Door<Locked> { return Door {}; }
 }
 
 fun main(): int {
