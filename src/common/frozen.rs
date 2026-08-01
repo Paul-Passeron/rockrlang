@@ -27,9 +27,10 @@ use std::{
 };
 
 const BUCKET_SIZE: usize = 32;
+type Bucket<T> = Box<[MaybeUninit<T>; BUCKET_SIZE]>;
 
 pub struct Frozen<T> {
-    data: Mutex<Vec<Box<[MaybeUninit<T>; BUCKET_SIZE]>>>,
+    data: Mutex<Vec<Bucket<T>>>,
     next_bucket_idx: AtomicUsize,
 }
 
@@ -65,6 +66,7 @@ impl<T> Frozen<T> {
         let next_id = self.next_bucket_idx.load(Ordering::Relaxed);
         data.last_mut().unwrap().get_mut(next_id).unwrap().write(item);
         self.next_bucket_idx.fetch_add(1, Ordering::Relaxed);
+        drop(data);
     }
 
     pub fn get(&self, idx: usize) -> Option<&T> {
@@ -81,11 +83,15 @@ impl<T> Frozen<T> {
         if bucket_idx == data.len() - 1 && idx >= next_bucket_idx {
             return None;
         }
-
+        // SAFETY: The index is proven to be valid
         let as_ref = unsafe { data[bucket_idx].as_ptr().wrapping_add(idx).as_ref() };
-        Some(unsafe { as_ref.unwrap().assume_init_ref() })
+        Some(
+            // SAFETY: The element is proven to be valid above
+            unsafe { as_ref.unwrap().assume_init_ref() },
+        )
     }
 
+    #[allow(clippy::mut_from_ref)]
     pub fn get_mut(&self, idx: usize) -> Option<&mut T> {
         let bucket_idx = idx / BUCKET_SIZE;
         let data = self.data.lock().unwrap();
@@ -97,6 +103,8 @@ impl<T> Frozen<T> {
         if bucket_idx == data.len() - 1 && idx >= next_bucket_idx {
             return None;
         }
+        // SAFETY: This is fine because the index is valid and the element is actually
+        // init
         Some(unsafe {
             data[bucket_idx]
                 .as_ptr()
@@ -140,9 +148,10 @@ impl<T> Drop for Frozen<T> {
 
         for (i, bucket) in data.iter_mut().enumerate() {
             let count = if i == last { next_bucket_idx } else { BUCKET_SIZE };
-            unsafe {
-                bucket.iter_mut().take(count).for_each(|elem| elem.assume_init_drop());
-            }
+            bucket.iter_mut().take(count).for_each(|elem| {
+                // SAFETY: We know these bucket elems are init.
+                unsafe { elem.assume_init_drop() }
+            });
         }
     }
 }
@@ -177,6 +186,7 @@ impl<'a, T> Iterator for FrozenIterMut<'a, T> {
     type Item = &'a mut T;
 
     fn next(&mut self) -> Option<Self::Item> {
+        // SAFETY: The borrow lives this long and the references are stable
         let res = unsafe {
             transmute::<Option<&mut T>, Option<&'a mut T>>(
                 self.frozen.get_mut(self.item_idx + self.bucket_idx * BUCKET_SIZE),

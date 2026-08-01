@@ -64,7 +64,9 @@ impl<'db> SanityChecker<'db> {
     }
 
     fn check_stmts(&mut self, stmts: &[ThirStmt]) {
-        stmts.iter().for_each(|stmt| self.check_stmt(stmt));
+        for stmt in stmts {
+            self.check_stmt(stmt);
+        }
     }
 
     fn expr_ty(&self, expr: ExprId) -> TypeRef {
@@ -112,7 +114,9 @@ impl<'db> SanityChecker<'db> {
                 self.check_stmts(stmts);
                 self.check_expr(*expr);
                 let scrut_ty = self.expr_ty(*expr);
-                branches.iter().for_each(|branch| self.check_branch(scrut_ty, branch));
+                for branch in branches {
+                    self.check_branch(scrut_ty, branch);
+                }
             }
             StmtKind::Expr(expr) => {
                 let _ = self.check_expr(*expr);
@@ -641,6 +645,7 @@ pub enum ConstructorType {
 }
 
 impl ConstructorType {
+    #[must_use]
     pub fn with_substitution(&self, db: &dyn Db, sub: &[TypeRef]) -> Self {
         match self {
             Self::Tuple(type_refs) => Self::Tuple(

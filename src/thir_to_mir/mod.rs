@@ -173,7 +173,9 @@ impl FuncInst {
 
             main_pkg = Some(*pkg);
         }
-        let main_pkg = main_pkg.unwrap();
+        let Some(main_pkg) = main_pkg else {
+            return false;
+        };
         let file_module = file_module_id(db, *main_pkg.root(db), None, main_pkg);
         let f_id = FunctionId::new(
             db,
@@ -632,20 +634,22 @@ impl<'a> ThirToMIR<'a> {
             return;
         };
 
-        use CastClass::{FatPtr, Int, ThinPtr};
         match (from_class, to_class) {
-            (Int, Int) | (Int, ThinPtr(_)) | (ThinPtr(_), Int) => (),
-            (ThinPtr(from_m), ThinPtr(to_m))
-            | (FatPtr(from_m), ThinPtr(to_m))
-            | (FatPtr(from_m), FatPtr(to_m)) => {
+            (CastClass::Int | CastClass::ThinPtr(_), CastClass::Int)
+            | (CastClass::Int, CastClass::ThinPtr(_)) => (),
+            (
+                CastClass::ThinPtr(from_m) | CastClass::FatPtr(from_m),
+                CastClass::ThinPtr(to_m),
+            )
+            | (CastClass::FatPtr(from_m), CastClass::FatPtr(to_m)) => {
                 if to_m.is_mut() && !from_m.is_mut() {
                     reject("a const pointer/reference cannot be cast to a mutable one");
                 }
             }
-            (Int, FatPtr(_)) | (ThinPtr(_), FatPtr(_)) => {
-                reject("a fat pointer's metadata cannot be created by a cast")
+            (CastClass::Int | CastClass::ThinPtr(_), CastClass::FatPtr(_)) => {
+                reject("a fat pointer's metadata cannot be created by a cast");
             }
-            (FatPtr(_), Int) => {
+            (CastClass::FatPtr(_), CastClass::Int) => {
                 reject("cast the fat pointer to a thin pointer first");
             }
         }
@@ -945,7 +949,7 @@ impl TypeRef {
 
     pub fn is_concrete(self, db: &dyn Db) -> bool {
         match self {
-            TypeRef::Concrete(type_id) => {
+            Self::Concrete(type_id) => {
                 !type_id.args(db).iter().any(|ty| !ty.is_concrete(db))
             }
             _ => false,

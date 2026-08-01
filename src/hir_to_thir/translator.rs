@@ -106,7 +106,7 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn handle_break(
-        &mut self,
+        &self,
         b: &mut ThirBuilder,
         span: Span,
         is_synthetic: bool,

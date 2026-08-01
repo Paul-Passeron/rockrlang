@@ -157,12 +157,9 @@ impl MIRTerminator {
     pub fn bitset_defs(&self, mir: &Mir) -> BitSet<MIRLocalID> {
         let domain = mir.locals.len();
         let mut res = BitSet::new(domain);
-        match self {
-            Self::Call { dest, .. } => {
-                res.insert(dest);
-            }
-            _ => (),
-        };
+        if let Self::Call { dest, .. } = self {
+            res.insert(dest);
+        }
         res
     }
 
@@ -179,16 +176,16 @@ impl MIRTerminator {
             Self::Goto { .. } | Self::Diverge => BitSet::new(domain),
             Self::Call { arguments, .. } => {
                 let mut res = BitSet::new(domain);
-                arguments.iter().for_each(|op| {
+                for op in arguments {
                     res.union(&op.bitset_uses(mir));
-                });
+                }
                 res
             }
             Self::Return { value: op, .. } => {
                 let mut res = BitSet::new(domain);
-                op.iter().for_each(|op| {
+                if let Some(op) = op {
                     res.union(&op.bitset_uses(mir));
-                });
+                }
                 res
             }
             Self::Switch { discriminant: op, .. } | Self::Branch { cond: op, .. } => {

@@ -257,7 +257,7 @@ impl MIRInitOut {
             }
         }
         match (init, uninit, maybe) {
-            (false, false, false) | (true, false, false) => InitState::Init,
+            (false | true, false, false) => InitState::Init,
             (false, true, false) => InitState::Uninit,
             _ => InitState::Maybe,
         }
@@ -385,7 +385,7 @@ fn apply_ops(
                 res.uninit.union(&affected[id.0]);
                 res.init.substract(&affected[id.0]);
             }
-        };
+        }
     }
     res
 }

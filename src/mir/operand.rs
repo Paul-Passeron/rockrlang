@@ -192,16 +192,16 @@ impl MIRRValue {
             MIRRValueKind::Constructor { args, .. } => args.bitset_uses(mir),
             MIRRValueKind::StructLit { fields, .. } => {
                 let mut res = BitSet::new(domain);
-                fields.values().for_each(|field| {
+                for field in fields.values() {
                     res.union(&field.bitset_uses(mir));
-                });
+                }
                 res
             }
             MIRRValueKind::Tuple(ops, _) => {
                 let mut res = BitSet::new(domain);
-                ops.iter().for_each(|field| {
+                for field in ops {
                     res.union(&field.bitset_uses(mir));
-                });
+                }
                 res
             }
         }
@@ -215,14 +215,14 @@ impl MIRConstructorArgs {
         match self {
             Self::None => (),
             Self::Tuple(ops) => {
-                ops.iter().for_each(|op| {
+                for op in ops {
                     res.union(&op.bitset_uses(mir));
-                });
+                }
             }
             Self::Struct(fields) => {
-                fields.values().for_each(|op| {
+                for op in fields.values() {
                     res.union(&op.bitset_uses(mir));
-                });
+                }
             }
         }
         res

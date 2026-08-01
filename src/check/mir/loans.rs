@@ -155,16 +155,19 @@ fn check_terminator(
     state: &HashSet<LoanID>,
 ) {
     match terminator {
-        MIRTerminator::Diverge | MIRTerminator::Goto { .. } => (),
         MIRTerminator::Call { arguments: ops, .. } => {
-            ops.iter().for_each(|op| check_operand(db, op, state, loans));
+            for op in ops {
+                check_operand(db, op, state, loans);
+            }
         }
         MIRTerminator::Return { value: Some(op), .. }
         | MIRTerminator::Branch { cond: op, .. }
         | MIRTerminator::Switch { discriminant: op, .. } => {
             check_operand(db, op, state, loans);
         }
-        MIRTerminator::Return { .. } => (),
+        MIRTerminator::Diverge
+        | MIRTerminator::Goto { .. }
+        | MIRTerminator::Return { .. } => {}
     }
 }
 
@@ -204,29 +207,21 @@ fn places_conflict(place: &MIRPlace, other: &MIRPlace) -> bool {
             (
                 MIRProjection::Field { name: n1, .. },
                 MIRProjection::Field { name: n2, .. },
-            ) => {
-                if n1 != n2 {
-                    return false;
-                }
+            ) if n1 != n2 => {
+                return false;
             }
             (
                 MIRProjection::TupleField { index: i1, .. },
                 MIRProjection::TupleField { index: i2, .. },
-            ) => {
-                if i1 != i2 {
-                    return false;
-                }
+            ) if i1 != i2 => {
+                return false;
             }
             (
                 MIRProjection::Downcast { variant: v1 },
                 MIRProjection::Downcast { variant: v2 },
-            ) => {
-                if v1 != v2 {
-                    return false;
-                }
+            ) if v1 != v2 => {
+                return false;
             }
-            (MIRProjection::Deref, MIRProjection::Deref) => {}
-            (MIRProjection::Index { .. }, MIRProjection::Index { .. }) => {}
             _ => {}
         }
     }

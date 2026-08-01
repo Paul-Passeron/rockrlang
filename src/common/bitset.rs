@@ -128,7 +128,7 @@ impl<T: BitSetIdx> BitSet<T> {
     /// returns true if it has changed
     pub fn union(&mut self, other: &Self) -> bool {
         let mut changed = false;
-        assert!(self.word_domain() == other.word_domain());
+        assert_eq!(self.word_domain(), other.word_domain());
         for (a, b) in self.words.iter_mut().zip(other.words.iter().copied()) {
             let prev = *a;
             *a |= b;
@@ -141,7 +141,7 @@ impl<T: BitSetIdx> BitSet<T> {
 
     pub fn intersect(&mut self, other: &Self) -> bool {
         let mut changed = false;
-        assert!(self.word_domain() == other.word_domain());
+        assert_eq!(self.word_domain(), other.word_domain());
         for (a, b) in self.words.iter_mut().zip(other.words.iter().copied()) {
             let prev = *a;
             *a &= b;
@@ -154,7 +154,7 @@ impl<T: BitSetIdx> BitSet<T> {
 
     pub fn substract(&mut self, other: &Self) -> bool {
         let mut changed = false;
-        assert!(self.word_domain() == other.word_domain());
+        assert_eq!(self.word_domain(), other.word_domain());
         for (a, b) in self.words.iter_mut().zip(other.words.iter().copied()) {
             let prev = *a;
             *a &= !b;

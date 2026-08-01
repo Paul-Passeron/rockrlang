@@ -55,11 +55,15 @@ impl MIRTerminator {
         match self {
             Self::Goto { .. } | Self::Diverge => (),
             Self::Call { arguments, dest, .. } => {
-                arguments.iter().for_each(|op| op.check(db, init, state));
+                for op in arguments {
+                    op.check(db, init, state);
+                }
                 init.mark_init(state, &MoveKey { base: *dest, projections: vec![] });
             }
             Self::Return { value, .. } => {
-                value.iter().for_each(|op| op.check(db, init, state));
+                if let Some(op) = value {
+                    op.check(db, init, state);
+                }
             }
             Self::Branch { cond: op, .. } | Self::Switch { discriminant: op, .. } => {
                 op.check(db, init, state);
@@ -78,7 +82,7 @@ impl MIROperand {
             Self::Copy(p) => {
                 p.check(db, init, m);
             }
-            _ => (),
+            Self::Constant(_, _) => (),
         }
     }
 }

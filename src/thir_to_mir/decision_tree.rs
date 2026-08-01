@@ -466,11 +466,11 @@ impl ThirToMIR<'_> {
             .as_enum_ref(self.db)
             .expect("downcast base must peel to an enum")
             .get_cons(self.db, variant_idx)
-            .unwrap()
+            .expect("There is variant with this name, otherwise THIR would not have been produced")
         else {
             panic!("Expected struct constructor");
         };
-        let resulting_ty = tys.iter().find(|(name, _)| *name == field).unwrap().1;
+        let resulting_ty = tys.iter().find(|(name, _)| *name == field).expect("There is variant with this name, otherwise THIR would not have been produced").1;
 
         projections.push(MIRProjection::Field { name: field, resulting_ty });
         MIRPlace { local: base.local, projections, ty: resulting_ty, span: base.span }

@@ -93,7 +93,7 @@ impl<T> Arena<T> {
     }
 
     pub fn next_id(&self) -> Idx<T> {
-        Idx(self.inner.len(), Default::default())
+        Idx(self.inner.len(), PhantomData)
     }
 
     pub fn get(&self, idx: Idx<T>) -> &T {
@@ -104,6 +104,7 @@ impl<T> Arena<T> {
         &mut self[idx]
     }
 
+    #[allow(clippy::needless_pass_by_ref_mut)]
     pub fn get_shared_mut(&mut self, idx: Idx<T>) -> &mut T {
         self.inner.get_mut(idx.0).expect("index out of bounds")
     }
@@ -130,7 +131,7 @@ impl<T> Default for Arena<T> {
 }
 
 impl<T> Idx<T> {
-    pub fn raw(&self) -> usize {
+    pub fn raw(self) -> usize {
         self.0
     }
 }

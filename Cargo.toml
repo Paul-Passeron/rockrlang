@@ -3,6 +3,8 @@ name = "rockr"
 version = "0.1.0"
 edition = "2024"
 default-run = "rockrc"
+repository="https://codeberg.org/norezap/Rockr"
+license="GNU-3"
 
 [lib]
 bench = false
@@ -69,6 +71,8 @@ must_use_candidate       = "allow"
 missing_const_for_fn     = "allow"  # nursery, extremely churny
 option_if_let_else       = "allow"
 multiple_crate_versions  = "allow"
+
+cargo_common_metadata = "allow"
 
 trivial_regex = "allow"
 

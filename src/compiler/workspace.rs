@@ -102,6 +102,7 @@ pub enum OptLevel {
     O3,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Config {
     pub no_std: bool,

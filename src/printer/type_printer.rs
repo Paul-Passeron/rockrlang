@@ -318,8 +318,8 @@ impl TypePrinter {
     pub fn function_id_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
         let sig = get_sig_of_function(db, function_id.interned());
         Self::join_path(
-            self.scope_owner_to_string(db, function_id.parent(db)),
-            self.function_sig_to_string(db, sig),
+            &self.scope_owner_to_string(db, function_id.parent(db)),
+            &self.function_sig_to_string(db, sig),
         )
     }
 
@@ -329,15 +329,15 @@ impl TypePrinter {
         function_id: FunctionId,
     ) -> String {
         Self::join_path(
-            self.scope_owner_to_string(db, function_id.parent(db)),
-            function_id.name(db).display(db).to_string(),
+            &self.scope_owner_to_string(db, function_id.parent(db)),
+            &function_id.name(db).display(db),
         )
     }
 
     /// Joins a scope prefix and a name with `::`, dropping the separator when
     /// the prefix is empty (e.g. an elided crate root).
-    fn join_path(prefix: String, name: String) -> String {
-        if prefix.is_empty() { name } else { format!("{prefix}::{name}") }
+    fn join_path(prefix: &str, name: &str) -> String {
+        if prefix.is_empty() { name.to_owned() } else { format!("{prefix}::{name}") }
     }
 
     pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {

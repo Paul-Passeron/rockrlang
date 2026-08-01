@@ -21,9 +21,7 @@ use dashmap::DashMap;
 use salsa::Setter;
 
 use crate::{
-    SourceFile,
-    compiler::{CompilerError, Config, Workspace},
-    layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth},
+    SourceFile, compiler::{CompilerError, Config, Workspace}, layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth}, unused,
 };
 
 #[salsa::db]
@@ -110,6 +108,7 @@ impl dyn Db {
 
 impl dyn Db {
     pub fn target_width(&self) -> IntWidth {
+        unused!(self);
         // For the moment, we don't have a way of setting the target, so we just
         // use the user's machine's width.
         match usize::BITS {
@@ -123,10 +122,12 @@ impl dyn Db {
     }
 
     pub fn ordering_strategy(&self) -> FieldOrderingKind {
+        unused!(self);
         FieldOrderingKind::SourceOrder
     }
 
     pub fn discriminant_strategy(&self) -> DiscriminantStrategyKind {
+        unused!(self);
         DiscriminantStrategyKind::AlwaysTagged
     }
 }

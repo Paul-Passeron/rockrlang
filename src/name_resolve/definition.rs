@@ -105,7 +105,7 @@ impl ModuleId {
 }
 
 impl TypeDefId {
-    pub fn name(&self, db: &dyn Db) -> Symbol {
+    pub fn name(self, db: &dyn Db) -> Symbol {
         match self {
             Self::Builtin(builtin) => builtin.name(db),
             Self::Struct(struct_id) => struct_id.name(db),
@@ -113,7 +113,7 @@ impl TypeDefId {
         }
     }
 
-    pub fn parent(&self, db: &dyn Db) -> ModuleId {
+    pub fn parent(self, db: &dyn Db) -> ModuleId {
         match self {
             Self::Builtin(_) => builtin_module(db),
             Self::Struct(struct_id) => struct_id.parent(db),
@@ -121,7 +121,7 @@ impl TypeDefId {
         }
     }
 
-    pub fn name_span(&self, db: &dyn Db) -> Option<Span> {
+    pub fn name_span(self, db: &dyn Db) -> Option<Span> {
         match self {
             Self::Builtin(_) => None,
             Self::Struct(struct_id) => Some(struct_id.name_span(db)),
@@ -129,7 +129,7 @@ impl TypeDefId {
         }
     }
 
-    pub fn span(&self, db: &dyn Db) -> Option<Span> {
+    pub fn span(self, db: &dyn Db) -> Option<Span> {
         match self {
             Self::Builtin(_) => None,
             Self::Struct(struct_id) => Some(struct_id.span(db)),
@@ -139,37 +139,37 @@ impl TypeDefId {
 }
 
 impl StructId {
-    pub fn name_span(&self, db: &dyn Db) -> Span {
+    pub fn name_span(self, db: &dyn Db) -> Span {
         struct_item(db, self.interned()).name.span
     }
 
-    pub fn span(&self, db: &dyn Db) -> Span {
+    pub fn span(self, db: &dyn Db) -> Span {
         struct_item(db, self.interned()).span
     }
 }
 
 impl EnumId {
-    pub fn name_span(&self, db: &dyn Db) -> Span {
+    pub fn name_span(self, db: &dyn Db) -> Span {
         enum_item(db, self.interned()).name.span
     }
 
-    pub fn span(&self, db: &dyn Db) -> Span {
+    pub fn span(self, db: &dyn Db) -> Span {
         enum_item(db, self.interned()).span
     }
 }
 
 impl InterfaceId {
-    pub fn name_span(&self, db: &dyn Db) -> Span {
+    pub fn name_span(self, db: &dyn Db) -> Span {
         interface_item(db, self.interned()).name.span
     }
 }
 
 impl FunctionId {
-    pub fn name_span(&self, db: &dyn Db) -> Span {
+    pub fn name_span(self, db: &dyn Db) -> Span {
         function_ast(db, self.interned()).inner(db).name_span()
     }
 
-    pub fn span(&self, db: &dyn Db) -> Span {
+    pub fn span(self, db: &dyn Db) -> Span {
         function_ast(db, self.interned()).inner(db).get_span()
     }
 }
@@ -206,7 +206,10 @@ fn definition_of_item<'db>(
         AstTopLevelItemDesc::Interface(interface) => {
             Some(Definition::Interface(InterfaceId::new(db, interface.name.data, m_id)))
         }
-        AstTopLevelItemDesc::Impl(_) => None,
+        AstTopLevelItemDesc::Impl(_) => {
+            // impls blocks do not carry any definitions
+            None
+        }
         AstTopLevelItemDesc::StructDef(struct_def) => Some(Definition::Type(
             TypeDefId::Struct(StructId::new(db, struct_def.name.data, m_id)),
         )),
@@ -256,32 +259,32 @@ pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
 
 impl AstIncludePathDesc {
     pub fn to_segments(&self) -> Option<NonEmpty<Symbol>> {
-        let (hd, tl) = match self {
-            Self::Symbol(symbol) => Some((*symbol, None)),
-            Self::NameResolved { from, to } => Some((*from, Some(to))),
-            Self::Error => None,
-        }?;
-        fn _to_segments(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
+        fn to_segments_aux(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
             match this {
                 AstIncludePathDesc::Symbol(symbol) => {
                     v.push(*symbol);
                 }
                 AstIncludePathDesc::NameResolved { from, to } => {
                     v.push(*from);
-                    _to_segments(&to.data, v);
+                    to_segments_aux(&to.data, v);
                 }
                 AstIncludePathDesc::Error => unreachable!(),
             }
         }
+        let (hd, tl) = match self {
+            Self::Symbol(symbol) => Some((*symbol, None)),
+            Self::NameResolved { from, to } => Some((*from, Some(to))),
+            Self::Error => None,
+        }?;
         let mut res = NonEmpty::singleton(hd);
         if let Some(rest) = tl {
-            _to_segments(&rest.data, &mut res);
+            to_segments_aux(&rest.data, &mut res);
         }
         Some(res)
     }
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(deref))]
 pub fn module_definitions<'db>(
     db: &'db dyn Db,
     module: InternedModuleId<'db>,
@@ -300,13 +303,13 @@ pub fn module_definitions<'db>(
             res.push((id.name(db), Definition::Module(id)));
         }
         let items = module_items(db, module);
-        items.iter().for_each(|items| {
-            items.iter().for_each(|item| {
-                definition_of_item(db, module, item).into_iter().for_each(|def| {
+        if let Some(items) = items {
+            for item in items {
+                if let Some(def) = definition_of_item(db, module, item) {
                     res.push((def.name(db), def));
-                });
-            });
-        });
+                }
+            }
+        }
 
         res
     }

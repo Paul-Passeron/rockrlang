@@ -437,12 +437,9 @@ impl InferenceCtx<'_> {
         let snapshot = self.table.snapshot();
         let res = f(self);
         self.snapshot_depth -= 1;
-        match &res {
-            Ok(_) => self.table.commit(snapshot),
-            Err(_) => {
-                self.table.rollback_to(snapshot);
-                self.rollback_undo_log(mark);
-            }
+        if res.is_ok() { self.table.commit(snapshot) } else {
+            self.table.rollback_to(snapshot);
+            self.rollback_undo_log(mark);
         }
         if self.snapshot_depth == 0 {
             self.undo_log.clear();
@@ -454,16 +451,16 @@ impl InferenceCtx<'_> {
         while self.undo_log.len() > mark {
             match self.undo_log.pop().expect("len > mark") {
                 SnapshotUndo::InferredExpr(id, old) => {
-                    restore(&mut self.inferred_exprs, id, old)
+                    restore(&mut self.inferred_exprs, id, old);
                 }
                 SnapshotUndo::InferredPattern(id, old) => {
-                    restore(&mut self.inferred_patterns, id, old)
+                    restore(&mut self.inferred_patterns, id, old);
                 }
                 SnapshotUndo::InferredPlace(id, old) => {
-                    restore(&mut self.inferred_places, id, old)
+                    restore(&mut self.inferred_places, id, old);
                 }
                 SnapshotUndo::Listeners(var, old) => {
-                    restore(&mut self.listeners, var, old)
+                    restore(&mut self.listeners, var, old);
                 }
                 SnapshotUndo::ReadySet(id) => {
                     self.ready_set.remove(&id);

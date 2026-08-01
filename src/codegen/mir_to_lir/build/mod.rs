@@ -83,7 +83,7 @@ impl<'ir> LocalSlot<'ir> {
         match self {
             LocalSlot::Ptr { ptr, .. } => *ptr,
             LocalSlot::Zst => panic!("ZST slots have no pointer"),
-            _ => unreachable!(),
+            LocalSlot::Value(_) => unreachable!(),
         }
     }
 
@@ -367,7 +367,7 @@ impl MTLBCtx<'_> {
         b: &mut BlockBuilder<'ir, '_>,
         ptr: ValueId<'ir>,
         ty: TypeRef,
-        proj: ProjKind,
+        proj: &ProjKind,
         lower: &LIRLower<'ir, '_>,
     ) -> (ValueId<'ir>, TypeRef) {
         match proj {
@@ -421,11 +421,11 @@ impl MTLBCtx<'_> {
                         let lir_ty = LIRTy { layout, origin: Some(ty) };
                         assert!(lir_ty.is_union(self.db));
                         let vlayout = lir_ty.union_layout(self.db).unwrap();
-                        let variant_layout = vlayout.variants[variant as usize];
+                        let variant_layout = vlayout.variants[*variant as usize];
                         let variant_ty = LIRTy { layout: variant_layout, origin: None };
-                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, variant);
+                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, *variant);
                         let Some(ConstructorType::Struct(fields)) =
-                            enum_ref.get_cons(self.db, variant as usize)
+                            enum_ref.get_cons(self.db, *variant as usize)
                         else {
                             unreachable!()
                         };
@@ -440,9 +440,9 @@ impl MTLBCtx<'_> {
                         let lir_ty = LIRTy { layout, origin: Some(ty) };
                         assert!(lir_ty.is_union(self.db));
                         let vlayout = lir_ty.union_layout(self.db).unwrap();
-                        let variant_layout = vlayout.variants[variant as usize];
+                        let variant_layout = vlayout.variants[*variant as usize];
                         let variant_ty = LIRTy { layout: variant_layout, origin: None };
-                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, variant);
+                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, *variant);
                         let field_ptr = b.field_ptr(payload_ptr, variant_ty, *index);
                         (field_ptr, *resulting_ty)
                     }
@@ -453,7 +453,7 @@ impl MTLBCtx<'_> {
         }
     }
 
-    fn get_proj_kinds<'place>(&self, place: &'place MIRPlace) -> Vec<ProjKind<'place>> {
+    fn get_proj_kinds(place: &MIRPlace) -> Vec<ProjKind<'_>> {
         let mut projs = place.projections.iter().collect_vec();
         projs.reverse();
         let mut res = vec![];
@@ -478,8 +478,8 @@ impl MTLBCtx<'_> {
         if slot.is_zst() {
             unreachable!();
         }
-        self.get_proj_kinds(place)
-            .into_iter()
+        Self::get_proj_kinds(place)
+            .iter()
             .fold((slot.ptr(), lower.mir.locals[place.local].ty), |(ptr, ty), proj| {
                 self.apply_proj(b, ptr, ty, proj, lower)
             })
@@ -746,7 +746,7 @@ impl MTLBCtx<'_> {
     }
 
     fn lower_cast<'ir>(
-        &mut self,
+        &self,
         b: &mut BlockBuilder<'ir, '_>,
         value: ValueId<'ir>,
         from: TypeRef,

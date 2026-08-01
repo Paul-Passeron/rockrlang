@@ -91,7 +91,6 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 let wrapped = RefWrappedTy::from_type_ref(self.db, place.ty);
                 let ty = wrapped.inner;
                 let depth = wrapped.depth();
-                // let (ty, depth) = place.ty.peel_aux(self.db);
                 if ty.as_enum_ref(self.db).is_some() {
                     let mut scrut_place = place.clone();
                     scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
@@ -100,7 +99,9 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
 
                     let layout = layout_of(self.db, ty);
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
-                    let vlayout = lir_ty.union_layout(self.db).unwrap();
+                    let vlayout = lir_ty
+                        .union_layout(self.db)
+                        .expect("If this is not a variant layout, this is a bug");
                     let Discriminant::Tagged { kind: discr_width, .. } =
                         vlayout.discriminant
                     else {

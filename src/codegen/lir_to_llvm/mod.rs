@@ -52,7 +52,7 @@ impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
         let ctx = Ctx {
             db: self.db,
             lir: &self.lir,
-            ctx,
+            c: ctx,
             m: ctx.create_module("main"),
             b: ctx.create_builder(),
         };
@@ -63,7 +63,7 @@ impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
 struct Ctx<'db, 'lir, 'ctx> {
     db: &'db dyn Db,
     lir: &'lir lir::Module<Complete>,
-    ctx: &'ctx Context,
+    c: &'ctx Context,
     m: IModule<'ctx>,
     b: Builder<'ctx>,
 }
@@ -104,7 +104,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
             })
             .collect_vec();
         let fn_ty = if sig.signature.ret.is_zst(self.db) {
-            self.ctx.void_type().fn_type(&params, is_variadic)
+            self.c.void_type().fn_type(&params, is_variadic)
         } else {
             self.basic(sig.signature.ret.layout).fn_type(&params, is_variadic)
         };
@@ -127,7 +127,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
             && tid == never_id(self.db)
         {
             let kind_id = Attribute::get_named_enum_kind_id("noreturn");
-            let noreturn = self.ctx.create_enum_attribute(kind_id, 0);
+            let noreturn = self.c.create_enum_attribute(kind_id, 0);
             f.add_attribute(AttributeLoc::Function, noreturn);
         }
 
@@ -136,10 +136,10 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
 
     fn lower_layout(&mut self, layout: LayoutID) -> AnyTypeEnum<'ctx> {
         match layout.data(self.db) {
-            LayoutData::ZeroSized => self.ctx.void_type().into(),
+            LayoutData::ZeroSized => self.c.void_type().into(),
             LayoutData::Scalar(scalar_kind) => match scalar_kind {
                 ScalarKind::Int(int_width) => self.get_int_ty(*int_width).into(),
-                ScalarKind::Ptr => self.ctx.ptr_type(AddressSpace::default()).into(),
+                ScalarKind::Ptr => self.c.ptr_type(AddressSpace::default()).into(),
                 ScalarKind::Float(_) => todo!(),
             },
             LayoutData::Aggregate(aggregate_layout) => {
@@ -150,10 +150,10 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                         BasicTypeEnum::try_from(self.lower_layout(*ty)).ok()
                     })
                     .collect_vec();
-                self.ctx.struct_type(field_types, false).into()
+                self.c.struct_type(field_types, false).into()
             }
             LayoutData::Union(_) => {
-                self.ctx.i8_type().array_type(layout.size(self.db).bytes() as u32).into()
+                self.c.i8_type().array_type(layout.size(self.db).bytes() as u32).into()
             }
         }
     }
@@ -181,7 +181,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                 // Handle the entry differently
                 for (blk, data) in &body.blocks {
                     if blk == body.entry {
-                        let entry_bb = self.ctx.append_basic_block(fn_ctx.func, "entry");
+                        let entry_bb = self.c.append_basic_block(fn_ctx.func, "entry");
                         fn_ctx.blocks.insert(blk, entry_bb);
                         self.b.position_at_end(entry_bb);
 
@@ -231,7 +231,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
         body: &FunctionBody,
         ctx: &mut FnCtx<'ctx>,
     ) {
-        let bb = self.ctx.append_basic_block(ctx.func, "");
+        let bb = self.c.append_basic_block(ctx.func, "");
         ctx.blocks.insert(blk, bb);
 
         self.b.position_at_end(bb);
@@ -278,7 +278,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                     let src = ctx.values[src].into_pointer_value();
                     let align = ty.layout.align(self.db).bytes() as u32;
                     let size = self
-                        .ctx
+                        .c
                         .i64_type()
                         .const_int(ty.layout.size(self.db).bytes(), false);
                     self.b.build_memcpy(dest, align, src, align, size).unwrap();
@@ -319,11 +319,11 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                                 .into()
                         }
                         ConstValue::NullPtr { .. } => {
-                            self.ctx.ptr_type(AddressSpace::default()).const_null().into()
+                            self.c.ptr_type(AddressSpace::default()).const_null().into()
                         }
                         ConstValue::Zeroed { ty } => self.basic(ty.layout).const_zero(),
                         ConstValue::Strlit { contents, null_terminated } => {
-                            let array_value = self.ctx.const_string(
+                            let array_value = self.c.const_string(
                                 unescaper::unescape(contents).unwrap().as_bytes(),
                                 *null_terminated,
                             );
@@ -361,13 +361,14 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                             ptr.as_basic_value_enum()
                         } else {
                             // expected to be array type of i8
+                            // SAFETY: The GEP is not out of bounds
                             let value = unsafe {
                                 self.b
                                     .build_in_bounds_gep(
-                                        self.ctx.i8_type(),
+                                        self.c.i8_type(),
                                         ptr,
                                         &[self
-                                            .ctx
+                                            .c
                                             .i32_type()
                                             .const_int(offset.bytes(), false)],
                                         "offset_for_field_ptr",
@@ -381,13 +382,14 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                         let union_layout = ty.union_layout(self.db).unwrap();
                         let offset = union_layout.payload_offset;
                         let ptr = ctx.values[ptr].into_pointer_value();
+                        // SAFETY: The GEP is not out of bounds
                         unsafe {
                             self.b
                                 .build_gep(
-                                    self.ctx.i8_type(),
+                                    self.c.i8_type(),
                                     ptr,
                                     &[self
-                                        .ctx
+                                        .c
                                         .i32_type()
                                         .const_int(offset.bytes(), false)],
                                     "payload_offset_ptr",
@@ -497,7 +499,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                             let lhs = lhs.into_pointer_value();
                             let rhs = rhs.into_pointer_value();
                             let ptrint = self
-                                .ctx
+                                .c
                                 .ptr_sized_int_type(&TargetData::create(""), None);
                             let lhs = self.b.build_ptr_to_int(lhs, ptrint, "").unwrap();
                             let rhs = self.b.build_ptr_to_int(rhs, ptrint, "").unwrap();
@@ -542,6 +544,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                         let ptr = ctx.values[ptr].into_pointer_value();
                         let idx = ctx.values[index].into_int_value();
                         let llvm_elem = self.basic(elem_ty.layout);
+                        // SAFETY: The GEP is not out of bounds
                         unsafe {
                             self.b
                                 .build_gep(llvm_elem, ptr, &[idx], "index-ptr")
@@ -567,11 +570,11 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
 
     fn get_int_ty(&self, w: IntWidth) -> IntType<'ctx> {
         match w {
-            IntWidth::I8 => self.ctx.i8_type(),
-            IntWidth::I16 => self.ctx.i16_type(),
-            IntWidth::I32 => self.ctx.i32_type(),
-            IntWidth::I64 => self.ctx.i64_type(),
-            IntWidth::I128 => self.ctx.i128_type(),
+            IntWidth::I8 => self.c.i8_type(),
+            IntWidth::I16 => self.c.i16_type(),
+            IntWidth::I32 => self.c.i32_type(),
+            IntWidth::I64 => self.c.i64_type(),
+            IntWidth::I128 => self.c.i128_type(),
         }
     }
 
