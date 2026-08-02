@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     collections::{BTreeMap, HashMap},
+    iter::empty,
     marker::PhantomData,
 };
 
@@ -38,6 +39,7 @@ use crate::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
+        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
@@ -51,7 +53,7 @@ use crate::{
     },
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
-        TypeRef, char_id, never_id, str_def, str_id, type_ref::CastClass, void_id,
+        TypeRef, char_id, never_id, str_id, type_ref::CastClass, void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -71,7 +73,7 @@ pub struct ThirToMIR<'a> {
     db: &'a dyn Db,
     builder: MIRBuilder<'a>,
     thir: &'a Thir,
-    subs: &'a [TypeRef],
+    subs: &'a Substitution,
 
     local_map: HashMap<thir::LocalId, MIRLocalID>,
     params: Vec<MIRLocalID>,
@@ -82,8 +84,7 @@ pub struct ThirToMIR<'a> {
 #[salsa::interned]
 pub struct MIRKey {
     pub fdef: FunctionId,
-
-    pub subs: Vec<TypeRef>,
+    pub subs: Substitution,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -104,48 +105,48 @@ impl FuncInst {
         *self.interned().fdef(db)
     }
 
-    pub fn subs(self, db: &dyn Db) -> &[TypeRef] {
+    pub fn subs(self, db: &dyn Db) -> &Substitution {
         self.interned().subs(db)
     }
 
     pub fn from_funcref(db: &dyn Db, fref: FunctionRef) -> Self {
         assert_eq!(get_templates_of_fun(db, fref.id.interned()).len(), fref.args.len());
-        MIRKey::new(db, fref.id, fref.args).into()
+        let empty_sub = Substitution::new(empty());
+        let concrete_tys = fref.args.iter().map(|ty| {
+            ty.to_concrete(db, &empty_sub)
+                .expect("If the fref isn't known to be concrete, this is a bug")
+        });
+        MIRKey::new(db, fref.id, Substitution::new(concrete_tys)).into()
     }
 
-    pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
+    pub fn ret_ty(self, db: &dyn Db) -> ConcreteTy {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         let ret_ty = match sig.ret {
-            TypeRef::Zelf => {
-                self.fdef(db).parent(db).get_canonical_zelf(db).unwrap_or(TypeRef::Error)
-            }
+            TypeRef::Zelf => self.fdef(db).parent(db).get_canonical_zelf(db).unwrap(),
             ret => ret,
         };
-        ret_ty.with_substitution(db, self.subs(db))
+        ret_ty.to_concrete(db, self.subs(db)).unwrap()
     }
 
-    pub fn params(self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
+    pub fn params(self, db: &dyn Db) -> Vec<(Symbol, ConcreteTy)> {
         let sig = get_sig_of_function(db, self.fdef(db).interned());
         let fdef = self.fdef(db);
         let zelf = fdef.parent(db).get_canonical_zelf(db);
         let receiver = sig.zelf.map(|arg| {
             (
                 Symbol::new(db, "self"),
-                arg.as_type_ref_for(db, zelf.unwrap_or(TypeRef::Error))
-                    .with_substitution(db, self.subs(db)),
+                arg.as_type_ref_for(db, zelf.unwrap())
+                    .to_concrete(db, self.subs(db))
+                    .unwrap(),
             )
         });
         receiver
             .into_iter()
-            .chain(sig.args.iter().map(|(symb, ty)| {
-                (
-                    *symb,
-                    match ty.with_substitution(db, self.subs(db)) {
-                        TypeRef::Zelf => zelf.expect("We should have a `Self` type here"),
-                        ty => ty,
-                    },
-                )
-            }))
+            .chain(
+                sig.args.iter().map(|(symb, ty)| {
+                    (*symb, ty.to_concrete(db, self.subs(db)).unwrap())
+                }),
+            )
             .collect()
     }
 }
@@ -210,12 +211,12 @@ pub fn _mir<'db>(db: &'db dyn Db, key: MIRKey<'db>) -> Mir {
     )
 }
 
-pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Vec<TypeRef>) -> &Mir {
+pub fn mir(db: &dyn Db, fdef: FunctionId, subs: Substitution) -> &Mir {
     _mir(db, MIRKey::new(db, fdef, subs))
 }
 
 impl<'a> ThirToMIR<'a> {
-    pub fn new(db: &'a dyn Db, thir: &'a Thir, subs: &'a [TypeRef]) -> Self {
+    pub fn new(db: &'a dyn Db, thir: &'a Thir, subs: &'a Substitution) -> Self {
         Self {
             db,
             builder: MIRBuilder::new(db, Some("entry".into())),
@@ -239,14 +240,8 @@ impl<'a> ThirToMIR<'a> {
     }
 
     /// Returns the substituted form of the type
-    pub fn ty(&self, ty: TypeRef) -> TypeRef {
-        let res = match ty {
-            TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
-                self.db,
-                type_id.def(self.db),
-                type_id.args(self.db).iter().map(|ty| self.ty(*ty)).collect(),
-            )),
-            TypeRef::Param(id) => self.subs[id.0],
+    pub fn ty(&self, ty: TypeRef) -> ConcreteTy {
+        match ty {
             TypeRef::Zelf => {
                 let unsub = self
                     .thir
@@ -256,18 +251,18 @@ impl<'a> ThirToMIR<'a> {
                     .unwrap_or(TypeRef::Error);
                 if matches!(unsub, TypeRef::Zelf) {
                     // Do not recurse infinitely, bail early
-                    TypeRef::Error
+                    panic!("Recursive `Self` type found in MIR")
                 } else {
                     self.ty(unsub)
                 }
             }
-            TypeRef::Associated(_) => todo!(),
-            _ => ty,
-        };
-        if !self.is_concrete(res) {
-            // panic!("Not a valid ty: {}", res.to_string(self.db))
+            ty => {
+                let Some(res) = ty.to_concrete(self.db, self.subs) else {
+                    panic!("Non-concrete type has reached MIR")
+                };
+                res
+            }
         }
-        res
     }
 
     fn build_thir_locals(&mut self) {
@@ -296,23 +291,13 @@ impl<'a> ThirToMIR<'a> {
             .expect("Cannot set parameters multiple times");
     }
 
-    fn check_substitution(&self) {
-        for ty in self.subs {
-            debug_assert!(
-                self.is_concrete(*ty),
-                "Expecting a valid type in substitution but got {}",
-                ty.to_string(self.db)
-            );
-        }
-    }
-
     fn build_stmts(&mut self, stmts: &[ThirStmt]) {
         for stmt in stmts {
             self.build_stmt(stmt);
         }
     }
 
-    fn synthetic_local(&self, ty: TypeRef, span: Span) -> MIRLocalID {
+    fn synthetic_local(&self, ty: ConcreteTy, span: Span) -> MIRLocalID {
         let local = MIRLocal::new(ty, Mutability::Const, span);
         self.builder.new_local(local)
     }
@@ -322,7 +307,7 @@ impl<'a> ThirToMIR<'a> {
         MIRPlace { local, projections: vec![], ty, span }
     }
 
-    fn synthetic_place(&self, ty: TypeRef, span: Span) -> MIRPlace {
+    fn synthetic_place(&self, ty: ConcreteTy, span: Span) -> MIRPlace {
         self.place_of_local(self.synthetic_local(ty, span), span)
     }
 
@@ -403,7 +388,7 @@ impl<'a> ThirToMIR<'a> {
         if let MIROperand::Move(place) = operand {
             return place;
         }
-        let ty = self.ty(operand.ty(self.db));
+        let ty = operand.ty(self.db);
         let as_rvalue = MIRRValue { kind: MIRRValueKind::Use(operand), ty, span };
         let place = self.synthetic_place(ty, span);
         self.builder.emit(Stmt::Assign { dest: place.clone(), rvalue: as_rvalue });
@@ -464,23 +449,16 @@ impl<'a> ThirToMIR<'a> {
         if place.ty.is_copy(self.db) { place.into_copy() } else { place.into_move() }
     }
 
-    fn struct_ref(&self, struct_ref: &StructRef) -> StructRef {
-        StructRef {
-            def: struct_ref.def,
-            args: struct_ref.args.iter().map(|ty| self.ty(*ty)).collect_vec(),
-        }
+    fn struct_ref(&self, struct_ref: &StructRef) -> ConcreteStructRef {
+        self.ty(struct_ref.clone().into_type_ref(self.db)).as_struct(self.db).unwrap()
     }
 
-    fn enum_ref(&self, enum_ref: &EnumRef) -> EnumRef {
-        EnumRef {
-            def: enum_ref.def,
-            args: enum_ref.args.iter().map(|ty| self.ty(*ty)).collect_vec(),
-        }
+    fn enum_ref(&self, enum_ref: &EnumRef) -> ConcreteEnumRef {
+        self.ty(enum_ref.clone().into_type_ref(self.db)).as_enum(self.db).unwrap()
     }
 
-    fn get_str_struct_ref(&self) -> StructRef {
-        let TypeDefId::Struct(str_def) = str_def(self.db) else { unreachable!() };
-        StructRef { def: str_def, args: vec![] }
+    fn get_str_struct_ref(&self) -> ConcreteStructRef {
+        str_id(self.db).as_struct(self.db).unwrap()
     }
 
     fn build_strlit(&self, strlit: &str, span: Span) -> MIRRValueKind {
@@ -488,8 +466,8 @@ impl<'a> ThirToMIR<'a> {
             MIRConstant::CString { contents: strlit.into(), null_terminated: false },
             span,
         );
-        let str_ty: TypeRef = str_id(self.db).into();
-        let str_ref = str_ty.as_struct_ref(self.db).expect("str is a struct");
+        let str_ty = str_id(self.db);
+        let str_ref = str_ty.as_struct(self.db).expect("str is a struct");
         let len_field_ty = str_ref
             .typeof_field(self.db, Symbol::new(self.db, "len"))
             .expect("str has a len field");
@@ -562,14 +540,10 @@ impl<'a> ThirToMIR<'a> {
             ExprKind::SizeOf(ty) => MIRRValueKind::SizeOf(self.ty(*ty)),
             ExprKind::TypeName(ty) => {
                 let ty = self.ty(*ty);
-                let name = ty.to_string(self.db);
+                let name = ty.as_type_ref(self.db).to_string(self.db);
                 let name_len = name.len();
 
-                let tref: TypeRef = str_id(self.db).into();
-                let struct_ref = tref
-                    .as_struct_ref(self.db)
-                    .expect("core::io::str should be a struct");
-
+                let struct_ref = self.get_str_struct_ref();
                 let data = MIROperand::Constant(
                     MIRConstant::CString { contents: name, null_terminated: false },
                     span,
@@ -595,8 +569,10 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             ExprKind::Cast(expr, ty) => {
+                // TODO: use `ConcreteTy`s instead of `TypeRef`s as early as possible
                 self.check_cast(self.thir.exprs[*expr].ty, *ty, span);
-                MIRRValueKind::Cast(self.build_operand(*expr), *ty)
+                let ty = self.ty(*ty);
+                MIRRValueKind::Cast(self.build_operand(*expr), ty)
             }
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
@@ -687,7 +663,7 @@ impl<'a> ThirToMIR<'a> {
         &mut self,
         called: FunctionRef,
         args: &[ExprId],
-        ret_ty: TypeRef,
+        ret_ty: ConcreteTy,
         span: Span,
     ) -> MIRLocalID {
         let called = called.concretize(self.db, self.subs);
@@ -704,7 +680,7 @@ impl<'a> ThirToMIR<'a> {
             span,
         });
         self.switch_to(next_bb);
-        if ret_ty == never_id(self.db).into() {
+        if ret_ty == never_id(self.db) {
             self.build_terminator(MIRTerminator::Diverge);
             let unreachable_bb = self.builder.new_block(Some("dead".into()));
             self.switch_to(unreachable_bb);
@@ -830,7 +806,7 @@ impl<'a> ThirToMIR<'a> {
             // TODO: Handle unicode one day
             ExprKind::Charlit(lit) => Some(MIRConstant::Integer {
                 value: u128::from(*lit as u8),
-                ty: char_id(self.db).into(),
+                ty: char_id(self.db),
             }),
             ExprKind::CStrLit(str_lit) => Some(MIRConstant::CString {
                 contents: str_lit.interned().contents(self.db).clone(),
@@ -871,7 +847,7 @@ impl<'a> ThirToMIR<'a> {
         self.build_ret(None, span);
     }
 
-    fn get_ret_ty(&self) -> TypeRef {
+    fn get_ret_ty(&self) -> ConcreteTy {
         self.ty(self.thir.get_ret_ty(self.db))
     }
 
@@ -883,7 +859,7 @@ impl<'a> ThirToMIR<'a> {
         if self.current_block_is_terminated() {
             return;
         }
-        if self.get_ret_ty() != void_id(self.db).into() {
+        if self.get_ret_ty() != void_id(self.db) {
             return;
         }
 
@@ -893,8 +869,6 @@ impl<'a> ThirToMIR<'a> {
 
     pub fn lower(mut self) -> Mir {
         // Only during debug ?
-        self.check_substitution();
-
         self.build_thir_locals();
         self.build_arguments();
 
@@ -907,7 +881,7 @@ impl<'a> ThirToMIR<'a> {
         }
 
         self.builder
-            .finalize(MIRKey::new(self.db, self.thir.id, self.subs.to_vec()).into())
+            .finalize(MIRKey::new(self.db, self.thir.id, self.subs).into())
             .expect("Something went wrong finalizing the builder")
     }
 }
@@ -980,14 +954,17 @@ impl TypeId {
 
 impl FunctionRef {
     #[must_use]
-    pub fn concretize(mut self, db: &dyn Db, subs: &[TypeRef]) -> Self {
-        let zelf = self.self_ty.map(|ty| ty.with_substitution(db, subs));
-        let Some((id, new_subs)) = concretize_fid(db, self.id, &self.args, zelf) else {
+    pub fn concretize(mut self, db: &dyn Db, subs: &Substitution) -> Self {
+        let zelf = self.self_ty.and_then(|ty| ty.to_concrete(db, subs));
+        let fun_subs = Substitution::new(
+            self.args.iter().map(|ty| ty.to_concrete(db, subs).unwrap()),
+        );
+        let Some((id, new_subs)) = concretize_fid(db, self.id, &fun_subs, zelf) else {
             return self;
         };
         if id != self.id {
             self.id = id;
-            self.args = new_subs;
+            self.args = new_subs.iter().map(|ty| ty.as_type_ref(db)).collect();
         }
         self
     }

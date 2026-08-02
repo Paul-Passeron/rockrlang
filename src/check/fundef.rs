@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
 use crate::{
     Db,
     check::{
@@ -25,7 +23,10 @@ use crate::{
     },
     compiler::timing::{Counts, Phase, timed},
     hir::function_ast,
-    mir::passes::dead_code_elimination::dce,
+    mir::{
+        concrete_ty::{ConcreteTy, Substitution},
+        passes::dead_code_elimination::dce,
+    },
     name_resolve::type_expr::get_templates_of_fun,
     resolved::{FunctionId, ScopeOwnerId, TypeRef},
     thir_to_mir::{MIRKey, mir},
@@ -63,26 +64,18 @@ pub fn check_fundef(db: &dyn Db, fdef: FunctionId) {
 pub(crate) fn reachable_mir_instances(
     db: &dyn Db,
     root: FunctionId,
-) -> Vec<(FunctionId, Vec<TypeRef>)> {
+) -> Vec<(FunctionId, Substitution)> {
     let mut seen: HashSet<MIRKey> = HashSet::new();
-    let mut worklist: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
+    let mut worklist: Vec<(FunctionId, Substitution)> = vec![];
     let mut res = vec![];
 
     if !get_templates_of_fun(db, root.interned()).is_empty() {
         // Gneric so not a monomorphization root
         return res;
     }
-    worklist.push((root, vec![]));
+    worklist.push((root, Substitution::empty()));
 
     while let Some((fdef, subs)) = worklist.pop() {
-        // Invariant: `subs` is fully concrete — no Params survive here.
-        debug_assert!(
-            subs.iter().all(|ty| matches!(ty, TypeRef::Concrete(_))),
-            "instance ({}, {:?}) reached the worklist with unresolved params",
-            fdef.name(db).display(db),
-            subs.iter().map(|t| t.to_string(db)).collect::<Vec<_>>(),
-        );
-
         if !seen.insert(MIRKey::new(db, fdef, subs.clone())) {
             continue;
         }
@@ -96,18 +89,28 @@ pub(crate) fn reachable_mir_instances(
             continue;
         };
         for call_info in tc.call_infos(db).values() {
-            let callee_subs: Vec<TypeRef> = call_info
+            let Some(callee_subs) = call_info
                 .substitution
                 .iter()
-                .map(|ty| ty.with_substitution(db, &subs))
-                .collect();
+                .map(|ty| ty.to_concrete(db, &subs))
+                .collect::<Option<Vec<_>>>()
+            else {
+                continue;
+            };
+            let callee_subs = Substitution::new(callee_subs);
 
             assert_eq!(
                 get_templates_of_fun(db, call_info.callee.into()).len(),
                 callee_subs.len()
             );
 
-            let zelf = call_info.zelf_ty.map(|ty| ty.with_substitution(db, &subs));
+            let zelf = match call_info.zelf_ty {
+                Some(ty) => {
+                    let Some(concrete) = ty.to_concrete(db, &subs) else { continue };
+                    Some(concrete)
+                }
+                None => None,
+            };
 
             let Some((fdef, callee_subs)) =
                 concretize_fid(db, call_info.callee, &callee_subs, zelf)
@@ -125,18 +128,23 @@ pub(crate) fn reachable_mir_instances(
 pub fn concretize_fid(
     db: &dyn Db,
     f_id: FunctionId,
-    callee_subs: &[TypeRef],
-    zelf: Option<TypeRef>,
-) -> Option<(FunctionId, Vec<TypeRef>)> {
+    callee_subs: &Substitution,
+    zelf: Option<ConcreteTy>,
+) -> Option<(FunctionId, Substitution)> {
     let ScopeOwnerId::Interface(i_ref) = f_id.parent(db) else {
-        return Some((f_id, callee_subs.to_vec()));
+        return Some((f_id, callee_subs.clone()));
     };
-    let zelf = zelf?.as_type_id()?;
+    let zelf = zelf?.as_type_id(db);
     let is_static = f_id.receiver(db).is_static();
     let arity = f_id.args(db).1.len();
     let hint = Some(i_ref.def(db));
     let method = method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint)?;
-    let mut new_subs = method.subs.iter().map(|ty| TypeRef::Concrete(*ty)).collect_vec();
-    new_subs.extend(callee_subs);
-    Some((method.method_id, new_subs))
+    let empty = Substitution::empty();
+    let mut new_subs: Vec<ConcreteTy> = method
+        .subs
+        .iter()
+        .map(|ty| TypeRef::Concrete(*ty).to_concrete(db, &empty).unwrap())
+        .collect();
+    new_subs.extend(callee_subs.iter());
+    Some((method.method_id, Substitution::new(new_subs)))
 }

@@ -347,31 +347,29 @@ pub trait AsAstImplCtx {
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
                 let pointee = this.resolve_any(db, pointee)?;
-                let ty = if *mutable {
-                    mut_ref_of(db, pointee)
+                Some(if *mutable {
+                    mut_ref_of::<TypeId>(db, pointee).into()
                 } else {
-                    const_ref_of(db, pointee)
-                };
-                Some(ty.into())
+                    const_ref_of::<TypeId>(db, pointee).into()
+                })
             }
             AstTypeExprDesc::Pointer { mutable, pointee } => {
                 let pointee = this.resolve_any(db, pointee)?;
-                let ty = if *mutable {
-                    mut_ptr_of(db, pointee)
+                Some(if *mutable {
+                    mut_ptr_of::<TypeId>(db, pointee).into()
                 } else {
-                    const_ptr_of(db, pointee)
-                };
-                Some(ty.into())
+                    const_ptr_of::<TypeId>(db, pointee).into()
+                })
             }
             AstTypeExprDesc::Slice { ty, len } => {
                 assert!(len.is_none(), "TODO: length in slice");
-                Some(slice_of(db, this.resolve_any(db, ty)?).into())
+                Some(slice_of::<TypeId>(db, this.resolve_any(db, ty)?).into())
             }
             AstTypeExprDesc::Tuple(tys) => {
                 if tys.len() == 1 {
                     this.resolve_any(db, tys.iter().next()?)
                 } else {
-                    Some(TypeRef::Concrete(tuple_of(
+                    Some(TypeRef::Concrete(tuple_of::<TypeId>(
                         db,
                         tys.iter()
                             .map(|ty| this.resolve_any(db, ty))

@@ -20,30 +20,38 @@ use crate::{
     common::{location::Span, symbols::Symbol},
     hir_to_thir::builder::ThirBuilder,
     name_resolve::type_expr::{struct_item, templates_of_struct},
-    resolved::{ScopeOwnerId, TypeDefId, TypeRef},
+    resolved::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{EnumRef, LocalId, PlaceBase, StructRef, ThirPlace},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
-impl TypeRef {
+impl TypeId {
     pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
-        let type_id = self.as_type_id()?;
-        match type_id.def(db) {
+        match self.def(db) {
             TypeDefId::Struct(struct_id) => {
-                Some(StructRef { def: struct_id, args: type_id.args(db).to_vec() })
+                Some(StructRef { def: struct_id, args: self.args(db).to_vec() })
             }
             _ => None,
         }
     }
 
     pub fn as_enum_ref(self, db: &dyn Db) -> Option<EnumRef> {
-        let type_id = self.as_type_id()?;
-        match type_id.def(db) {
+        match self.def(db) {
             TypeDefId::Enum(enum_id) => {
-                Some(EnumRef { def: enum_id, args: type_id.args(db).to_vec() })
+                Some(EnumRef { def: enum_id, args: self.args(db).to_vec() })
             }
             _ => None,
         }
+    }
+}
+
+impl TypeRef {
+    pub fn as_struct_ref(self, db: &dyn Db) -> Option<StructRef> {
+        self.as_type_id()?.as_struct_ref(db)
+    }
+
+    pub fn as_enum_ref(self, db: &dyn Db) -> Option<EnumRef> {
+        self.as_type_id()?.as_enum_ref(db)
     }
 }
 

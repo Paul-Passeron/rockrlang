@@ -313,7 +313,7 @@ impl<'db> LowerFundef<'db> {
                         .map(|ty| self.resolve_any_holed_arg(ty, module))
                         .collect();
 
-                    tuple_of(self.db, partial_args).into()
+                    tuple_of::<TypeId>(self.db, partial_args).into()
                 }
             }
             AstTypeExprDesc::Error(_) => TypeRef::Error,

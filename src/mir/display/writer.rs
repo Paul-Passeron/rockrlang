@@ -84,5 +84,5 @@ fn fmt_local<W: MIRWrite>(w: &mut W, db: &dyn Db, local: &MIRLocal) -> fmt::Resu
     if let Some(name) = local.name {
         mwrite!(w, "{} :", name.to_string(db))?;
     }
-    mwrite!(w, "{}", local.ty.to_string(db))
+    mwrite!(w, "{}", local.ty.as_type_ref(db).to_string(db))
 }

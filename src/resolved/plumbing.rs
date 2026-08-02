@@ -21,6 +21,7 @@ use std::marker::PhantomData;
 use crate::{
     hir::Mutability,
     layout::Size,
+    mir::concrete_ty::ConcreteTy,
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
@@ -508,48 +509,95 @@ impl PtrKind {
     }
 }
 
-pub fn ptr_of(db: &dyn Db, ty: TypeRef, mutable: bool) -> TypeId {
+pub trait AdtLike: Copy + Eq {
+    type Args: Copy + Eq + From<Self> + TryInto<Self>;
+    fn adt(db: &dyn Db, def: TypeDefId, args: Vec<Self::Args>) -> Self;
+    fn def(self, db: &dyn Db) -> TypeDefId;
+    fn args(self, db: &dyn Db) -> &[Self::Args];
+
+    fn as_ref(self, db: &dyn Db) -> Option<(Mutability, Self::Args)> {
+        let ptr_kind = self.def(db).is_ptr_like(db)?;
+        match ptr_kind {
+            PtrKind::Ref(mutability) => Some((mutability, self.args(db)[0])),
+            PtrKind::RawPtr(_) => None,
+        }
+    }
+}
+
+impl AdtLike for TypeId {
+    type Args = TypeRef;
+
+    fn adt(db: &dyn Db, def: TypeDefId, args: Vec<Self::Args>) -> Self {
+        Self::new(db, def, args)
+    }
+
+    fn def(self, db: &dyn Db) -> TypeDefId {
+        self.def(db)
+    }
+
+    fn args(self, db: &dyn Db) -> &[Self::Args] {
+        self.args(db)
+    }
+}
+
+impl AdtLike for ConcreteTy {
+    type Args = Self;
+
+    fn adt(db: &dyn Db, def: TypeDefId, args: Vec<Self::Args>) -> Self {
+        Self::new(db, def, args)
+    }
+
+    fn def(self, db: &dyn Db) -> TypeDefId {
+        self.def(db)
+    }
+
+    fn args(self, db: &dyn Db) -> &[Self::Args] {
+        self.args(db)
+    }
+}
+
+pub fn ptr_of<T: AdtLike>(db: &dyn Db, ty: T::Args, mutable: bool) -> T {
     if mutable { mut_ptr_of(db, ty) } else { const_ptr_of(db, ty) }
 }
 
-pub fn const_ptr_of(db: &dyn Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::const_ptr(db).into(), vec![ty])
+pub fn const_ptr_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
+    T::adt(db, BuiltinTypeId::const_ptr(db).into(), vec![ty])
 }
 
-pub fn mut_ptr_of(db: &dyn Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::mut_ptr(db).into(), vec![ty])
+pub fn mut_ptr_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
+    T::adt(db, BuiltinTypeId::mut_ptr(db).into(), vec![ty])
 }
 
-pub fn const_ref_of(db: &dyn Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::const_ref(db).into(), vec![ty])
+pub fn const_ref_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
+    T::adt(db, BuiltinTypeId::const_ref(db).into(), vec![ty])
 }
 
-pub fn mut_ref_of(db: &dyn Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::mut_ref(db).into(), vec![ty])
+pub fn mut_ref_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
+    T::adt(db, BuiltinTypeId::mut_ref(db).into(), vec![ty])
 }
 
-pub fn ref_of(db: &dyn Db, ty: TypeRef, mutable: bool) -> TypeId {
+pub fn ref_of<T: AdtLike>(db: &dyn Db, ty: T::Args, mutable: bool) -> T {
     if mutable { mut_ref_of(db, ty) } else { const_ref_of(db, ty) }
 }
 
-pub fn slice_of(db: &dyn Db, ty: TypeRef) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::slice(db).into(), vec![ty])
+pub fn slice_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
+    T::adt(db, BuiltinTypeId::slice(db).into(), vec![ty])
 }
 
-pub fn tuple_of(db: &dyn Db, tys: Vec<TypeRef>) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::tuple(db).into(), tys)
+pub fn tuple_of<T: AdtLike>(db: &dyn Db, tys: Vec<T::Args>) -> T {
+    T::adt(db, BuiltinTypeId::tuple(db).into(), tys)
 }
 
-pub fn int_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::int(db).into(), vec![])
+pub fn int_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::int(db).into(), vec![])
 }
 
-pub fn usize_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::usize(db).into(), vec![])
+pub fn usize_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::usize(db).into(), vec![])
 }
 
-pub fn char_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::char(db).into(), vec![])
+pub fn char_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::char(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
@@ -574,23 +622,23 @@ pub fn str_def(db: &dyn Db) -> TypeDefId {
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn str_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, str_def(db), vec![])
+pub fn str_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, str_def(db), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn void_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::void(db).into(), vec![])
+pub fn void_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::void(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn bool_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::bool(db).into(), vec![])
+pub fn bool_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::bool(db).into(), vec![])
 }
 
 #[salsa::tracked(returns(copy))]
-pub fn never_id(db: &dyn Db) -> TypeId {
-    TypeId::new(db, BuiltinTypeId::never(db).into(), vec![])
+pub fn never_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::never(db).into(), vec![])
 }
 
 impl<'db> From<InternedInterfaceRef<'db>> for InterfaceRef {

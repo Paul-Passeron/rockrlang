@@ -20,13 +20,11 @@ use std::range::RangeInclusive;
 use itertools::Itertools;
 
 use crate::{
-    Db,
-    layout::{
+    Db, layout::{
         aggregate::{finish_aggregate, struct_layout},
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
-    },
-    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
+    }, mir::concrete_ty::ConcreteTy, resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
 };
 
 pub mod aggregate;
@@ -106,7 +104,7 @@ pub struct LayoutID(salsa::Id);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LIRTy {
     pub layout: LayoutID,
-    pub origin: Option<TypeRef>,
+    pub origin: Option<ConcreteTy>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

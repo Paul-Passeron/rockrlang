@@ -148,7 +148,7 @@ pub fn fmt_constant<W: MIRWrite>(
 ) -> fmt::Result {
     match constant {
         MIRConstant::Integer { value, ty } => {
-            mwrite!(w, "{value}_{}", ty.to_string(db))
+            mwrite!(w, "{value}_{}", ty.as_type_ref(db).to_string(db))
         }
         MIRConstant::Bool(b) => mwrite!(w, "{b}"),
         MIRConstant::CString { contents, null_terminated } => {
@@ -199,15 +199,15 @@ pub fn fmt_rvalue<W: MIRWrite>(
             w.write_str(")")
         }
         MIRRValueKind::SizeOf(ty) => {
-            mwrite!(w, "@sizeof({})", ty.to_string(db))
+            mwrite!(w, "@sizeof({})", ty.as_type_ref(db).to_string(db))
         }
         MIRRValueKind::Constructor { enum_ref, idx, args, .. } => {
-            mwrite!(w, "{}::#{idx}(", enum_ref.def.name(db).to_string(db))?;
+            mwrite!(w, "{}::#{idx}(", enum_ref.def(db).name(db).to_string(db))?;
             fmt_constructor_args(w, db, args)?;
             w.write_str(")")
         }
         MIRRValueKind::StructLit { struct_ref, fields, .. } => {
-            mwrite!(w, "{} {{", struct_ref.def.name(db).to_string(db))?;
+            mwrite!(w, "{} {{", struct_ref.def(db).name(db).to_string(db))?;
             let mut first = true;
             for (name, op) in fields {
                 if !first {
@@ -233,7 +233,7 @@ pub fn fmt_rvalue<W: MIRWrite>(
             w.write_str("cast ")?;
             fmt_operand(w, db, operand)?;
             w.write_str(" as ")?;
-            w.write_str(type_ref.to_string(db).as_str())
+            w.write_str(type_ref.as_type_ref(db).to_string(db).as_str())
         }
     }
 }

@@ -24,13 +24,12 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
-    hir::Mutability,
-    hir::signature::get_sig_of_function,
+    hir::{Mutability, signature::get_sig_of_function},
     name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id, const_ptr_of, int_id,
-        ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
+        AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
+        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -77,7 +76,7 @@ impl<'db> SanityChecker<'db> {
         match &stmt.kind {
             StmtKind::Block { stmts, .. } => self.check_stmts(stmts),
             StmtKind::If { cond, then, else_, .. } => {
-                let bool_ty = TypeRef::Concrete(bool_id(self.db));
+                let bool_ty = bool_id(self.db).as_type_ref(self.db);
                 let ThirExprWithSetup { stmts, expr } = cond;
                 self.check_stmts(stmts);
                 self.check_expr_with_expected_type(*expr, bool_ty);
@@ -87,7 +86,7 @@ impl<'db> SanityChecker<'db> {
                 }
             }
             StmtKind::While { cond, body, .. } => {
-                let bool_ty = TypeRef::Concrete(bool_id(self.db));
+                let bool_ty = bool_id(self.db).as_type_ref(self.db);
                 let ThirExprWithSetup { stmts, expr } = cond;
                 self.check_stmts(stmts);
                 self.check_expr_with_expected_type(*expr, bool_ty);
@@ -125,20 +124,15 @@ impl<'db> SanityChecker<'db> {
         }
     }
 
-    fn get_peeled(
-        &mut self,
-        ty: TypeRef,
-        expected_ty: TypeRef,
-        span: Span,
-    ) -> RefWrappedTy {
-        RefWrappedTy::peel_until(self.db, ty, expected_ty).unwrap_or_else(|| {
+    fn get_peeled(&mut self, ty: TypeRef, expected_ty: TypeRef, span: Span) -> PeeledTy {
+        peel_type_ref_until(self.db, ty, expected_ty).unwrap_or_else(|| {
             println!(
                 "ERROR: Could not peel {} until {} :(",
                 ty.to_string(self.db),
                 expected_ty.to_string(self.db)
             );
             self.check_types(expected_ty, ty, span);
-            RefWrappedTy::from_type_ref(self.db, ty)
+            PeeledTy::from_type_ref(self.db, ty)
         })
     }
 
@@ -156,7 +150,7 @@ impl<'db> SanityChecker<'db> {
             ThirPatternKind::Struct { def, fields } => {
                 let actual = def.get_fields_ty(self.db);
                 for (sym, fpat) in fields {
-                    let ty = peeled.wrap_like(self.db, actual[sym]);
+                    let ty = wrap_type_ref(self.db, &peeled.refs, actual[sym]);
                     self.check_pattern(ty, fpat);
                 }
                 let bare = TypeRef::Concrete(TypeId::new(
@@ -186,7 +180,7 @@ impl<'db> SanityChecker<'db> {
                     .and_then(|ty| ty.def(self.db).is_int_like(self.db))
                     .is_none()
                 {
-                    self.check_types(expected_ty, int_id(self.db).into(), pat.span);
+                    self.check_types(expected_ty, int_id(self.db).as_type_ref(self.db), pat.span);
                 }
             }
         }
@@ -198,7 +192,7 @@ impl<'db> SanityChecker<'db> {
             self.check_stmts(&guard.stmts);
             self.check_expr_with_expected_type(
                 guard.expr,
-                TypeRef::Concrete(bool_id(self.db)),
+                bool_id(self.db).as_type_ref(self.db),
             );
         }
         self.check_stmts(&branch.body);
@@ -211,13 +205,13 @@ impl<'db> SanityChecker<'db> {
                 // TODO
             }
             ExprKind::Charlit(_) => self.check_types(
-                TypeRef::Concrete(char_id(self.db)),
+                char_id(self.db).as_type_ref(self.db),
                 infos.ty,
                 infos.span,
             ),
             ExprKind::StrLit(_) => {
                 self.check_types(
-                    TypeRef::Concrete(str_id(self.db)),
+                    str_id(self.db).as_type_ref(self.db),
                     infos.ty,
                     infos.span,
                 );
@@ -225,13 +219,13 @@ impl<'db> SanityChecker<'db> {
             ExprKind::CStrLit(_) => self.check_types(
                 TypeRef::Concrete(const_ptr_of(
                     self.db,
-                    TypeRef::Concrete(char_id(self.db)),
+                    char_id(self.db).as_type_ref(self.db),
                 )),
                 infos.ty,
                 infos.span,
             ),
             ExprKind::BoolLit(_) => self.check_types(
-                TypeRef::Concrete(bool_id(self.db)),
+                bool_id(self.db).as_type_ref(self.db),
                 infos.ty,
                 infos.span,
             ),
@@ -286,7 +280,7 @@ impl<'db> SanityChecker<'db> {
                             .is_none()
                         {
                             self.check_types(
-                                int_id(self.db).into(),
+                                int_id(self.db).as_type_ref(self.db),
                                 infos.ty,
                                 infos.span,
                             );
@@ -304,16 +298,16 @@ impl<'db> SanityChecker<'db> {
                             .is_none()
                         {
                             self.check_types(
-                                int_id(self.db).into(),
+                                int_id(self.db).as_type_ref(self.db),
                                 infos.ty,
                                 infos.span,
                             );
                         }
                         self.check_types(lhs_ty, rhs_ty, infos.span);
-                        self.check_types(bool_id(self.db).into(), infos.ty, infos.span);
+                        self.check_types(bool_id(self.db).as_type_ref(self.db), infos.ty, infos.span);
                     }
                     BinaryOperator::And | BinaryOperator::Or => {
-                        let bool_id = bool_id(self.db).into();
+                        let bool_id = bool_id(self.db).as_type_ref(self.db);
                         self.check_types(bool_id, lhs_ty, lhs_span);
                         self.check_types(bool_id, rhs_ty, rhs_span);
                         self.check_types(bool_id, infos.ty, infos.span);
@@ -333,12 +327,12 @@ impl<'db> SanityChecker<'db> {
             ExprKind::Not(operand) => {
                 let operand_ty = self.check_expr(*operand);
                 self.check_types(
-                    TypeRef::Concrete(bool_id(self.db)),
+                    bool_id(self.db).as_type_ref(self.db),
                     operand_ty,
                     self.thir.exprs[*operand].span,
                 );
                 self.check_types(
-                    TypeRef::Concrete(bool_id(self.db)),
+                    bool_id(self.db).as_type_ref(self.db),
                     infos.ty,
                     infos.span,
                 );
@@ -493,7 +487,7 @@ impl<'db> SanityChecker<'db> {
         if let Some(expr) = expr {
             self.check_expr_with_expected_type(expr, ret_ty);
         } else {
-            let void_ty = TypeRef::Concrete(void_id(self.db));
+            let void_ty = void_id(self.db).as_type_ref(self.db);
             self.check_types(ret_ty, void_ty, span);
         }
     }
@@ -544,7 +538,7 @@ impl<'db> SanityChecker<'db> {
                     .is_none()
                 {
                     let idx_span = self.thir.exprs[*idx_expr].span;
-                    self.check_types(ty, TypeRef::Concrete(int_id(self.db)), idx_span);
+                    self.check_types(ty, int_id(self.db).as_type_ref(self.db), idx_span);
                     return None;
                 }
                 before.element_of_indexed(self.db)
@@ -597,7 +591,7 @@ impl<'db> SanityChecker<'db> {
         &mut self,
         ty: &ConstructorType,
         pat: &ThirConstructorArgs<ThirPattern>,
-        peeled: &RefWrappedTy,
+        peeled: &PeeledTy,
         span: Span,
     ) {
         match (ty, pat) {
@@ -606,13 +600,15 @@ impl<'db> SanityChecker<'db> {
                 assert_eq!(tys.len(), pats.len());
                 for (sym, fty) in tys {
                     let fpat = &pats.iter().find(|p| p.field == *sym).unwrap().expr;
-                    self.check_pattern(peeled.wrap_like(self.db, *fty), fpat);
+                    let ty = wrap_type_ref(self.db, &peeled.refs, *fty);
+                    self.check_pattern(ty, fpat);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
                 assert_eq!(tys.len(), pats.len());
                 tys.iter().zip(pats).for_each(|(ty, pat)| {
-                    self.check_pattern(peeled.wrap_like(self.db, *ty), pat);
+                    let ty = wrap_type_ref(self.db, &peeled.refs, *ty);
+                    self.check_pattern(ty, pat);
                 });
             }
             _ => Diag::generic_error(
@@ -781,27 +777,27 @@ pub enum WrapKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RefWrappedTy {
-    pub inner: TypeRef,
+pub struct RefWrappedTy<T: AdtLike> {
+    pub inner: T,
     pub refs: Vec<WrapKind>, // [&A, &B, &C] means &C &B &A T
 }
 
-impl RefWrappedTy {
-    pub fn wrap_like(&self, db: &dyn Db, to_wrap: TypeRef) -> TypeRef {
-        self.refs.iter().fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty))
+impl<T: AdtLike> RefWrappedTy<T> {
+    pub fn wrap_like(&self, db: &dyn Db, to_wrap: T) -> T {
+        self.refs.iter().fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty.into()))
     }
 
-    pub fn as_type_ref(&self, db: &dyn Db) -> TypeRef {
+    pub fn as_type_ref(&self, db: &dyn Db) -> T {
         self.wrap_like(db, self.inner)
     }
 
-    pub fn peel_until(db: &dyn Db, to_peel: TypeRef, target: TypeRef) -> Option<Self> {
+    pub fn peel_until(db: &dyn Db, to_peel: T, target: T) -> Option<Self> {
         let mut refs = vec![];
         let mut inner = to_peel;
         while inner != target
             && let Some((mutability, ty)) = inner.as_ref(db)
         {
-            inner = ty;
+            inner = ty.try_into().ok()?;
             refs.push(WrapKind::Ref(mutability));
         }
         if inner != target {
@@ -810,11 +806,11 @@ impl RefWrappedTy {
         Some(Self { inner, refs })
     }
 
-    pub fn from_type_ref(db: &dyn Db, ty: TypeRef) -> Self {
+    pub fn from_type(db: &dyn Db, ty: T) -> Self {
         let mut refs = vec![];
         let mut inner = ty;
         while let Some((mutability, ty)) = inner.as_ref(db) {
-            inner = ty;
+            inner = ty.try_into().ok().unwrap();
             refs.push(WrapKind::Ref(mutability));
         }
         refs.reverse();
@@ -827,8 +823,51 @@ impl RefWrappedTy {
 }
 
 impl WrapKind {
-    pub fn wrap(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
+    pub fn wrap<T: AdtLike>(self, db: &dyn Db, ty: T::Args) -> T {
         let Self::Ref(mutability) = self;
-        ref_of(db, ty, mutability.is_mut()).into()
+        ref_of(db, ty, mutability.is_mut())
     }
+}
+
+/// Applies `refs` (as collected by [`peel_type_ref_until`]) on top of `ty`.
+///
+/// Unlike [`RefWrappedTy::wrap_like`], this works directly on `TypeRef` and so
+/// tolerates non-concrete leaves (e.g. a bare `Param` inside a generic
+/// function's own body), which `RefWrappedTy<TypeId>` cannot represent.
+fn wrap_type_ref(db: &dyn Db, refs: &[WrapKind], ty: TypeRef) -> TypeRef {
+    refs.iter().fold(ty, |ty, WrapKind::Ref(mutability)| ty.wrap_ref(db, mutability.is_mut()))
+}
+
+/// Like [`RefWrappedTy`], but over `TypeRef` directly — `AdtLike` cannot be
+/// implemented for `TypeRef` since a bare `Param`/`Zelf`/`Error`/`Unknown` has
+/// no `def()`, and those legitimately appear here in unmonomorphized THIR.
+pub struct PeeledTy {
+    pub inner: TypeRef,
+    pub refs: Vec<WrapKind>,
+}
+
+impl PeeledTy {
+    fn from_type_ref(db: &dyn Db, mut ty: TypeRef) -> Self {
+        let mut refs = vec![];
+        while let Some((mutability, inner)) = ty.as_ref(db) {
+            ty = inner;
+            refs.push(WrapKind::Ref(mutability));
+        }
+        refs.reverse();
+        Self { inner: ty, refs }
+    }
+}
+
+fn peel_type_ref_until(db: &dyn Db, mut ty: TypeRef, target: TypeRef) -> Option<PeeledTy> {
+    let mut refs = vec![];
+    while ty != target
+        && let Some((mutability, inner)) = ty.as_ref(db)
+    {
+        ty = inner;
+        refs.push(WrapKind::Ref(mutability));
+    }
+    if ty != target {
+        return None;
+    }
+    Some(PeeledTy { inner: ty, refs })
 }

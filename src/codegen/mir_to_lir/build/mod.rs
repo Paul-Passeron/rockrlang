@@ -37,6 +37,7 @@ use crate::{
     mir::{
         MIRBlockID, MIRLocalID, Mir,
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
+        concrete_ty::ConcreteTy,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
@@ -44,7 +45,9 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeRef, bool_id, type_ref::CastClass},
+    resolved::{
+        BuiltinTypeId, BuiltinTypeKind, TypeDefId, bool_id, type_ref::CastClass,
+    },
     thir_to_mir::FuncInst,
 };
 
@@ -186,7 +189,7 @@ impl MTLBCtx<'_> {
             .map(crate::lir::ValueDef::id)
             .collect_vec();
         for (local, decl) in mir.locals.iter() {
-            let layout = layout_of(self.db, decl.ty);
+            let layout = layout_of(self.db, decl.ty.as_type_ref(self.db));
             if layout.is_zst(self.db) {
                 lower.value_map.insert(local, LocalSlot::Zst);
             } else {
@@ -201,7 +204,7 @@ impl MTLBCtx<'_> {
                 .iter()
                 .filter(|param| {
                     let tref = lower.mir.locals[**param].ty;
-                    let layout = layout_of(self.db, tref);
+                    let layout = layout_of(self.db, tref.as_type_ref(self.db));
                     !layout.is_zst(self.db)
                 })
                 .enumerate()
@@ -276,7 +279,13 @@ impl MTLBCtx<'_> {
                         fref.args = fref
                             .args
                             .iter()
-                            .map(|ty| ty.with_substitution(self.db, caller_subs))
+                            .map(|ty| {
+                                ty.to_concrete(self.db, caller_subs)
+                                    .expect(
+                                        "Call args must be concrete after substitution",
+                                    )
+                                    .as_type_ref(self.db)
+                            })
                             .collect();
                         let inst = FuncInst::from_funcref(self.db, fref);
                         self.mir_map.mir_to_lir[&inst]
@@ -330,13 +339,13 @@ impl MTLBCtx<'_> {
             MIROperand::Constant(cst, ..) => match cst {
                 MIRConstant::Integer { value, ty } => {
                     let is_ptr = ty.as_ptr(self.db);
-                    let layout = layout_of(self.db, *ty);
+                    let layout = layout_of(self.db, ty.as_type_ref(self.db));
                     let ty = LIRTy { layout, origin: Some(*ty) };
                     if let Some((_, pointee)) = is_ptr {
                         if *value != 0 {
                             todo!()
                         }
-                        let layout = layout_of(self.db, pointee);
+                        let layout = layout_of(self.db, pointee.as_type_ref(self.db));
                         let pointee = LIRTy { layout, origin: Some(pointee) };
                         Some(b.const_null_ptr(pointee))
                     } else {
@@ -345,7 +354,7 @@ impl MTLBCtx<'_> {
                 }
                 MIRConstant::Bool(value) => {
                     let layout = LayoutID::int(self.db, IntWidth::I8);
-                    let ty = LIRTy { layout, origin: Some(bool_id(self.db).into()) };
+                    let ty = LIRTy { layout, origin: Some(bool_id(self.db)) };
                     Some(b.const_int(ty, u128::from(*value)).erase())
                 }
                 MIRConstant::CString { contents, null_terminated } => {
@@ -366,29 +375,32 @@ impl MTLBCtx<'_> {
         &mut self,
         b: &mut BlockBuilder<'ir, '_>,
         ptr: ValueId<'ir>,
-        ty: TypeRef,
+        ty: ConcreteTy,
         proj: &ProjKind,
         lower: &LIRLower<'ir, '_>,
-    ) -> (ValueId<'ir>, TypeRef) {
+    ) -> (ValueId<'ir>, ConcreteTy) {
         match proj {
             ProjKind::Regular(MIRProjection::Deref) => {
                 let new_ty =
                     ty.as_ptr(self.db).unwrap_or_else(|| ty.as_ref(self.db).unwrap()).1;
-                let ptr_layout = layout_of(self.db, ty); // layout of the pointer type itself
+                let ptr_layout = layout_of(self.db, ty.as_type_ref(self.db)); // layout of the pointer type itself
                 let lir_ty = LIRTy { layout: ptr_layout, origin: Some(ty) };
                 (b.load(ptr, lir_ty), new_ty)
             }
             ProjKind::Regular(MIRProjection::Field { name, resulting_ty }) => {
-                let layout = layout_of(self.db, ty);
+                let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 let src_idx = {
                     let item = struct_item(
                         self.db,
-                        ty.as_struct_ref(self.db)
+                        ty.as_struct(self.db)
                             .unwrap_or_else(|| {
-                                panic!("Type was {}", ty.to_string(self.db))
+                                panic!(
+                                    "Type was {}",
+                                    ty.as_type_ref(self.db).to_string(self.db)
+                                )
                             })
-                            .def
+                            .def(self.db)
                             .into(),
                     );
                     let pos = item.fields.iter().position(|f| f.name == *name).unwrap();
@@ -397,7 +409,7 @@ impl MTLBCtx<'_> {
                 (b.field_ptr(ptr, lir_ty, src_idx), *resulting_ty)
             }
             ProjKind::Regular(MIRProjection::TupleField { index, resulting_ty }) => {
-                let layout = layout_of(self.db, ty);
+                let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
@@ -405,19 +417,27 @@ impl MTLBCtx<'_> {
                 let index = self.lower_operand(b, index, lower).unwrap();
                 let elem_ty =
                     ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db)).unwrap().1;
-                let lir_elem =
-                    LIRTy { layout: layout_of(self.db, elem_ty), origin: Some(elem_ty) };
-                let ptr_ty = LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) };
+                let lir_elem = LIRTy {
+                    layout: layout_of(self.db, elem_ty.as_type_ref(self.db)),
+                    origin: Some(elem_ty),
+                };
+                let ptr_ty = LIRTy {
+                    layout: layout_of(self.db, ty.as_type_ref(self.db)),
+                    origin: Some(ty),
+                };
                 let base_ptr = b.load(ptr, ptr_ty);
                 (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
             }
             ProjKind::DowncastThen { next, variant } => {
-                let enum_ref = ty.as_enum_ref(self.db).unwrap_or_else(|| {
-                    panic!("Expected an enum but got {}", ty.to_string(self.db))
+                let enum_ref = ty.as_enum(self.db).unwrap_or_else(|| {
+                    panic!(
+                        "Expected an enum but got {}",
+                        ty.as_type_ref(self.db).to_string(self.db)
+                    )
                 });
                 match next {
                     MIRProjection::Field { name, resulting_ty } => {
-                        let layout = layout_of(self.db, ty);
+                        let layout = layout_of(self.db, ty.as_type_ref(self.db));
                         let lir_ty = LIRTy { layout, origin: Some(ty) };
                         assert!(lir_ty.is_union(self.db));
                         let vlayout = lir_ty.union_layout(self.db).unwrap();
@@ -436,7 +456,7 @@ impl MTLBCtx<'_> {
                         (field_ptr, *resulting_ty)
                     }
                     MIRProjection::TupleField { index, resulting_ty } => {
-                        let layout = layout_of(self.db, ty);
+                        let layout = layout_of(self.db, ty.as_type_ref(self.db));
                         let lir_ty = LIRTy { layout, origin: Some(ty) };
                         assert!(lir_ty.is_union(self.db));
                         let vlayout = lir_ty.union_layout(self.db).unwrap();
@@ -495,7 +515,7 @@ impl MTLBCtx<'_> {
         // Should we load the computed place ptr
         // or eagerly load / extract ?
         // (This should not matter for valid places)
-        let layout = layout_of(self.db, place.ty);
+        let layout = layout_of(self.db, place.ty.as_type_ref(self.db));
         let ty = LIRTy { layout, origin: Some(place.ty) };
         let ptr = self.lower_place_as_ptr(b, place, lower);
         b.load(ptr, ty)
@@ -511,9 +531,13 @@ impl MTLBCtx<'_> {
         match &rvalue.kind {
             MIRRValueKind::Constructor { enum_ref, idx, args, .. } => {
                 let variant = *idx as u32;
-                let tref = enum_ref.clone().into_type_ref(self.db);
-                let layout = layout_of(self.db, tref);
-                let ty = LIRTy { layout, origin: Some(tref) };
+                let concrete_ty = ConcreteTy::new(
+                    self.db,
+                    TypeDefId::Enum(enum_ref.def(self.db)),
+                    enum_ref.args(self.db).to_vec(),
+                );
+                let layout = layout_of(self.db, concrete_ty.as_type_ref(self.db));
+                let ty = LIRTy { layout, origin: Some(concrete_ty) };
                 let payload_ptr = b.union_payload_ptr(ptr, ty, variant);
                 let union_layout = ty.union_layout(self.db).unwrap();
                 let variant_layout = union_layout.variants[variant as usize];
@@ -692,14 +716,14 @@ impl MTLBCtx<'_> {
                 }
             }
             MIRRValueKind::Discriminant(place) => {
-                let layout = layout_of(self.db, place.ty);
+                let layout = layout_of(self.db, place.ty.as_type_ref(self.db));
                 let ty = LIRTy { layout, origin: Some(place.ty) };
                 let ptr = self.lower_place_as_ptr(b, place, lower);
                 Some(b.get_discriminant(ptr, ty).unwrap().erase())
             }
             MIRRValueKind::Metadata(_) => todo!(),
-            MIRRValueKind::SizeOf(type_ref) => {
-                let layout = layout_of(self.db, *type_ref);
+            MIRRValueKind::SizeOf(ty) => {
+                let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let s = layout.size(self.db).bytes();
                 Some(
                     b.const_int(
@@ -717,15 +741,19 @@ impl MTLBCtx<'_> {
             }
             MIRRValueKind::StructLit { struct_ref, fields, .. } => {
                 let in_src_order = {
-                    let item = struct_item(self.db, struct_ref.def.into());
+                    let item = struct_item(self.db, struct_ref.def(self.db).into());
                     item.fields
                         .iter()
                         .filter_map(|f| self.lower_operand(b, &fields[&f.name], lower))
                         .collect_vec()
                 };
-                let tref = struct_ref.clone().into_type_ref(self.db);
-                let layout = layout_of(self.db, tref);
-                let ty = LIRTy { layout, origin: Some(tref) };
+                let concrete_ty = ConcreteTy::new(
+                    self.db,
+                    TypeDefId::Struct(struct_ref.def(self.db)),
+                    struct_ref.args(self.db).to_vec(),
+                );
+                let layout = layout_of(self.db, concrete_ty.as_type_ref(self.db));
+                let ty = LIRTy { layout, origin: Some(concrete_ty) };
                 Some(b.make_aggregate(ty, in_src_order).erase())
             }
             MIRRValueKind::Tuple(ops, _) => {
@@ -733,7 +761,7 @@ impl MTLBCtx<'_> {
                     .iter()
                     .filter_map(|op| self.lower_operand(b, op, lower))
                     .collect_vec();
-                let layout = layout_of(self.db, rvalue.ty);
+                let layout = layout_of(self.db, rvalue.ty.as_type_ref(self.db));
                 let ty = LIRTy { layout, origin: Some(rvalue.ty) };
                 Some(b.make_aggregate(ty, values).erase())
             }
@@ -749,25 +777,29 @@ impl MTLBCtx<'_> {
         &self,
         b: &mut BlockBuilder<'ir, '_>,
         value: ValueId<'ir>,
-        from: TypeRef,
-        to: TypeRef,
+        from: ConcreteTy,
+        to: ConcreteTy,
     ) -> ValueId<'ir> {
         let unsupported = || {
             unreachable!(
                 "cast from `{}` to `{}` should have been rejected in thir_to_mir",
-                from.to_string(self.db),
-                to.to_string(self.db)
+                from.as_type_ref(self.db).to_string(self.db),
+                to.as_type_ref(self.db).to_string(self.db)
             )
         };
-        let (Some(from_class), Some(to_class)) =
-            (from.cast_class(self.db), to.cast_class(self.db))
-        else {
+        let (Some(from_class), Some(to_class)) = (
+            from.as_type_ref(self.db).cast_class(self.db),
+            to.as_type_ref(self.db).cast_class(self.db),
+        ) else {
             unsupported()
         };
 
         let (value, from_class) = match (from_class, to_class) {
             (CastClass::FatPtr(muta), CastClass::ThinPtr(_)) => {
-                let ty = LIRTy { layout: layout_of(self.db, from), origin: Some(from) };
+                let ty = LIRTy {
+                    layout: layout_of(self.db, from.as_type_ref(self.db)),
+                    origin: Some(from),
+                };
                 (b.extract_field(value, ty, FAT_PTR_DATA_FIELD), CastClass::ThinPtr(muta))
             }
             _ => (value, from_class),
@@ -804,17 +836,18 @@ impl MTLBCtx<'_> {
         }
     }
 
-    fn scalar_kind_of(&self, ty: TypeRef) -> ScalarKind {
-        match layout_of(self.db, ty).data(self.db) {
+    fn scalar_kind_of(&self, ty: ConcreteTy) -> ScalarKind {
+        match layout_of(self.db, ty.as_type_ref(self.db)).data(self.db) {
             LayoutData::Scalar(kind) => *kind,
-            _ => unreachable!("`{}` is not a scalar", ty.to_string(self.db)),
+            _ => unreachable!(
+                "`{}` is not a scalar",
+                ty.as_type_ref(self.db).to_string(self.db)
+            ),
         }
     }
 
-    fn is_signed(&self, ty: TypeRef) -> bool {
-        ty.as_type_id()
-            .and_then(|ty| ty.def(self.db).is_int_like(self.db))
-            .is_some_and(|int_like| int_like.is_signed(self.db))
+    fn is_signed(&self, ty: ConcreteTy) -> bool {
+        ty.def(self.db).is_int_like(self.db).is_some_and(|int_like| int_like.is_signed(self.db))
     }
 }
 

@@ -22,8 +22,8 @@ use crate::{
     name_resolve::type_expr::{get_templates_of_fun_only, templates_of_owner},
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
     resolved::{
-        BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeRef, ptr_of,
-        ref_of,
+        BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeId, TypeRef,
+        ptr_of, ref_of,
     },
     typecheck::inference::{
         InferTy,
@@ -56,8 +56,8 @@ impl ZelfArg {
     pub fn as_type_ref_for(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         match self.kind {
             ZelfKind::Zelf => ty,
-            ZelfKind::RefZelf => ref_of(db, ty, self.mutability.is_mut()).into(),
-            ZelfKind::PtrZelf => ptr_of(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::RefZelf => ref_of::<TypeId>(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::PtrZelf => ptr_of::<TypeId>(db, ty, self.mutability.is_mut()).into(),
         }
     }
 }

@@ -139,7 +139,7 @@ impl MIRRValue {
 }
 
 fn record_place(db: &dyn Db, mir: &Mir, place: &MIRPlace, out: &mut HashSet<MoveKey>) {
-    if !mir.locals[place.local].ty.is_copy(db) {
+    if !mir.locals[place.local].ty.as_type_ref(db).is_copy(db) {
         out.insert(place.as_move_key());
     }
     for proj in &place.projections {
@@ -159,7 +159,7 @@ fn record_operand(db: &dyn Db, mir: &Mir, op: &MIROperand, out: &mut HashSet<Mov
 fn compute_move_key_set(db: &dyn Db, mir: &Mir) -> HashSet<MoveKey> {
     let mut set = HashSet::new();
     for local in mir.locals.keys() {
-        if !mir.locals[local].ty.is_copy(db) {
+        if !mir.locals[local].ty.as_type_ref(db).is_copy(db) {
             set.insert(MoveKey { base: local, projections: Vec::new() });
         }
     }

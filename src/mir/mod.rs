@@ -30,12 +30,12 @@ use crate::{
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         cache::MIRCache,
+        concrete_ty::ConcreteTy,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind,
         },
     },
-    resolved::TypeRef,
     thir,
     thir_to_mir::FuncInst,
 };
@@ -44,6 +44,7 @@ pub mod analysis;
 pub mod basic_block;
 pub mod builder;
 pub mod cache;
+pub mod concrete_ty;
 pub mod display;
 pub mod operand;
 pub mod passes;
@@ -84,7 +85,7 @@ pub struct Mir {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct MIRLocal {
-    pub ty: TypeRef,
+    pub ty: ConcreteTy,
     pub mutability: Mutability,
 
     // Metadata:
@@ -95,7 +96,7 @@ pub struct MIRLocal {
 }
 
 impl MIRLocal {
-    pub fn new(ty: TypeRef, mutability: Mutability, span: Span) -> Self {
+    pub fn new(ty: ConcreteTy, mutability: Mutability, span: Span) -> Self {
         Self { ty, mutability, span, name: None, thir_src: None, syn_src: None }
     }
 
