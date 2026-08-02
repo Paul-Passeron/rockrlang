@@ -22,12 +22,14 @@ use crate::{
     },
     codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     common::location::LocationInfo,
-    compiler::diagnostic::{Diag, Severity},
-    compiler::timing::{PhaseStat, render_timings},
-    mir::passes::dead_code_elimination::dce,
+    compiler::{
+        diagnostic::{Diag, Severity},
+        timing::{PhaseStat, render_timings},
+    },
+    mir::{concrete_ty::Substitution, passes::dead_code_elimination::dce},
     name_resolve::file_module_id,
     printer::render_diagnostics,
-    resolved::{FunctionId, TypeRef},
+    resolved::FunctionId,
     thir::{ExprKind, thir_body},
     thir_to_mir::{MIRKey, mir},
 };
@@ -132,7 +134,7 @@ fn display_ir(db: &dyn Db, w: Workspace) {
 
     let packages = workspace_packages(db, w);
     let mut seen: HashSet<MIRKey> = HashSet::new();
-    let mut instances: Vec<(FunctionId, Vec<TypeRef>)> = vec![];
+    let mut instances: Vec<(FunctionId, Substitution)> = vec![];
     for pkg in packages {
         let module = file_module_id(db, *pkg.root(db), None, *pkg);
         for root in collect_module_functions(db, module.interned()) {
@@ -163,7 +165,7 @@ fn display_ir(db: &dyn Db, w: Workspace) {
         let mut instances = instances;
         instances.sort_by_key(|(fdef, subs)| FrefSortKey {
             info: fdef.name_span(db).start().loc_info(db).clone(),
-            subs: subs.iter().map(|ty| ty.to_string(db)).collect(),
+            subs: subs.iter().map(|ty| ty.as_type_ref(db).to_string(db)).collect(),
         });
         for (fdef, subs) in instances {
             if !fdef.has_body(db) {

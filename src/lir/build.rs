@@ -659,7 +659,7 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
     fn ptr_of(&self, ty: LIRTy) -> LIRTy {
         LIRTy {
             layout: LayoutID::ptr(self.db),
-            origin: ty.origin.map(|ty| ptr_of(self.db, ty, true).into()),
+            origin: ty.origin.map(|ty| ptr_of(self.db, ty, true)),
         }
     }
 

@@ -30,10 +30,13 @@ use crate::{
     Db,
     common::{bitset::BitSet, location::Span, symbols::Symbol},
     hir::Mutability,
-    mir::{ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Projection, RValueKind},
+    mir::{
+        ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Projection, RValueKind,
+        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
+    },
     parse_tree::expr::BinaryOperator,
-    resolved::{TypeRef, bool_id, char_id, ptr_of},
-    thir::{EnumRef, FunctionRef, StructRef},
+    resolved::{bool_id, char_id, ptr_of},
+    thir::FunctionRef,
 };
 
 use super::{Constant, Place};
@@ -47,7 +50,7 @@ pub enum MIROperand {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRConstant {
-    Integer { value: u128, ty: TypeRef },
+    Integer { value: u128, ty: ConcreteTy },
     Bool(bool),
     CString { contents: String, null_terminated: bool },
 }
@@ -56,15 +59,15 @@ pub enum MIRConstant {
 pub struct MIRPlace {
     pub local: LocalID,
     pub projections: Vec<Projection>,
-    pub ty: TypeRef,
+    pub ty: ConcreteTy,
     pub span: Span,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIRProjection {
     Deref,
-    Field { name: Symbol, resulting_ty: TypeRef },
-    TupleField { index: u32, resulting_ty: TypeRef },
+    Field { name: Symbol, resulting_ty: ConcreteTy },
+    TupleField { index: u32, resulting_ty: ConcreteTy },
     Index { index: Operand },
     Downcast { variant: usize },
 }
@@ -72,7 +75,7 @@ pub enum MIRProjection {
 #[derive(Clone, PartialEq, Eq)]
 pub struct MIRRValue {
     pub kind: RValueKind,
-    pub ty: TypeRef,
+    pub ty: ConcreteTy,
     pub span: Span,
 }
 
@@ -96,11 +99,20 @@ pub enum MIRRValueKind {
     UnaryOp(UnaryOperator, Operand),
     Discriminant(Place),
     Metadata(Operand),
-    SizeOf(TypeRef),
-    Constructor { enum_ref: EnumRef, idx: usize, args: ConstructorArgs, span: Span },
-    StructLit { struct_ref: StructRef, fields: BTreeMap<Symbol, Operand>, span: Span },
+    SizeOf(ConcreteTy),
+    Constructor {
+        enum_ref: ConcreteEnumRef,
+        idx: usize,
+        args: ConstructorArgs,
+        span: Span,
+    },
+    StructLit {
+        struct_ref: ConcreteStructRef,
+        fields: BTreeMap<Symbol, Operand>,
+        span: Span,
+    },
     Tuple(Vec<Operand>, Span),
-    Cast(Operand, TypeRef),
+    Cast(Operand, ConcreteTy),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -111,17 +123,17 @@ pub enum MIRConstructorArgs {
 }
 
 impl Constant {
-    pub fn ty(&self, db: &dyn Db) -> TypeRef {
+    pub fn ty(&self, db: &dyn Db) -> ConcreteTy {
         match self {
             Self::Integer { ty, .. } => *ty,
-            Self::Bool(_) => bool_id(db).into(),
-            Self::CString { .. } => ptr_of(db, char_id(db).into(), false).into(),
+            Self::Bool(_) => bool_id(db),
+            Self::CString { .. } => ptr_of(db, char_id(db), false),
         }
     }
 }
 
 impl Operand {
-    pub fn ty(&self, db: &dyn Db) -> TypeRef {
+    pub fn ty(&self, db: &dyn Db) -> ConcreteTy {
         match self {
             Self::Constant(mirconstant, _) => mirconstant.ty(db),
             Self::Move(mirplace) | Self::Copy(mirplace) => mirplace.ty,
@@ -146,7 +158,7 @@ impl From<FunctionRef> for MIRCallee {
 }
 
 impl Constant {
-    pub fn int(value: u128, ty: TypeRef) -> Self {
+    pub fn int(value: u128, ty: ConcreteTy) -> Self {
         Self::Integer { value, ty }
     }
 }

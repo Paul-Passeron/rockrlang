@@ -26,6 +26,7 @@ use crate::{
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
+        concrete_ty::ConcreteTy,
         operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
     resolved::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of, usize_id},
@@ -88,16 +89,16 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 self.ctx.goto(bbs[*branch_idx]);
             }
             DecisionTree::Switch { place, cases, default } => {
-                let wrapped = RefWrappedTy::from_type_ref(self.db, place.ty);
+                let wrapped = RefWrappedTy::from_type(self.db, place.ty);
                 let ty = wrapped.inner;
                 let depth = wrapped.depth();
-                if ty.as_enum_ref(self.db).is_some() {
+                if ty.as_enum(self.db).is_some() {
                     let mut scrut_place = place.clone();
                     scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
                     scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
 
-                    let layout = layout_of(self.db, ty);
+                    let layout = layout_of(self.db, ty.as_type_ref(self.db));
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
                     let vlayout = lir_ty
                         .union_layout(self.db)
@@ -108,8 +109,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         todo!()
                     };
 
-                    let discr_ty: TypeRef =
-                        int_ty_with_witdh(self.db, discr_width).into();
+                    let discr_ty: ConcreteTy = int_ty_with_witdh(self.db, discr_width);
 
                     let discr = MIRRValue {
                         kind: MIRRValueKind::Discriminant(scrut_place),
@@ -152,9 +152,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         default,
                         span,
                     });
-                } else if ty
-                    .as_type_id()
-                    .is_some_and(|ty| ty.def(self.db).is_int_like(self.db).is_some())
+                } else if ty.as_type_id(self.db).def(self.db).is_int_like(self.db).is_some()
                 {
                     let mut scrut_place = place.clone();
                     scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
@@ -189,7 +187,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         span,
                     });
                 } else {
-                    todo!("Ty is {}", ty.to_string(self.db))
+                    todo!("Ty is {}", ty.as_type_ref(self.db).to_string(self.db))
                 }
             }
             DecisionTree::Fail => {
@@ -241,7 +239,7 @@ impl StructRef {
 }
 
 impl ThirToMIR<'_> {
-    pub fn wrap_ref_to_fit(&mut self, target: TypeRef, place: &MIRPlace) -> MIRRValue {
+    pub fn wrap_ref_to_fit(&mut self, target: ConcreteTy, place: &MIRPlace) -> MIRRValue {
         let span = self.builder.locals[place.local].span;
         if place.ty == target || target.as_ref(self.db).is_none() {
             return MIRRValue {
@@ -253,7 +251,7 @@ impl ThirToMIR<'_> {
 
         let RefWrappedTy { mut refs, .. } =
             RefWrappedTy::peel_until(self.db, target, place.ty)
-                .unwrap_or_else(|| RefWrappedTy::from_type_ref(self.db, place.ty));
+                .unwrap_or_else(|| RefWrappedTy::from_type(self.db, place.ty));
         if refs.is_empty() {
             // TODO: weird ???
             return MIRRValue {
@@ -265,7 +263,7 @@ impl ThirToMIR<'_> {
         let WrapKind::Ref(inital) = refs.remove(0);
         let mut res = MIRRValue {
             kind: MIRRValueKind::Ref(place.clone(), inital),
-            ty: ref_of(self.db, place.ty, inital.is_mut()).into(),
+            ty: ref_of(self.db, place.ty, inital.is_mut()),
             span,
         };
         for w in &refs {
@@ -275,7 +273,7 @@ impl ThirToMIR<'_> {
             self.assign(place.clone(), res);
             res = MIRRValue {
                 kind: MIRRValueKind::Ref(place, *mutability),
-                ty: new_ty.into(),
+                ty: new_ty,
                 span,
             };
         }
@@ -283,7 +281,7 @@ impl ThirToMIR<'_> {
     }
 }
 
-pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> TypeId {
+pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> ConcreteTy {
     match width {
         IntWidth::I8 => char_id(db),
         IntWidth::I16 => todo!(),

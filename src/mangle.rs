@@ -23,8 +23,9 @@ use crate::{
     Db,
     hir::{FunctionLikeAst, function_ast, owning_module},
     layout::{IntWidth, Size},
+    mir::concrete_ty::{ConcreteTy, InternedConcreteTy},
     name_resolve::builtin_module,
-    resolved::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeId, TypeRef},
+    resolved::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeRef},
     thir_to_mir::{FuncInst, MIRKey},
 };
 
@@ -72,7 +73,8 @@ pub enum MangleFun {
 #[salsa::tracked]
 fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     let fdef = *f.fdef(db);
-    let templates = f.subs(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
+    let templates =
+        f.subs(db).iter().map(|ty| ty_mangle(db, ty).clone()).collect_vec();
     let path = path_of_module(db, owning_module(db, fdef.parent(db)));
     let name = fdef.name(db).to_string(db);
     let inst: FuncInst = f.into();
@@ -89,7 +91,7 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
         }
         FunctionLikeAst::Method(method) => {
             let zelf = fdef.parent(db).get_canonical_zelf(db).unwrap();
-            let ty = ty_mangle(db, zelf).clone();
+            let ty = ty_mangle(db, zelf.to_concrete(db, f.subs(db)).unwrap()).clone();
             let is_static = method.data.receiver.is_static();
             Arc::new(MangleFun::Method { is_static, ty, sig, templates })
         }
@@ -107,16 +109,9 @@ struct InternedTR {
 }
 
 #[salsa::tracked]
-pub fn _ty_mangle<'db>(db: &'db dyn Db, ty: InternedTR<'db>) -> MangleType {
-    match ty.tref(db) {
-        TypeRef::Concrete(type_id) => mangle_type_id(db, *type_id),
-        _ => MangleType::Error,
-    }
-}
-
-fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
-    let args = id.args(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
-    let (name, path) = match id.def(db) {
+pub fn ty_mangle_aux<'db>(db: &'db dyn Db, ty: InternedConcreteTy<'db>) -> MangleType {
+    let args = ty.args(db).iter().map(|ty| ty_mangle(db, *ty).clone()).collect_vec();
+    let (name, path) = match ty.def(db) {
         TypeDefId::Builtin(id) => return mangle_builtin_id(db, id, args),
         TypeDefId::Struct(id) => {
             let name = id.name(db).to_string(db);
@@ -131,6 +126,24 @@ fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
     };
     MangleType::Adt { path, name, parameters: args }
 }
+
+// fn mangle_type_id(db: &dyn Db, id: TypeId) -> MangleType {
+//     let args = id.args(db).iter().map(|ty| ty_mangle(db,
+// *ty).clone()).collect_vec();     let (name, path) = match id.def(db) {
+//         TypeDefId::Builtin(id) => return mangle_builtin_id(db, id, args),
+//         TypeDefId::Struct(id) => {
+//             let name = id.name(db).to_string(db);
+//             let path = path_of_module(db, id.parent(db));
+//             (name, path)
+//         }
+//         TypeDefId::Enum(id) => {
+//             let name = id.name(db).to_string(db);
+//             let path = path_of_module(db, id.parent(db));
+//             (name, path)
+//         }
+//     };
+//     MangleType::Adt { path, name, parameters: args }
+// }
 
 fn path_of_module(db: &dyn Db, m: ModuleId) -> Vec<String> {
     fn aux(db: &dyn Db, m: ModuleId, res: &mut Vec<String>) {
@@ -168,8 +181,8 @@ fn mangle_builtin_id(
     }
 }
 
-pub fn ty_mangle(db: &dyn Db, tref: TypeRef) -> &MangleType {
-    _ty_mangle(db, InternedTR::new(db, tref))
+pub fn ty_mangle(db: &dyn Db, ty: ConcreteTy) -> &MangleType {
+    ty_mangle_aux(db, ty.interned())
 }
 
 pub fn mangle_ident(s: &str) -> String {

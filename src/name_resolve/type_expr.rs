@@ -109,20 +109,20 @@ pub fn resolve_type_expr_desc<'db>(
             let pointee = pointee.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            ptr_of(db, pointee, *mutable).into()
+            ptr_of::<TypeId>(db, pointee, *mutable).into()
         }
         AstTypeExprDesc::Ref { mutable, pointee } => {
             let pointee = pointee.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            ref_of(db, pointee, *mutable).into()
+            ref_of::<TypeId>(db, pointee, *mutable).into()
         }
         AstTypeExprDesc::Slice { ty, len } => {
             assert!(len.is_none(), "TODO: handle non value-type");
             let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            slice_of(db, elem).into()
+            slice_of::<TypeId>(db, elem).into()
         }
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys
@@ -133,7 +133,7 @@ pub fn resolve_type_expr_desc<'db>(
                     })
                 })
                 .collect_vec();
-            tuple_of(db, types).into()
+            tuple_of::<TypeId>(db, types).into()
         }
         AstTypeExprDesc::Error(_) => TypeRef::Error,
     }

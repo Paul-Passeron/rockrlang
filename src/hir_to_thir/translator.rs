@@ -589,7 +589,15 @@ impl<'db> ThirTranslator<'db> {
                     Either::Right(place) => (place, b.get_place(place).ty),
                 };
 
-                let wrapped = RefWrappedTy::from_type_ref(self.db, ty);
+                let Some(ty_id) = ty.as_type_id() else {
+                    Diag::generic_error(
+                        "Expected a struct type to destructure".into(),
+                        span,
+                    )
+                    .accumulate(self.db);
+                    return;
+                };
+                let wrapped = RefWrappedTy::from_type(self.db, ty_id);
                 let Some(def) = wrapped.inner.as_struct_ref(self.db) else {
                     Diag::generic_error(
                         "Expected a struct type to destructure".into(),

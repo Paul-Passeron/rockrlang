@@ -43,7 +43,17 @@ impl TypeRef {
             _ => None,
         }
     }
+}
 
+impl TryFrom<TypeRef> for TypeId {
+    type Error = ();
+
+    fn try_from(value: TypeRef) -> Result<Self, Self::Error> {
+        value.as_type_id().ok_or(())
+    }
+}
+
+impl TypeRef {
     pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[Self])> {
         let id = self.as_type_id()?;
         match id.def(db) {
@@ -115,7 +125,7 @@ impl TypeRef {
 
     pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
         if self.as_ref(db).and_then(|(_, ty)| ty.as_slice(db)).is_some() {
-            Some(Self::Concrete(usize_id(db)))
+            Some(usize_id(db).as_type_ref(db))
         } else {
             None
         }

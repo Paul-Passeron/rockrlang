@@ -123,8 +123,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
         );
 
         if let Some(ty) = sig.signature.ret.origin
-            && let Some(tid) = ty.as_type_id()
-            && tid == never_id(self.db)
+            && ty == never_id(self.db)
         {
             let kind_id = Attribute::get_named_enum_kind_id("noreturn");
             let noreturn = self.c.create_enum_attribute(kind_id, 0);

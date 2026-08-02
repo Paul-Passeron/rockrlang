@@ -19,14 +19,11 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    codegen::{
-        Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap,
-    },
+    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap},
     layout::{LIRTy, layout_of},
     lir::{DefinedLinkage::Export, Module, Signature},
     mangle::fun_mangle,
-    mir::Mir,
-    resolved::TypeRef,
+    mir::{Mir, concrete_ty::ConcreteTy},
     thir_to_mir::FuncInst,
 };
 
@@ -50,15 +47,18 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
     pub fn declare_import(
         &mut self,
         name: String,
-        params: &[TypeRef],
-        ret_ty: TypeRef,
+        params: &[ConcreteTy],
+        ret_ty: ConcreteTy,
         inst: FuncInst,
     ) {
         let params = params
             .iter()
-            .map(|ty| LIRTy { layout: layout_of(self.db, *ty), origin: Some(*ty) })
+            .map(|ty| LIRTy {
+                layout: layout_of(self.db, ty.as_type_ref(self.db)),
+                origin: Some(*ty),
+            })
             .collect_vec();
-        let ret_layout = layout_of(self.db, ret_ty);
+        let ret_layout = layout_of(self.db, ret_ty.as_type_ref(self.db));
         let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
         let sig = Signature { params, ret };
         let variadic = inst.is_variadic(self.db);
@@ -71,10 +71,13 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
             .func
             .params(self.db)
             .into_iter()
-            .map(|(_, ty)| LIRTy { layout: layout_of(self.db, ty), origin: Some(ty) })
+            .map(|(_, ty)| LIRTy {
+                layout: layout_of(self.db, ty.as_type_ref(self.db)),
+                origin: Some(ty),
+            })
             .collect_vec();
         let ret_ty = mir.func.ret_ty(self.db);
-        let ret_layout = layout_of(self.db, ret_ty);
+        let ret_layout = layout_of(self.db, ret_ty.as_type_ref(self.db));
         let ret = LIRTy { layout: ret_layout, origin: Some(ret_ty) };
         let sig = Signature { params, ret };
         let inst = mir.func;

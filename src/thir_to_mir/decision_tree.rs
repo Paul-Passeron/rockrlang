@@ -25,11 +25,12 @@ use crate::{
     common::symbols::Symbol,
     mir::{
         MIRLocalID,
+        concrete_ty::{ConcreteTy, Substitution},
         operand::{MIRPlace, MIRProjection},
     },
     name_resolve::type_expr::enum_item,
     parse_tree::top_level::AstEnumVariantKind,
-    resolved::{TypeRef, bool_id},
+    resolved::bool_id,
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
     thir_to_mir::ThirToMIR,
 };
@@ -93,10 +94,10 @@ impl<'a> Matrix<'a> {
             .collect_vec();
 
         let place = self.cols[col].clone();
-        let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
+        let wrapped = RefWrappedTy::from_type(ctx.db, place.ty);
         let ty = wrapped.inner;
 
-        if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct_ref(ctx.db).is_some() {
+        if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct(ctx.db).is_some() {
             return self.expand_irrefutable(col, ctx).compile(ctx);
         }
 
@@ -111,7 +112,7 @@ impl<'a> Matrix<'a> {
 
     fn expand_irrefutable(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
         let place = &self.cols[col];
-        let wrapped = RefWrappedTy::from_type_ref(ctx.db, place.ty);
+        let wrapped = RefWrappedTy::from_type(ctx.db, place.ty);
         let ty = wrapped.inner;
 
         let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
@@ -128,7 +129,7 @@ impl<'a> Matrix<'a> {
                     pl
                 })
                 .collect()
-        } else if let Some(struct_ref) = ty.as_struct_ref(ctx.db) {
+        } else if let Some(struct_ref) = ty.as_struct(ctx.db) {
             struct_ref
                 .get_fields_ty(ctx.db)
                 .iter()
@@ -278,11 +279,11 @@ impl<'a> Matrix<'a> {
         ctor: Constructor,
         ctx: &mut ThirToMIR,
     ) -> VariantArity {
-        let wrapped = RefWrappedTy::from_type_ref(ctx.db, self.cols[col].ty);
+        let wrapped = RefWrappedTy::from_type(ctx.db, self.cols[col].ty);
         let ty = wrapped.inner;
         match ctor {
             Constructor::Variant(idx) => {
-                let id = ty.as_enum_ref(ctx.db).expect("This should be an enum").def;
+                let id = ty.as_enum(ctx.db).expect("This should be an enum").def(ctx.db);
                 let kind = &enum_item(ctx.db, id.interned()).variants[idx].kind;
                 match kind {
                     AstEnumVariantKind::Unit => VariantArity::None,
@@ -384,25 +385,21 @@ impl ThirPattern {
     }
 }
 
-fn is_complete(db: &dyn Db, sig: &BTreeSet<Constructor>, ty: TypeRef) -> bool {
+fn is_complete(db: &dyn Db, sig: &BTreeSet<Constructor>, ty: ConcreteTy) -> bool {
     let sig: HashSet<Constructor> = HashSet::from_iter(sig.iter().copied());
-    match ty {
-        TypeRef::Concrete(_) if let Some(enum_ref) = ty.as_enum_ref(db) => {
-            let enum_id = enum_ref.def;
-            let variant_count = enum_item(db, enum_id.into()).variants.len();
-            variant_count == sig.len()
-        }
-        TypeRef::Concrete(id) if id == bool_id(db) => {
-            sig.contains(&Constructor::BoolLit(true))
-                && sig.contains(&Constructor::BoolLit(false))
-        }
-        TypeRef::Concrete(_)
-            if ty.as_tuple_ref(db).is_some() || ty.as_struct_ref(db).is_some() =>
-        {
-            true
-        }
-        _ => false,
+    if let Some(enum_ref) = ty.as_enum(db) {
+        let enum_id = enum_ref.def(db);
+        let variant_count = enum_item(db, enum_id.into()).variants.len();
+        return variant_count == sig.len();
     }
+    if ty == bool_id(db) {
+        return sig.contains(&Constructor::BoolLit(true))
+            && sig.contains(&Constructor::BoolLit(false));
+    }
+    if ty.as_tuple_ref(db).is_some() || ty.as_struct(db).is_some() {
+        return true;
+    }
+    false
 }
 
 enum VariantArity {
@@ -422,9 +419,9 @@ impl VariantArity {
 }
 
 impl ThirToMIR<'_> {
-    fn deref_through_refs(&self, base: &MIRPlace) -> (Vec<MIRProjection>, TypeRef) {
+    fn deref_through_refs(&self, base: &MIRPlace) -> (Vec<MIRProjection>, ConcreteTy) {
         let mut projections = base.projections.clone();
-        let peeled = RefWrappedTy::from_type_ref(self.db, base.ty);
+        let peeled = RefWrappedTy::from_type(self.db, base.ty);
         projections.extend(std::iter::repeat_n(MIRProjection::Deref, peeled.depth()));
         (projections, peeled.inner)
     }
@@ -439,14 +436,16 @@ impl ThirToMIR<'_> {
         projections.push(MIRProjection::Downcast { variant: variant_idx });
 
         let ConstructorType::Tuple(tys) = enum_ty
-            .as_enum_ref(self.db)
+            .as_enum(self.db)
             .expect("downcast base must peel to an enum")
             .get_cons(self.db, variant_idx)
             .unwrap()
         else {
             panic!("Expected tuple constructor");
         };
-        let resulting_ty = tys[tuple_idx];
+        let resulting_ty = tys[tuple_idx]
+            .to_concrete(self.db, &Substitution::empty())
+            .expect("Constructor field type should be concrete");
 
         projections
             .push(MIRProjection::TupleField { index: tuple_idx as u32, resulting_ty });
@@ -463,14 +462,17 @@ impl ThirToMIR<'_> {
         projections.push(MIRProjection::Downcast { variant: variant_idx });
 
         let ConstructorType::Struct(tys) = enum_ty
-            .as_enum_ref(self.db)
+            .as_enum(self.db)
             .expect("downcast base must peel to an enum")
             .get_cons(self.db, variant_idx)
             .expect("There is variant with this name, otherwise THIR would not have been produced")
         else {
             panic!("Expected struct constructor");
         };
-        let resulting_ty = tys.iter().find(|(name, _)| *name == field).expect("There is variant with this name, otherwise THIR would not have been produced").1;
+        let field_ty = tys.iter().find(|(name, _)| *name == field).expect("There is variant with this name, otherwise THIR would not have been produced").1;
+        let resulting_ty = field_ty
+            .to_concrete(self.db, &Substitution::empty())
+            .expect("Constructor field type should be concrete");
 
         projections.push(MIRProjection::Field { name: field, resulting_ty });
         MIRPlace { local: base.local, projections, ty: resulting_ty, span: base.span }
