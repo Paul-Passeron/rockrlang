@@ -341,11 +341,7 @@ impl<'db> InferenceCtx<'db> {
         let ty = self.find(ty);
         let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
         if let Entry::Vacant(e) = self.implements.entry(id) {
-            e.insert(HashSet::from_iter(once(InterfaceImplem {
-                interface: id,
-                ty,
-                templates,
-            })));
+            e.insert(once(InterfaceImplem { interface: id, ty, templates }).collect());
         } else {
             for implem in self.implements.get(&id).iter().flat_map(|implem| implem.iter())
             {

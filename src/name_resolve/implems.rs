@@ -177,10 +177,9 @@ pub fn impls_in_package<'db>(
     db: &'db dyn Db,
     package: Package<'db>,
 ) -> Set<ImplSource<'db>> {
-    Set::from_iter(
-        modules_in_package(db, package)
-            .iter()
-            .flat_map(|module| module_impls(db, module.interned()))
-            .copied(),
-    )
+    modules_in_package(db, package)
+        .iter()
+        .flat_map(|module| module_impls(db, module.interned()))
+        .copied()
+        .collect()
 }
