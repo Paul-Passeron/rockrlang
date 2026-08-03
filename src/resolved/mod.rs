@@ -147,12 +147,37 @@ pub struct BuiltinTypeDef {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntWidthKind {
+    System, // For isize / usize
+    Fixed(IntWidth),
+}
+
+impl From<IntWidth> for IntWidthKind {
+    fn from(value: IntWidth) -> Self {
+        Self::Fixed(value)
+    }
+}
+
+impl IntWidthKind {
+    pub fn as_suffix(self) -> &'static str {
+        match self {
+            IntWidthKind::System => "size",
+            IntWidthKind::Fixed(IntWidth::I8) => "8",
+            IntWidthKind::Fixed(IntWidth::I16) => "16",
+            IntWidthKind::Fixed(IntWidth::I32) => "32",
+            IntWidthKind::Fixed(IntWidth::I64) => "64",
+            IntWidthKind::Fixed(IntWidth::I128) => "128",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BuiltinTypeKind {
     Void,
     Never,
 
     Bool,
-    Int { width: IntWidth, signed: bool },
+    Int { width: IntWidthKind, signed: bool },
 
     Ref { mutability: Mutability },
     Ptr { mutability: Mutability },

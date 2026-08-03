@@ -84,7 +84,7 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRDeclare<'db, 'ctx>> {
         let name = if inst.is_main(self.db) {
             "main".into()
         } else {
-            fun_mangle(self.db, inst).mangle()
+            fun_mangle(self.db, inst).mangle(self.db)
         };
         let id = self.lir().declare_defined(name, sig, Export);
         self.ctx.mir_map.add(mir, id);

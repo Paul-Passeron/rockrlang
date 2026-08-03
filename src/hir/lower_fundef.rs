@@ -221,6 +221,9 @@ impl<'db> LowerFundef<'db> {
         match &desc.data {
             AstTypeExprDesc::Named { name, args } => {
                 if args.is_empty() {
+                    if name.data == Symbol::new(self.db, "_") {
+                        return TypeRef::Unknown;
+                    }
                     if name.data == Symbol::new(self.db, "Self") {
                         return TypeRef::Zelf;
                     }
@@ -251,8 +254,7 @@ impl<'db> LowerFundef<'db> {
                 } else {
                     Diag::generic_error(
                         format!(
-                            "{}: Could not resolve name {} in scope",
-                            desc.span.start().loc_info(self.db),
+                            "Could not resolve name {} in scope",
                             name.data.display(self.db),
                         ),
                         desc.span,

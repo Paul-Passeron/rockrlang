@@ -33,7 +33,9 @@ use crate::{
     printer::type_printer::TypePrinter,
     resolved::{
         EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
-        StructId, TypeDefId, bool_id, char_id, int_id, never_id, usize_id, void_id,
+        StructId, TypeDefId, bool_id, char_id, i8_id, i16_id, i32_id, i64_id, i128_id,
+        int_id, isize_id, never_id, u8_id, u16_id, u32_id, u64_id, u128_id, usize_id,
+        void_id,
     },
 };
 use nonempty::NonEmpty;
@@ -226,9 +228,20 @@ fn definition_of_item<'db>(
 #[salsa::tracked]
 pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
     let mut res = BTreeMap::from([
-        (Symbol::new(db, "usize"), Definition::Type(usize_id(db).def(db))),
         (Symbol::new(db, "int"), Definition::Type(int_id(db).def(db))),
-        (Symbol::new(db, "i32"), Definition::Type(int_id(db).def(db))), /* i32 is an alias for int. Might want to switch this around */
+        (Symbol::new(db, "usize"), Definition::Type(usize_id(db).def(db))),
+        (Symbol::new(db, "isize"), Definition::Type(isize_id(db).def(db))),
+        (Symbol::new(db, "i8"), Definition::Type(i8_id(db).def(db))),
+        (Symbol::new(db, "i16"), Definition::Type(i16_id(db).def(db))),
+        (Symbol::new(db, "i32"), Definition::Type(i32_id(db).def(db))),
+        (Symbol::new(db, "i64"), Definition::Type(i64_id(db).def(db))),
+        (Symbol::new(db, "i128"), Definition::Type(i128_id(db).def(db))),
+        (Symbol::new(db, "u8"), Definition::Type(u8_id(db).def(db))),
+        (Symbol::new(db, "u16"), Definition::Type(u16_id(db).def(db))),
+        (Symbol::new(db, "u32"), Definition::Type(u32_id(db).def(db))),
+        (Symbol::new(db, "u64"), Definition::Type(u64_id(db).def(db))),
+        (Symbol::new(db, "u128"), Definition::Type(u128_id(db).def(db))),
+        (Symbol::new(db, "char"), Definition::Type(char_id(db).def(db))),
         (Symbol::new(db, "void"), Definition::Type(void_id(db).def(db))),
         (Symbol::new(db, "char"), Definition::Type(char_id(db).def(db))),
         (Symbol::new(db, "bool"), Definition::Type(bool_id(db).def(db))),

@@ -20,12 +20,12 @@ use std::marker::PhantomData;
 
 use crate::{
     hir::Mutability,
-    layout::Size,
     mir::concrete_ty::ConcreteTy,
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
     },
+    resolved::IntWidthKind,
 };
 
 use super::{
@@ -277,10 +277,7 @@ impl BuiltinTypeDef<'_> {
             BuiltinTypeKind::Never => "never".into(),
             BuiltinTypeKind::Bool => "bool".into(),
             BuiltinTypeKind::Int { width, signed } => {
-                format!("{}{}", if signed { "i" } else { "u" }, {
-                    let s: Size = width.into();
-                    s.bytes() * 8
-                })
+                format!("{}{}", if signed { "i" } else { "u" }, width.as_suffix())
             }
             BuiltinTypeKind::Ref { mutability } => {
                 format!("&{}", if mutability.is_mut() { "mut" } else { "" })
@@ -338,7 +335,7 @@ impl BuiltinTypeId {
     pub fn i8(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I8, signed: true },
+            BuiltinTypeKind::Int { width: IntWidth::I8.into(), signed: true },
         )
         .into()
     }
@@ -346,7 +343,7 @@ impl BuiltinTypeId {
     pub fn i16(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I16, signed: true },
+            BuiltinTypeKind::Int { width: IntWidth::I16.into(), signed: true },
         )
         .into()
     }
@@ -354,7 +351,7 @@ impl BuiltinTypeId {
     pub fn i32(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I32, signed: true },
+            BuiltinTypeKind::Int { width: IntWidth::I32.into(), signed: true },
         )
         .into()
     }
@@ -362,7 +359,7 @@ impl BuiltinTypeId {
     pub fn i64(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
+            BuiltinTypeKind::Int { width: IntWidth::I64.into(), signed: true },
         )
         .into()
     }
@@ -370,7 +367,7 @@ impl BuiltinTypeId {
     pub fn i128(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I64, signed: true },
+            BuiltinTypeKind::Int { width: IntWidth::I128.into(), signed: true },
         )
         .into()
     }
@@ -378,7 +375,7 @@ impl BuiltinTypeId {
     pub fn u8(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I8, signed: false },
+            BuiltinTypeKind::Int { width: IntWidth::I8.into(), signed: false },
         )
         .into()
     }
@@ -386,7 +383,7 @@ impl BuiltinTypeId {
     pub fn u16(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I16, signed: false },
+            BuiltinTypeKind::Int { width: IntWidth::I16.into(), signed: false },
         )
         .into()
     }
@@ -394,7 +391,7 @@ impl BuiltinTypeId {
     pub fn u32(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I32, signed: false },
+            BuiltinTypeKind::Int { width: IntWidth::I32.into(), signed: false },
         )
         .into()
     }
@@ -402,7 +399,7 @@ impl BuiltinTypeId {
     pub fn u64(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
+            BuiltinTypeKind::Int { width: IntWidth::I64.into(), signed: false },
         )
         .into()
     }
@@ -410,7 +407,7 @@ impl BuiltinTypeId {
     pub fn u128(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: IntWidth::I64, signed: false },
+            BuiltinTypeKind::Int { width: IntWidth::I128.into(), signed: false },
         )
         .into()
     }
@@ -422,7 +419,7 @@ impl BuiltinTypeId {
     pub fn usize(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: db.target_width(), signed: false },
+            BuiltinTypeKind::Int { width: IntWidthKind::System, signed: false },
         )
         .into()
     }
@@ -430,7 +427,7 @@ impl BuiltinTypeId {
     pub fn isize(db: &dyn Db) -> Self {
         BuiltinTypeDef::new(
             db,
-            BuiltinTypeKind::Int { width: db.target_width(), signed: true },
+            BuiltinTypeKind::Int { width: IntWidthKind::System, signed: true },
         )
         .into()
     }
@@ -594,6 +591,50 @@ pub fn int_id(db: &dyn Db) -> ConcreteTy {
 
 pub fn usize_id(db: &dyn Db) -> ConcreteTy {
     ConcreteTy::new(db, BuiltinTypeId::usize(db).into(), vec![])
+}
+
+pub fn isize_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::isize(db).into(), vec![])
+}
+
+pub fn i8_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::i8(db).into(), vec![])
+}
+
+pub fn i16_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::i16(db).into(), vec![])
+}
+
+pub fn i32_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::i32(db).into(), vec![])
+}
+
+pub fn i64_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::i64(db).into(), vec![])
+}
+
+pub fn i128_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::i128(db).into(), vec![])
+}
+
+pub fn u8_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::u8(db).into(), vec![])
+}
+
+pub fn u16_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::u16(db).into(), vec![])
+}
+
+pub fn u32_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::u32(db).into(), vec![])
+}
+
+pub fn u64_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::u64(db).into(), vec![])
+}
+
+pub fn u128_id(db: &dyn Db) -> ConcreteTy {
+    ConcreteTy::new(db, BuiltinTypeId::u128(db).into(), vec![])
 }
 
 pub fn char_id(db: &dyn Db) -> ConcreteTy {

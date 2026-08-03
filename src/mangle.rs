@@ -22,10 +22,12 @@ use itertools::Itertools;
 use crate::{
     Db,
     hir::{FunctionLikeAst, function_ast, owning_module},
-    layout::{IntWidth, Size},
+    layout::Size,
     mir::concrete_ty::{ConcreteTy, InternedConcreteTy},
     name_resolve::builtin_module,
-    resolved::{BuiltinTypeId, BuiltinTypeKind, ModuleId, TypeDefId, TypeRef},
+    resolved::{
+        BuiltinTypeId, BuiltinTypeKind, IntWidthKind, ModuleId, TypeDefId, TypeRef,
+    },
     thir_to_mir::{FuncInst, MIRKey},
 };
 
@@ -52,7 +54,7 @@ pub enum FloatKind {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IntKind {
-    pub width: IntWidth,
+    pub width: IntWidthKind,
     pub signed: bool,
 }
 
@@ -73,8 +75,7 @@ pub enum MangleFun {
 #[salsa::tracked]
 fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
     let fdef = *f.fdef(db);
-    let templates =
-        f.subs(db).iter().map(|ty| ty_mangle(db, ty).clone()).collect_vec();
+    let templates = f.subs(db).iter().map(|ty| ty_mangle(db, ty).clone()).collect_vec();
     let path = path_of_module(db, owning_module(db, fdef.parent(db)));
     let name = fdef.name(db).to_string(db);
     let inst: FuncInst = f.into();
@@ -190,38 +191,41 @@ pub fn mangle_ident(s: &str) -> String {
 }
 
 impl IntKind {
-    pub fn mangle(self) -> String {
+    pub fn mangle(self, db: &dyn Db) -> String {
         format!("{}{}", if self.signed { "i" } else { "u" }, {
-            let s: Size = self.width.into();
+            let s: Size = match self.width {
+                IntWidthKind::System => db.target_width().into(),
+                IntWidthKind::Fixed(int_width) => int_width.into(),
+            };
             s.bytes()
         })
     }
 }
 
 impl FloatKind {
-    pub fn mangle(self) -> String {
+    pub fn mangle(self, _db: &dyn Db) -> String {
         match self {} // uninhabited
     }
 }
 
 impl MangleType {
-    pub fn mangle(&self) -> String {
+    pub fn mangle(&self, db: &dyn Db) -> String {
         match self {
-            Self::Ptr(t) => format!("P{}", t.mangle()),
-            Self::Array(t) => format!("A{}", t.mangle()),
+            Self::Ptr(t) => format!("P{}", t.mangle(db)),
+            Self::Array(t) => format!("A{}", t.mangle(db)),
             Self::Tuple(ts) => {
-                let inner: String = ts.iter().map(Self::mangle).collect();
+                let inner: String = ts.iter().map(|t| t.mangle(db)).collect();
                 format!("T{inner}E")
             }
-            Self::Int(k) => k.mangle(),
-            Self::Float(k) => format!("f{}", k.mangle()),
+            Self::Int(k) => k.mangle(db),
+            Self::Float(k) => format!("f{}", k.mangle(db)),
             Self::Adt { path, name, parameters } => {
                 let idents: String = path
                     .iter()
                     .map(|s| mangle_ident(s))
                     .chain(std::iter::once(mangle_ident(name)))
                     .collect();
-                let params: String = parameters.iter().map(Self::mangle).collect();
+                let params: String = parameters.iter().map(|t| t.mangle(db)).collect();
                 format!("N{idents}E{params}E")
             }
             Self::Never => "z".to_owned(),
@@ -233,25 +237,25 @@ impl MangleType {
 
 impl MangleSig {
     // <name-ident> <param-types...> E <ret-type>
-    pub fn mangle(&self) -> String {
-        let params: String = self.parameters.iter().map(MangleType::mangle).collect();
-        format!("{}{}E{}", mangle_ident(&self.name), params, self.ret.mangle())
+    pub fn mangle(&self, db: &dyn Db) -> String {
+        let params: String = self.parameters.iter().map(|t| t.mangle(db)).collect();
+        format!("{}{}E{}", mangle_ident(&self.name), params, self.ret.mangle(db))
     }
 }
 
 impl MangleFun {
-    pub fn mangle(&self) -> String {
+    pub fn mangle(&self, db: &dyn Db) -> String {
         match self {
             Self::Extern(name) => name.clone(),
             Self::Method { is_static, ty, sig, templates } => {
                 let kind = if *is_static { 's' } else { 'm' };
-                let tpls: String = templates.iter().map(MangleType::mangle).collect();
-                format!("_ZM{kind}{}{}G{tpls}E", ty.mangle(), sig.mangle())
+                let tpls: String = templates.iter().map(|t| t.mangle(db)).collect();
+                format!("_ZM{kind}{}{}G{tpls}E", ty.mangle(db), sig.mangle(db))
             }
             Self::Function { path, sig, templates } => {
                 let p: String = path.iter().map(|s| mangle_ident(s)).collect();
-                let tpls: String = templates.iter().map(MangleType::mangle).collect();
-                format!("_ZF{p}E{}G{tpls}E", sig.mangle())
+                let tpls: String = templates.iter().map(|t| t.mangle(db)).collect();
+                format!("_ZF{p}E{}G{tpls}E", sig.mangle(db))
             }
         }
     }

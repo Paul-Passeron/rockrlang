@@ -20,11 +20,14 @@ use std::range::RangeInclusive;
 use itertools::Itertools;
 
 use crate::{
-    Db, layout::{
+    Db,
+    layout::{
         aggregate::{finish_aggregate, struct_layout},
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
-    }, mir::concrete_ty::ConcreteTy, resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, TypeRef},
+    },
+    mir::concrete_ty::ConcreteTy,
+    resolved::{BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef},
 };
 
 pub mod aggregate;
@@ -158,7 +161,13 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
         BuiltinTypeKind::Tuple if args.is_empty() => LayoutID::zst(db),
         BuiltinTypeKind::Void | BuiltinTypeKind::Never => LayoutID::zst(db),
         BuiltinTypeKind::Bool => LayoutID::int(db, IntWidth::I8),
-        BuiltinTypeKind::Int { width, .. } => LayoutID::int(db, width),
+        BuiltinTypeKind::Int { width, .. } => LayoutID::int(
+            db,
+            match width {
+                IntWidthKind::System => db.target_width(),
+                IntWidthKind::Fixed(int_width) => int_width,
+            },
+        ),
         BuiltinTypeKind::Ref { .. } | BuiltinTypeKind::Ptr { .. } => LayoutID::ptr(db),
         BuiltinTypeKind::Tuple => {
             let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
