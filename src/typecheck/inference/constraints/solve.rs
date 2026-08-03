@@ -778,6 +778,7 @@ impl<'db> InferenceCtx<'db> {
         );
         loop {
             while let Some(id) = self.ready.pop_front() {
+                self.ready_set.remove(&id);
                 if self.error_constraints.contains(&id) {
                     continue;
                 }
