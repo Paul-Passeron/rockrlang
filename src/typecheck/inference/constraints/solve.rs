@@ -31,7 +31,7 @@ use crate::{
     printer::type_printer::{TypePrinter, TypePrinterOption, TypePrinterOptionSet},
     resolved::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
+        TypeDefId, TypeId, TypeRef, type_ref::CastClass,
     },
     thir_to_mir::lower_match::int_ty_with_witdh,
     typecheck::{
@@ -769,6 +769,54 @@ impl<'db> InferenceCtx<'db> {
         ConstraintSolveResult::Solved
     }
 
+    fn solve_cast_constraint(
+        &mut self,
+        from: &InferTy,
+        to: &InferTy,
+    ) -> ConstraintSolveResult {
+        let from = self.find(from);
+        let to = self.find(to);
+        if matches!(from, InferTy::Var(_)) || matches!(to, InferTy::Var(_)) {
+            return ConstraintSolveResult::Pending;
+        }
+
+        let reject = |reason: &'static str| {
+            ConstraintSolveResult::Error(UnificationError::InvalidCast {
+                from: from.clone(),
+                to: to.clone(),
+                reason,
+            })
+        };
+
+        let (Some(from_class), Some(to_class)) =
+            (self.infer_cast_class(&from), self.infer_cast_class(&to))
+        else {
+            return reject("only integer and pointer-like types can be cast");
+        };
+
+        match (from_class, to_class) {
+            (CastClass::Int | CastClass::ThinPtr(_), CastClass::Int)
+            | (CastClass::Int, CastClass::ThinPtr(_)) => ConstraintSolveResult::Solved,
+            (
+                CastClass::ThinPtr(from_m) | CastClass::FatPtr(from_m),
+                CastClass::ThinPtr(to_m),
+            )
+            | (CastClass::FatPtr(from_m), CastClass::FatPtr(to_m)) => {
+                if to_m.is_mut() && !from_m.is_mut() {
+                    reject("a const pointer/reference cannot be cast to a mutable one")
+                } else {
+                    ConstraintSolveResult::Solved
+                }
+            }
+            (CastClass::Int | CastClass::ThinPtr(_), CastClass::FatPtr(_)) => {
+                reject("a fat pointer's metadata cannot be created by a cast")
+            }
+            (CastClass::FatPtr(_), CastClass::Int) => {
+                reject("cast the fat pointer to a thin pointer first")
+            }
+        }
+    }
+
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
@@ -927,6 +975,9 @@ impl<'db> InferenceCtx<'db> {
             }
             InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
                 self.solve_metadata_of_fat_ptr_constraint(*fat_ptr_var, *metadata_var)
+            }
+            InferenceConstraintKind::Cast { from, to } => {
+                self.solve_cast_constraint(from, to)
             }
         }
     }

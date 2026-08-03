@@ -178,4 +178,8 @@ impl InferenceCtx<'_> {
         });
         metadata_var
     }
+
+    pub fn emit_cast_constraint(&mut self, from: InferTy, to: InferTy) {
+        self.emit_constraint(InferenceConstraintKind::Cast { from, to });
+    }
 }

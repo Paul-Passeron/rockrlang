@@ -316,6 +316,7 @@ pub enum UnificationError {
     InvalidStructField { id: StructId, invalid: Symbol },
     AlreadyDiagnosed,
     Custom(String),
+    InvalidCast { from: InferTy, to: InferTy, reason: &'static str },
 }
 
 impl UnificationError {
@@ -423,6 +424,12 @@ impl fmt::Display for Display<'_, &UnificationError> {
             }
             UnificationError::AlreadyDiagnosed => Ok(()),
             UnificationError::Custom(s) => write!(f, "Custom : {s}"),
+            UnificationError::InvalidCast { from, to, reason } => write!(
+                f,
+                "cannot cast `{}` to `{}`: {reason}",
+                from.to_string(self.db),
+                to.to_string(self.db)
+            ),
         }
     }
 }

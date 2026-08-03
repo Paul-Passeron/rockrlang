@@ -156,49 +156,19 @@ impl InferenceCtx<'_> {
                 self.unify(&fat_ptr_ty, &fat_ptr_var.into())?;
                 Ok(metadata_var.into())
             }
-            HirExprDesc::As { expr: castee, ty } => self.infer_as_cast(expr, castee, ty),
+            HirExprDesc::As { expr: castee, ty } => self.infer_as_cast(castee, ty),
         }
     }
 
     fn infer_as_cast(
         &mut self,
-        expr: &HirExpr,
         castee: &HirExpr,
         ty: &TypeRef,
     ) -> Result<InferTy, UnificationError> {
-        if let Some((id, _)) = ty.as_builtin(self.db)
-            && id.is_int_like(self.db).is_some()
-        {
-            let expr_ty = self.emit_intlike_constraint();
-            let actual_expr_ty = self.infer_expr(castee)?;
-
-            let casted_to =
-                self.allocate_type_ref(*ty, self.implicit_ctx.clone().as_ref());
-            if let Err(err) = self.unify(&expr_ty.into(), &actual_expr_ty) {
-                Diag::generic_error(
-                    format!("Invalid cast: {}", err.display(self.db)),
-                    expr.span,
-                )
-                .accumulate(self.db);
-            }
-            return Ok(casted_to);
-        }
-        // For the moment, this only works on pointer types.
-        // This can do ref -> ptr but not ptr -> ref
-        let pointee = self.fresh_var();
-        let expr_ptr_ty = self.emit_deref_constraint(pointee.into());
         let expr_ty = self.infer_expr(castee)?;
-        if let Err(err) = self.unify(&expr_ptr_ty.into(), &expr_ty) {
-            Diag::generic_error(
-                format!("Unification error in as expr: {}", err.display(self.db)),
-                castee.span,
-            )
-            .accumulate(self.db);
-        }
-
-        let actual_ty = self.allocate_type_ref(*ty, &self.implicit_ctx());
-
-        Ok(actual_ty)
+        let casted_to = self.allocate_type_ref(*ty, &self.implicit_ctx());
+        self.emit_cast_constraint(expr_ty, casted_to.clone());
+        Ok(casted_to)
     }
 
     fn infer_place_aux(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {

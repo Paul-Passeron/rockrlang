@@ -24,8 +24,8 @@ use crate::{
     name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     resolved::{
-        BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
-        rehole, str_def,
+        BuiltinTypeId, BuiltinTypeKind, PtrKind, ScopeOwnerId, StructId, TypeDefId,
+        TypeRef, rehole, str_def, type_ref::CastClass,
     },
     typecheck::inference::{
         InferTy, InferenceCtx,
@@ -135,6 +135,24 @@ impl InferenceCtx<'_> {
             BuiltinTypeKind::Tuple => Some(fields),
             _ => None,
         }
+    }
+
+    pub fn infer_cast_class(&self, ty: &InferTy) -> Option<CastClass> {
+        let (def, fields) = ty.as_adt()?;
+        if let Some(kind) = def.is_ptr_like(self.db) {
+            let is_fat = matches!(kind, PtrKind::Ref(_))
+                && fields[0].as_slice(self.db).is_some();
+            return Some(if is_fat {
+                CastClass::FatPtr(kind.mutability())
+            } else {
+                CastClass::ThinPtr(kind.mutability())
+            });
+        }
+        let TypeDefId::Builtin(builtin) = def else {
+            return None;
+        };
+        matches!(builtin.kind(self.db), BuiltinTypeKind::Bool | BuiltinTypeKind::Int { .. })
+            .then_some(CastClass::Int)
     }
 
     pub fn static_allocate_type_ref(

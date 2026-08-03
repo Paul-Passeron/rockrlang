@@ -75,6 +75,7 @@ pub enum InferenceConstraintKind {
     IsInner { inner: InferTy, ref_ty: InferTy },
     FatPtr { fat_ptr_var: InferVar },
     MetadataOfFatPtr { fat_ptr_var: InferVar, metadata_var: InferVar },
+    Cast { from: InferTy, to: InferTy },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -548,6 +549,14 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
                     "MetadataOfFatPtr {{ fat_ptr_var: {fat_ptr_var}, metadata_var: {metadata_var} }}"
                 )
             }
+            InferenceConstraintKind::Cast { from, to } => {
+                write!(
+                    f,
+                    "Cast {{from: {}, to: {}}}",
+                    self.ctx.find_const(from).to_string(self.db),
+                    self.ctx.find_const(to).to_string(self.db)
+                )
+            }
         }
     }
 }
@@ -643,6 +652,12 @@ impl InferenceConstraintKind {
                 .listeners()
                 .into_iter()
                 .chain(ctx.find(&metadata_var.into()).listeners())
+                .collect(),
+            Self::Cast { from, to } => ctx
+                .find(from)
+                .listeners()
+                .into_iter()
+                .chain(ctx.find(to).listeners())
                 .collect(),
         }
     }
