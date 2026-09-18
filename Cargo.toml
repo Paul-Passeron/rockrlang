@@ -24,8 +24,8 @@ parking_lot = "0.12.5"
 pathdiff = "0.2.3"
 regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
-salsa = {version = "0.28.1", features = []}
-salsa-macros = "0.28.1"
+salsa = {version = "0.28.4", features = []}
+salsa-macros = "0.28.4"
 unescaper = "0.1.8"
 walkdir = "2.5.0"
 
