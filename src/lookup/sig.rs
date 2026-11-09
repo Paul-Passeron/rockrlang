@@ -23,7 +23,7 @@ use crate::{
         location::{Location, Span},
         symbols::Symbol,
     },
-    hir::{FunctionLikeAst, function_ast},
+    hir::FunctionLikeAst,
     lookup::enclosing_fun,
     name_resolve::type_expr::templates_of_owner,
     parse_tree::{
@@ -93,7 +93,7 @@ impl FunctionLikeAst {
 
 impl FunctionId {
     pub fn body_span(self, db: &dyn Db) -> Option<Span> {
-        function_ast(db, self.into()).inner(db).body_span()
+        self.ast(db).body_span()
     }
 }
 
@@ -108,7 +108,7 @@ pub fn sig_node_at(db: &dyn Db, loc: Location) -> Option<SigNode> {
             .is_none_or(|span| !span.encloses(loc) && loc.offset < span.start_offset)
             .then_some(())?;
 
-        let ast = function_ast(db, func.into()).inner(db);
+        let ast = func.ast(db);
         general_sig_at(db, func, &ast.general_sig(), loc)
     }
     _aux(db, loc.file, loc.offset)

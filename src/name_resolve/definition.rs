@@ -21,12 +21,10 @@ use crate::{
         location::Span,
         symbols::{InternedSymbol, Symbol},
     },
-    hir::{FunctionLikeAst, function_ast},
+    hir::FunctionLikeAst,
     name_resolve::{
         builtin_module, core_module, core_package, file_module_id,
-        interfaces::interface_item,
-        module_items, std_module,
-        type_expr::{enum_item, struct_item},
+        interfaces::interface_item, module_items, std_module,
     },
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
@@ -142,21 +140,21 @@ impl TypeDefId {
 
 impl StructId {
     pub fn name_span(self, db: &dyn Db) -> Span {
-        struct_item(db, self.interned()).name.span
+        self.item(db).name.span
     }
 
     pub fn span(self, db: &dyn Db) -> Span {
-        struct_item(db, self.interned()).span
+        self.item(db).span
     }
 }
 
 impl EnumId {
     pub fn name_span(self, db: &dyn Db) -> Span {
-        enum_item(db, self.interned()).name.span
+        self.item(db).name.span
     }
 
     pub fn span(self, db: &dyn Db) -> Span {
-        enum_item(db, self.interned()).span
+        self.item(db).span
     }
 }
 
@@ -168,11 +166,11 @@ impl InterfaceId {
 
 impl FunctionId {
     pub fn name_span(self, db: &dyn Db) -> Span {
-        function_ast(db, self.interned()).inner(db).name_span()
+        self.ast(db).name_span()
     }
 
     pub fn span(self, db: &dyn Db) -> Span {
-        function_ast(db, self.interned()).inner(db).get_span()
+        self.ast(db).get_span()
     }
 }
 

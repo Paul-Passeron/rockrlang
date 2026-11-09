@@ -22,7 +22,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{FunctionLikeAst, function_ast, impl_items},
+    hir::{FunctionLikeAst, impl_items},
     layout::{LIRTy, ScalarKind, layout_of},
     parse_tree::{
         expr::BinaryOperator,
@@ -379,8 +379,7 @@ impl<'db> InferenceCtx<'db> {
         receiver: &InferTy,
         method_call_infos: &MethodCallInfos<'_>,
     ) -> ConstraintSolveResult {
-        let FunctionLikeAst::Method(ast) =
-            function_ast(self.db, method_call_infos.method_id.interned()).inner(self.db)
+        let FunctionLikeAst::Method(ast) = method_call_infos.method_id.ast(self.db)
         else {
             unreachable!()
         };

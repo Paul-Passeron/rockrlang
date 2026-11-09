@@ -194,6 +194,10 @@ pub enum ScopeOwnerId {
 }
 
 impl ScopeOwnerId {
+    pub fn zelf_or_error(&self, db: &dyn Db) -> TypeRef {
+        self.get_canonical_zelf(db).unwrap_or(TypeRef::Error)
+    }
+
     pub fn get_canonical_zelf(&self, db: &dyn Db) -> Option<TypeRef> {
         match self {
             Self::Module(_) => None,

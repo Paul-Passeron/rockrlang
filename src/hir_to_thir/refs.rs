@@ -19,7 +19,7 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir_to_thir::builder::ThirBuilder,
-    name_resolve::type_expr::{struct_item, templates_of_struct},
+    name_resolve::type_expr::templates_of_struct,
     resolved::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{EnumRef, LocalId, PlaceBase, StructRef, ThirPlace},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
@@ -70,7 +70,7 @@ impl ThirPlace {
 
 impl StructRef {
     pub fn declared_typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
-        let item = struct_item(db, self.def.interned());
+        let item = self.def.item(db);
         let found = item.fields.iter().find(|f| f.name == field)?;
         let ctx = AstImplicitContext::new(
             db,

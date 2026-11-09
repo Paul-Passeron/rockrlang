@@ -42,9 +42,7 @@ use crate::{
         interfaces::{
             core_int_iter_struct, core_into_iterator_interface, core_iter_interface,
         },
-        type_expr::{
-            enum_item, get_template_param_count, get_templates_of_fun, templates_of_enum,
-        },
+        type_expr::{get_template_param_count, get_templates_of_fun, templates_of_enum},
     },
     parse_tree::{
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
@@ -758,7 +756,7 @@ impl<'db> LowerFundef<'db> {
     ) -> HirExprDesc {
         let ty = self.instantiate_holed(type_def_id);
         if let TypeDefId::Enum(enum_id) = type_def_id {
-            let items = enum_item(self.db, enum_id.interned());
+            let items = enum_id.item(self.db);
             if items.variants.iter().any(|variant| {
                 variant.name == symbol
                     && matches!(&variant.kind, AstEnumVariantKind::TupleLike(_))

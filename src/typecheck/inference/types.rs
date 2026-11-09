@@ -21,7 +21,6 @@ use crate::{
     Db,
     common::symbols::Symbol,
     hir::Mutability,
-    name_resolve::type_expr::struct_item,
     parse_tree::type_expr::AstTypeExprDesc,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, PtrKind, ScopeOwnerId, StructId, TypeDefId,
@@ -206,10 +205,7 @@ impl InferenceCtx<'_> {
         type_expr: &AstTypeExprDesc,
         ctx: &ImplicitContext,
     ) -> InferTy {
-        self.allocate_type_ref(
-            ctx.resolve(self.db, type_expr).unwrap_or(TypeRef::Error),
-            ctx,
-        )
+        self.allocate_type_ref(ctx.resolve_err(self.db, type_expr), ctx)
     }
 
     pub fn is_struct(
@@ -220,7 +216,7 @@ impl InferenceCtx<'_> {
             match *def {
                 TypeDefId::Struct(struct_id) => {
                     let templates = fields;
-                    let ast = struct_item(self.db, struct_id.interned());
+                    let ast = struct_id.item(self.db);
                     let templates = if templates.len() == ast.template_args.len() {
                         templates.iter().cloned().collect::<Arc<_>>()
                     } else {

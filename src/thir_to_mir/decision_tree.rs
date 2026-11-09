@@ -284,7 +284,7 @@ impl<'a> Matrix<'a> {
         match ctor {
             Constructor::Variant(idx) => {
                 let id = ty.as_enum(ctx.db).expect("This should be an enum").def(ctx.db);
-                let kind = &enum_item(ctx.db, id.interned()).variants[idx].kind;
+                let kind = &id.item(ctx.db).variants[idx].kind;
                 match kind {
                     AstEnumVariantKind::Unit => VariantArity::None,
                     AstEnumVariantKind::StructLike(fields) => VariantArity::Struct(

@@ -584,6 +584,10 @@ pub fn owning_module(db: &dyn Db, owner: ScopeOwnerId) -> ModuleId {
 }
 
 impl FunctionId {
+    pub fn ast(self, db: &dyn Db) -> &FunctionLikeAst {
+        function_ast(db, self.interned()).inner(db)
+    }
+
     pub fn receiver(self, db: &dyn Db) -> AstReceiver {
         let ast = function_ast(db, self.interned());
         match ast.inner(db) {
@@ -598,7 +602,7 @@ impl FunctionId {
     pub fn ret_ty(self, db: &dyn Db) -> TypeRef {
         let templates = get_templates_of_fun(db, self.interned());
         let owning_module = owning_module(db, self.parent(db));
-        let ast = function_ast(db, self.interned()).inner(db);
+        let ast = self.ast(db);
         resolve_type_expr(
             db,
             ast.get_ret(),
@@ -609,7 +613,7 @@ impl FunctionId {
     }
 
     pub fn args(self, db: &dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
-        let ast = function_ast(db, self.interned()).inner(db);
+        let ast = self.ast(db);
         match ast {
             FunctionLikeAst::ExternDef(spanned, _) => (None, spanned.data.args.clone()),
             FunctionLikeAst::Fundef(spanned) => (None, spanned.data.args.clone()),
@@ -629,10 +633,10 @@ impl FunctionId {
     }
 
     pub fn has_body(self, db: &dyn Db) -> bool {
-        function_ast(db, self.interned()).inner(db).has_body()
+        self.ast(db).has_body()
     }
 
     pub fn is_var_args(self, db: &dyn Db) -> bool {
-        function_ast(db, self.interned()).inner(db).is_variadic()
+        self.ast(db).is_variadic()
     }
 }

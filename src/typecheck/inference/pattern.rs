@@ -22,7 +22,7 @@ use crate::{
     common::location::Span,
     compiler::diagnostic::Diag,
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
-    name_resolve::type_expr::{enum_item, struct_item, templates_of_struct},
+    name_resolve::type_expr::templates_of_struct,
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId},
 };
@@ -95,7 +95,7 @@ impl InferenceCtx<'_> {
     }
 
     fn get_enum_variant(&self, enum_id: EnumId, name: Symbol) -> Option<AstEnumVariant> {
-        let item = enum_item(self.db, enum_id.interned());
+        let item = enum_id.item(self.db);
         item.variants.iter().find(|variant| variant.name == name).cloned()
     }
 
@@ -109,7 +109,7 @@ impl InferenceCtx<'_> {
         ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(enum_id.parent(self.db)),
-            &enum_item(self.db, enum_id.interned()).template_args,
+            &enum_id.item(self.db).template_args,
             template_tys.iter().cloned().collect(),
             Some(zelf),
         )
@@ -356,7 +356,7 @@ impl InferenceCtx<'_> {
             infer_templates.iter().cloned().collect(),
             Some(struct_ty.clone()),
         );
-        let item = struct_item(self.db, struct_id.interned());
+        let item = struct_id.item(self.db);
 
         let field_types: HashMap<Symbol, InferTy> = item
             .fields

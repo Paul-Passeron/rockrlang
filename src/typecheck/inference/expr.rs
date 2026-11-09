@@ -29,11 +29,10 @@ use crate::{
     compiler::diagnostic::Diag,
     hir::{
         HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, HirPlaceKind, HirStructField,
-        LocalId, function_ast,
+        LocalId,
     },
     name_resolve::type_expr::{
-        enum_item, get_templates_of_fun, struct_item, templates_of_enum,
-        templates_of_struct,
+        get_templates_of_fun, struct_item, templates_of_enum, templates_of_struct,
     },
     parse_tree::{
         expr::BinaryOperator,
@@ -280,7 +279,7 @@ impl InferenceCtx<'_> {
         span: Span,
     ) -> Result<InferTy, UnificationError> {
         if let Some((struct_id, templates)) = self.allocate_struct_partial_ref(ty) {
-            let ast = struct_item(self.db, struct_id.interned());
+            let ast = struct_id.item(self.db);
             let inferred_fields = fields
                 .iter()
                 .map(|field| self.infer_expr(&field.expr).map(|res| (field.field, res)))
@@ -370,7 +369,7 @@ impl InferenceCtx<'_> {
         template_hints: &[TypeRef],
         span: Span,
     ) -> Result<InferTy, UnificationError> {
-        let variants = &enum_item(self.db, enum_def.interned()).variants;
+        let variants = &enum_def.item(self.db).variants;
         let Some(variant) = variants.iter().find(|variant| variant.name == name) else {
             Diag::generic_error(
                 format!(
@@ -521,7 +520,7 @@ impl InferenceCtx<'_> {
         templates: &[InferTy],
         zelf: Option<&InferTy>,
     ) -> InferTy {
-        let ast = function_ast(self.db, target.interned()).inner(self.db);
+        let ast = target.ast(self.db);
         let ast_ret_ty = ast.get_ret();
 
         let ctx = ImplicitContext::from_function(

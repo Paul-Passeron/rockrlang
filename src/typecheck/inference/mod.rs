@@ -35,7 +35,7 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
-    hir::{LocalId, Mutability, function_ast},
+    hir::{LocalId, Mutability},
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -213,7 +213,7 @@ impl<'db> InferenceCtx<'db> {
             snapshot_depth: 0,
         };
 
-        let ast = function_ast(this.db, func.interned()).inner(this.db);
+        let ast = func.ast(this.db);
         let args = ast.get_args();
         for (local, ast) in params.iter().zip_eq(args) {
             let ty = this.implicit_ctx().resolve_err(this.db, &ast.ty.data);

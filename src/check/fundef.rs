@@ -22,7 +22,6 @@ use crate::{
         thir::{checked_thir_body, thir_is_valid},
     },
     compiler::timing::{Counts, Phase, timed},
-    hir::function_ast,
     mir::{
         concrete_ty::{ConcreteTy, Substitution},
         passes::dead_code_elimination::dce,
@@ -81,7 +80,7 @@ pub(crate) fn reachable_mir_instances(
         }
         res.push((fdef, subs.clone()));
 
-        if !function_ast(db, fdef.interned()).inner(db).has_body() {
+        if !fdef.ast(db).has_body() {
             continue; // extern: no calls to walk
         }
 

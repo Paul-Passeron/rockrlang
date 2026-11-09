@@ -21,7 +21,6 @@ use crate::{
     Db,
     common::symbols::Symbol,
     compiler::diagnostic::Diag,
-    name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
@@ -36,7 +35,7 @@ pub fn check_typedef(db: &dyn Db, typedef: TypeDefId) {
 }
 
 fn check_struct(db: &dyn Db, struct_id: StructId) {
-    let item = struct_item(db, struct_id.interned());
+    let item = struct_id.item(db);
     let ctx = AstImplicitContext::new(
         db,
         ScopeOwnerId::Module(struct_id.parent(db)),
@@ -74,7 +73,7 @@ fn check_struct(db: &dyn Db, struct_id: StructId) {
 }
 
 fn check_enum(db: &dyn Db, enum_id: EnumId) {
-    let item = enum_item(db, enum_id.interned());
+    let item = enum_id.item(db);
     let ctx = AstImplicitContext::new(
         db,
         ScopeOwnerId::Module(enum_id.parent(db)),

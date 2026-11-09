@@ -28,7 +28,6 @@ use crate::{
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
     },
     hir_to_thir::builder::ThirBuilder,
-    name_resolve::type_expr::enum_item,
     resolved::{ScopeOwnerId, TypeId, TypeRef, rehole},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Projection, ScopeId,
@@ -69,7 +68,7 @@ impl<'db> ThirTranslator<'db> {
                     type_id.def(db),
                     type_id.args(db).iter().map(|ty| aux(db, owner, *ty)).collect(),
                 )),
-                TypeRef::Zelf => owner.get_canonical_zelf(db).unwrap_or(TypeRef::Error),
+                TypeRef::Zelf => owner.zelf_or_error(db),
                 _ => ty,
             }
         }
@@ -452,7 +451,8 @@ impl<'db> ThirTranslator<'db> {
                 def.map(|def| ThirPatternKind::Struct { def, fields })
             }
             HirPatternDesc::Constructor { resolution, name, fields } => {
-                let id = enum_item(self.db, resolution.interned())
+                let id = resolution
+                    .item(self.db)
                     .variants
                     .iter()
                     .position(|variant| variant.name == *name);
@@ -821,7 +821,9 @@ impl<'db> ThirTranslator<'db> {
                         ExprKind::Error
                     },
                     |enum_def| {
-                        let Some(idx) = enum_item(self.db, enum_def.def.interned())
+                        let Some(idx) = enum_def
+                            .def
+                            .item(self.db)
                             .variants
                             .iter()
                             .position(|v| v.name == *name)

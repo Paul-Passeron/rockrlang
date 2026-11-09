@@ -25,7 +25,6 @@ use crate::{
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{Mutability, signature::get_sig_of_function},
-    name_resolve::type_expr::{enum_item, struct_item},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{
         AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
@@ -671,7 +670,7 @@ impl ConstructorType {
 
 impl EnumRef {
     pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
-        let item = enum_item(db, self.def.interned());
+        let item = self.def.item(db);
         let variant = item.variants.get(idx)?;
         let raw = match &variant.kind {
             AstEnumVariantKind::Unit => Some(ConstructorType::None),
@@ -703,7 +702,7 @@ impl EnumRef {
     }
 
     pub fn variants(&self, db: &dyn Db) -> Vec<ConstructorType> {
-        let n = enum_item(db, self.def.interned()).variants.len();
+        let n = self.def.item(db).variants.len();
         (0..n).into_iter().map(|i| self.get_cons(db, i).unwrap()).collect()
     }
 }
@@ -727,7 +726,7 @@ impl StructRef {
     /// Field types as declared on the struct definition, still referencing the
     /// struct's own template parameters rather than the concrete `self.args`.
     pub fn declared_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
-        let item = struct_item(db, self.def.interned());
+        let item = self.def.item(db);
         let mut res = HashMap::new();
         for field in &item.fields {
             let ctx = AstImplicitContext::new(

@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, SourceFile,
     common::location::{Location, Span},
-    hir::function_ast,
     lookup::{enclosing_fun, enclosing_scope_owner},
     name_resolve::{interfaces::interface_item, module_items},
     parse_tree::{
@@ -58,7 +57,7 @@ pub fn type_node_at(db: &dyn Db, loc: Location) -> Option<TypeNode> {
 }
 
 fn function_type_at(db: &dyn Db, func: FunctionId, loc: Location) -> Option<TypeNode> {
-    let ast = function_ast(db, func.into()).inner(db);
+    let ast = func.ast(db);
     let (templates, args, ret_ty, body) =
         (ast.templates(), ast.get_args(), ast.get_ret(), ast.body());
     let ctx = AstImplicitContext::new(db, func.parent(db), templates);

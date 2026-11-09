@@ -33,7 +33,7 @@ use crate::{
         type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     resolved::{
-        InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
+        EnumId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
         ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of,
         slice_of, tuple_of,
     },
@@ -149,6 +149,18 @@ pub fn resolve_type_expr<'db>(
     resolve_type_expr_desc(db, &type_expr.data, module, template_args, has_zelf)
 }
 
+impl StructId {
+    pub fn item(self, db: &dyn Db) -> &AstStructDef {
+        struct_item(db, self.interned())
+    }
+}
+
+impl EnumId {
+    pub fn item(self, db: &dyn Db) -> &AstEnumDef {
+        enum_item(db, self.interned())
+    }
+}
+
 #[salsa::tracked]
 pub fn struct_item<'db>(
     db: &'db dyn Db,
@@ -191,7 +203,7 @@ pub fn templates_of_struct<'db>(
 #[salsa::tracked]
 impl StructId {
     pub fn field_names(self, db: &dyn Db) -> Arc<[Symbol]> {
-        let item = struct_item(db, self.interned());
+        let item = self.item(db);
         item.fields.iter().map(|field| field.name).collect()
     }
 }

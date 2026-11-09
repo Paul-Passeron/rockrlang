@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    hir::{FunctionLikeAst, function_ast, owning_module},
+    hir::{FunctionLikeAst, owning_module},
     layout::Size,
     mir::concrete_ty::{ConcreteTy, InternedConcreteTy},
     name_resolve::builtin_module,
@@ -83,7 +83,7 @@ fn _fun_mangle<'db>(db: &'db dyn Db, f: MIRKey<'db>) -> Arc<MangleFun> {
         inst.params(db).iter().map(|(_, ty)| ty_mangle(db, *ty).clone()).collect_vec();
     let ret = ty_mangle(db, inst.ret_ty(db)).clone();
     let sig = MangleSig { name, parameters, ret };
-    match function_ast(db, fdef.into()).inner(db) {
+    match fdef.ast(db) {
         FunctionLikeAst::ExternDef(_, _) => {
             Arc::new(MangleFun::Extern(fdef.name(db).to_string(db)))
         }

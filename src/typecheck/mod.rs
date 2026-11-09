@@ -164,9 +164,7 @@ impl<'db> TyCtx<'db> {
                 type_id.def(db),
                 type_id.args(db).iter().map(|ty| self.canon_type(*ty)).collect(),
             )),
-            TypeRef::Zelf => {
-                self.function.parent(db).get_canonical_zelf(db).unwrap_or(TypeRef::Error)
-            }
+            TypeRef::Zelf => self.function.parent(db).zelf_or_error(db),
             _ => ty,
         }
     }
