@@ -70,8 +70,7 @@ impl<'db> InferenceCtx<'db> {
                         );
                     };
 
-                    self.unify(target, field)?;
-                    ConstraintSolveResult::Solved
+                    self.unify(target, field).into()
                 }
                 InferTy::Param(id) => ConstraintSolveResult::Error(
                     UnificationError::TemplateDereferencing(id),
@@ -92,15 +91,11 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Pending;
         };
         let to_unify = if let Some(PtrKind::Ref(mutability)) = def.is_ptr_like(self.db) {
-            &InferTy::Adt {
-                def: BuiltinTypeId::ref_(self.db, mutability).into(),
-                fields: vec![inner.clone()],
-            }
+            &self.ref_of(inner.clone(), mutability)
         } else {
             inner
         };
-        self.unify(&ty.into(), to_unify)?;
-        ConstraintSolveResult::Solved
+        self.unify(&ty.into(), to_unify).into()
     }
 
     fn solve_indexed_by_constraint(
@@ -113,8 +108,7 @@ impl<'db> InferenceCtx<'db> {
         if let Some(elem_ty) = self.is_builtin_indexed_by_int(&found) {
             self.unify(&elem_var.into(), &elem_ty)?;
             let idx = self.emit_intlike_constraint();
-            self.unify(index_ty, &idx.into())?;
-            ConstraintSolveResult::Solved
+            self.unify(index_ty, &idx.into()).into()
         } else if found.as_adt().is_some() {
             todo!("Trait-based indexing")
         } else {
@@ -138,8 +132,7 @@ impl<'db> InferenceCtx<'db> {
                     },
                 );
             }
-            self.unify(&elem_var.into(), &fields[has_index as usize])?;
-            ConstraintSolveResult::Solved
+            self.unify(&elem_var.into(), &fields[has_index as usize]).into()
         } else if let Some((def, _)) = found.as_adt() {
             ConstraintSolveResult::Error(UnificationError::TypeDefIdMismatch(
                 def,
@@ -159,8 +152,7 @@ impl<'db> InferenceCtx<'db> {
         let found = self.find(struct_ty);
         if let Some((struct_id, fields)) = self.is_struct(&found) {
             if let Some(ty) = &fields.get(&field) {
-                self.unify(&elem_var.into(), ty)?;
-                ConstraintSolveResult::Solved
+                self.unify(&elem_var.into(), ty).into()
             } else {
                 ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField {
                     def: TypeDefId::Struct(struct_id),
@@ -251,8 +243,7 @@ impl<'db> InferenceCtx<'db> {
             BinaryOperator::Plus | BinaryOperator::Minus | BinaryOperator::Times => {
                 if lid == rid {
                     let ty = InferTy::simple(TypeDefId::Builtin(lid));
-                    self.unify(&res_ty.into(), &ty)?;
-                    ConstraintSolveResult::Solved
+                    self.unify(&res_ty.into(), &ty).into()
                 } else {
                     let llayout = layout_of(
                         self.db,
@@ -280,8 +271,7 @@ impl<'db> InferenceCtx<'db> {
                 let lty = InferTy::simple(TypeDefId::Builtin(lid));
                 let rty = InferTy::simple(TypeDefId::Builtin(rid));
                 self.unify(&lty, &rty)?;
-                self.unify(&lty, &res_ty.into())?;
-                ConstraintSolveResult::Solved
+                self.unify(&lty, &res_ty.into()).into()
             }
             BinaryOperator::And => todo!(),
             BinaryOperator::Or => todo!(),
@@ -656,29 +646,24 @@ impl<'db> InferenceCtx<'db> {
                     .is_some_and(|this_id| this_id.def(self.db) == interface_id)
             })
             .collect::<HashMap<_, _>>();
-        if competing_impls.is_empty() {
-            return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
-                self.find(ty),
-                interface_id,
-                args.iter().cloned().collect(),
-            ));
-        }
-        let competing_impls = self.get_working_impls(competing_impls);
-
-        let impl_ = if competing_impls.len() == 1 {
-            let (_, impl_) = competing_impls
-                .into_iter()
-                .next()
-                .expect("We know that competing impls has a single element");
-            impl_
-        } else if competing_impls.is_empty() {
-            return ConstraintSolveResult::Error(UnificationError::NoImplemCandidateFor(
-                self.find(ty),
-                interface_id,
-                args.iter().cloned().collect(),
-            ));
+        let competing_impls = if competing_impls.is_empty() {
+            competing_impls
         } else {
-            return ConstraintSolveResult::Pending;
+            self.get_working_impls(competing_impls)
+        };
+        let mut competing_impls = competing_impls.into_iter();
+        let impl_ = match (competing_impls.next(), competing_impls.next()) {
+            (Some((_, impl_)), None) => impl_,
+            (None, _) => {
+                return ConstraintSolveResult::Error(
+                    UnificationError::NoImplemCandidateFor(
+                        self.find(ty),
+                        interface_id,
+                        args.iter().cloned().collect(),
+                    ),
+                );
+            }
+            (Some(_), Some(_)) => return ConstraintSolveResult::Pending,
         };
         for constraint in impl_.constraints {
             self.emit_constraint(constraint);
@@ -724,8 +709,7 @@ impl<'db> InferenceCtx<'db> {
             )));
         }
 
-        self.unify(&metadata_var.into(), &self.usize_ty())?;
-        ConstraintSolveResult::Solved
+        self.unify(&metadata_var.into(), &self.usize_ty()).into()
     }
 
     fn solve_cast_constraint(
@@ -920,8 +904,7 @@ impl<'db> InferenceCtx<'db> {
                     // We're done
                     ConstraintSolveResult::Solved
                 } else if let Some(ty) = get_ref_inner(self, ref_ty) {
-                    self.unify(&inner, &ty)?;
-                    ConstraintSolveResult::Solved
+                    self.unify(&inner, &ty).into()
                 } else {
                     ConstraintSolveResult::Pending
                 }
@@ -943,8 +926,7 @@ impl<'db> InferenceCtx<'db> {
         a: &InferTy,
         b: &InferTy,
     ) -> ConstraintSolveResult {
-        self.unify(a, b)?;
-        ConstraintSolveResult::Solved
+        self.unify(a, b).into()
     }
 
     fn compute_possible_blocks(

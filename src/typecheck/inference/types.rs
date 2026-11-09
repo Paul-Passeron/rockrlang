@@ -61,6 +61,13 @@ impl InferenceCtx<'_> {
         InferTy::Adt { def: BuiltinTypeId::const_ptr(self.db).into(), fields: vec![ty] }
     }
 
+    pub fn ref_of(&self, ty: InferTy, mutability: Mutability) -> InferTy {
+        InferTy::Adt {
+            def: BuiltinTypeId::ref_(self.db, mutability).into(),
+            fields: vec![ty],
+        }
+    }
+
     pub fn slice_of(&self, ty: InferTy) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db)),

@@ -29,14 +29,13 @@ use itertools::Itertools;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
-    hir::interface_items,
+    hir::{Mutability, interface_items},
     parse_tree::{
         expr::BinaryOperator,
         top_level::{AstInterfaceItem, AstMethodsig},
     },
     resolved::{
-        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
+        FunctionId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId, TypeId, TypeRef,
     },
     typecheck::{
         CallKind, ExprId, InferCallInfos,
@@ -122,6 +121,12 @@ impl FromResidual<Result<Infallible, UnificationError>> for ConstraintSolveResul
     fn from_residual(residual: Result<Infallible, UnificationError>) -> Self {
         let Err(err) = residual;
         Self::Error(err)
+    }
+}
+
+impl From<Result<(), UnificationError>> for ConstraintSolveResult {
+    fn from(res: Result<(), UnificationError>) -> Self {
+        res.map_or_else(Self::Error, |()| Self::Solved)
     }
 }
 
@@ -421,20 +426,11 @@ impl<'db> InferenceCtx<'db> {
         );
         match &constraint.kind {
             InferenceConstraintKind::IntLike { res_ty } => {
-                match self.unify(&res_ty.into(), &self.int_ty()) {
-                    Ok(()) => ConstraintSolveResult::Solved,
-                    Err(err) => ConstraintSolveResult::Error(err),
-                }
+                self.unify(&res_ty.into(), &self.int_ty()).into()
             }
             InferenceConstraintKind::Deref { var, target } => {
-                let adt = InferTy::Adt {
-                    def: TypeDefId::Builtin(BuiltinTypeId::const_ref(self.db)),
-                    fields: vec![target.clone()],
-                };
-                match self.unify(&var.into(), &adt) {
-                    Ok(()) => ConstraintSolveResult::Solved,
-                    Err(err) => ConstraintSolveResult::Error(err),
-                }
+                let adt = self.ref_of(target.clone(), Mutability::Const);
+                self.unify(&var.into(), &adt).into()
             }
             _ => {
                 unreachable!(
