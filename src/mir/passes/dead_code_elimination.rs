@@ -170,7 +170,7 @@ impl<'a> DCECtx<'a> {
             MIRRValueKind::SizeOf(t) => MIRRValueKind::SizeOf(*t),
             MIRRValueKind::Constructor { enum_ref, idx, args, span } => {
                 MIRRValueKind::Constructor {
-                    enum_ref: enum_ref.clone(),
+                    enum_ref: *enum_ref,
                     idx: *idx,
                     args: self.copy_cons_args(args),
                     span: *span,
@@ -178,7 +178,7 @@ impl<'a> DCECtx<'a> {
             }
             MIRRValueKind::StructLit { struct_ref, fields, span } => {
                 MIRRValueKind::StructLit {
-                    struct_ref: struct_ref.clone(),
+                    struct_ref: *struct_ref,
                     fields: fields
                         .iter()
                         .map(|f| (*f.0, self.copy_operand(f.1)))

@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 
@@ -212,14 +213,16 @@ fn report_file(
 
     let mut out = format!("{}:\n", path.display());
     for e in unmet {
-        out += &format!(
-            "  expected but not reported: line {} {} `{}`  (annotated on line {})\n",
+        let _ = writeln!(
+            out,
+            "  expected but not reported: line {} {} `{}`  (annotated on line {})",
             e.line, e.severity, e.needle, e.written_on
         );
     }
     for g in extra {
-        out += &format!(
-            "  reported but not expected: line {}:{} {}: {}\n",
+        let _ = writeln!(
+            out,
+            "  reported but not expected: line {}:{} {}: {}",
             g.line, g.column, g.severity, g.message
         );
     }
@@ -227,8 +230,9 @@ fn report_file(
         out += "  to accept these, append to the offending line (chaining several \
                 `//~` on one line is fine):\n";
         for g in extra {
-            out += &format!(
-                "    line {}:  //~ {} {}\n",
+            let _ = writeln!(
+                out,
+                "    line {}:  //~ {} {}",
                 g.line,
                 g.severity.to_string().to_uppercase(),
                 g.message

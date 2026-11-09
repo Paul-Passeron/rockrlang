@@ -249,12 +249,12 @@ impl<'a> ThirToMIR<'a> {
                     .parent(self.db)
                     .get_canonical_zelf(self.db)
                     .unwrap_or(TypeRef::Error);
-                if matches!(unsub, TypeRef::Zelf) {
-                    // Do not recurse infinitely, bail early
-                    panic!("Recursive `Self` type found in MIR")
-                } else {
-                    self.ty(unsub)
-                }
+                // Do not recurse infinitely, bail early
+                assert!(
+                    !matches!(unsub, TypeRef::Zelf),
+                    "Recursive `Self` type found in MIR"
+                );
+                self.ty(unsub)
             }
             ty => {
                 let Some(res) = ty.to_concrete(self.db, self.subs) else {

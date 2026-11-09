@@ -179,7 +179,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         }),
         (Regex::new(r"[0-9]+\.[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
             let parsed = lexeme.parse::<f64>().map_err(|_| LexError {
-                message: format!("Invalid float lit: `{}`", lexeme),
+                message: format!("Invalid float lit: `{lexeme}`"),
                 file: location.file,
                 offset: location.start_offset,
             })?;
@@ -188,7 +188,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         }),
         (Regex::new("[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
             let parsed = lexeme.parse::<i64>().map_err(|_| LexError {
-                message: format!("Int lit too large: `{}`", lexeme),
+                message: format!("Int lit too large: `{lexeme}`"),
                 file: location.file,
                 offset: location.start_offset,
             })?;

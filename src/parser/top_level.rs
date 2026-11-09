@@ -104,7 +104,7 @@ impl Parser<'_> {
                     Ok(include) => includes.push(include),
                     Err(err) => {
                         self.synchronize(Self::is_top_level_sync_point);
-                        err.clone().accumulate(self.db);
+                        err.accumulate(self.db);
                         includes.push(AstIncludePath::new(
                             AstIncludePathDesc::Error,
                             start.span(self.get_end()),

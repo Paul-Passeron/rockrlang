@@ -174,7 +174,7 @@ fn display_ir(db: &dyn Db, w: Workspace) {
             if !thir_is_lowerable(db, fdef) {
                 continue;
             }
-            let the_mir = mir(db, fdef, subs.clone());
+            let the_mir = mir(db, fdef, subs);
             let dce = dce(db, the_mir.func);
             println!("{}", fdef.called_to_string(db));
             println!("{}\n", dce.display(db));

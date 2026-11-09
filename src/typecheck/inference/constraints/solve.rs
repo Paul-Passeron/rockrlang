@@ -689,7 +689,7 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Pending;
         };
         for constraint in impl_.constraints {
-            self.emit_constraint(constraint.clone());
+            self.emit_constraint(constraint);
         }
 
         self.solve_constraints()
@@ -713,7 +713,7 @@ impl<'db> InferenceCtx<'db> {
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)
             )));
-        };
+        }
         ConstraintSolveResult::Solved
     }
 
