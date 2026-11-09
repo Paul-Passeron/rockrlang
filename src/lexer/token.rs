@@ -32,6 +32,7 @@ use crate::{
 pub enum TokenKind {
     Identifier(Symbol),
     IntLit(i64),
+    FloatLit(u64), // f64 bits, to keep Eq/Hash
     CharLit(char),
     StrLit(StrLit),
     CStrLit(StrLit),
@@ -126,6 +127,7 @@ impl fmt::Display for TokenKindDisplay<'_, '_> {
                 write!(f, "{}", name.interned().contents(self.db))
             }
             TokenKind::IntLit(value) => write!(f, "{value}"),
+            TokenKind::FloatLit(bits) => write!(f, "{:?}", f64::from_bits(*bits)),
             TokenKind::CharLit(c) => write!(f, "{c}"),
             TokenKind::StrLit(s) => {
                 write!(f, "\"{}\"", s.interned().contents(self.db))
