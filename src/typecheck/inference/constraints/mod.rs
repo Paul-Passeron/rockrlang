@@ -19,6 +19,7 @@ use std::{
     collections::{HashMap, HashSet, btree_map::Entry},
     fmt,
     iter::once,
+    ops::{FromResidual, Residual, Try},
     sync::Arc,
 };
 
@@ -100,6 +101,75 @@ enum ConstraintSolveResult {
     Solved,
     Pending,
     Error(UnificationError),
+}
+
+enum CondtraintSolveResultResidual {
+    Pending,
+    Error(UnificationError),
+}
+
+impl From<CondtraintSolveResultResidual> for ConstraintSolveResult {
+    fn from(value: CondtraintSolveResultResidual) -> Self {
+        match value {
+            CondtraintSolveResultResidual::Pending => Self::Pending,
+            CondtraintSolveResultResidual::Error(unification_error) => {
+                Self::Error(unification_error)
+            }
+        }
+    }
+}
+
+impl FromResidual<CondtraintSolveResultResidual> for ConstraintSolveResult {
+    fn from_residual(residual: CondtraintSolveResultResidual) -> Self {
+        residual.into()
+    }
+}
+
+impl Residual<()> for CondtraintSolveResultResidual {
+    type TryType = ConstraintSolveResult;
+}
+
+impl Try for ConstraintSolveResult {
+    type Output = ();
+
+    type Residual = CondtraintSolveResultResidual;
+
+    fn from_output((): Self::Output) -> Self {
+        Self::Solved
+    }
+
+    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+        match self {
+            ConstraintSolveResult::Solved => std::ops::ControlFlow::Continue(()),
+            ConstraintSolveResult::Pending => {
+                std::ops::ControlFlow::Break(CondtraintSolveResultResidual::Pending)
+            }
+            ConstraintSolveResult::Error(unification_error) => {
+                std::ops::ControlFlow::Break(CondtraintSolveResultResidual::Error(
+                    unification_error,
+                ))
+            }
+        }
+    }
+}
+
+impl From<UnificationError> for ConstraintSolveResult {
+    fn from(value: UnificationError) -> Self {
+        Self::Error(value)
+    }
+}
+
+trait AsConstraintSolveResult {
+    fn as_cs_res(self) -> ConstraintSolveResult;
+}
+
+impl<T> AsConstraintSolveResult for Result<T, UnificationError> {
+    fn as_cs_res(self) -> ConstraintSolveResult {
+        match self {
+            Ok(_) => ConstraintSolveResult::Solved,
+            Err(err) => ConstraintSolveResult::Error(err),
+        }
+    }
 }
 
 impl InferenceCtx<'_> {
