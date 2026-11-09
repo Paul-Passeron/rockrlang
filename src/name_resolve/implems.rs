@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use itertools::Itertools;
-use salsa::Accumulator;
 
 use crate::{
     Db,
@@ -160,11 +159,11 @@ pub fn module_impls<'db>(
                     res.push(src);
                 }
                 Some(None) => {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        db,
                         "Cannot implement for an unknown interface".into(),
                         item.interface.as_ref().unwrap().span,
-                    )
-                    .accumulate(db);
+                    );
                 }
             }
         }

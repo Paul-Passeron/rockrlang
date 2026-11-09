@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
@@ -113,7 +111,7 @@ pub fn module_items<'db>(
             parse_file::accumulated::<ParseError>(db, *file);
         for err in parse_errors {
             let span = Span::new(err.file, err.start, err.end);
-            Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
+            Diag::emit_error(db, format!("{:?}", err.kind), span);
         }
         return Some(ast.items(db).clone());
     }
@@ -136,7 +134,7 @@ pub fn module_items<'db>(
                 parse_file::accumulated::<ParseError>(db, file);
             for err in parse_errors {
                 let span = Span::new(err.file, err.start, err.end);
-                Diag::generic_error(format!("{:?}", err.kind), span).accumulate(db);
+                Diag::emit_error(db, format!("{:?}", err.kind), span);
             }
             Some(ast.items(db).clone())
         }

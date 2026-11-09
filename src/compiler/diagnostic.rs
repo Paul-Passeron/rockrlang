@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use salsa::Accumulator;
+
 use crate::{Db, common::location::Span, name_resolve::definition::Definition};
 
 #[allow(dead_code)]
@@ -109,6 +111,10 @@ impl Diag {
         let primary = DiagLabel::new(span, None);
 
         Self::new(Severity::Error, message, primary, vec![], vec![], vec![])
+    }
+
+    pub fn emit_error(db: &dyn Db, message: String, span: Span) {
+        Self::generic_error(message, span).accumulate(db);
     }
 
     pub fn generic_warning(message: String, span: Span) -> Self {

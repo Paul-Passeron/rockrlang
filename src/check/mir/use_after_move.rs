@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
     compiler::diagnostic::Diag,
@@ -92,12 +90,10 @@ impl MIRPlace {
         match init.query(m, &self.as_move_key()) {
             InitState::Init => (),
             InitState::Maybe => {
-                Diag::generic_error("Use after move (maybe)".to_owned(), self.span)
-                    .accumulate(db);
+                Diag::emit_error(db, "Use after move (maybe)".to_owned(), self.span);
             }
             InitState::Uninit => {
-                Diag::generic_error("Use after move".to_owned(), self.span)
-                    .accumulate(db);
+                Diag::emit_error(db, "Use after move".to_owned(), self.span);
             }
         }
     }

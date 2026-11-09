@@ -22,7 +22,6 @@ use std::{
 };
 
 use itertools::{Either, Itertools};
-use salsa::Accumulator;
 
 use crate::{
     Db,
@@ -593,15 +592,15 @@ impl<'a> ThirToMIR<'a> {
 
     fn check_cast(&self, from: TypeRef, to: TypeRef, span: Span) {
         let reject = |reason: &str| {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "cannot cast `{}` to `{}`: {reason}",
                     from.to_string(self.db),
                     to.to_string(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
         };
 
         let (Some(from_class), Some(to_class)) =

@@ -21,7 +21,6 @@ use std::{
 };
 
 use itertools::Itertools;
-use salsa::Accumulator;
 
 use crate::{
     Db,
@@ -135,14 +134,14 @@ impl<'db> LowerFundef<'db> {
                 if let Some(id) = scope.map.get(symbol) {
                     self.new_place(HirPlaceKind::Local(*id), expr.span, false)
                 } else {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!(
                             "expr_as_place: Name `{}` not found in local scope",
                             symbol.interned().contents(self.db)
                         ),
                         expr.span,
-                    )
-                    .accumulate(self.db);
+                    );
                     let err = self.new_expr(HirExprDesc::Error, expr.span, false);
                     self.new_place(HirPlaceKind::Temporary(err.boxed()), expr.span, false)
                 }
@@ -252,14 +251,14 @@ impl<'db> LowerFundef<'db> {
 
                     TypeId::new(self.db, type_def_id, partial_args).into()
                 } else {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!(
                             "Could not resolve name {} in scope",
                             name.data.display(self.db),
                         ),
                         desc.span,
-                    )
-                    .accumulate(self.db);
+                    );
                     TypeRef::Error
                 }
             }
@@ -356,14 +355,14 @@ impl<'db> LowerFundef<'db> {
                 symbol.interned().contents(self.db)
             )
         } else {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Name `{}` not found in the current scope.",
                     symbol.display(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
             HirExprDesc::Error
         }
     }
@@ -420,14 +419,14 @@ impl<'db> LowerFundef<'db> {
                 Some(Definition::Type(type_def_id)) => self
                     .lower_name_resolved_expr_from_type(scope, module, to, type_def_id),
                 _ => {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!(
                             "badly name-resolved item ({})",
                             from.interned().contents(self.db)
                         ),
                         from_span,
-                    )
-                    .accumulate(self.db);
+                    );
                     HirExprDesc::Error
                 }
             }
@@ -892,15 +891,15 @@ impl<'db> LowerFundef<'db> {
         args: &AstConstructFields,
     ) -> HirPattern {
         let Some(resolution) = resolve_in_module(self.db, name, module) else {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Unresolved name {} in module {}",
                     name.to_string(self.db),
                     get_module_pretty_name(self.db, module.interned())
                 ),
                 pat.span,
-            )
-            .accumulate(self.db);
+            );
             return self.new_pattern(HirPatternDesc::Error, pat.span, false);
         };
 

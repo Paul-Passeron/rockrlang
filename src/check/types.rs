@@ -17,8 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -48,28 +46,28 @@ fn check_struct(db: &dyn Db, struct_id: StructId) {
     for field in &item.fields {
         if !names.insert(field.name) {
             // Duplicate field.name
-            Diag::generic_error(
+            Diag::emit_error(
+                db,
                 format!(
                     "Duplicated field name `{}` in struct `{}`",
                     field.name.to_string(db),
                     TypeDefId::Struct(struct_id).to_string(db)
                 ),
                 field.span,
-            )
-            .accumulate(db);
+            );
         }
         match ctx.resolve(db, &field.ty.data) {
             Some(_) => (),
             None => {
-                Diag::generic_error(
+                Diag::emit_error(
+                    db,
                     format!(
                         "Field `{}` in struct `{}` has error type",
                         field.name.to_string(db),
                         TypeDefId::Struct(struct_id).to_string(db)
                     ),
                     field.ty.span,
-                )
-                .accumulate(db);
+                );
             }
         }
     }
@@ -86,15 +84,15 @@ fn check_enum(db: &dyn Db, enum_id: EnumId) {
     for variant in &item.variants {
         if !names.insert(variant.name) {
             // Duplicate variant.name
-            Diag::generic_error(
+            Diag::emit_error(
+                db,
                 format!(
                     "Duplicated variant name `{}` in enum `{}`",
                     variant.name.to_string(db),
                     TypeDefId::Enum(enum_id).to_string(db)
                 ),
                 variant.span,
-            )
-            .accumulate(db);
+            );
         }
         check_variant(db, enum_id, variant, &ctx);
     }
@@ -113,7 +111,8 @@ fn check_variant(
             for field in fields {
                 if !names.insert(field.name) {
                     // Duplicate field.name
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        db,
                         format!(
                             "Duplicated field name `{}` in variant `{}` of enum `{}`",
                             field.name.to_string(db),
@@ -121,13 +120,13 @@ fn check_variant(
                             TypeDefId::Enum(enum_id).to_string(db)
                         ),
                         field.span,
-                    )
-                    .accumulate(db);
+                    );
                 }
                 match ctx.resolve(db, &field.ty.data) {
                     Some(_) => (),
                     None => {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            db,
                             format!(
                                 "Field name `{}` in variant `{}` of enum `{}` has error type",
                                 field.name.to_string(db),
@@ -135,8 +134,7 @@ fn check_variant(
                                 TypeDefId::Enum(enum_id).to_string(db)
                             ),
                             field.ty.span,
-                        )
-                        .accumulate(db);
+                        );
                     }
                 }
             }
@@ -148,15 +146,15 @@ fn check_variant(
                 match ty {
                     Some(_) => (),
                     None => {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            db,
                             format!(
                                 "Tuple field in position {i} of variant `{}` in enum `{}` has error type",
                                 variant.name.to_string(db),
                                 TypeDefId::Enum(enum_id).to_string(db)
                             ),
                             ast.span,
-                        )
-                        .accumulate(db);
+                        );
                     }
                 }
             }

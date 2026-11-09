@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::{collections::BTreeMap, panic, sync::Arc};
 
 use itertools::Itertools;
-use salsa::Accumulator;
 
 use crate::common::location::Span;
 use crate::compiler::diagnostic::Diag;
@@ -187,11 +186,11 @@ impl<'db> TyCtx<'db> {
 
         let unsolveds = self.inf_ctx.unsolved_constraints();
         for unsolved in unsolveds {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!("unsolved constraint: {}", unsolved.kind.display(&self.inf_ctx)),
                 unsolved.span,
-            )
-            .accumulate(self.db);
+            );
         }
 
         let drain = std::mem::take(&mut self.inf_ctx.inferred_exprs)
@@ -249,12 +248,37 @@ impl<'db> TyCtx<'db> {
         )
     }
 
-    fn type_check_expr(&mut self, expr: &HirExpr) -> (TyRef, Option<UnificationError>) {
-        let (ty, err) = match self.inf_ctx.infer_expr(expr) {
-            Ok(infer_ty) => (TyRef::Inf(infer_ty), None),
-            Err(err) => (TyRef::Error, Some(err)),
-        };
-        (ty, err)
+    fn report_unif(&self, err: &UnificationError, span: Span) {
+        Diag::emit_error(
+            self.db,
+            format!("unification error: `{}`", err.display(self.db)),
+            span,
+        );
+    }
+
+    fn type_check_expr(&mut self, expr: &HirExpr) -> TyRef {
+        match self.inf_ctx.infer_expr(expr) {
+            Ok(infer_ty) => TyRef::Inf(infer_ty),
+            Err(err) => {
+                self.report_unif(&err, expr.span);
+                TyRef::Error
+            }
+        }
+    }
+
+    fn check_cond(&mut self, cond: &HirExpr, what: &str) {
+        if let TyRef::Inf(ty) = self.type_check_expr(cond)
+            && let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty())
+        {
+            Diag::emit_error(
+                self.db,
+                format!(
+                    "{what} condition must be of type bool: {}",
+                    err.display(self.db)
+                ),
+                cond.span,
+            );
+        }
     }
 
     fn get_ret_ty(&mut self) -> InferTy {
@@ -263,14 +287,7 @@ impl<'db> TyCtx<'db> {
     }
 
     fn type_check_match(&mut self, scrutinee: &HirExpr, branches: &[HirMatchBranch]) {
-        let (typeof_scrut, err) = self.type_check_expr(scrutinee);
-        if let Some(err) = err {
-            Diag::generic_error(
-                format!("unification error: `{}`", err.display(self.db)),
-                scrutinee.span,
-            )
-            .accumulate(self.db);
-        }
+        let typeof_scrut = self.type_check_expr(scrutinee);
         let typeof_scrut = match typeof_scrut {
             TyRef::Inf(infer_ty) => infer_ty,
             TyRef::Error => self.inf_ctx.fresh_var().into(),
@@ -332,11 +349,7 @@ impl<'db> TyCtx<'db> {
         let init_ty = match self.inf_ctx.infer_expr(init) {
             Ok(ty) => ty,
             Err(err) => {
-                Diag::generic_error(
-                    format!("unification error: `{}`", err.display(self.db)),
-                    init.span,
-                )
-                .accumulate(self.db);
+                self.report_unif(&err, init.span);
                 InferTy::Var(self.inf_ctx.fresh_var())
             }
         };
@@ -349,32 +362,32 @@ impl<'db> TyCtx<'db> {
                             .emit_is_inner_constraint(pattern_ty, init_ty.clone());
                     }
                     HirPatternDesc::Constructor { .. } => {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             "Invalid lhs pattern: Constructor not allowed here".into(),
                             pattern.span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                     HirPatternDesc::IntLit(_) => {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             "Invalid lhs pattern: int literal not allowed here".into(),
                             pattern.span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                     HirPatternDesc::Error => {
                         // Pass-through (Should have already been reported)
                     }
                     _ => {
                         self.inf_ctx.unify(&init_ty, &pattern_ty).unwrap_or_else(|err| {
-                            Diag::generic_error(
+                            Diag::emit_error(
+                                self.db,
                                 format!(
                                     "Could not typecheck pattern: {}",
                                     err.display(self.db)
                                 ),
                                 whole_span,
-                            )
-                            .accumulate(self.db);
+                            );
                         });
                     }
                 }
@@ -386,23 +399,19 @@ impl<'db> TyCtx<'db> {
                     )
                     && let Err(_err) = self.inf_ctx.unify(&init_ty, &annotated)
                 {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!(
                             "Annotation does not match the type: {} vs {}",
                             self.inf_ctx.find(&annotated).to_string(self.db),
                             self.inf_ctx.find(&init_ty).to_string(self.db),
                         ),
                         pattern.span.start().span(init.span.end()),
-                    )
-                    .accumulate(self.db);
+                    );
                 }
             }
             Err(err) => {
-                Diag::generic_error(
-                    format!("unification error: `{}`", err.display(self.db)),
-                    pattern.span,
-                )
-                .accumulate(self.db);
+                self.report_unif(&err, pattern.span);
             }
         }
     }
@@ -419,68 +428,20 @@ impl<'db> TyCtx<'db> {
                 self.type_check_assign(lhs, rhs, stmt.span);
             }
             HirStmtKind::Expr(hir_expr) => {
-                let (_, err) = self.type_check_expr(hir_expr);
-                if let Some(err) = err {
-                    Diag::generic_error(
-                        format!("unification error: `{}`", err.display(self.db)),
-                        hir_expr.span,
-                    )
-                    .accumulate(self.db);
-                }
+                self.type_check_expr(hir_expr);
             }
             HirStmtKind::Return(hir_expr) => {
                 self.type_check_ret(hir_expr.as_ref(), stmt.span);
             }
             HirStmtKind::If { cond, then, else_ } => {
-                match self.inf_ctx.infer_expr(cond) {
-                    Ok(ty) => {
-                        if let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty())
-                        {
-                            Diag::generic_error(
-                                format!(
-                                    "if condition must be of type bool: {}",
-                                    err.display(self.db)
-                                ),
-                                cond.span,
-                            )
-                            .accumulate(self.db);
-                        }
-                    }
-                    Err(err) => {
-                        Diag::generic_error(
-                            format!("unification error: `{}`", err.display(self.db)),
-                            cond.span,
-                        )
-                        .accumulate(self.db);
-                    }
-                }
+                self.check_cond(cond, "if");
                 self.type_check_stmt(then);
                 else_.as_ref().inspect(|else_| self.type_check_stmt(else_));
             }
-            HirStmtKind::While { cond, body } => match self.inf_ctx.infer_expr(cond) {
-                Ok(ty) => {
-                    if let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty()) {
-                        Diag::generic_error(
-                            format!(
-                                "while condition must be of type bool: {}",
-                                err.display(self.db)
-                            ),
-                            cond.span,
-                        )
-                        .accumulate(self.db);
-
-                        return;
-                    }
-                    self.type_check_stmt(body);
-                }
-                Err(err) => {
-                    Diag::generic_error(
-                        format!("unification error: `{}`", err.display(self.db)),
-                        cond.span,
-                    )
-                    .accumulate(self.db);
-                }
-            },
+            HirStmtKind::While { cond, body } => {
+                self.check_cond(cond, "while");
+                self.type_check_stmt(body);
+            }
             HirStmtKind::Block(stmts, _) => {
                 for stmt in stmts {
                     self.type_check_stmt(stmt);
@@ -490,104 +451,86 @@ impl<'db> TyCtx<'db> {
             HirStmtKind::Break | HirStmtKind::Error => (),
         }
         if let Err((cstr, err)) = self.inf_ctx.solve_constraints() {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "unification error while solving `{}`: {}",
                     cstr.kind.display(&self.inf_ctx),
                     err.display(self.db)
                 ),
                 stmt.span,
-            )
-            .accumulate(self.db);
+            );
         }
     }
 
     fn type_check_ret(&mut self, hir_expr: Option<&HirExpr>, span: Span) {
         let ret_ty = self.get_ret_ty();
         if let Some(expr) = &hir_expr {
-            let (ty, err) = self.type_check_expr(expr);
-            if let Some(err) = err {
-                Diag::generic_error(
-                    format!("unification error: `{}`", err.display(self.db)),
-                    expr.span,
-                )
-                .accumulate(self.db);
-            }
+            let ty = self.type_check_expr(expr);
 
             match ty {
                 TyRef::Inf(infer_ty) => {
                     if let Err(err) = self.inf_ctx.unify(&ret_ty, &infer_ty) {
                         let _ = err;
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             format!(
                                 "Cannot return {} form a function expected to return {}",
                                 self.inf_ctx.find(&infer_ty).to_string(self.db),
                                 self.inf_ctx.find(&ret_ty).to_string(self.db)
                             ),
                             expr.span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                 }
                 TyRef::Error => {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!(
                             "Cannot return error type form a function expected to return {}",
                             self.inf_ctx.find(&ret_ty).to_string(self.db)
                         ),
                         expr.span,
-                    )
-                    .accumulate(self.db);
+                    );
                 }
             }
         } else {
             let void_ty = self.inf_ctx.void_ty();
             if ret_ty != void_ty {
-                Diag::generic_error(
+                Diag::emit_error(
+                    self.db,
                     format!(
                         "Cannot have an empty return from a function expected to return {}",
                         self.inf_ctx.find(&ret_ty).to_string(self.db)
                     ),
                     span,
-                )
-                .accumulate(self.db);
+                );
             }
         }
     }
 
     fn type_check_assign(&mut self, lhs: &HirPlace, rhs: &HirExpr, span: Span) {
-        let (rhs_ty, rhs_err) = self.type_check_expr(rhs);
-        if let Some(rhs_err) = rhs_err {
-            Diag::generic_error(
-                format!("unification error: `{}`", rhs_err.display(self.db)),
-                rhs.span,
-            )
-            .accumulate(self.db);
-        }
+        let rhs_ty = self.type_check_expr(rhs);
         match self.inf_ctx.infer_place(lhs) {
             Ok(lhs_ty) => match rhs_ty {
                 TyRef::Inf(rhs_ty) => {
                     if let Err(err) = self.inf_ctx.unify(&lhs_ty, &rhs_ty) {
                         let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
                         let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             format!(
                                 "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
                                 err.display(self.db)
                             ),
                             span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                 }
                 TyRef::Error => (),
             },
             Err(err) => {
-                Diag::generic_error(
-                    format!("unification error: `{}`", err.display(self.db)),
-                    lhs.span,
-                )
-                .accumulate(self.db);
+                self.report_unif(&err, lhs.span);
             }
         }
     }

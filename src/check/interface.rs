@@ -17,8 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::{HashMap, hash_map::Entry};
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -39,14 +37,14 @@ fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
         if let Entry::Vacant(e) = names.entry(name) {
             e.insert(item.name_span());
         } else {
-            Diag::generic_error(
+            Diag::emit_error(
+                db,
                 format!(
                     "Cannot define the same name multiple time: `{}`",
                     name.to_string(db)
                 ),
                 item.name_span(),
-            )
-            .accumulate(db);
+            );
         }
     }
 }

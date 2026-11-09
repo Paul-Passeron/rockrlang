@@ -170,8 +170,11 @@ impl<'db> SanityChecker<'db> {
                 if let Some(cty) = def.get_cons(self.db, *idx) {
                     self.check_constructor_pat(&cty, args, &peeled, pat.span);
                 } else {
-                    Diag::generic_error("Unknown constructor for enum".into(), pat.span)
-                        .accumulate(self.db);
+                    Diag::emit_error(
+                        self.db,
+                        "Unknown constructor for enum".into(),
+                        pat.span,
+                    );
                 }
             }
             ThirPatternKind::IntLit(_) => {
@@ -458,11 +461,11 @@ impl<'db> SanityChecker<'db> {
         if let Some(ty) = self.compute_type_after_projection(before, projection, span) {
             self.check_types(expected, ty, span);
         } else {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 "Could not compute the type after projection".into(),
                 span,
-            )
-            .accumulate(self.db);
+            );
         }
     }
 
@@ -577,11 +580,11 @@ impl<'db> SanityChecker<'db> {
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(exprs)) => {
                 if tys.len() != exprs.len() {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         "Wrong number of args for the tuple variant constructor".into(),
                         span,
-                    )
-                    .accumulate(self.db);
+                    );
                 }
                 // Make sure we see all exprs even if mismatch
                 let expr_tys =
@@ -708,15 +711,15 @@ impl EnumRef {
 pub fn sanity_check(db: &dyn Db, thir: &Thir) {
     let mismatches = SanityChecker::new(db, thir).check();
     for mismatch in &mismatches {
-        Diag::generic_error(
+        Diag::emit_error(
+            db,
             format!(
                 "Type mismatch: Expected {} but got {}",
                 mismatch.expected.to_string(db),
                 mismatch.got.to_string(db),
             ),
             mismatch.span,
-        )
-        .accumulate(db);
+        );
     }
 }
 

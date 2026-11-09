@@ -62,7 +62,6 @@ use crate::{
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
-use salsa::Accumulator;
 use var::InferVar;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -253,8 +252,11 @@ impl<'db> InferenceCtx<'db> {
                     templates,
                     false,
                 ) else {
-                    Diag::generic_error("Unknown interface in scope".into(), cons.span)
-                        .accumulate(this.db);
+                    Diag::emit_error(
+                        this.db,
+                        "Unknown interface in scope".into(),
+                        cons.span,
+                    );
                     continue;
                 };
 

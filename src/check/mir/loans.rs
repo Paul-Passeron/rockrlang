@@ -17,8 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashSet;
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
     common::bitset::BitSet,
@@ -142,8 +140,7 @@ fn check_access(
             AccessKind::Copy => loan.mutability.is_mut(),
         };
         if violates {
-            Diag::generic_error("Conflict here (place)!".to_owned(), place.span)
-                .accumulate(db);
+            Diag::emit_error(db, "Conflict here (place)!".to_owned(), place.span);
         }
     }
 }
@@ -187,8 +184,7 @@ fn check_rvalue_conflicts(
                     let incompatible =
                         mutability.is_mut() || existing.mutability.is_mut();
                     if incompatible {
-                        Diag::generic_error("Conflict here !".to_owned(), rvalue.span)
-                            .accumulate(db);
+                        Diag::emit_error(db, "Conflict here !".to_owned(), rvalue.span);
                     }
                 }
             }

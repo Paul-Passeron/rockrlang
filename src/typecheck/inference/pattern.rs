@@ -129,15 +129,15 @@ impl InferenceCtx<'_> {
             let ctx = self.get_ctx_for_enum(enum_id, template_tys);
             tys.iter().map(|ty| self.allocate_ast_type_expr(&ty.data, &ctx)).collect()
         } else {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Expected variant `{}` to be tuple for enum `{}`",
                     name.to_string(self.db),
                     enum_id.name(self.db).to_string(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
             vec![]
         }
     }
@@ -161,15 +161,15 @@ impl InferenceCtx<'_> {
                 })
                 .collect()
         } else {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Expected variant `{}` to be struct-like for enum `{}`",
                     name.to_string(self.db),
                     enum_id.name(self.db).to_string(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
             HashMap::new()
         }
     }
@@ -266,7 +266,8 @@ impl InferenceCtx<'_> {
             .collect();
 
         if variant_tys.len() != tys.len() {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Mismatched length in tuple variant `{}` for enum `{}`, expected {} but got {}",
                     infos.name.to_string(self.db),
@@ -275,8 +276,7 @@ impl InferenceCtx<'_> {
                     tys.len()
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
         }
 
         variant_tys
@@ -314,11 +314,11 @@ impl InferenceCtx<'_> {
             }) => {
                 let adjusted = self.apply_binds_like(binds_like, inner_ty);
                 if let Err(err) = self.unify(&adjusted, &pot_ref_ty) {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         format!("Unification error: {}", err.display(self.db)),
                         *span,
-                    )
-                    .accumulate(self.db);
+                    );
                 }
             }
             _ => {
@@ -390,11 +390,15 @@ impl InferenceCtx<'_> {
                         }
                         Err(err) => {
                             let span = field.span();
-                            Diag::generic_error(format!("Unification error in field `{}` of struct pattern: {}",
-                                field.name().to_string(self.db),
-                                err.display(self.db),
-                            ), span)
-                                .accumulate(self.db);
+                            Diag::emit_error(
+                                self.db,
+                                format!(
+                                    "Unification error in field `{}` of struct pattern: {}",
+                                    field.name().to_string(self.db),
+                                    err.display(self.db),
+                                ),
+                                span,
+                            );
                         }
                     }
                 }
@@ -406,14 +410,14 @@ impl InferenceCtx<'_> {
                         .unwrap_or_else(|| self.fresh_var().into());
                     let adjusted = self.apply_binds_like(binds_like, field_ty);
                     if let Err(err) = self.unify(&adjusted, &local_ty) {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             format!(
                                 "Unification error in field pattern: {}",
                                 err.display(self.db)
                             ),
                             *span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                 }
             }

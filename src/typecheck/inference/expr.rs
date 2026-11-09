@@ -141,11 +141,11 @@ impl InferenceCtx<'_> {
                 for arg in args {
                     let _ = self.infer_expr_aux(arg);
                 }
-                Diag::generic_error(
+                Diag::emit_error(
+                    self.db,
                     "function not found in current scope".into(),
                     expr.span,
-                )
-                .accumulate(self.db);
+                );
                 Ok(self.fresh_var().into())
             }
             HirExprDesc::Error => Ok(self.fresh_var().into()),
@@ -336,7 +336,8 @@ impl InferenceCtx<'_> {
             ast_fields.iter().map(|f| f.name).collect();
         let got_fields: HashSet<Symbol> = fields.iter().map(|f| f.field).collect();
         for field in got_fields.difference(&expected_fields) {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Missing field `{}` in struct lit variant `{}` for type `{}`",
                     field.to_string(self.db),
@@ -344,12 +345,12 @@ impl InferenceCtx<'_> {
                     enum_id.name(self.db).to_string(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
         }
         // For inferred fields not in ast fields
         for field in expected_fields.difference(&got_fields) {
-            Diag::generic_error(
+            Diag::emit_error(
+                self.db,
                 format!(
                     "Invalid field `{}` in struct lit variant `{}` for type `{}`",
                     field.to_string(self.db),
@@ -357,8 +358,7 @@ impl InferenceCtx<'_> {
                     enum_id.name(self.db).to_string(self.db)
                 ),
                 span,
-            )
-            .accumulate(self.db);
+            );
         }
     }
 
@@ -444,14 +444,14 @@ impl InferenceCtx<'_> {
                         Err(err) => Some(err),
                     };
                     if let Some(err) = err {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             format!(
                                 "Unification error in expr: {}",
                                 err.display(self.db)
                             ),
                             field.expr.span,
-                        )
-                        .accumulate(self.db);
+                        );
                     }
                 }
             }
@@ -628,27 +628,27 @@ pub fn diagnose_bad_struct_fields(
     }
     // For ast fields not in inferred fields
     for field in field_sets.1.difference(&field_sets.0) {
-        Diag::generic_error(
+        Diag::emit_error(
+            db,
             format!(
                 "Missing field `{}` in struct lit for type `{}`",
                 field.to_string(db),
                 struct_id.name(db).to_string(db)
             ),
             span,
-        )
-        .accumulate(db);
+        );
     }
     // For inferred fields not in ast fields
     for field in field_sets.0.difference(&field_sets.1) {
-        Diag::generic_error(
+        Diag::emit_error(
+            db,
             format!(
                 "Invalid field `{}` in struct lit for type `{}`",
                 field.to_string(db),
                 struct_id.name(db).to_string(db)
             ),
             span,
-        )
-        .accumulate(db);
+        );
     }
     false
 }

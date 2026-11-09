@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use itertools::{Either, Itertools};
-use salsa::Accumulator;
 
 use crate::{
     Db,
@@ -217,11 +216,11 @@ impl<'db> ThirTranslator<'db> {
                 )]
             }
             HirStmtKind::Defer(_) => {
-                Diag::generic_error(
+                Diag::emit_error(
+                    self.db,
                     "`defer` statements are not implemented yet".into(),
                     stmt.span,
-                )
-                .accumulate(self.db);
+                );
                 vec![ThirStmt::error(stmt.span, stmt.is_synthetic)]
             }
             HirStmtKind::Break => {
@@ -462,8 +461,7 @@ impl<'db> ThirTranslator<'db> {
                 if let (Some(id), Some(def)) = (id, def) {
                     Some(ThirPatternKind::Constructor { def, idx: id, args })
                 } else {
-                    Diag::generic_error("Bad enum variant".into(), pat.span)
-                        .accumulate(self.db);
+                    Diag::emit_error(self.db, "Bad enum variant".into(), pat.span);
                     None
                 }
             }
@@ -590,20 +588,20 @@ impl<'db> ThirTranslator<'db> {
                 };
 
                 let Some(ty_id) = ty.as_type_id() else {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         "Expected a struct type to destructure".into(),
                         span,
-                    )
-                    .accumulate(self.db);
+                    );
                     return;
                 };
                 let wrapped = RefWrappedTy::from_type(self.db, ty_id);
                 let Some(def) = wrapped.inner.as_struct_ref(self.db) else {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         "Expected a struct type to destructure".into(),
                         span,
-                    )
-                    .accumulate(self.db);
+                    );
                     return;
                 };
 
@@ -789,8 +787,7 @@ impl<'db> ThirTranslator<'db> {
                 if let Some(struct_def) = ty.as_struct_ref(self.db) {
                     ExprKind::StructLit { struct_def, fields }
                 } else {
-                    Diag::generic_error("Expected a struct.".into(), expr.span)
-                        .accumulate(self.db);
+                    Diag::emit_error(self.db, "Expected a struct.".into(), expr.span);
                     ExprKind::Error
                 }
             }
@@ -820,8 +817,7 @@ impl<'db> ThirTranslator<'db> {
                 let args = self.expr_args(b, args, stmts);
                 ty.as_enum_ref(self.db).map_or_else(
                     || {
-                        Diag::generic_error("Expected an enum.".into(), expr.span)
-                            .accumulate(self.db);
+                        Diag::emit_error(self.db, "Expected an enum.".into(), expr.span);
                         ExprKind::Error
                     },
                     |enum_def| {
@@ -830,11 +826,11 @@ impl<'db> ThirTranslator<'db> {
                             .iter()
                             .position(|v| v.name == *name)
                         else {
-                            Diag::generic_error(
+                            Diag::emit_error(
+                                self.db,
                                 "Could not find variant in enum.".into(),
                                 expr.span,
-                            )
-                            .accumulate(self.db);
+                            );
                             return ExprKind::Error;
                         };
                         ExprKind::Constructor { enum_def, idx, args }
@@ -1157,8 +1153,7 @@ impl<'db> ThirTranslator<'db> {
                 let field_ty = if let Some(struct_ref) = ty.as_struct_ref(self.db) {
                     struct_ref.typeof_field(self.db, *field).unwrap_or(TypeRef::Error)
                 } else {
-                    Diag::generic_error("expected an enum here.".into(), span)
-                        .accumulate(self.db);
+                    Diag::emit_error(self.db, "expected an enum here.".into(), span);
                     TypeRef::Error
                 };
                 b.with_projection(
@@ -1177,11 +1172,11 @@ impl<'db> ThirTranslator<'db> {
                 };
                 let idx_ty = if let Some(tuple_ref) = ty.as_tuple_ref(self.db) {
                     tuple_ref.get(*index as usize).copied().unwrap_or_else(|| {
-                        Diag::generic_error(
+                        Diag::emit_error(
+                            self.db,
                             "expected a sufficiently long tuple here.".into(),
                             span,
-                        )
-                        .accumulate(self.db);
+                        );
                         TypeRef::Error
                     })
                 } else {
@@ -1200,11 +1195,11 @@ impl<'db> ThirTranslator<'db> {
                 let deref_ty =
                     ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db)).map_or_else(
                         || {
-                            Diag::generic_error(
+                            Diag::emit_error(
+                                self.db,
                                 "expected a ptr here.".into(),
                                 place.span,
-                            )
-                            .accumulate(self.db);
+                            );
                             TypeRef::Error
                         },
                         |(_, inner)| inner,
@@ -1219,11 +1214,11 @@ impl<'db> ThirTranslator<'db> {
                     (pl.span, pl.ty)
                 };
                 let deref_ty = ty.element_of_indexed(self.db).unwrap_or_else(|| {
-                    Diag::generic_error(
+                    Diag::emit_error(
+                        self.db,
                         "expected an element of indexed here.".into(),
                         place_span,
-                    )
-                    .accumulate(self.db);
+                    );
                     TypeRef::Error
                 });
                 let index = self.expr(b, index, stmts);
