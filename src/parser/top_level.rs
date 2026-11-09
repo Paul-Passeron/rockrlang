@@ -87,11 +87,9 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstModule, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Module)?;
-        self.consume();
+        self.eat(TokenKind::Module)?;
         let name = self.parse_symbol()?;
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
         let mut items = vec![];
         let mut includes = vec![];
         while self.current_token()?.kind != TokenKind::CloseBra {
@@ -128,8 +126,7 @@ impl Parser<'_> {
                 }
             }
         }
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
         let end = self.get_end();
         Ok(AstModule::new(
             AstModuleDesc { annotations, name, items, includes },
@@ -148,8 +145,7 @@ impl Parser<'_> {
     fn parse_fundef_arg(&mut self) -> Result<AstFundefArg, ParseError> {
         let start = self.get_start();
         let name = self.parse_symbol()?;
-        self.expect(TokenKind::Colon)?;
-        self.consume();
+        self.eat(TokenKind::Colon)?;
         let ty = self.parse_type_expr()?;
         let end = self.get_end();
         Ok(AstFundefArg {
@@ -312,15 +308,13 @@ impl Parser<'_> {
         {
             self.consume();
             let templates = self.parse_template_args()?;
-            self.expect(TokenKind::Gt)?;
-            self.consume();
+            self.eat(TokenKind::Gt)?;
             templates
         } else {
             vec![]
         };
 
-        self.expect(TokenKind::OpenPar)?;
-        self.consume();
+        self.eat(TokenKind::OpenPar)?;
 
         let mut has_args = true;
 
@@ -350,11 +344,9 @@ impl Parser<'_> {
             false
         };
 
-        self.expect(TokenKind::ClosePar)?;
-        self.consume();
+        self.eat(TokenKind::ClosePar)?;
 
-        self.expect(TokenKind::Colon)?;
-        self.consume();
+        self.eat(TokenKind::Colon)?;
 
         let return_type = self.parse_type_expr()?;
 
@@ -375,8 +367,7 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstMethodDef, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Fun)?;
-        self.consume();
+        self.eat(TokenKind::Fun)?;
         let AstMethodsig {
             data:
                 AstMethodsigDesc {
@@ -415,8 +406,7 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstFundef, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Fun)?;
-        self.consume();
+        self.eat(TokenKind::Fun)?;
         let (
             AstFunsig {
                 data:
@@ -457,22 +447,18 @@ impl Parser<'_> {
             TokenKind::Comma,
             |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar),
         )?;
-        self.expect(TokenKind::ClosePar)?;
-        self.consume();
+        self.eat(TokenKind::ClosePar)?;
         Ok(AstAnnotationItem::Call { name, args })
     }
 
     pub fn parse_annotation(&mut self) -> Result<AstAnnotation, ParseError> {
-        self.expect(TokenKind::AddressOf)?;
-        self.consume();
-        self.expect(TokenKind::OpenSqr)?;
-        self.consume();
+        self.eat(TokenKind::AddressOf)?;
+        self.eat(TokenKind::OpenSqr)?;
         let items =
             self.parse_list(Self::parse_annotation_item, TokenKind::Comma, |p| {
                 p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseSqr)
             })?;
-        self.expect(TokenKind::CloseSqr)?;
-        self.consume();
+        self.eat(TokenKind::CloseSqr)?;
         Ok(AstAnnotation { items })
     }
 
@@ -492,11 +478,9 @@ impl Parser<'_> {
             TokenKind::Type => {
                 self.consume();
                 let Spanned { data: name, span: name_span } = self.parse_symbol()?;
-                self.expect(TokenKind::Eq)?;
-                self.consume();
+                self.eat(TokenKind::Eq)?;
                 let ty = self.parse_type_expr()?;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
                 Ok(AstImplItem::Type { annotations, name, name_span, ty })
             }
             TokenKind::Fun => {
@@ -519,8 +503,7 @@ impl Parser<'_> {
             {
                 self.consume();
                 let args = self.parse_template_args()?;
-                self.expect(TokenKind::Gt)?;
-                self.consume();
+                self.eat(TokenKind::Gt)?;
                 args
             } else {
                 vec![]
@@ -533,8 +516,7 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstImplBlock, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Impl)?;
-        self.consume();
+        self.eat(TokenKind::Impl)?;
         let template_args = self.parse_optional_template_args()?;
         let first_ty = self.parse_type_expr()?;
         let (interface, implemented) = if let Some(t) = self.peek_n(0)
@@ -547,8 +529,7 @@ impl Parser<'_> {
             (None, first_ty)
         };
 
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
 
         let mut items = Vec::new();
         while let Some(t) = self.peek_n(0)
@@ -556,8 +537,7 @@ impl Parser<'_> {
         {
             items.push(self.parse_impl_item()?);
         }
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
 
         let span = start.span(self.get_end());
 
@@ -574,8 +554,7 @@ impl Parser<'_> {
     fn parse_struct_def_field(&mut self) -> Result<AstStructDefField, ParseError> {
         let start = self.get_start();
         let name = self.parse_symbol()?.data;
-        self.expect(TokenKind::Colon)?;
-        self.consume();
+        self.eat(TokenKind::Colon)?;
         let ty = self.parse_type_expr()?;
         let end = self.get_end();
         Ok(AstStructDefField { name, ty, span: start.span(end) })
@@ -595,8 +574,7 @@ impl Parser<'_> {
             Some(TokenKind::OpenBra) => {
                 self.consume();
                 let fields = self.parse_struct_def_fields()?;
-                self.expect(TokenKind::CloseBra)?;
-                self.consume();
+                self.eat(TokenKind::CloseBra)?;
                 AstEnumVariantKind::StructLike(fields)
             }
             Some(TokenKind::OpenPar) => {
@@ -606,8 +584,7 @@ impl Parser<'_> {
                         p.peek_n(0).is_none_or(|t| t.kind == TokenKind::ClosePar)
                     })?;
 
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 AstEnumVariantKind::TupleLike(fields)
             }
             _ => AstEnumVariantKind::Unit,
@@ -627,15 +604,12 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstEnumDef, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Enum)?;
-        self.consume();
+        self.eat(TokenKind::Enum)?;
         let name = self.parse_symbol()?;
         let template_args = self.parse_optional_template_args()?;
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
         let variants = self.parse_enum_variants()?;
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
         Ok(AstEnumDef {
             annotations,
             name,
@@ -650,15 +624,12 @@ impl Parser<'_> {
         annotations: Vec<AstAnnotation>,
     ) -> Result<AstStructDef, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Struct)?;
-        self.consume();
+        self.eat(TokenKind::Struct)?;
         let name = self.parse_symbol()?;
         let template_args = self.parse_optional_template_args()?;
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
         let fields = self.parse_struct_def_fields()?;
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
 
         Ok(AstStructDef {
             annotations,
@@ -674,15 +645,13 @@ impl Parser<'_> {
             TokenKind::Type => {
                 self.consume();
                 let arg = self.parse_template_arg()?;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
                 Ok(AstInterfaceItem::Type(arg))
             }
             TokenKind::Fun => {
                 self.consume();
                 let sig = self.parse_methodsig(vec![])?;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
                 Ok(AstInterfaceItem::Sig(Arc::new(sig)))
             }
             x => Err(ParseError {
@@ -753,8 +722,7 @@ impl Parser<'_> {
                 } else {
                     vec![]
                 };
-                self.expect(TokenKind::OpenBra)?;
-                self.consume();
+                self.eat(TokenKind::OpenBra)?;
                 let mut items = vec![];
                 while let Some(t) = self.peek_n(0)
                     && !matches!(t.kind, TokenKind::CloseBra)
@@ -762,8 +730,7 @@ impl Parser<'_> {
                     let item = self.parse_interface_item()?;
                     items.push(item);
                 }
-                self.expect(TokenKind::CloseBra)?;
-                self.consume();
+                self.eat(TokenKind::CloseBra)?;
                 let span = start.span(self.get_end());
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::Interface(AstInterface {
@@ -779,19 +746,15 @@ impl Parser<'_> {
             }
             TokenKind::Directive(s) if s.is(self.db, "extern") => {
                 self.consume();
-                self.expect(TokenKind::OpenBra)?;
-                self.consume();
+                self.eat(TokenKind::OpenBra)?;
                 let mut annotations = annotations;
                 annotations.extend(self.parse_annotations()?);
                 let fun_start = self.get_start();
-                self.expect(TokenKind::Fun)?;
-                self.consume();
+                self.eat(TokenKind::Fun)?;
                 let (mut funsig, variadic) = self.parse_funsig(annotations, true)?;
                 funsig.span.start_offset = fun_start.offset;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
-                self.expect(TokenKind::CloseBra)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
+                self.eat(TokenKind::CloseBra)?;
                 let end = self.get_end();
                 Ok(AstTopLevelItem::new(
                     AstTopLevelItemDesc::ExternDef(funsig, variadic),

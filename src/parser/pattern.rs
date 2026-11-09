@@ -49,8 +49,7 @@ impl Parser<'_> {
             TokenKind::OpenPar => {
                 self.consume(); // consume '('
                 let fields = self.parse_pattern_list(TokenKind::ClosePar)?;
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstPatternDesc::Named(AstNamedPattern::Tuple { fields }),
@@ -93,8 +92,7 @@ impl Parser<'_> {
                 let args = AstConstructFields::TupleFields(
                     self.parse_pattern_list(TokenKind::ClosePar)?,
                 );
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 Ok(AstNamedPattern::Constructor { name: name.data, args })
             }
 
@@ -105,8 +103,7 @@ impl Parser<'_> {
                     TokenKind::Comma,
                     |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
                 )?;
-                self.expect(TokenKind::CloseBra)?;
-                self.consume();
+                self.eat(TokenKind::CloseBra)?;
 
                 let args = AstConstructFields::StructFields(fields);
 

@@ -165,6 +165,12 @@ impl<'db> Parser<'db> {
         }
     }
 
+    pub fn eat(&mut self, kind: TokenKind) -> Result<(), ParseError> {
+        self.expect(kind)?;
+        self.consume();
+        Ok(())
+    }
+
     pub fn peek_n(&self, n: usize) -> Option<&Token> {
         self.tokens.get(self.position + n)
     }

@@ -229,8 +229,7 @@ impl Parser<'_> {
                         Some(TokenKind::OpenPar) => {
                             self.consume();
                             let args = self.parse_expr_args()?;
-                            self.expect(TokenKind::ClosePar)?;
-                            self.consume();
+                            self.eat(TokenKind::ClosePar)?;
                             let end = self.get_end();
                             let span = start.span(end);
                             expr = Spanned::new(
@@ -290,8 +289,7 @@ impl Parser<'_> {
                     if self.peek_n(0).map(|t| &t.kind) == Some(&TokenKind::OpenPar) {
                         self.consume();
                         let args = self.parse_expr_args()?;
-                        self.expect(TokenKind::ClosePar)?;
-                        self.consume();
+                        self.eat(TokenKind::ClosePar)?;
                         let end = self.get_end();
                         let span = expr.span.start().span(end);
                         expr = Spanned::new(
@@ -319,8 +317,7 @@ impl Parser<'_> {
                 Some(TokenKind::OpenSqr) => {
                     self.consume();
                     let index = self.parse_expr_unrestricted()?;
-                    self.expect(TokenKind::CloseSqr)?;
-                    self.consume();
+                    self.eat(TokenKind::CloseSqr)?;
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
@@ -335,8 +332,7 @@ impl Parser<'_> {
                 Some(TokenKind::OpenPar) => {
                     self.consume();
                     let args = self.parse_expr_args()?;
-                    self.expect(TokenKind::ClosePar)?;
-                    self.consume();
+                    self.eat(TokenKind::ClosePar)?;
                     let end = self.get_end();
                     let span = expr.span.start().span(end);
                     expr = Spanned::new(
@@ -393,8 +389,7 @@ impl Parser<'_> {
                     {
                         self.consume();
                         let fields = self.parse_struct_fields()?;
-                        self.expect(TokenKind::CloseBra)?;
-                        self.consume();
+                        self.eat(TokenKind::CloseBra)?;
 
                         let end = self.get_end();
                         let span = expr.span.start().span(end);
@@ -499,25 +494,21 @@ impl Parser<'_> {
                     TokenKind::Comma,
                     |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
                 )?;
-                self.expect(TokenKind::CloseBra)?;
-                self.consume();
+                self.eat(TokenKind::CloseBra)?;
                 Ok(Spanned::new(AstExprDesc::SliceLit(exprs), tok.location))
             }
             TokenKind::OpenPar => {
                 self.consume();
                 let exprs = self.parse_expr_args()?;
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 let end = self.get_end();
                 Ok(Spanned::new(AstExprDesc::Tuple(exprs), start.span(end)))
             }
             TokenKind::Directive(dir) if dir.is(self.db, "sizeof") => {
                 self.consume();
-                self.expect(TokenKind::OpenPar)?;
-                self.consume();
+                self.eat(TokenKind::OpenPar)?;
                 let ty = self.parse_type_expr()?;
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 let end = self.get_end();
                 Ok(AstExpr::new(AstExprDesc::SizeOf(ty), start.span(end)))
             }
@@ -525,13 +516,11 @@ impl Parser<'_> {
             TokenKind::Directive(dir) if dir.is(self.db, "metadata") => {
                 self.consume();
 
-                self.expect(TokenKind::OpenPar)?;
-                self.consume();
+                self.eat(TokenKind::OpenPar)?;
 
                 let expr = self.parse_expr_unrestricted()?;
 
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
 
                 let end = self.get_end();
 
@@ -541,13 +530,11 @@ impl Parser<'_> {
             TokenKind::Directive(dir) if dir.is(self.db, "type_name") => {
                 self.consume();
 
-                self.expect(TokenKind::OpenPar)?;
-                self.consume();
+                self.eat(TokenKind::OpenPar)?;
 
                 let ty = self.parse_type_expr()?;
 
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
 
                 let end = self.get_end();
 
@@ -580,8 +567,7 @@ impl Parser<'_> {
                     {
                         self.consume();
                         let fields = self.parse_struct_fields()?;
-                        self.expect(TokenKind::CloseBra)?;
-                        self.consume();
+                        self.eat(TokenKind::CloseBra)?;
                         let end = self.get_end();
                         let ty_span = start.span(start);
                         let ty = Spanned::new(
@@ -618,19 +604,16 @@ impl Parser<'_> {
 
         let type_args = self.parse_turbofish_args()?;
 
-        self.expect(TokenKind::Access)?;
-        self.consume();
+        self.eat(TokenKind::Access)?;
 
         let ty_span = start.span(self.get_end());
         let ty = self.apply_type_args(lhs_ty, type_args, ty_span)?;
 
         let method_sym = self.parse_symbol()?;
 
-        self.expect(TokenKind::OpenPar)?;
-        self.consume();
+        self.eat(TokenKind::OpenPar)?;
         let args = self.parse_expr_args()?;
-        self.expect(TokenKind::ClosePar)?;
-        self.consume();
+        self.eat(TokenKind::ClosePar)?;
 
         let end = self.get_end();
         Ok(Spanned::new(
@@ -661,8 +644,7 @@ impl Parser<'_> {
 
         let type_args = self.parse_turbofish_args()?;
 
-        self.expect(TokenKind::Access)?;
-        self.consume();
+        self.eat(TokenKind::Access)?;
 
         // Parse variant name first — it's part of the qualified path,
         // not part of a struct literal. This gives us:
@@ -679,8 +661,7 @@ impl Parser<'_> {
         {
             self.consume();
             let fields = self.parse_struct_fields()?;
-            self.expect(TokenKind::CloseBra)?;
-            self.consume();
+            self.eat(TokenKind::CloseBra)?;
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::StructLit { ty, variant: Some(variant_sym.data), fields },
@@ -689,8 +670,7 @@ impl Parser<'_> {
         } else if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::OpenPar)) {
             self.consume();
             let args = self.parse_expr_args()?;
-            self.expect(TokenKind::ClosePar)?;
-            self.consume();
+            self.eat(TokenKind::ClosePar)?;
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::StaticCall {
@@ -711,11 +691,9 @@ impl Parser<'_> {
     }
 
     fn parse_turbofish_args(&mut self) -> Result<Vec<AstAnyTypeExpr>, ParseError> {
-        self.expect(TokenKind::Lt)?;
-        self.consume();
+        self.eat(TokenKind::Lt)?;
         let type_args = self.parse_any_type_args()?;
-        self.expect(TokenKind::Gt)?;
-        self.consume();
+        self.eat(TokenKind::Gt)?;
         Ok(type_args)
     }
 
@@ -738,8 +716,7 @@ impl Parser<'_> {
         if is_struct_lit {
             self.consume();
             let fields = self.parse_struct_fields()?;
-            self.expect(TokenKind::CloseBra)?;
-            self.consume();
+            self.eat(TokenKind::CloseBra)?;
             let end = self.get_end();
             Ok(Spanned::new(
                 AstExprDesc::StructLit { ty, variant: Some(name_sym.data), fields },
@@ -763,8 +740,7 @@ impl Parser<'_> {
             if self.peek_n(0).is_some_and(|t| matches!(t.kind, TokenKind::OpenPar)) {
                 self.consume();
                 let args = self.parse_expr_args()?;
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstExprDesc::StaticCall {

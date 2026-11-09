@@ -25,8 +25,7 @@ use crate::{
 
 impl Parser<'_> {
     pub(super) fn parse_block(&mut self) -> Result<Vec<AstStmt>, ParseError> {
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
 
         let mut res = vec![];
 
@@ -64,8 +63,7 @@ impl Parser<'_> {
             }
         }
 
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
 
         Ok(res)
     }
@@ -79,8 +77,7 @@ impl Parser<'_> {
 
     fn parse_let_decl(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Let)?;
-        self.consume();
+        self.eat(TokenKind::Let)?;
         let pat = self.parse_pattern()?;
         let type_constraint = if let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Colon)
@@ -90,11 +87,9 @@ impl Parser<'_> {
         } else {
             None
         };
-        self.expect(TokenKind::Eq)?;
-        self.consume();
+        self.eat(TokenKind::Eq)?;
         let value = self.parse_expr()?;
-        self.expect(TokenKind::Semicolon)?;
-        self.consume();
+        self.eat(TokenKind::Semicolon)?;
         let end = self.get_end();
         Ok(AstStmt::new(
             AstStmtDesc::LetDecl { pat, type_constraint, value },
@@ -104,11 +99,9 @@ impl Parser<'_> {
 
     fn parse_for_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::For)?;
-        self.consume();
+        self.eat(TokenKind::For)?;
         let element = self.parse_pattern()?;
-        self.expect(TokenKind::In)?;
-        self.consume();
+        self.eat(TokenKind::In)?;
         let iterator = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
@@ -120,8 +113,7 @@ impl Parser<'_> {
 
     fn parse_return(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Return)?;
-        self.consume();
+        self.eat(TokenKind::Return)?;
         let value = if let Some(t) = self.peek_n(0)
             && matches!(t.kind, TokenKind::Semicolon)
         {
@@ -130,16 +122,14 @@ impl Parser<'_> {
             let value = self.parse_expr()?;
             Some(value)
         };
-        self.expect(TokenKind::Semicolon)?;
-        self.consume();
+        self.eat(TokenKind::Semicolon)?;
         let end = self.get_end();
         Ok(AstStmt::new(AstStmtDesc::Return { value }, start.span(end)))
     }
 
     fn parse_while_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::While)?;
-        self.consume();
+        self.eat(TokenKind::While)?;
         let cond = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let body = self.parse_block_as_stmt()?;
         let end = self.get_end();
@@ -182,8 +172,7 @@ impl Parser<'_> {
 
         let rhs = self.parse_expr()?;
 
-        self.expect(TokenKind::Semicolon)?;
-        self.consume();
+        self.eat(TokenKind::Semicolon)?;
 
         let end = self.get_end();
         let desc = if let Some(op) = compound_op {
@@ -200,11 +189,9 @@ impl Parser<'_> {
 
     fn parse_match_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::Match)?;
-        self.consume();
+        self.eat(TokenKind::Match)?;
         let scrutinee = self.with_struct_lit_restriction(true, Self::parse_expr)?;
-        self.expect(TokenKind::OpenBra)?;
-        self.consume();
+        self.eat(TokenKind::OpenBra)?;
         let mut branches = Vec::new();
         while self.peek_n(0).is_some_and(|t| !matches!(t.kind, TokenKind::CloseBra)) {
             let pat = self.parse_pattern()?;
@@ -215,13 +202,11 @@ impl Parser<'_> {
             } else {
                 None
             };
-            self.expect(TokenKind::BigArrow)?;
-            self.consume();
+            self.eat(TokenKind::BigArrow)?;
             let body = self.parse_block_as_stmt()?;
             branches.push(AstMatchBranch { pat, guard, body: Box::new(body) });
         }
-        self.expect(TokenKind::CloseBra)?;
-        self.consume();
+        self.eat(TokenKind::CloseBra)?;
 
         Ok(AstStmt::new(
             AstStmtDesc::Match { scrutinee, branches },
@@ -231,8 +216,7 @@ impl Parser<'_> {
 
     fn parse_if_stmt(&mut self) -> Result<AstStmt, ParseError> {
         let start = self.get_start();
-        self.expect(TokenKind::If)?;
-        self.consume();
+        self.eat(TokenKind::If)?;
         let cond = self.with_struct_lit_restriction(true, Self::parse_expr)?;
         let then = self.parse_block_as_stmt()?;
         let else_ = if let Some(t) = self.peek_n(0)
@@ -262,8 +246,7 @@ impl Parser<'_> {
             TokenKind::Break => {
                 let start = self.get_start();
                 self.consume();
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
                 let span = start.span(self.get_end());
                 Ok(AstStmt::new(AstStmtDesc::Break, span))
             }
@@ -276,8 +259,7 @@ impl Parser<'_> {
             }
             _ => self.try_parse_assign().or_else(|_| {
                 let expr = self.parse_expr()?;
-                self.expect(TokenKind::Semicolon)?;
-                self.consume();
+                self.eat(TokenKind::Semicolon)?;
                 let span = expr.span;
                 Ok(AstStmt::new(AstStmtDesc::Expr(expr), span))
             }),

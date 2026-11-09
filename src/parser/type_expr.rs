@@ -91,8 +91,7 @@ impl Parser<'_> {
                 } else {
                     None
                 };
-                self.expect(TokenKind::CloseSqr)?;
-                self.consume();
+                self.eat(TokenKind::CloseSqr)?;
                 let end = self.get_end();
                 Ok(Spanned::new(
                     AstTypeExprDesc::Slice { ty: Box::new(ty), len },
@@ -103,8 +102,7 @@ impl Parser<'_> {
             TokenKind::OpenPar => {
                 self.consume();
                 let tys = self.parse_any_type_args()?;
-                self.expect(TokenKind::ClosePar)?;
-                self.consume();
+                self.eat(TokenKind::ClosePar)?;
                 let end = self.get_end();
 
                 Ok(AstTypeExpr::new(AstTypeExprDesc::Tuple(tys), start.span(end)))
@@ -131,8 +129,7 @@ impl Parser<'_> {
                     Some(TokenKind::Lt) => {
                         self.consume();
                         let args = self.parse_any_type_args()?;
-                        self.expect(TokenKind::Gt)?;
-                        self.consume();
+                        self.eat(TokenKind::Gt)?;
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstTypeExprDesc::Named {
