@@ -38,7 +38,6 @@ macro_rules! get_simple_rule {
 
 pub(super) fn get_skip_rules() -> Vec<Regex> {
     vec![
-        Regex::new(r"\n").unwrap(),
         Regex::new("[ \n\t\r]+").unwrap(),
         Regex::new(r"//[^\n]*").unwrap(),
         Regex::new(r"(?s)/\*.*?\*/").unwrap(),
