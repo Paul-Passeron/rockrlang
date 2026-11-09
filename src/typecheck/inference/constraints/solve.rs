@@ -39,9 +39,8 @@ use crate::{
         inference::{
             InferTy, InferenceCtx, UnificationError,
             constraints::{
-                AsConstraintSolveResult, ConstraintSolveResult, InferenceConstraint,
-                InferenceConstraintId, InferenceConstraintKind, MAX_IMPL_DEPTH,
-                MethodConstraint,
+                ConstraintSolveResult, InferenceConstraint, InferenceConstraintId,
+                InferenceConstraintKind, MAX_IMPL_DEPTH, MethodConstraint,
             },
             implems::PotentialBlockRes,
             implicit::{AsAstImplCtx, ImplicitContext},
@@ -71,7 +70,8 @@ impl<'db> InferenceCtx<'db> {
                         );
                     };
 
-                    self.unify(target, field).as_cs_res()
+                    self.unify(target, field)?;
+                    ConstraintSolveResult::Solved
                 }
                 InferTy::Param(id) => ConstraintSolveResult::Error(
                     UnificationError::TemplateDereferencing(id),
@@ -99,7 +99,8 @@ impl<'db> InferenceCtx<'db> {
         } else {
             inner
         };
-        self.unify(&ty.into(), to_unify).as_cs_res()
+        self.unify(&ty.into(), to_unify)?;
+        ConstraintSolveResult::Solved
     }
 
     fn solve_indexed_by_constraint(
@@ -110,9 +111,9 @@ impl<'db> InferenceCtx<'db> {
     ) -> ConstraintSolveResult {
         let found = self.find(base_ty);
         if let Some(elem_ty) = self.is_builtin_indexed_by_int(&found) {
-            self.unify(&elem_var.into(), &elem_ty).as_cs_res()?;
+            self.unify(&elem_var.into(), &elem_ty)?;
             let idx = self.emit_intlike_constraint();
-            self.unify(index_ty, &idx.into()).as_cs_res()?;
+            self.unify(index_ty, &idx.into())?;
             ConstraintSolveResult::Solved
         } else if found.as_adt().is_some() {
             todo!("Trait-based indexing")
@@ -137,7 +138,8 @@ impl<'db> InferenceCtx<'db> {
                     },
                 );
             }
-            self.unify(&elem_var.into(), &fields[has_index as usize]).as_cs_res()
+            self.unify(&elem_var.into(), &fields[has_index as usize])?;
+            ConstraintSolveResult::Solved
         } else if let Some((def, _)) = found.as_adt() {
             ConstraintSolveResult::Error(UnificationError::TypeDefIdMismatch(
                 def,
@@ -157,7 +159,8 @@ impl<'db> InferenceCtx<'db> {
         let found = self.find(struct_ty);
         if let Some((struct_id, fields)) = self.is_struct(&found) {
             if let Some(ty) = &fields.get(&field) {
-                self.unify(&elem_var.into(), ty).as_cs_res()
+                self.unify(&elem_var.into(), ty)?;
+                ConstraintSolveResult::Solved
             } else {
                 ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField {
                     def: TypeDefId::Struct(struct_id),
@@ -204,7 +207,7 @@ impl<'db> InferenceCtx<'db> {
             if let InferTy::Var(_) = rhs_ty
                 && let Some(lid) = lid.is_int_like(self.db)
             {
-                self.unify(&lhs_ty, &rhs_ty).as_cs_res()?;
+                self.unify(&lhs_ty, &rhs_ty)?;
                 return self.solve_int_binop(res_ty, lid, lid, op);
             }
         }
@@ -216,7 +219,7 @@ impl<'db> InferenceCtx<'db> {
                 if fields.is_empty()
                     && let Some(int_like) = def.is_int_like(self.db) =>
             {
-                self.unify(&v.into(), &rhs_ty).as_cs_res()?;
+                self.unify(&v.into(), &rhs_ty)?;
                 self.solve_int_binop(res_ty, int_like, int_like, op)
             }
             (lhs_ty, rhs_ty) => todo!(
@@ -252,7 +255,8 @@ impl<'db> InferenceCtx<'db> {
                 if lid == rid {
                     let ty =
                         InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
-                    self.unify(&res_ty.into(), &ty).as_cs_res()
+                    self.unify(&res_ty.into(), &ty)?;
+                    ConstraintSolveResult::Solved
                 } else {
                     let llayout = layout_of(
                         self.db,
@@ -271,7 +275,8 @@ impl<'db> InferenceCtx<'db> {
                         let ty = int_ty_with_witdh(self.db, max_width);
                         let infer_ty =
                             InferTy::Adt { def: ty.def(self.db), fields: Vec::new() };
-                        return self.unify(&res_ty.into(), &infer_ty).as_cs_res();
+                        self.unify(&res_ty.into(), &infer_ty)?;
+                        return ConstraintSolveResult::Solved;
                     }
                     todo!()
                 }
@@ -281,8 +286,8 @@ impl<'db> InferenceCtx<'db> {
                     InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
                 let rty =
                     InferTy::Adt { def: TypeDefId::Builtin(rid), fields: Vec::new() };
-                self.unify(&lty, &rty).as_cs_res()?;
-                self.unify(&lty, &res_ty.into()).as_cs_res()?;
+                self.unify(&lty, &rty)?;
+                self.unify(&lty, &res_ty.into())?;
                 ConstraintSolveResult::Solved
             }
             BinaryOperator::And => todo!(),
@@ -410,7 +415,7 @@ impl<'db> InferenceCtx<'db> {
         method_call_infos.args.iter().zip(&ast.data.args).try_for_each(
             |(arg, ast_ty)| {
                 let arg_ty = self.allocate_ast_type_expr(&ast_ty.ty.data, &method_ctx);
-                self.unify(arg, &arg_ty).as_cs_res()
+                self.unify(arg, &arg_ty)
             },
         )?;
 
@@ -421,7 +426,7 @@ impl<'db> InferenceCtx<'db> {
             &method_ctx,
         );
 
-        self.unify(&method_call_infos.ret_var.into(), &ret_ty).as_cs_res()?;
+        self.unify(&method_call_infos.ret_var.into(), &ret_ty)?;
 
         let call_infos = InferCallInfos {
             expr_id,
@@ -688,8 +693,8 @@ impl<'db> InferenceCtx<'db> {
         }
 
         self.solve_constraints()
-            .map_err(|(cs, err)| UnificationError::UnmetConstraint(cs, Box::new(err)))
-            .as_cs_res()
+            .map_err(|(cs, err)| UnificationError::UnmetConstraint(cs, Box::new(err)))?;
+        ConstraintSolveResult::Solved
     }
 
     fn solve_fat_ptr_constraint(
@@ -727,7 +732,8 @@ impl<'db> InferenceCtx<'db> {
             )));
         }
 
-        self.unify(&metadata_var.into(), &self.usize_ty()).as_cs_res()
+        self.unify(&metadata_var.into(), &self.usize_ty())?;
+        ConstraintSolveResult::Solved
     }
 
     fn solve_cast_constraint(
@@ -922,7 +928,8 @@ impl<'db> InferenceCtx<'db> {
                     // We're done
                     ConstraintSolveResult::Solved
                 } else if let Some(ty) = get_ref_inner(self, ref_ty) {
-                    self.unify(&inner, &ty).as_cs_res()
+                    self.unify(&inner, &ty)?;
+                    ConstraintSolveResult::Solved
                 } else {
                     ConstraintSolveResult::Pending
                 }
@@ -944,7 +951,8 @@ impl<'db> InferenceCtx<'db> {
         a: &InferTy,
         b: &InferTy,
     ) -> ConstraintSolveResult {
-        self.unify(a, b).as_cs_res()
+        self.unify(a, b)?;
+        ConstraintSolveResult::Solved
     }
 
     fn compute_possible_blocks(

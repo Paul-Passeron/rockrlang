@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{
     collections::{HashMap, HashSet, btree_map::Entry},
+    convert::Infallible,
     fmt,
     iter::once,
     ops::{FromResidual, Residual, Try},
@@ -125,6 +126,15 @@ impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
     }
 }
 
+impl FromResidual<Result<Infallible, UnificationError>> for ConstraintSolveResult {
+    fn from_residual(residual: Result<Infallible, UnificationError>) -> Self {
+        match residual {
+            Ok(_) => unreachable!(),
+            Err(err) => Self::Error(err),
+        }
+    }
+}
+
 impl Residual<()> for ConstraintSolveResultResidual {
     type TryType = ConstraintSolveResult;
 }
@@ -156,19 +166,6 @@ impl Try for ConstraintSolveResult {
 impl From<UnificationError> for ConstraintSolveResult {
     fn from(value: UnificationError) -> Self {
         Self::Error(value)
-    }
-}
-
-trait AsConstraintSolveResult {
-    fn as_cs_res(self) -> ConstraintSolveResult;
-}
-
-impl<T> AsConstraintSolveResult for Result<T, UnificationError> {
-    fn as_cs_res(self) -> ConstraintSolveResult {
-        match self {
-            Ok(_) => ConstraintSolveResult::Solved,
-            Err(err) => ConstraintSolveResult::Error(err),
-        }
     }
 }
 
