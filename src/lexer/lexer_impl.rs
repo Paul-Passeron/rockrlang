@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![allow(dead_code)]
-#![allow(unused_variables)]
 
 use core::fmt;
 use regex::Regex;
@@ -57,16 +55,6 @@ impl<T: fmt::Debug> Iterator for Lexer<'_, T> {
 }
 
 impl<'db, T> Lexer<'db, T> {
-    fn advance(&mut self) -> Option<char> {
-        if self.is_done() {
-            None
-        } else {
-            let c = self.file.content(self.db)[self.offset..].chars().next()?;
-            self.offset += c.len_utf8();
-            Some(c)
-        }
-    }
-
     fn advance_n_bytes(&mut self, n: usize) {
         if self.is_done() {
             return;
