@@ -45,9 +45,7 @@ use crate::{
     },
     name_resolve::type_expr::struct_item,
     parse_tree::expr::BinaryOperator,
-    resolved::{
-        BuiltinTypeId, BuiltinTypeKind, TypeDefId, bool_id, type_ref::CastClass,
-    },
+    resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, bool_id, type_ref::CastClass},
     thir_to_mir::FuncInst,
 };
 
@@ -847,7 +845,9 @@ impl MTLBCtx<'_> {
     }
 
     fn is_signed(&self, ty: ConcreteTy) -> bool {
-        ty.def(self.db).is_int_like(self.db).is_some_and(|int_like| int_like.is_signed(self.db))
+        ty.def(self.db)
+            .is_int_like(self.db)
+            .is_some_and(|int_like| int_like.is_signed(self.db))
     }
 }
 

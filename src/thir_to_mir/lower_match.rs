@@ -152,7 +152,11 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         default,
                         span,
                     });
-                } else if ty.as_type_id(self.db).def(self.db).is_int_like(self.db).is_some()
+                } else if ty
+                    .as_type_id(self.db)
+                    .def(self.db)
+                    .is_int_like(self.db)
+                    .is_some()
                 {
                     let mut scrut_place = place.clone();
                     scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));

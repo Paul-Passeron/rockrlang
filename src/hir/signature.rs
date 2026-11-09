@@ -56,8 +56,12 @@ impl ZelfArg {
     pub fn as_type_ref_for(self, db: &dyn Db, ty: TypeRef) -> TypeRef {
         match self.kind {
             ZelfKind::Zelf => ty,
-            ZelfKind::RefZelf => ref_of::<TypeId>(db, ty, self.mutability.is_mut()).into(),
-            ZelfKind::PtrZelf => ptr_of::<TypeId>(db, ty, self.mutability.is_mut()).into(),
+            ZelfKind::RefZelf => {
+                ref_of::<TypeId>(db, ty, self.mutability.is_mut()).into()
+            }
+            ZelfKind::PtrZelf => {
+                ptr_of::<TypeId>(db, ty, self.mutability.is_mut()).into()
+            }
         }
     }
 }

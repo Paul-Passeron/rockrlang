@@ -140,8 +140,8 @@ impl InferenceCtx<'_> {
     pub fn infer_cast_class(&self, ty: &InferTy) -> Option<CastClass> {
         let (def, fields) = ty.as_adt()?;
         if let Some(kind) = def.is_ptr_like(self.db) {
-            let is_fat = matches!(kind, PtrKind::Ref(_))
-                && fields[0].as_slice(self.db).is_some();
+            let is_fat =
+                matches!(kind, PtrKind::Ref(_)) && fields[0].as_slice(self.db).is_some();
             return Some(if is_fat {
                 CastClass::FatPtr(kind.mutability())
             } else {
@@ -151,8 +151,11 @@ impl InferenceCtx<'_> {
         let TypeDefId::Builtin(builtin) = def else {
             return None;
         };
-        matches!(builtin.kind(self.db), BuiltinTypeKind::Bool | BuiltinTypeKind::Int { .. })
-            .then_some(CastClass::Int)
+        matches!(
+            builtin.kind(self.db),
+            BuiltinTypeKind::Bool | BuiltinTypeKind::Int { .. }
+        )
+        .then_some(CastClass::Int)
     }
 
     pub fn static_allocate_type_ref(

@@ -569,7 +569,8 @@ impl<'a> ThirToMIR<'a> {
                 MIRRValueKind::Metadata(self.build_operand(*expr))
             }
             ExprKind::Cast(expr, ty) => {
-                // TODO: use `ConcreteTy`s instead of `TypeRef`s as early as possible
+                // TODO: use `ConcreteTy`s instead of `TypeRef`s as early as
+                // possible
                 self.check_cast(self.thir.exprs[*expr].ty, *ty, span);
                 let ty = self.ty(*ty);
                 MIRRValueKind::Cast(self.build_operand(*expr), ty)

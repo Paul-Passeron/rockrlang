@@ -103,8 +103,8 @@ impl<T> Frozen<T> {
         if bucket_idx == data.len() - 1 && idx >= next_bucket_idx {
             return None;
         }
-        // SAFETY: This is fine because the index is valid and the element is actually
-        // init
+        // SAFETY: This is fine because the index is valid and the element is
+        // actually init
         Some(unsafe {
             data[bucket_idx]
                 .as_ptr()
@@ -274,7 +274,8 @@ impl<T> IntoIterator for Frozen<T> {
             if i == last_box {
                 for (idx, item) in values.into_iter().enumerate() {
                     if idx < last_item {
-                        // SAFETY: This is the last bucket, but before the last_idx
+                        // SAFETY: This is the last bucket, but before the
+                        // last_idx
                         unsafe {
                             res.push(item.assume_init());
                         }

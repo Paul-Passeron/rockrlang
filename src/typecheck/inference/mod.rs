@@ -444,7 +444,9 @@ impl InferenceCtx<'_> {
         let snapshot = self.table.snapshot();
         let res = f(self);
         self.snapshot_depth -= 1;
-        if res.is_ok() { self.table.commit(snapshot) } else {
+        if res.is_ok() {
+            self.table.commit(snapshot)
+        } else {
             self.table.rollback_to(snapshot);
             self.rollback_undo_log(mark);
         }

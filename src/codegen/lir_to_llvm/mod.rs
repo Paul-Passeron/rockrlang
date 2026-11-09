@@ -387,10 +387,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                                 .build_gep(
                                     self.c.i8_type(),
                                     ptr,
-                                    &[self
-                                        .c
-                                        .i32_type()
-                                        .const_int(offset.bytes(), false)],
+                                    &[self.c.i32_type().const_int(offset.bytes(), false)],
                                     "payload_offset_ptr",
                                 )
                                 .unwrap()
@@ -497,9 +494,8 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                         } else if lhs.is_pointer_value() && rhs.is_pointer_value() {
                             let lhs = lhs.into_pointer_value();
                             let rhs = rhs.into_pointer_value();
-                            let ptrint = self
-                                .c
-                                .ptr_sized_int_type(&TargetData::create(""), None);
+                            let ptrint =
+                                self.c.ptr_sized_int_type(&TargetData::create(""), None);
                             let lhs = self.b.build_ptr_to_int(lhs, ptrint, "").unwrap();
                             let rhs = self.b.build_ptr_to_int(rhs, ptrint, "").unwrap();
                             (lhs, rhs)

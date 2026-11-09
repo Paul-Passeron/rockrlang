@@ -19,7 +19,9 @@ use itertools::Itertools;
 
 use crate::{
     Db,
-    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap},
+    codegen::{
+        Codegen, MIRToLIRBuild, MIRToLIRDeclare, MTLBCtx, mir_to_lir::build::MIRMap,
+    },
     layout::{LIRTy, layout_of},
     lir::{DefinedLinkage::Export, Module, Signature},
     mangle::fun_mangle,

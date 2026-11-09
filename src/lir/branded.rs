@@ -20,15 +20,19 @@ use std::marker::PhantomData;
 use itertools::Itertools;
 
 use crate::{
-    Db, common::{
+    Db,
+    common::{
         arena::{Arena, Idx},
         symbols::Symbol,
-    }, layout::LIRTy, lir::{
+    },
+    layout::LIRTy,
+    lir::{
         Branded, Finalized, FunctionSig, LIRDef, LIRFunctionId, ValueDef, ValueId,
         VerifyError,
         finalized::{BlockData, FunctionBody, StackSlot},
         inst::{BlockTarget, ValueInstKind, VoidInstKind},
-    }, unused,
+    },
+    unused,
 };
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;

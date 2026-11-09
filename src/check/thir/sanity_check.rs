@@ -180,7 +180,11 @@ impl<'db> SanityChecker<'db> {
                     .and_then(|ty| ty.def(self.db).is_int_like(self.db))
                     .is_none()
                 {
-                    self.check_types(expected_ty, int_id(self.db).as_type_ref(self.db), pat.span);
+                    self.check_types(
+                        expected_ty,
+                        int_id(self.db).as_type_ref(self.db),
+                        pat.span,
+                    );
                 }
             }
         }
@@ -304,7 +308,11 @@ impl<'db> SanityChecker<'db> {
                             );
                         }
                         self.check_types(lhs_ty, rhs_ty, infos.span);
-                        self.check_types(bool_id(self.db).as_type_ref(self.db), infos.ty, infos.span);
+                        self.check_types(
+                            bool_id(self.db).as_type_ref(self.db),
+                            infos.ty,
+                            infos.span,
+                        );
                     }
                     BinaryOperator::And | BinaryOperator::Or => {
                         let bool_id = bool_id(self.db).as_type_ref(self.db);
@@ -835,7 +843,8 @@ impl WrapKind {
 /// tolerates non-concrete leaves (e.g. a bare `Param` inside a generic
 /// function's own body), which `RefWrappedTy<TypeId>` cannot represent.
 fn wrap_type_ref(db: &dyn Db, refs: &[WrapKind], ty: TypeRef) -> TypeRef {
-    refs.iter().fold(ty, |ty, WrapKind::Ref(mutability)| ty.wrap_ref(db, mutability.is_mut()))
+    refs.iter()
+        .fold(ty, |ty, WrapKind::Ref(mutability)| ty.wrap_ref(db, mutability.is_mut()))
 }
 
 /// Like [`RefWrappedTy`], but over `TypeRef` directly — `AdtLike` cannot be
@@ -858,7 +867,11 @@ impl PeeledTy {
     }
 }
 
-fn peel_type_ref_until(db: &dyn Db, mut ty: TypeRef, target: TypeRef) -> Option<PeeledTy> {
+fn peel_type_ref_until(
+    db: &dyn Db,
+    mut ty: TypeRef,
+    target: TypeRef,
+) -> Option<PeeledTy> {
     let mut refs = vec![];
     while ty != target
         && let Some((mutability, inner)) = ty.as_ref(db)

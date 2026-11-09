@@ -21,7 +21,10 @@ use dashmap::DashMap;
 use salsa::Setter;
 
 use crate::{
-    SourceFile, compiler::{CompilerError, Config, Workspace}, layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth}, unused,
+    SourceFile,
+    compiler::{CompilerError, Config, Workspace},
+    layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth},
+    unused,
 };
 
 #[salsa::db]
