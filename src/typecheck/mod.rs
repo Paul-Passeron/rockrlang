@@ -403,8 +403,8 @@ impl<'db> TyCtx<'db> {
                         self.db,
                         format!(
                             "Annotation does not match the type: {} vs {}",
-                            self.inf_ctx.find(&annotated).to_string(self.db),
-                            self.inf_ctx.find(&init_ty).to_string(self.db),
+                            self.inf_ctx.show(&annotated),
+                            self.inf_ctx.show(&init_ty),
                         ),
                         pattern.span.start().span(init.span.end()),
                     );
@@ -476,8 +476,8 @@ impl<'db> TyCtx<'db> {
                             self.db,
                             format!(
                                 "Cannot return {} form a function expected to return {}",
-                                self.inf_ctx.find(&infer_ty).to_string(self.db),
-                                self.inf_ctx.find(&ret_ty).to_string(self.db)
+                                self.inf_ctx.show(&infer_ty),
+                                self.inf_ctx.show(&ret_ty)
                             ),
                             expr.span,
                         );
@@ -488,7 +488,7 @@ impl<'db> TyCtx<'db> {
                         self.db,
                         format!(
                             "Cannot return error type form a function expected to return {}",
-                            self.inf_ctx.find(&ret_ty).to_string(self.db)
+                            self.inf_ctx.show(&ret_ty)
                         ),
                         expr.span,
                     );
@@ -501,7 +501,7 @@ impl<'db> TyCtx<'db> {
                     self.db,
                     format!(
                         "Cannot have an empty return from a function expected to return {}",
-                        self.inf_ctx.find(&ret_ty).to_string(self.db)
+                        self.inf_ctx.show(&ret_ty)
                     ),
                     span,
                 );
@@ -515,8 +515,8 @@ impl<'db> TyCtx<'db> {
             Ok(lhs_ty) => match rhs_ty {
                 TyRef::Inf(rhs_ty) => {
                     if let Err(err) = self.inf_ctx.unify(&lhs_ty, &rhs_ty) {
-                        let lstr = self.inf_ctx.find(&lhs_ty).to_string(self.db);
-                        let rstr = self.inf_ctx.find(&rhs_ty).to_string(self.db);
+                        let lstr = self.inf_ctx.show(&lhs_ty);
+                        let rstr = self.inf_ctx.show(&rhs_ty);
                         Diag::emit_error(
                             self.db,
                             format!(

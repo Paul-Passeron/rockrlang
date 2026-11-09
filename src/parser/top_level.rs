@@ -53,7 +53,7 @@ impl Parser<'_> {
     ) -> Result<AstAnyTopLevelItem, ParseError> {
         let start = self.get_start();
         match &self.current_token()?.kind {
-            TokenKind::Directive(dir) if *dir == Symbol::new(self.db, "include") => {
+            TokenKind::Directive(dir) if dir.is(self.db, "include") => {
                 self.consume();
                 let include_path = self.parse_include_path()?;
                 let end = self.get_end();
@@ -777,7 +777,7 @@ impl Parser<'_> {
                     span,
                 ))
             }
-            TokenKind::Directive(s) if *s == Symbol::new(self.db, "extern") => {
+            TokenKind::Directive(s) if s.is(self.db, "extern") => {
                 self.consume();
                 self.expect(TokenKind::OpenBra)?;
                 self.consume();

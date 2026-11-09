@@ -173,10 +173,7 @@ impl<'db> InferenceCtx<'db> {
                 field,
             })
         } else {
-            println!(
-                "Pending here ! found type to be {}",
-                self.find(&found).to_string(self.db)
-            );
+            println!("Pending here ! found type to be {}", self.show(&found));
             ConstraintSolveResult::Pending
         }
     }

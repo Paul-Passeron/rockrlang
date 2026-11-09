@@ -159,6 +159,10 @@ impl InferenceCtx<'_> {
         self.snapshot(|this| this.try_unify(a, b))
     }
 
+    pub fn show(&mut self, ty: &InferTy) -> String {
+        self.find(ty).to_string(self.db)
+    }
+
     pub fn find(&mut self, ty: &InferTy) -> InferTy {
         match ty {
             InferTy::Var(infer_var) => {

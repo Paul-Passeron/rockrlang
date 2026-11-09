@@ -220,7 +220,7 @@ impl<'db> LowerFundef<'db> {
         match &desc.data {
             AstTypeExprDesc::Named { name, args } => {
                 if args.is_empty() {
-                    if name.data == Symbol::new(self.db, "_") {
+                    if name.data.is(self.db, "_") {
                         return TypeRef::Unknown;
                     }
                     if name.data.is(self.db, "Self") {

@@ -16,10 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    common::{
-        location::{self, Span},
-        symbols::Symbol,
-    },
+    common::location::{self, Span},
     lexer::TokenKind,
     parse_tree::{
         Spanned,
@@ -514,7 +511,7 @@ impl Parser<'_> {
                 let end = self.get_end();
                 Ok(Spanned::new(AstExprDesc::Tuple(exprs), start.span(end)))
             }
-            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "sizeof") => {
+            TokenKind::Directive(dir) if dir.is(self.db, "sizeof") => {
                 self.consume();
                 self.expect(TokenKind::OpenPar)?;
                 self.consume();
@@ -525,7 +522,7 @@ impl Parser<'_> {
                 Ok(AstExpr::new(AstExprDesc::SizeOf(ty), start.span(end)))
             }
 
-            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "metadata") => {
+            TokenKind::Directive(dir) if dir.is(self.db, "metadata") => {
                 self.consume();
 
                 self.expect(TokenKind::OpenPar)?;
@@ -541,7 +538,7 @@ impl Parser<'_> {
                 Ok(AstExpr::new(AstExprDesc::Metadata(Box::new(expr)), start.span(end)))
             }
 
-            TokenKind::Directive(dir) if dir == Symbol::new(self.db, "type_name") => {
+            TokenKind::Directive(dir) if dir.is(self.db, "type_name") => {
                 self.consume();
 
                 self.expect(TokenKind::OpenPar)?;

@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    common::symbols::Symbol,
     lexer::TokenKind,
     parse_tree::{
         Spanned,
@@ -167,7 +166,7 @@ impl Parser<'_> {
         let start = self.get_start();
 
         if let TokenKind::Identifier(name) = self.current_token()?.kind
-            && name == Symbol::new(self.db, "_")
+            && name.is(self.db, "_")
         {
             self.consume();
             let end = self.get_end();
