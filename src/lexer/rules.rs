@@ -168,16 +168,24 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
             Ok(Token {
                 location,
                 kind: TokenKind::CharLit(
-                    rustc_literal_escaper::unescape_char(&lexeme[1..len - 1])
-                        .map_err(|_| todo!())?,
+                    rustc_literal_escaper::unescape_char(&lexeme[1..len - 1]).map_err(
+                        |_| LexError {
+                            message: format!("Invalid escape character {lexeme}"),
+                            file: location.file,
+                            offset: location.start_offset,
+                        },
+                    )?,
                 ),
             })
         }),
         (Regex::new("[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
-            Ok(Token {
-                location,
-                kind: TokenKind::IntLit(lexeme.parse::<i64>().unwrap()),
-            })
+            let parsed = lexeme.parse::<i64>().map_err(|_| LexError {
+                message: format!("Int lit too large: `{}`", lexeme),
+                file: location.file,
+                offset: location.start_offset,
+            })?;
+
+            Ok(Token { location, kind: TokenKind::IntLit(parsed) })
         }),
     ]
 }
