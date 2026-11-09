@@ -62,15 +62,25 @@ impl<'db, T> Lexer<'db, T> {
             None
         } else {
             let c = self.file.content(self.db)[self.offset..].chars().next()?;
-            self.offset += 1;
+            self.offset += c.len_utf8();
             Some(c)
         }
     }
 
-    fn advance_n(&mut self, n: usize) {
-        for _ in 0..n {
-            self.advance();
+    fn advance_n_bytes(&mut self, n: usize) {
+        if self.is_done() {
+            return;
         }
+        let mut count = 0;
+        while count < n {
+            let Some(c) =
+                self.file.content(self.db)[self.offset + count..].chars().next()
+            else {
+                return;
+            };
+            count += c.len_utf8();
+        }
+        self.offset += count;
     }
 
     pub fn is_done(&self) -> bool {
@@ -97,7 +107,7 @@ impl<'db, T> Lexer<'db, T> {
             if !could_skip {
                 break;
             }
-            self.advance_n(skip_count);
+            self.advance_n_bytes(skip_count);
         }
     }
 
@@ -145,7 +155,7 @@ impl<'db, T> Lexer<'db, T> {
                     break;
                 }
             }
-            self.advance_n(token_length);
+            self.advance_n_bytes(token_length);
             res.unwrap_or_else(|| {
                 Err(LexError {
                     message: format!(
