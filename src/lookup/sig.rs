@@ -82,42 +82,18 @@ struct GeneralSignature<'a> {
 
 impl FunctionLikeAst {
     fn general_sig(&self) -> GeneralSignature<'_> {
-        match self {
-            Self::ExternDef(ast, _) => GeneralSignature {
-                name: &ast.data.name,
-                ret_ty: &ast.data.return_type,
-                args: &ast.data.args,
-                templates: &ast.data.template_args,
-            },
-            Self::Fundef(ast) => GeneralSignature {
-                name: &ast.data.name,
-                ret_ty: &ast.data.return_type,
-                args: &ast.data.args,
-                templates: &ast.data.template_args,
-            },
-            Self::Method(ast) => GeneralSignature {
-                name: &ast.data.name,
-                ret_ty: &ast.data.return_type,
-                args: &ast.data.args,
-                templates: &ast.data.template_args,
-            },
-            Self::TraitMethod(ast) => GeneralSignature {
-                name: &ast.data.name,
-                ret_ty: &ast.data.return_type,
-                args: &ast.data.args,
-                templates: &ast.data.template_args,
-            },
+        GeneralSignature {
+            name: self.name(),
+            ret_ty: self.get_ret(),
+            args: self.get_args(),
+            templates: self.templates(),
         }
     }
 }
 
 impl FunctionId {
     pub fn body_span(self, db: &dyn Db) -> Option<Span> {
-        match function_ast(db, self.into()).inner(db) {
-            FunctionLikeAst::Fundef(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::Method(ast) => Some(ast.data.body_span),
-            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_) => None,
-        }
+        function_ast(db, self.into()).inner(db).body_span()
     }
 }
 

@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, SourceFile,
     common::location::{Location, Span},
-    hir::{FunctionLikeAst, function_ast},
+    hir::function_ast,
     lookup::{enclosing_fun, enclosing_scope_owner},
     name_resolve::{interfaces::interface_item, module_items},
     parse_tree::{
@@ -59,32 +59,8 @@ pub fn type_node_at(db: &dyn Db, loc: Location) -> Option<TypeNode> {
 
 fn function_type_at(db: &dyn Db, func: FunctionId, loc: Location) -> Option<TypeNode> {
     let ast = function_ast(db, func.into()).inner(db);
-    let (templates, args, ret_ty, body) = match &ast {
-        FunctionLikeAst::Fundef(a) => (
-            a.data.template_args.as_slice(),
-            a.data.args.as_slice(),
-            &a.data.return_type,
-            a.data.body.as_slice(),
-        ),
-        FunctionLikeAst::Method(a) => (
-            a.data.template_args.as_slice(),
-            a.data.args.as_slice(),
-            &a.data.return_type,
-            a.data.body.as_slice(),
-        ),
-        FunctionLikeAst::ExternDef(a, _) => (
-            a.data.template_args.as_slice(),
-            a.data.args.as_slice(),
-            &a.data.return_type,
-            [].as_slice(),
-        ),
-        FunctionLikeAst::TraitMethod(a) => (
-            a.data.template_args.as_slice(),
-            a.data.args.as_slice(),
-            &a.data.return_type,
-            [].as_slice(),
-        ),
-    };
+    let (templates, args, ret_ty, body) =
+        (ast.templates(), ast.get_args(), ast.get_ret(), ast.body());
     let ctx = AstImplicitContext::new(db, func.parent(db), templates);
 
     let resolved = thir_body(db, func).and_then(|t| t.resolved_type_seed_at(db, loc));

@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::parse_tree::{Spanned, stmt::AstStmt, top_level::AstTemplateArg};
 use std::{fmt, sync::Arc};
 
 use crate::{
@@ -437,6 +438,40 @@ impl FunctionLikeAst {
     pub fn has_body(&self) -> bool {
         !matches!(self, Self::ExternDef(_, _) | Self::TraitMethod(_))
     }
+
+    pub fn name(&self) -> &Spanned<Symbol> {
+        match self {
+            Self::ExternDef(spanned, _) => &spanned.data.name,
+            Self::Fundef(spanned) => &spanned.data.name,
+            Self::Method(spanned) => &spanned.data.name,
+            Self::TraitMethod(spanned) => &spanned.data.name,
+        }
+    }
+
+    pub fn templates(&self) -> &[AstTemplateArg] {
+        match self {
+            Self::ExternDef(spanned, _) => &spanned.data.template_args,
+            Self::Fundef(spanned) => &spanned.data.template_args,
+            Self::Method(spanned) => &spanned.data.template_args,
+            Self::TraitMethod(spanned) => &spanned.data.template_args,
+        }
+    }
+
+    pub fn body(&self) -> &[AstStmt] {
+        match self {
+            Self::Fundef(spanned) => &spanned.data.body,
+            Self::Method(spanned) => &spanned.data.body,
+            Self::ExternDef(_, _) | Self::TraitMethod(_) => &[],
+        }
+    }
+
+    pub fn is_variadic(&self) -> bool {
+        matches!(self, Self::ExternDef(_, true))
+    }
+
+    pub fn is_method(&self) -> bool {
+        matches!(self, Self::Method(_) | Self::TraitMethod(_))
+    }
 }
 
 #[salsa::tracked]
@@ -564,13 +599,13 @@ impl FunctionId {
         let templates = get_templates_of_fun(db, self.interned());
         let owning_module = owning_module(db, self.parent(db));
         let ast = function_ast(db, self.interned()).inner(db);
-        let (type_expr, has_zelf) = match ast {
-            FunctionLikeAst::ExternDef(spanned, _) => (&spanned.data.return_type, false),
-            FunctionLikeAst::Fundef(spanned) => (&spanned.data.return_type, false),
-            FunctionLikeAst::Method(spanned) => (&spanned.data.return_type, true),
-            FunctionLikeAst::TraitMethod(spanned) => (&spanned.data.return_type, true),
-        };
-        resolve_type_expr(db, type_expr, owning_module.interned(), templates, has_zelf)
+        resolve_type_expr(
+            db,
+            ast.get_ret(),
+            owning_module.interned(),
+            templates,
+            ast.is_method(),
+        )
     }
 
     pub fn args(self, db: &dyn Db) -> (Option<TypeRef>, Vec<AstFundefArg>) {
@@ -594,16 +629,10 @@ impl FunctionId {
     }
 
     pub fn has_body(self, db: &dyn Db) -> bool {
-        !matches!(
-            function_ast(db, self.interned()).inner(db),
-            FunctionLikeAst::ExternDef(_, _) | FunctionLikeAst::TraitMethod(_)
-        )
+        function_ast(db, self.interned()).inner(db).has_body()
     }
 
     pub fn is_var_args(self, db: &dyn Db) -> bool {
-        match function_ast(db, self.interned()).inner(db) {
-            FunctionLikeAst::ExternDef(_, var_arg) => *var_arg,
-            _ => false,
-        }
+        function_ast(db, self.interned()).inner(db).is_variadic()
     }
 }

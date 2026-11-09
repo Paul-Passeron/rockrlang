@@ -22,7 +22,7 @@ use itertools::Itertools;
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{FunctionLikeAst, function_ast, impl_sources},
+    hir::{function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         interfaces::interface_item,
@@ -221,14 +221,7 @@ pub fn get_templates_of_fun_only<'db>(
 ) -> Vec<AstTemplateArg> {
     let mut res = vec![];
     let ast = function_ast(db, function);
-    match ast.inner(db) {
-        FunctionLikeAst::ExternDef(sig, _) => res.extend(sig.data.template_args.clone()),
-        FunctionLikeAst::Fundef(def) => {
-            res.extend(def.data.template_args.clone());
-        }
-        FunctionLikeAst::Method(def) => res.extend(def.data.template_args.clone()),
-        FunctionLikeAst::TraitMethod(sig) => res.extend(sig.data.template_args.clone()),
-    }
+    res.extend(ast.inner(db).templates().iter().cloned());
     res
 }
 

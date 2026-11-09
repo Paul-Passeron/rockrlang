@@ -33,7 +33,7 @@ use crate::{
         timing::{Counts, Phase, timed},
         workspace_packages,
     },
-    hir::{Mutability, function_ast, signature::get_sig_of_function},
+    hir::{Mutability, signature::get_sig_of_function},
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
@@ -153,10 +153,7 @@ impl FuncInst {
 #[salsa::tracked]
 impl FuncInst {
     pub fn is_variadic(self, db: &dyn Db) -> bool {
-        match function_ast(db, self.fdef(db).interned()).inner(db) {
-            crate::hir::FunctionLikeAst::ExternDef(_, variadic) => *variadic,
-            _ => false,
-        }
+        self.fdef(db).is_var_args(db)
     }
 
     pub fn is_main(self, db: &dyn Db) -> bool {

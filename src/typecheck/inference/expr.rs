@@ -28,8 +28,8 @@ use crate::{
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
     hir::{
-        FunctionLikeAst, HirConstructorArgs, HirExpr, HirExprDesc, HirPlace,
-        HirPlaceKind, HirStructField, LocalId, function_ast,
+        HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, HirPlaceKind, HirStructField,
+        LocalId, function_ast,
     },
     name_resolve::type_expr::{
         enum_item, get_templates_of_fun, struct_item, templates_of_enum,
@@ -505,13 +505,9 @@ impl InferenceCtx<'_> {
         target: FunctionId,
         arg_count: usize,
     ) -> Result<(), UnificationError> {
-        let ast = function_ast(self.db, target.interned()).inner(self.db);
         let (_, args) = target.args(self.db);
-        if args.len() == arg_count {
-            Ok(())
-        } else if let FunctionLikeAst::ExternDef(_, variadic) = ast
-            && *variadic
-            && args.len() <= arg_count
+        if args.len() == arg_count
+            || (target.is_var_args(self.db) && args.len() <= arg_count)
         {
             Ok(())
         } else {
@@ -526,12 +522,7 @@ impl InferenceCtx<'_> {
         zelf: Option<&InferTy>,
     ) -> InferTy {
         let ast = function_ast(self.db, target.interned()).inner(self.db);
-        let ast_ret_ty = match ast {
-            FunctionLikeAst::ExternDef(sig, _) => &sig.data.return_type,
-            FunctionLikeAst::Fundef(def) => &def.data.return_type,
-            FunctionLikeAst::Method(def) => &def.data.return_type,
-            FunctionLikeAst::TraitMethod(sig) => &sig.data.return_type,
-        };
+        let ast_ret_ty = ast.get_ret();
 
         let ctx = ImplicitContext::from_function(
             self.db,
