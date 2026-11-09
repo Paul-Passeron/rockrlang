@@ -20,7 +20,7 @@ use std::{
     convert::Infallible,
     fmt,
     iter::once,
-    ops::{FromResidual, Residual, Try},
+    ops::{ControlFlow, FromResidual, Residual, Try},
     sync::Arc,
 };
 
@@ -109,29 +109,19 @@ enum ConstraintSolveResultResidual {
     Error(UnificationError),
 }
 
-impl From<ConstraintSolveResultResidual> for ConstraintSolveResult {
-    fn from(value: ConstraintSolveResultResidual) -> Self {
-        match value {
-            ConstraintSolveResultResidual::Pending => Self::Pending,
-            ConstraintSolveResultResidual::Error(unification_error) => {
-                Self::Error(unification_error)
-            }
-        }
-    }
-}
-
 impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
     fn from_residual(residual: ConstraintSolveResultResidual) -> Self {
-        residual.into()
+        match residual {
+            ConstraintSolveResultResidual::Pending => Self::Pending,
+            ConstraintSolveResultResidual::Error(err) => Self::Error(err),
+        }
     }
 }
 
 impl FromResidual<Result<Infallible, UnificationError>> for ConstraintSolveResult {
     fn from_residual(residual: Result<Infallible, UnificationError>) -> Self {
-        match residual {
-            Ok(_) => unreachable!(),
-            Err(err) => Self::Error(err),
-        }
+        let Err(err) = residual;
+        Self::Error(err)
     }
 }
 
@@ -148,24 +138,14 @@ impl Try for ConstraintSolveResult {
         Self::Solved
     }
 
-    fn branch(self) -> std::ops::ControlFlow<Self::Residual, Self::Output> {
+    fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
         match self {
-            ConstraintSolveResult::Solved => std::ops::ControlFlow::Continue(()),
-            ConstraintSolveResult::Pending => {
-                std::ops::ControlFlow::Break(ConstraintSolveResultResidual::Pending)
-            }
-            ConstraintSolveResult::Error(unification_error) => {
-                std::ops::ControlFlow::Break(ConstraintSolveResultResidual::Error(
-                    unification_error,
-                ))
+            Self::Solved => ControlFlow::Continue(()),
+            Self::Pending => ControlFlow::Break(ConstraintSolveResultResidual::Pending),
+            Self::Error(err) => {
+                ControlFlow::Break(ConstraintSolveResultResidual::Error(err))
             }
         }
-    }
-}
-
-impl From<UnificationError> for ConstraintSolveResult {
-    fn from(value: UnificationError) -> Self {
-        Self::Error(value)
     }
 }
 
