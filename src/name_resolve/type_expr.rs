@@ -64,7 +64,7 @@ pub fn resolve_type_expr_desc<'db>(
     match type_expr {
         AstTypeExprDesc::Named { name, args } => {
             if args.is_empty() {
-                if name.data == Symbol::new(db, "Self") {
+                if name.data.is(db, "Self") {
                     return TypeRef::Zelf;
                 }
                 if let Some(idx) = template_args.iter().position(|p| p.name == name.data)

@@ -138,7 +138,7 @@ impl<'db> LowerFundef<'db> {
                         self.db,
                         format!(
                             "expr_as_place: Name `{}` not found in local scope",
-                            symbol.interned().contents(self.db)
+                            symbol.display(self.db)
                         ),
                         expr.span,
                     );
@@ -223,7 +223,7 @@ impl<'db> LowerFundef<'db> {
                     if name.data == Symbol::new(self.db, "_") {
                         return TypeRef::Unknown;
                     }
-                    if name.data == Symbol::new(self.db, "Self") {
+                    if name.data.is(self.db, "Self") {
                         return TypeRef::Zelf;
                     }
                     if let Some(idx) =
@@ -352,7 +352,7 @@ impl<'db> LowerFundef<'db> {
         {
             todo!(
                 "bare function name `{}` used as value expression",
-                symbol.interned().contents(self.db)
+                symbol.display(self.db)
             )
         } else {
             Diag::emit_error(
@@ -395,7 +395,7 @@ impl<'db> LowerFundef<'db> {
                 }
                 _ => todo!(),
             }
-        } else if from == Symbol::new(self.db, "Self") {
+        } else if from.is(self.db, "Self") {
             // TODO: we're losing template info here
             let zelf = self
                 .function
@@ -421,10 +421,7 @@ impl<'db> LowerFundef<'db> {
                 _ => {
                     Diag::emit_error(
                         self.db,
-                        format!(
-                            "badly name-resolved item ({})",
-                            from.interned().contents(self.db)
-                        ),
+                        format!("badly name-resolved item ({})", from.display(self.db)),
                         from_span,
                     );
                     HirExprDesc::Error
@@ -507,7 +504,7 @@ impl<'db> LowerFundef<'db> {
                 if let Some(_id) = scope.map.get(symbol) {
                     todo!(
                         "call through local function pointer `{}`",
-                        symbol.interned().contents(self.db)
+                        symbol.display(self.db)
                     )
                 }
                 let args =

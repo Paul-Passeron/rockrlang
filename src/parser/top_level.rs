@@ -96,7 +96,7 @@ impl Parser<'_> {
         let mut includes = vec![];
         while self.current_token()?.kind != TokenKind::CloseBra {
             if let TokenKind::Directive(s) = self.current_token()?.kind
-                && s.interned().contents(self.db) == "include"
+                && s.is(self.db, "include")
             {
                 self.consume();
                 let start = self.get_start();

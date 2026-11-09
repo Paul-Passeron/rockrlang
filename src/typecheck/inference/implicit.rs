@@ -296,9 +296,7 @@ pub trait AsAstImplCtx {
     ) -> Option<TypeRef> {
         match ty {
             AstTypeExprDesc::Named { name, args } => {
-                if name.data == Symbol::new(db, "Self")
-                    && module == this.owning_module(db)
-                {
+                if name.data.is(db, "Self") && module == this.owning_module(db) {
                     return if let Some(zelf) = this.owner(db).get_canonical_zelf(db) {
                         Some(zelf)
                     } else {
@@ -326,9 +324,7 @@ pub trait AsAstImplCtx {
                 }
             }
             AstTypeExprDesc::NameResolved { from, to } => {
-                if from.data == Symbol::new(db, "Self")
-                    && module == this.owning_module(db)
-                {
+                if from.data.is(db, "Self") && module == this.owning_module(db) {
                     if let AstTypeExprDesc::Named { name, args } = &to.as_ref().data
                         && args.is_empty()
                     {

@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
-    compiler::diagnostic::{Diag, Severity},
+    compiler::diagnostic::Diag,
     resolved::{FunctionId, InternedFunctionId},
     thir::{Thir, thir_body},
 };
@@ -41,5 +41,5 @@ pub fn checked_thir_body<'db>(db: &'db dyn Db, function: InternedFunctionId<'db>
 pub fn thir_is_valid(db: &dyn Db, function: FunctionId) -> bool {
     checked_thir_body::accumulated::<Diag>(db, function.interned())
         .iter()
-        .all(|diag| diag.severity != Severity::Error)
+        .all(|diag| !diag.is_error())
 }

@@ -49,6 +49,9 @@ impl Symbol {
     pub fn to_string(self, db: &dyn Db) -> String {
         self.display(db)
     }
+    pub fn is(self, db: &dyn Db, s: &str) -> bool {
+        self.interned().contents(db) == s
+    }
 }
 
 #[salsa::interned]

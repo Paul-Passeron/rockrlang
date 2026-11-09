@@ -253,8 +253,7 @@ impl<'db> InferenceCtx<'db> {
             }
             BinaryOperator::Plus | BinaryOperator::Minus | BinaryOperator::Times => {
                 if lid == rid {
-                    let ty =
-                        InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
+                    let ty = InferTy::simple(TypeDefId::Builtin(lid));
                     self.unify(&res_ty.into(), &ty)?;
                     ConstraintSolveResult::Solved
                 } else {
@@ -273,8 +272,7 @@ impl<'db> InferenceCtx<'db> {
                     {
                         let max_width = lwidth.max(rwidth);
                         let ty = int_ty_with_witdh(self.db, max_width);
-                        let infer_ty =
-                            InferTy::Adt { def: ty.def(self.db), fields: Vec::new() };
+                        let infer_ty = InferTy::simple(ty.def(self.db));
                         self.unify(&res_ty.into(), &infer_ty)?;
                         return ConstraintSolveResult::Solved;
                     }
@@ -282,10 +280,8 @@ impl<'db> InferenceCtx<'db> {
                 }
             }
             BinaryOperator::Div | BinaryOperator::Modulo => {
-                let lty =
-                    InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
-                let rty =
-                    InferTy::Adt { def: TypeDefId::Builtin(rid), fields: Vec::new() };
+                let lty = InferTy::simple(TypeDefId::Builtin(lid));
+                let rty = InferTy::simple(TypeDefId::Builtin(rid));
                 self.unify(&lty, &rty)?;
                 self.unify(&lty, &res_ty.into())?;
                 ConstraintSolveResult::Solved

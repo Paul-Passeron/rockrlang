@@ -23,7 +23,7 @@ use crate::{
     codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     common::location::LocationInfo,
     compiler::{
-        diagnostic::{Diag, Severity},
+        diagnostic::Diag,
         timing::{PhaseStat, render_timings},
     },
     mir::{concrete_ty::Substitution, passes::dead_code_elimination::dce},
@@ -60,7 +60,7 @@ pub use workspace::*;
 pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
     let ws = Workspace::get(db);
     let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
-    let has_errors = raw_diags.iter().any(|d| d.severity == Severity::Error);
+    let has_errors = raw_diags.iter().any(|d| d.is_error());
     (has_errors, raw_diags)
 }
 

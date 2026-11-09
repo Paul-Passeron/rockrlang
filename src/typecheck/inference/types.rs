@@ -35,42 +35,27 @@ use crate::{
 
 impl InferenceCtx<'_> {
     pub fn void_ty(&self) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::void(self.db)),
-            fields: Vec::new(),
-        }
+        InferTy::simple(BuiltinTypeId::void(self.db))
     }
 
     pub fn int_ty(&self) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::int(self.db)),
-            fields: Vec::new(),
-        }
+        InferTy::simple(BuiltinTypeId::int(self.db))
     }
 
     pub fn usize_ty(&self) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::usize(self.db)),
-            fields: Vec::new(),
-        }
+        InferTy::simple(BuiltinTypeId::usize(self.db))
     }
 
     pub fn bool_ty(&self) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::bool(self.db)),
-            fields: Vec::new(),
-        }
+        InferTy::simple(BuiltinTypeId::bool(self.db))
     }
 
     pub fn char_ty(&self) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::char(self.db)),
-            fields: Vec::new(),
-        }
+        InferTy::simple(BuiltinTypeId::char(self.db))
     }
 
     pub fn str_ty(&self) -> InferTy {
-        InferTy::Adt { def: str_def(self.db), fields: Vec::new() }
+        InferTy::simple(str_def(self.db))
     }
 
     pub fn ptr_of(&self, ty: InferTy) -> InferTy {

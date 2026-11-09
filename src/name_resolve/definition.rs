@@ -451,5 +451,5 @@ pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -
     } else {
         String::new()
     };
-    format!("{}{}", prefix, id.name(db).interned().contents(db))
+    format!("{}{}", prefix, id.name(db).display(db))
 }

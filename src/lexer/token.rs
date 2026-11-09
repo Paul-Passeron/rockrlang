@@ -121,22 +121,22 @@ impl fmt::Display for TokenKindDisplay<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.kind {
             TokenKind::Identifier(name) => {
-                write!(f, "{}", name.interned().contents(self.db))
+                write!(f, "{}", name.display(self.db))
             }
             TokenKind::IntLit(value) => write!(f, "{value}"),
             TokenKind::FloatLit(bits) => write!(f, "{:?}", f64::from_bits(*bits)),
             TokenKind::CharLit(c) => write!(f, "{c}"),
             TokenKind::StrLit(s) => {
-                write!(f, "\"{}\"", s.interned().contents(self.db))
+                write!(f, "\"{}\"", s.display(self.db))
             }
             TokenKind::CStrLit(s) => {
-                write!(f, "c\"{}\"", s.interned().contents(self.db))
+                write!(f, "c\"{}\"", s.display(self.db))
             }
             TokenKind::Directive(d) => {
-                write!(f, "@{}", d.interned().contents(self.db))
+                write!(f, "@{}", d.display(self.db))
             }
             TokenKind::Hashed(symbol) => {
-                write!(f, "#{}", symbol.interned().contents(self.db))
+                write!(f, "#{}", symbol.display(self.db))
             }
             TokenKind::HashPound => write!(f, "#"),
             TokenKind::Let => write!(f, "let"),

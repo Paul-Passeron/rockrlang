@@ -61,6 +61,10 @@ pub struct DiagLabel {
 }
 
 impl Diag {
+    pub fn is_error(&self) -> bool {
+        self.severity == Severity::Error
+    }
+
     pub fn redefinition(db: &dyn Db, defs: Vec<Definition>) -> Self {
         assert!(!defs.is_empty());
         let (first, others) = {

@@ -72,6 +72,10 @@ pub enum InferTy {
 }
 
 impl InferTy {
+    pub fn simple(def: impl Into<TypeDefId>) -> Self {
+        Self::Adt { def: def.into(), fields: Vec::new() }
+    }
+
     pub fn to_string<'a>(&'a self, db: &'a dyn Db) -> String {
         TypePrinter::new().infer_ty_to_string(db, self.clone(), None)
     }
