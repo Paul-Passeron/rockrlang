@@ -103,36 +103,36 @@ enum ConstraintSolveResult {
     Error(UnificationError),
 }
 
-enum CondtraintSolveResultResidual {
+enum ConstraintSolveResultResidual {
     Pending,
     Error(UnificationError),
 }
 
-impl From<CondtraintSolveResultResidual> for ConstraintSolveResult {
-    fn from(value: CondtraintSolveResultResidual) -> Self {
+impl From<ConstraintSolveResultResidual> for ConstraintSolveResult {
+    fn from(value: ConstraintSolveResultResidual) -> Self {
         match value {
-            CondtraintSolveResultResidual::Pending => Self::Pending,
-            CondtraintSolveResultResidual::Error(unification_error) => {
+            ConstraintSolveResultResidual::Pending => Self::Pending,
+            ConstraintSolveResultResidual::Error(unification_error) => {
                 Self::Error(unification_error)
             }
         }
     }
 }
 
-impl FromResidual<CondtraintSolveResultResidual> for ConstraintSolveResult {
-    fn from_residual(residual: CondtraintSolveResultResidual) -> Self {
+impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
+    fn from_residual(residual: ConstraintSolveResultResidual) -> Self {
         residual.into()
     }
 }
 
-impl Residual<()> for CondtraintSolveResultResidual {
+impl Residual<()> for ConstraintSolveResultResidual {
     type TryType = ConstraintSolveResult;
 }
 
 impl Try for ConstraintSolveResult {
     type Output = ();
 
-    type Residual = CondtraintSolveResultResidual;
+    type Residual = ConstraintSolveResultResidual;
 
     fn from_output((): Self::Output) -> Self {
         Self::Solved
@@ -142,10 +142,10 @@ impl Try for ConstraintSolveResult {
         match self {
             ConstraintSolveResult::Solved => std::ops::ControlFlow::Continue(()),
             ConstraintSolveResult::Pending => {
-                std::ops::ControlFlow::Break(CondtraintSolveResultResidual::Pending)
+                std::ops::ControlFlow::Break(ConstraintSolveResultResidual::Pending)
             }
             ConstraintSolveResult::Error(unification_error) => {
-                std::ops::ControlFlow::Break(CondtraintSolveResultResidual::Error(
+                std::ops::ControlFlow::Break(ConstraintSolveResultResidual::Error(
                     unification_error,
                 ))
             }
