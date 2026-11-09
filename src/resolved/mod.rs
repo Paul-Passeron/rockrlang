@@ -161,12 +161,12 @@ impl From<IntWidth> for IntWidthKind {
 impl IntWidthKind {
     pub fn as_suffix(self) -> &'static str {
         match self {
-            IntWidthKind::System => "size",
-            IntWidthKind::Fixed(IntWidth::I8) => "8",
-            IntWidthKind::Fixed(IntWidth::I16) => "16",
-            IntWidthKind::Fixed(IntWidth::I32) => "32",
-            IntWidthKind::Fixed(IntWidth::I64) => "64",
-            IntWidthKind::Fixed(IntWidth::I128) => "128",
+            Self::System => "size",
+            Self::Fixed(IntWidth::I8) => "8",
+            Self::Fixed(IntWidth::I16) => "16",
+            Self::Fixed(IntWidth::I32) => "32",
+            Self::Fixed(IntWidth::I64) => "64",
+            Self::Fixed(IntWidth::I128) => "128",
         }
     }
 }

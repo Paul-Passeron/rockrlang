@@ -88,7 +88,7 @@ impl<'a> From<InternedConcreteTy<'a>> for ConcreteTy {
     }
 }
 
-impl<'a> From<ConcreteTy> for InternedConcreteTy<'a> {
+impl From<ConcreteTy> for InternedConcreteTy<'_> {
     fn from(value: ConcreteTy) -> Self {
         value.interned()
     }
@@ -99,7 +99,7 @@ impl ConcreteTy {
         self.interned().def(db)
     }
 
-    pub fn args(self, db: &dyn Db) -> &[ConcreteTy] {
+    pub fn args(self, db: &dyn Db) -> &[Self] {
         self.interned().args(db)
     }
 
@@ -111,7 +111,7 @@ impl ConcreteTy {
         self.interned().as_type_id(db)
     }
 
-    pub fn new(db: &dyn Db, def: TypeDefId, args: Vec<ConcreteTy>) -> Self {
+    pub fn new(db: &dyn Db, def: TypeDefId, args: Vec<Self>) -> Self {
         InternedConcreteTy::new(db, def, args).into()
     }
 }
@@ -119,7 +119,7 @@ impl ConcreteTy {
 impl TypeRef {
     pub fn to_concrete(self, db: &dyn Db, subs: &Substitution) -> Option<ConcreteTy> {
         match self {
-            TypeRef::Concrete(type_id) => {
+            Self::Concrete(type_id) => {
                 let args = type_id
                     .args(db)
                     .iter()
@@ -128,7 +128,7 @@ impl TypeRef {
                 Some(ConcreteTy::new(db, type_id.def(db), args))
             }
 
-            TypeRef::Param(type_param_id) => subs.0.get(type_param_id.0).copied(),
+            Self::Param(type_param_id) => subs.0.get(type_param_id.0).copied(),
             _ => None,
         }
     }
@@ -143,7 +143,7 @@ impl ConcreteTy {
         self.interned().as_struct(db)
     }
 
-    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<ConcreteTy>> {
+    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
         self.as_type_ref(db).as_tuple_ref(db).map(|tys| {
             tys.iter()
                 .map(|ty| {
@@ -154,7 +154,7 @@ impl ConcreteTy {
         })
     }
 
-    pub fn as_ptr(self, db: &dyn Db) -> Option<(crate::hir::Mutability, ConcreteTy)> {
+    pub fn as_ptr(self, db: &dyn Db) -> Option<(crate::hir::Mutability, Self)> {
         self.as_type_ref(db).as_ptr(db).map(|(m, ty)| {
             (
                 m,
@@ -164,7 +164,7 @@ impl ConcreteTy {
         })
     }
 
-    pub fn as_ref(self, db: &dyn Db) -> Option<(crate::hir::Mutability, ConcreteTy)> {
+    pub fn as_ref(self, db: &dyn Db) -> Option<(crate::hir::Mutability, Self)> {
         self.as_type_ref(db).as_ref(db).map(|(m, ty)| {
             (
                 m,
@@ -236,7 +236,7 @@ impl<'db> From<InternedConcreteEnumRef<'db>> for ConcreteEnumRef {
     }
 }
 
-impl<'db> From<ConcreteEnumRef> for InternedConcreteEnumRef<'db> {
+impl From<ConcreteEnumRef> for InternedConcreteEnumRef<'_> {
     fn from(value: ConcreteEnumRef) -> Self {
         Self(value.0, PhantomData)
     }
@@ -248,7 +248,7 @@ impl<'db> From<InternedConcreteStructRef<'db>> for ConcreteStructRef {
     }
 }
 
-impl<'db> From<ConcreteStructRef> for InternedConcreteStructRef<'db> {
+impl From<ConcreteStructRef> for InternedConcreteStructRef<'_> {
     fn from(value: ConcreteStructRef) -> Self {
         Self(value.0, PhantomData)
     }
@@ -327,7 +327,7 @@ impl ConcreteStructRef {
 }
 
 #[salsa::tracked]
-impl<'db> InternedStructId<'db> {
+impl InternedStructId<'_> {
     #[salsa::tracked(returns(copy))]
     pub fn declared_typeof_field(self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
         let item = struct_item(db, self);
