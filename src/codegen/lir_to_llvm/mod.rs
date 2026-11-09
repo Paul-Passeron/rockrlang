@@ -15,8 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
-
+use crate::{
+    Db,
+    codegen::{Codegen, IModule, LIRToLLVM},
+    common::arena::Idx,
+    layout::{Discriminant, IntWidth, LIRTy, LayoutData, LayoutID, Offset, ScalarKind},
+    lir::{
+        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
+        finalized::{BlockData, FunctionBody, StackSlot},
+        inst::{
+            CastKind, ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
+        },
+    },
+    resolved::never_id,
+};
 use inkwell::{
     AddressSpace,
     attributes::{Attribute, AttributeLoc},
@@ -31,21 +43,7 @@ use inkwell::{
     },
 };
 use itertools::Itertools;
-
-use crate::{
-    Db,
-    codegen::{Codegen, IModule, LIRToLLVM},
-    common::arena::Idx,
-    layout::{Discriminant, IntWidth, LayoutData, LayoutID, Offset, ScalarKind},
-    lir::{
-        self, Complete, Finalized, FunctionSig, LIRDef, LIRFunctionId,
-        finalized::{BlockData, FunctionBody, StackSlot},
-        inst::{
-            CastKind, ConstValue, Instruction, Terminator, ValueInstKind, VoidInstKind,
-        },
-    },
-    resolved::never_id,
-};
+use std::{collections::HashMap, num::NonZero};
 
 impl<'db, 'ctx> Codegen<'db, LIRToLLVM<'db, 'ctx>> {
     pub fn finalize(self, ctx: &'ctx Context) -> IModule<'ctx> {
@@ -207,7 +205,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                             });
 
                         for inst in &data.insts {
-                            self.lower_inst(inst, &mut fn_ctx);
+                            self.lower_inst(inst, body, &mut fn_ctx);
                         }
                     } else {
                         self.build_block(blk, body, &mut fn_ctx);
@@ -260,11 +258,22 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
             });
 
         for inst in &blk_data.insts {
-            self.lower_inst(inst, ctx);
+            self.lower_inst(inst, body, ctx);
         }
     }
 
-    fn lower_inst(&mut self, inst: &Instruction<Finalized>, ctx: &mut FnCtx<'ctx>) {
+    fn ty_as_int_bitcast(&mut self, ty: LIRTy) -> IntType<'ctx> {
+        debug_assert!(!ty.is_zst(self.db));
+        let bitwidth = ty.layout.size(self.db).bytes() * 8;
+        self.c.custom_width_int_type(NonZero::new(bitwidth as u32).unwrap()).unwrap()
+    }
+
+    fn lower_inst(
+        &mut self,
+        inst: &Instruction<Finalized>,
+        body: &FunctionBody,
+        ctx: &mut FnCtx<'ctx>,
+    ) {
         match inst {
             Instruction::Void(void_inst_kind) => match void_inst_kind {
                 VoidInstKind::Store { ptr, value } => {
@@ -546,6 +555,43 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                                 .unwrap()
                                 .into()
                         }
+                    }
+                    ValueInstKind::Bitwise { op, lhs, rhs } => {
+                        let result_ty = ctx.values[lhs].get_type();
+                        let lhs_int_ty = self.ty_as_int_bitcast(body.defs[*lhs].ty);
+                        let lhs_value = self
+                            .b
+                            .build_bit_cast(ctx.values[lhs], lhs_int_ty, "Lhs bit cast")
+                            .unwrap()
+                            .into_int_value();
+                        let rhs_value = self
+                            .b
+                            .build_bit_cast(ctx.values[rhs], lhs_int_ty, "Rhs bit cast")
+                            .unwrap()
+                            .into_int_value();
+
+                        let bits: BasicValueEnum<'_> = match op {
+                            lir::Bitwise::And => self
+                                .b
+                                .build_and(lhs_value, rhs_value, "bitwise and")
+                                .unwrap()
+                                .into(),
+                            lir::Bitwise::Or => self
+                                .b
+                                .build_or(lhs_value, rhs_value, "bitwise or")
+                                .unwrap()
+                                .into(),
+                            lir::Bitwise::Xor => self
+                                .b
+                                .build_xor(lhs_value, rhs_value, "bitwise xor")
+                                .unwrap()
+                                .into(),
+                        };
+
+                        self.b
+                            .build_bit_cast(bits, result_ty, "bits to value")
+                            .unwrap()
+                            .into()
                     }
                 };
                 ctx.values.insert(*def, value);

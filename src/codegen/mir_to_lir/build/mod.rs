@@ -29,7 +29,7 @@ use crate::{
         layout_of,
     },
     lir::{
-        ArithBinop, Body, CmpBinop, LIRFunctionId, ValueId,
+        ArithBinop, Body, CmpBinop, LIRFunctionId, Logic, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
         inst::{CastKind, Terminator},
@@ -713,8 +713,8 @@ impl MTLBCtx<'_> {
                         );
                         b.not(lt)
                     }
-                    BinaryOperator::And => todo!(),
-                    BinaryOperator::Or => todo!(),
+                    BinaryOperator::And => b.logic(Logic::And, lhs, rhs),
+                    BinaryOperator::Or => b.logic(Logic::Or, lhs, rhs),
                     BinaryOperator::BitAnd => todo!(),
                     BinaryOperator::BitOr => todo!(),
                     BinaryOperator::BitXor => todo!(),

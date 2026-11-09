@@ -233,6 +233,9 @@ impl ValueInstKind<Branded<'_>> {
             Self::Cast { kind, value, to } => {
                 ValueInstKind::Cast { kind, value: value.idx, to }
             }
+            Self::Bitwise { op, lhs, rhs } => {
+                ValueInstKind::Bitwise { op, lhs: lhs.idx, rhs: rhs.idx }
+            }
         }
     }
 }

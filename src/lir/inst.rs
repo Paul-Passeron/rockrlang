@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     layout::{LIRTy, ScalarKind},
-    lir::{ArithBinop, CmpBinop, LIRFunctionId, Logic, Refs},
+    lir::{ArithBinop, Bitwise, CmpBinop, LIRFunctionId, Logic, Refs},
 };
 
 pub enum Instruction<R: Refs> {
@@ -65,6 +65,7 @@ pub enum ValueInstKind<R: Refs> {
     Logic { op: Logic, lhs: R::Val, rhs: R::Val },
     Not { value: R::Val },
     Cast { kind: CastKind, value: R::Val, to: ScalarKind },
+    Bitwise { op: Bitwise, lhs: R::Val, rhs: R::Val },
 }
 
 pub enum CastKind {

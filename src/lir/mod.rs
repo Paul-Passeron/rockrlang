@@ -220,6 +220,13 @@ pub enum Logic {
     And,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Bitwise {
+    And,
+    Or,
+    Xor,
+}
+
 pub enum Body<S: ModulePhase> {
     Import { variadic: bool },
     Defined(DefinedLinkage, S::FnBody),

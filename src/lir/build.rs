@@ -25,8 +25,8 @@ use crate::{
         VariantsLayout,
     },
     lir::{
-        Aggregate, ArithBinop, Body, Branded, Building, CmpBinop, FunctionSig, Int,
-        IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar, ScalarMarker,
+        Aggregate, ArithBinop, Bitwise, Body, Branded, Building, CmpBinop, FunctionSig,
+        Int, IntValue, LIRDef, LIRFunctionId, Logic, Module, Scalar, ScalarMarker,
         ScalarValue, SigKind, Typed, TypedPtr, Union, ValueClass, ValueDef, ValueId,
         ValueKind, VerifyError,
         branded::{BrandedBlockData, BrandedBlockId, BrandedStackSlot, InProgressBody},
@@ -506,6 +506,22 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         self.push_value(bool_ty, ValueInstKind::Logic { op, lhs, rhs })
     }
 
+    pub fn bitwise(
+        &mut self,
+        op: Bitwise,
+        lhs: ValueId<'ir>,
+        rhs: ValueId<'ir>,
+    ) -> ValueId<'ir> {
+        debug_assert_eq!(
+            self.body.defs[lhs.idx].ty.layout.size(self.db),
+            self.body.defs[rhs.idx].ty.layout.size(self.db)
+        );
+        self.push_value(
+            self.body.defs[lhs.idx].ty,
+            ValueInstKind::Bitwise { op, lhs, rhs },
+        )
+    }
+
     pub fn logic_typed(
         &mut self,
         op: Logic,
@@ -579,8 +595,6 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         let res = dest.as_ref().map(ValueDef::id);
 
         let params = self.get_params(f);
-
-        // assert_eq!(params.len(), args.len());
 
         for (param, arg) in params.iter().zip(args.iter()) {
             assert_eq!(param.layout, self.body.defs[arg.idx].ty.layout);
