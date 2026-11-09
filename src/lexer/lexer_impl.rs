@@ -117,7 +117,6 @@ impl<'db, T> Lexer<'db, T> {
         token_patterns: Vec<TokenPattern<'db, T>>,
         skip_patterns: Vec<Regex>,
     ) -> Self {
-        let contents = source.content(db);
         Self { db, offset: 0, file: source, token_patterns, skip_patterns }
     }
 
@@ -146,11 +145,7 @@ impl<'db, T> Lexer<'db, T> {
                 {
                     token_length = mat.end();
                     let token_string: &str = &to_match[..token_length];
-                    let mut end = self.offset;
-                    for _ in 0..token_length {
-                        end += 1;
-                    }
-                    let span = Span::new(self.file, start, end);
+                    let span = Span::new(self.file, start, start + token_length);
                     res = Some(func(self.db, token_string, span));
                     break;
                 }
@@ -160,7 +155,7 @@ impl<'db, T> Lexer<'db, T> {
                 Err(LexError {
                     message: format!(
                         "Unexpected character `{}`",
-                        contents.chars().nth(self.offset).unwrap_or('\0')
+                        contents[self.offset..].chars().next().unwrap_or('\0')
                     ),
                     file: self.file,
                     offset: self.offset,
