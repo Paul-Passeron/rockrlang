@@ -152,10 +152,10 @@ impl<'db, 'ctx> Codegen<'db, MIRToLIRBuild<'db, 'ctx>> {
     fn lower(&mut self, lir_id: LIRFunctionId) {
         let db = self.db;
         let Self { lir, ctx, .. } = self;
-        lir.build_function(db, lir_id, |b| Self::_lower(b, ctx)).unwrap();
+        lir.build_function(db, lir_id, |b| Self::lower_with_builder(b, ctx)).unwrap();
     }
 
-    fn _lower(builder: &mut FunctionBuilder<'_, '_>, ctx: &mut MTLBCtx) {
+    fn lower_with_builder(builder: &mut FunctionBuilder<'_, '_>, ctx: &mut MTLBCtx) {
         ctx.lower(builder);
     }
 }

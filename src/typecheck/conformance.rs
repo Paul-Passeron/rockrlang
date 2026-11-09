@@ -149,7 +149,7 @@ fn impl_bounds_hold(db: &dyn Db, id: ImplId, subs: &[TypeId], zelf: TypeId) -> b
     })
 }
 
-fn _type_implements_initial(
+fn type_implements_initial(
     _db: &dyn Db,
     _id: salsa::Id,
     _ty: InternedTypeId<'_>,
@@ -160,7 +160,7 @@ fn _type_implements_initial(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=_type_implements_initial
+    cycle_initial=type_implements_initial
 )]
 fn _type_implements<'db>(
     db: &'db dyn Db,

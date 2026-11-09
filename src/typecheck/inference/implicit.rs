@@ -288,7 +288,7 @@ pub trait AsAstImplCtx {
         }
     }
 
-    fn _resolve(
+    fn resolve_in_module(
         this: &Self,
         db: &dyn Db,
         ty: &AstTypeExprDesc,
@@ -342,7 +342,7 @@ pub trait AsAstImplCtx {
                     else {
                         return None;
                     };
-                    Self::_resolve(this, db, &to.data, new_module)
+                    Self::resolve_in_module(this, db, &to.data, new_module)
                 }
             }
             AstTypeExprDesc::Ref { mutable, pointee } => {
@@ -382,7 +382,7 @@ pub trait AsAstImplCtx {
     }
 
     fn resolve(&self, db: &dyn Db, ty: &AstTypeExprDesc) -> Option<TypeRef> {
-        Self::_resolve(self, db, ty, self.owning_module(db))
+        Self::resolve_in_module(self, db, ty, self.owning_module(db))
     }
 
     fn resolve_err(&self, db: &dyn Db, ty: &AstTypeExprDesc) -> TypeRef {
