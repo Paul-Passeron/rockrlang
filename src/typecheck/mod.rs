@@ -240,44 +240,25 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_expr(&mut self, expr: &HirExpr) -> InferTy {
         match self.inf_ctx.infer_expr(expr) {
-            Ok(InferTy::Error) => {
-                Diag::emit_error(
-                    self.db,
-                    format!("Could not infer type of expression"),
-                    expr.span,
-                );
-                InferTy::Error
-            }
+            Ok(infer_ty) => infer_ty,
             Err(err) => {
                 self.report_unif(&err, expr.span);
                 InferTy::Error
             }
-            Ok(infer_ty) => infer_ty,
         }
     }
 
     fn check_cond(&mut self, cond: &HirExpr, what: &str) {
         let expr_ty = self.type_check_expr(cond);
-        match expr_ty {
-            InferTy::Var(_) | InferTy::Adt { .. } | InferTy::Param(_) => {
-                if let Err(err) = self.inf_ctx.unify(&expr_ty, &self.inf_ctx.bool_ty()) {
-                    Diag::emit_error(
-                        self.db,
-                        format!(
-                            "{what} condition must be of type bool: {}",
-                            err.display(self.db)
-                        ),
-                        cond.span,
-                    );
-                }
-            }
-            InferTy::Error => {
-                Diag::emit_error(
-                    self.db,
-                    format!("{what} condition must be of type bool but got an error",),
-                    cond.span,
-                );
-            }
+        if let Err(err) = self.inf_ctx.unify(&expr_ty, &self.inf_ctx.bool_ty()) {
+            Diag::emit_error(
+                self.db,
+                format!(
+                    "{what} condition must be of type bool: {}",
+                    err.display(self.db)
+                ),
+                cond.span,
+            );
         }
     }
 
