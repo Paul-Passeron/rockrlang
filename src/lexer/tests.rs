@@ -6,7 +6,9 @@ use crate::{
     lexer::{Lexer, TokenKind},
 };
 
-fn lex_in(db: &RockrDb, src: &str) -> Vec<Result<(TokenKind, usize, usize), String>> {
+type Lexed = Result<(TokenKind, usize, usize), String>;
+
+fn lex_in(db: &RockrDb, src: &str) -> Vec<Lexed> {
     let file = SourceFile::new(db, PathBuf::from("test.rkr"), Arc::from(src));
     let mut lexer = Lexer::new(db as &dyn Db, file);
     let mut out = vec![];
