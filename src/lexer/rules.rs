@@ -25,29 +25,26 @@ use crate::common::symbols::Symbol;
 use crate::lexer::TokenPattern;
 use regex::Regex;
 
+fn anchored(re: &str) -> Regex {
+    Regex::new(&format!(r"\A(?:{re})")).unwrap()
+}
+
 macro_rules! get_simple_rule {
     ($regex: literal, $kind: expr) => {
-        (
-            Regex::new($regex).unwrap(),
-            |_, _: &str, location: Span| -> Result<Token, LexError> {
-                Ok(super::Token { location, kind: $kind })
-            },
-        )
+        (anchored($regex), |_, _: &str, location: Span| -> Result<Token, LexError> {
+            Ok(super::Token { location, kind: $kind })
+        })
     };
 }
 
 pub(super) fn get_skip_rules() -> Vec<Regex> {
-    vec![
-        Regex::new("[ \n\t\r]+").unwrap(),
-        Regex::new(r"//[^\n]*").unwrap(),
-        Regex::new(r"(?s)/\*.*?\*/").unwrap(),
-    ]
+    vec![anchored("[ \n\t\r]+"), anchored(r"//[^\n]*"), anchored(r"(?s)/\*.*?\*/")]
 }
 
 pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
     vec![
         (
-            Regex::new(r#"c"(\\.|[^"\\])*""#).unwrap(),
+            anchored(r#"c"(\\.|[^"\\])*""#),
             |db: &'db dyn Db, lexeme: &str, location: Span| {
                 let len = lexeme.len();
                 Ok(Token {
@@ -96,7 +93,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("&", TokenKind::BitAnd),
         get_simple_rule!("!", TokenKind::Not),
         (
-            Regex::new("#[A-Za-z_][A-Za-z0-9_]*").unwrap(),
+            anchored("#[A-Za-z_][A-Za-z0-9_]*"),
             |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
@@ -106,7 +103,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         ),
         get_simple_rule!("#", TokenKind::HashPound),
         (
-            Regex::new("@[A-Za-z_][A-Za-z0-9_]*").unwrap(),
+            anchored("@[A-Za-z_][A-Za-z0-9_]*"),
             |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
@@ -119,7 +116,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         ),
         get_simple_rule!("@", TokenKind::AddressOf),
         (
-            Regex::new("[A-Za-z_][A-Za-z0-9_]*").unwrap(),
+            anchored("[A-Za-z_][A-Za-z0-9_]*"),
             |db: &'db dyn Db, lexeme: &str, location: Span| {
                 Ok(Token {
                     location,
@@ -153,7 +150,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
             },
         ),
         (
-            Regex::new(r#""(\\.|[^"\\])*""#).unwrap(),
+            anchored(r#""(\\.|[^"\\])*""#),
             |db: &'db dyn Db, lexeme: &str, location: Span| {
                 let len = lexeme.len();
                 Ok(Token {
@@ -162,7 +159,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 })
             },
         ),
-        (Regex::new(r"'(\\.|[^'\\])*'").unwrap(), |_, lexeme: &str, location: Span| {
+        (anchored(r"'(\\.|[^'\\])*'"), |_, lexeme: &str, location: Span| {
             let len = lexeme.len();
             Ok(Token {
                 location,
@@ -177,7 +174,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 ),
             })
         }),
-        (Regex::new(r"[0-9]+\.[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
+        (anchored(r"[0-9]+\.[0-9]+"), |_, lexeme: &str, location: Span| {
             let parsed = lexeme.parse::<f64>().map_err(|_| LexError {
                 message: format!("Invalid float lit: `{lexeme}`"),
                 file: location.file,
@@ -186,7 +183,7 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
 
             Ok(Token { location, kind: TokenKind::FloatLit(parsed.to_bits()) })
         }),
-        (Regex::new("[0-9]+").unwrap(), |_, lexeme: &str, location: Span| {
+        (anchored("[0-9]+"), |_, lexeme: &str, location: Span| {
             let parsed = lexeme.parse::<i64>().map_err(|_| LexError {
                 message: format!("Int lit too large: `{lexeme}`"),
                 file: location.file,
