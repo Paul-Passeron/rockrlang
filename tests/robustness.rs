@@ -22,10 +22,8 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-const TIMEOUT: Duration = Duration::from_secs(300);
+const TIMEOUT: Duration = Duration::from_secs(120);
 const LINE_DELETIONS_PER_FILE: usize = 8;
-const LINE_DELETIONS_PER_LARGE_FILE: usize = 3;
-const LARGE_FILE_LINES: usize = 300;
 
 const KNOWN_PANICS: &[(&str, &str)] = &[
     ("", "Cannot index into"),
@@ -65,12 +63,7 @@ fn mutants() -> Vec<Mutant> {
             push(format!("first {keep} lines"), lines[..keep].join("\n"));
         }
 
-        let deletions = if lines.len() > LARGE_FILE_LINES {
-            LINE_DELETIONS_PER_LARGE_FILE
-        } else {
-            LINE_DELETIONS_PER_FILE
-        };
-        let step = (lines.len() / deletions).max(1);
+        let step = (lines.len() / LINE_DELETIONS_PER_FILE).max(1);
         for i in (0..lines.len()).step_by(step) {
             let mut l = lines.clone();
             l.remove(i);
@@ -91,12 +84,13 @@ fn mutants() -> Vec<Mutant> {
 enum Verdict {
     Ok,
     Panicked(String),
-    TimedOut,
+    TimedOut(PathBuf),
 }
 
 fn compile(source: &str, workdir: &std::path::Path, id: usize) -> Verdict {
     let file = workdir.join(format!("m{id}.rkr"));
     let obj = workdir.join(format!("m{id}.o"));
+    let err = workdir.join(format!("m{id}.stderr"));
     std::fs::write(&file, source).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_rockrc"))
         .arg(&file)
@@ -104,7 +98,7 @@ fn compile(source: &str, workdir: &std::path::Path, id: usize) -> Verdict {
         .arg(&obj)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(std::fs::File::create(&err).unwrap())
         .spawn()
         .unwrap();
     let start = Instant::now();
@@ -115,12 +109,17 @@ fn compile(source: &str, workdir: &std::path::Path, id: usize) -> Verdict {
         if start.elapsed() > TIMEOUT {
             let _ = child.kill();
             let _ = child.wait();
-            return Verdict::TimedOut;
+            let keep = PathBuf::from("target/robustness-timeouts");
+            std::fs::create_dir_all(&keep).unwrap();
+            let saved = keep.join(format!("m{id}.rkr"));
+            std::fs::copy(&file, &saved).unwrap();
+            let _ = std::fs::copy(&err, keep.join(format!("m{id}.stderr")));
+            return Verdict::TimedOut(saved);
         }
         std::thread::sleep(Duration::from_millis(10));
     };
-    let stderr =
-        String::from_utf8_lossy(&child.wait_with_output().unwrap().stderr).into_owned();
+    let stderr = String::from_utf8_lossy(&std::fs::read(&err).unwrap()).into_owned();
+    let _ = std::fs::remove_file(&err);
     let _ = std::fs::remove_file(&file);
     let _ = std::fs::remove_file(&obj);
     if status.code() == Some(101) {
@@ -141,8 +140,7 @@ fn damaged_examples_never_crash_the_compiler() {
 
     let next = AtomicUsize::new(0);
     let problems: Mutex<BTreeMap<String, Vec<String>>> = Mutex::new(BTreeMap::new());
-    let threads =
-        std::thread::available_parallelism().map_or(2, |n| (n.get() / 2).max(1));
+    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {
@@ -151,7 +149,12 @@ fn damaged_examples_never_crash_the_compiler() {
                     let Some(m) = mutants.get(i) else { break };
                     let key = match compile(&m.source, &workdir, i) {
                         Verdict::Ok => continue,
-                        Verdict::TimedOut => "timed out".to_owned(),
+                        Verdict::TimedOut(saved) => {
+                            format!(
+                                "timed out after {TIMEOUT:?}, input saved to {}",
+                                saved.display()
+                            )
+                        }
                         Verdict::Panicked(msg) => {
                             if is_known(&m.origin, &msg) {
                                 continue;

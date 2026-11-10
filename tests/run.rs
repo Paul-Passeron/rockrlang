@@ -36,24 +36,26 @@ fn runnable_examples() -> Vec<PathBuf> {
     examples
 }
 
-fn run_with_timeout(mut cmd: Command) -> Result<(Option<i32>, String), String> {
+fn run_with_timeout(
+    mut cmd: Command,
+    out: &Path,
+) -> Result<(Option<i32>, String), String> {
+    let file = std::fs::File::create(out).map_err(|e| e.to_string())?;
     let mut child = cmd
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(file)
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("failed to spawn: {e}"))?;
     let start = Instant::now();
     loop {
-        if child.try_wait().map_err(|e| e.to_string())?.is_some() {
-            let output = child.wait_with_output().map_err(|e| e.to_string())?;
-            return Ok((
-                output.status.code(),
-                String::from_utf8_lossy(&output.stdout).into(),
-            ));
+        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+            let stdout = std::fs::read(out).map_err(|e| e.to_string())?;
+            return Ok((status.code(), String::from_utf8_lossy(&stdout).into()));
         }
         if start.elapsed() > TIMEOUT {
             let _ = child.kill();
+            let _ = child.wait();
             return Err(format!("timed out after {TIMEOUT:?}"));
         }
         std::thread::sleep(Duration::from_millis(20));
@@ -76,7 +78,7 @@ fn run_example(path: &Path, workdir: &Path) -> Result<String, String> {
     }
     let mut cmd = Command::new(format!("./{name}"));
     cmd.current_dir(workdir);
-    let (code, stdout) = run_with_timeout(cmd)?;
+    let (code, stdout) = run_with_timeout(cmd, &workdir.join(format!("{name}.stdout")))?;
     Ok(format!(
         "{stdout}[exit: {}]\n",
         code.map_or_else(|| "signal".into(), |c| c.to_string())
