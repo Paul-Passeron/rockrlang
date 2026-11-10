@@ -275,9 +275,15 @@ impl<'db> InferenceCtx<'db> {
             }
             BinaryOperator::And => todo!(),
             BinaryOperator::Or => todo!(),
-            BinaryOperator::BitAnd => todo!(),
-            BinaryOperator::BitOr => todo!(),
-            BinaryOperator::BitXor => todo!(),
+            BinaryOperator::BitAnd | BinaryOperator::BitOr | BinaryOperator::BitXor => {
+                let lty =
+                    InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
+                let rty =
+                    InferTy::Adt { def: TypeDefId::Builtin(rid), fields: Vec::new() };
+                self.unify(&lty, &rty)?;
+                self.unify(&lty, &res_ty.into())?;
+                ConstraintSolveResult::Solved
+            }
         }
     }
 

@@ -29,7 +29,7 @@ use crate::{
         layout_of,
     },
     lir::{
-        ArithBinop, Body, CmpBinop, LIRFunctionId, Logic, ValueId,
+        ArithBinop, Bitwise, Body, CmpBinop, LIRFunctionId, Logic, ValueId,
         branded::BrandedBlockId,
         build::{BlockBuilder, FunctionBuilder, Terminated},
         inst::{CastKind, Terminator},
@@ -715,9 +715,9 @@ impl MTLBCtx<'_> {
                     }
                     BinaryOperator::And => b.logic(Logic::And, lhs, rhs),
                     BinaryOperator::Or => b.logic(Logic::Or, lhs, rhs),
-                    BinaryOperator::BitAnd => todo!(),
-                    BinaryOperator::BitOr => todo!(),
-                    BinaryOperator::BitXor => todo!(),
+                    BinaryOperator::BitAnd => b.bitwise(Bitwise::And, lhs, rhs),
+                    BinaryOperator::BitOr => b.bitwise(Bitwise::Or, lhs, rhs),
+                    BinaryOperator::BitXor => b.bitwise(Bitwise::Xor, lhs, rhs),
                 })
             }
             MIRRValueKind::UnaryOp(op, operand) => {

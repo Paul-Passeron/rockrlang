@@ -326,8 +326,8 @@ impl<'db> SanityChecker<'db> {
                     BinaryOperator::BitAnd
                     | BinaryOperator::BitOr
                     | BinaryOperator::BitXor => {
-                        Diag::todo("Handle bit manipulation ops".into(), infos.span)
-                            .accumulate(self.db);
+                        self.check_types(lhs_ty, rhs_ty, rhs_span);
+                        self.check_types(lhs_ty, infos.ty, infos.span);
                     }
                 }
             }
