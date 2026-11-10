@@ -438,7 +438,7 @@ impl<'db> InferenceCtx<'db> {
             zelf_ty: Some(zelf_ty),
         };
 
-        self.call_infos.insert(expr_id, call_infos);
+        self.insert_call_info(expr_id, call_infos);
         ConstraintSolveResult::Solved
     }
 
@@ -511,10 +511,6 @@ impl<'db> InferenceCtx<'db> {
         }
 
         if possible_blocks.len() > 1 {
-            for possible in possible_blocks {
-                let src = possible.0;
-                println!("Here: {}", src.id(self.db).to_string(self.db));
-            }
             return ConstraintSolveResult::Pending;
         }
         let (src, PotentialBlockRes { templates, constraints }) = possible_blocks
@@ -779,6 +775,9 @@ impl<'db> InferenceCtx<'db> {
     pub fn solve_constraints(
         &mut self,
     ) -> Result<(), (Arc<InferenceConstraint>, TypeInferenceError)> {
+        if self.probe_queue.is_some() {
+            return Ok(());
+        }
         debug_assert!(
             !self.in_snapshot(),
             "solve_constraints must not run inside a snapshot"
@@ -841,7 +840,7 @@ impl<'db> InferenceCtx<'db> {
         Ok(())
     }
 
-    fn try_solve_constraint(
+    pub(crate) fn try_solve_constraint(
         &mut self,
         constraint: &InferenceConstraint,
     ) -> ConstraintSolveResult {

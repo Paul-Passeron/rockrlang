@@ -32,6 +32,10 @@ use std::sync::Arc;
 
 impl InferenceCtx<'_> {
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {
+        if let Some(queue) = &mut self.probe_queue {
+            queue.push(constraint);
+            return;
+        }
         let constraint = Arc::new(self.fresh_constraint(constraint));
         self.ready_push(constraint.id);
         self.register_listeners(&constraint);

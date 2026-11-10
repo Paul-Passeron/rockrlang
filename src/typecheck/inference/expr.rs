@@ -556,7 +556,7 @@ impl InferenceCtx<'_> {
             .zip(&inferred_args)
             .try_for_each(|(a, b)| self.unify(a, b))?;
 
-        self.call_infos.insert(
+        self.insert_call_info(
             id,
             InferCallInfos {
                 expr_id: id,

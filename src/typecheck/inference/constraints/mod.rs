@@ -29,17 +29,16 @@ use crate::{
     typecheck::{
         CallKind, ExprId, InferCallInfos,
         inference::{
-            InferTy, InferenceCtx, InterfaceImplem, TypeInferenceError,
+            InferTy, InferenceCtx, InterfaceImplem, SnapshotUndo, TypeInferenceError,
             implems::PotentialBlockRes, implicit::ImplicitContext, var::InferVar,
         },
     },
 };
 use itertools::Itertools;
 use std::{
-    collections::{HashMap, HashSet, btree_map::Entry},
+    collections::{HashMap, HashSet, VecDeque},
     convert::Infallible,
     fmt,
-    iter::once,
     ops::{ControlFlow, FromResidual, Residual, Try},
     sync::Arc,
 };
@@ -95,13 +94,13 @@ impl InferenceConstraintKind {
 }
 
 #[derive(Debug)]
-enum ConstraintSolveResult {
+pub(crate) enum ConstraintSolveResult {
     Solved,
     Pending,
     Error(TypeInferenceError),
 }
 
-enum ConstraintSolveResultResidual {
+pub(crate) enum ConstraintSolveResultResidual {
     Pending,
     Error(TypeInferenceError),
 }
@@ -150,6 +149,12 @@ impl Try for ConstraintSolveResult {
             }
         }
     }
+}
+
+enum ProbeOutcome {
+    Holds,
+    Fails,
+    Ambiguous,
 }
 
 impl InferenceCtx<'_> {
@@ -325,35 +330,73 @@ impl<'db> InferenceCtx<'db> {
             zelf_ty: Some(zelf_ty),
         };
 
-        self.call_infos.insert(*expr_id, call_infos);
+        self.insert_call_info(*expr_id, call_infos);
         ConstraintSolveResult::Solved
     }
 
-    fn get_working_impls(
-        &self,
-        competing_impls: impl IntoIterator<Item = (ImplSource<'db>, PotentialBlockRes)>,
-    ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
-        let competing_impls = competing_impls.into_iter().collect::<Box<[_]>>();
-        if competing_impls.len() > 1 {
-            let mut possibles = HashSet::new();
-            for (i, (_, impl_)) in competing_impls.iter().enumerate() {
-                let mut this = self.clone();
-                for constraint in &impl_.constraints {
-                    this.emit_constraint(constraint.clone());
+    fn run_probe(&mut self, constraints: Vec<InferenceConstraintKind>) -> ProbeOutcome {
+        let outer = self.probe_queue.replace(Vec::new()); // nested probes stack
+        let mut pending: VecDeque<InferenceConstraint> =
+            constraints.into_iter().map(|k| self.fresh_constraint(k)).collect();
+
+        let outcome = 'outer: loop {
+            let mut progressed = false;
+            for _ in 0..pending.len() {
+                let c = pending.pop_front().expect("len checked");
+                match self.try_solve_constraint(&c) {
+                    ConstraintSolveResult::Solved => progressed = true,
+                    ConstraintSolveResult::Pending => pending.push_back(c),
+                    ConstraintSolveResult::Error(_) => break 'outer ProbeOutcome::Fails,
                 }
-                if this.solve_constraints() == Ok(()) {
-                    possibles.insert(i);
+
+                let emitted =
+                    std::mem::take(self.probe_queue.as_mut().expect("in probe"));
+                if !emitted.is_empty() {
+                    progressed = true;
+                    pending.extend(emitted.into_iter().map(|k| self.fresh_constraint(k)));
                 }
             }
-            competing_impls
-                .into_iter()
-                .enumerate()
-                .filter(|(i, _)| possibles.contains(i))
-                .map(|(_, elem)| elem)
-                .collect()
-        } else {
-            competing_impls.into_iter().collect()
+            if pending.is_empty() {
+                break ProbeOutcome::Holds;
+            }
+            if !progressed {
+                break ProbeOutcome::Ambiguous;
+            }
+        };
+
+        self.probe_queue = outer;
+        outcome
+    }
+
+    pub fn probe<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        let mark = self.undo_log.len();
+        self.snapshot_depth += 1;
+        let snap = self.table.snapshot();
+        let res = f(self);
+        self.snapshot_depth -= 1;
+        self.table.rollback_to(snap);
+        self.rollback_undo_log(mark);
+        if self.snapshot_depth == 0 {
+            self.undo_log.clear();
         }
+        res
+    }
+
+    fn get_working_impls(
+        &mut self,
+        competing_impls: impl IntoIterator<Item = (ImplSource<'db>, PotentialBlockRes)>,
+    ) -> HashMap<ImplSource<'db>, PotentialBlockRes> {
+        let competing = competing_impls.into_iter().collect::<Vec<_>>();
+        if competing.len() <= 1 {
+            return competing.into_iter().collect();
+        }
+        competing
+            .into_iter()
+            .filter(|(_, res)| {
+                let cs = res.constraints.clone();
+                !matches!(self.probe(|this| this.run_probe(cs)), ProbeOutcome::Fails)
+            })
+            .collect()
     }
 
     fn has_implementation(
@@ -392,24 +435,19 @@ impl<'db> InferenceCtx<'db> {
     ) {
         let ty = self.find(ty);
         let templates = templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
-        if let Entry::Vacant(e) = self.implements.entry(id) {
-            e.insert(once(InterfaceImplem { interface: id, ty, templates }).collect());
-        } else {
-            let existing = self.implements[&id].iter().cloned().collect::<Box<[_]>>();
-            for implem in &existing {
-                let implem_ty = self.find(&implem.ty);
-                let implem_templates =
-                    implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
-                if ty == implem_ty && templates == implem_templates {
-                    return;
-                }
+        let existing =
+            self.implements.get(&id).map(|set| set.iter().cloned().collect::<Box<[_]>>());
+        for implem in existing.iter().flatten() {
+            let implem_ty = self.find(&implem.ty);
+            let implem_templates =
+                implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
+            if ty == implem_ty && templates == implem_templates {
+                return;
             }
-            self.implements.entry(id).or_default().insert(InterfaceImplem {
-                interface: id,
-                ty,
-                templates,
-            });
         }
+        let implem = InterfaceImplem { interface: id, ty, templates };
+        self.push_undo(SnapshotUndo::Implemented(id, implem.clone()));
+        self.implements.entry(id).or_default().insert(implem);
     }
 
     fn try_default_constraint(

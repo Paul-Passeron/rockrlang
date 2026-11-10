@@ -39,7 +39,9 @@ use crate::{
         ExprId, InferCallInfos, PatternId, PlaceId,
         inference::{
             canon::CanonTy,
-            constraints::{InferenceConstraint, InferenceConstraintId},
+            constraints::{
+                InferenceConstraint, InferenceConstraintId, InferenceConstraintKind,
+            },
             implicit::{AsAstImplCtx, ImplicitContext},
         },
     },
@@ -118,6 +120,7 @@ pub struct InferenceCtx<'a> {
 
     undo_log: Vec<SnapshotUndo>,
     snapshot_depth: usize,
+    probe_queue: Option<Vec<InferenceConstraintKind>>,
 }
 
 #[derive(Clone)]
@@ -128,6 +131,8 @@ enum SnapshotUndo {
     Listeners(InferVar, Option<Vec<InferenceConstraintId>>),
     ReadySet(InferenceConstraintId),
     ReadyPush(InferenceConstraintId),
+    Implemented(InterfaceId, InterfaceImplem),
+    CallInfo(ExprId, Option<InferCallInfos>),
 }
 
 fn restore<K: Ord, V>(map: &mut BTreeMap<K, V>, key: K, old: Option<V>) {
@@ -213,6 +218,7 @@ impl<'db> InferenceCtx<'db> {
             inferred_places: BTreeMap::new(),
             undo_log: Vec::new(),
             snapshot_depth: 0,
+            probe_queue: None,
         };
 
         let ast = func.ast(this.db);
@@ -490,6 +496,14 @@ impl InferenceCtx<'_> {
                 SnapshotUndo::ReadySet(id) => {
                     self.ready_set.remove(&id);
                 }
+                SnapshotUndo::Implemented(id, implem) => {
+                    if let Some(set) = self.implements.get_mut(&id) {
+                        set.remove(&implem);
+                    }
+                }
+                SnapshotUndo::CallInfo(id, old) => {
+                    restore(&mut self.call_infos, id, old);
+                }
                 SnapshotUndo::ReadyPush(id) => {
                     let popped = self.ready.pop_back();
                     debug_assert_eq!(
@@ -500,6 +514,11 @@ impl InferenceCtx<'_> {
                 }
             }
         }
+    }
+
+    pub(super) fn insert_call_info(&mut self, id: ExprId, infos: InferCallInfos) {
+        let old = self.call_infos.insert(id, infos);
+        self.push_undo(SnapshotUndo::CallInfo(id, old));
     }
 
     fn in_snapshot(&self) -> bool {
