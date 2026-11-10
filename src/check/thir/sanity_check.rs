@@ -15,11 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
-
-use itertools::Itertools;
-use salsa::Accumulator;
-
+use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -38,6 +34,9 @@ use crate::{
     },
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
+use itertools::Itertools;
+use salsa::Accumulator;
+use std::collections::{HashMap, HashSet};
 
 pub struct SanityError {
     pub expected: TypeRef,
@@ -658,12 +657,12 @@ impl ConstructorType {
     pub fn with_substitution(&self, db: &dyn Db, sub: &[TypeRef]) -> Self {
         match self {
             Self::Tuple(type_refs) => Self::Tuple(
-                type_refs.iter().map(|ty| ty.with_substitution(db, sub)).collect(),
+                type_refs.iter().map(|ty| ty.subst(db, &Subst::params(sub))).collect(),
             ),
             Self::Struct(items) => Self::Struct(
                 items
                     .iter()
-                    .map(|(name, ty)| (*name, ty.with_substitution(db, sub)))
+                    .map(|(name, ty)| (*name, ty.subst(db, &Subst::params(sub))))
                     .collect(),
             ),
             Self::None => Self::None,
@@ -745,7 +744,7 @@ impl StructRef {
     pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
         self.declared_fields_ty(db)
             .into_iter()
-            .map(|(name, ty)| (name, ty.with_substitution(db, &self.args)))
+            .map(|(name, ty)| (name, ty.subst(db, &Subst::params(&self.args))))
             .collect()
     }
 }
@@ -754,7 +753,7 @@ impl FunctionRef {
     pub fn ret_ty(&self, db: &dyn Db) -> TypeRef {
         let sig = get_sig_of_function(db, self.id.interned());
         let zelf = self.zelf_binding(db);
-        sig.ret.instantiate(db, &self.args, zelf)
+        sig.ret.subst(db, &Subst::params(&self.args).with_zelf(zelf))
     }
 
     pub fn params(&self, db: &dyn Db) -> Vec<(Symbol, TypeRef)> {
@@ -768,16 +767,16 @@ impl FunctionRef {
         zelf_arg
             .into_iter()
             .map(|ty| (Symbol::new(db, "self"), ty))
-            .chain(
-                sig.args.iter().map(|(s, ty)| (*s, ty.instantiate(db, &self.args, zelf))),
-            )
+            .chain(sig.args.iter().map(|(s, ty)| {
+                (*s, ty.subst(db, &Subst::params(&self.args).with_zelf(zelf)))
+            }))
             .collect()
     }
 
     fn zelf_binding(&self, db: &dyn Db) -> Option<TypeRef> {
         self.self_ty.or_else(|| match self.id.parent(db) {
             ScopeOwnerId::Impl(i) => {
-                Some(i.implemented(db).with_substitution(db, &self.args))
+                Some(i.implemented(db).subst(db, &Subst::params(&self.args)))
             }
             _ => None,
         })

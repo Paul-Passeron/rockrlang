@@ -24,7 +24,7 @@ use crate::compiler::diagnostic::Diag;
 use crate::hir::{HirMatchBranch, HirPatternDesc, HirPlace};
 use crate::parse_tree::type_expr::AstAnyTypeExpr;
 use crate::printer::render_diagnostics;
-use crate::resolved::TypeId;
+use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
     compiler::timing::{Counts, Phase, timed},
@@ -151,16 +151,8 @@ impl<'db> TyCtx<'db> {
     }
 
     fn canon_type(&self, ty: TypeRef) -> TypeRef {
-        let db = self.db;
-        match ty {
-            TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
-                db,
-                type_id.def(db),
-                type_id.args(db).iter().map(|ty| self.canon_type(*ty)).collect(),
-            )),
-            TypeRef::Zelf => self.function.parent(db).zelf_or_error(db),
-            _ => ty,
-        }
+        let zelf = self.function.parent(self.db).zelf_or_error(self.db);
+        ty.subst(self.db, &Subst::zelf(zelf))
     }
 
     fn finalize(mut self) -> TypeCheckResults<'db> {

@@ -32,6 +32,27 @@ pub enum CastClass {
     FatPtr(Mutability),
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Subst<'a> {
+    pub params: Option<&'a [TypeRef]>,
+    pub zelf: Option<TypeRef>,
+}
+
+impl<'a> Subst<'a> {
+    pub fn params(params: &'a [TypeRef]) -> Self {
+        Self { params: Some(params), zelf: None }
+    }
+
+    pub fn zelf(zelf: TypeRef) -> Self {
+        Self { params: None, zelf: Some(zelf) }
+    }
+
+    #[must_use]
+    pub fn with_zelf(self, zelf: Option<TypeRef>) -> Self {
+        Self { zelf, ..self }
+    }
+}
+
 impl TypeRef {
     pub fn to_string(self, db: &dyn Db) -> String {
         TypePrinter::new().type_ref_to_string(db, self)
@@ -132,19 +153,6 @@ impl TypeRef {
     }
 
     #[must_use]
-    pub fn with_substitution(self, db: &dyn Db, sub: &[Self]) -> Self {
-        match self {
-            Self::Concrete(type_id) => Self::Concrete(TypeId::new(
-                db,
-                type_id.def(db),
-                type_id.args(db).iter().map(|t| t.with_substitution(db, sub)).collect(),
-            )),
-            Self::Param(id) => sub[id.0],
-            Self::Associated(_) | Self::Zelf | Self::Error | Self::Unknown => self,
-        }
-    }
-
-    #[must_use]
     pub fn wrap_ref(self, db: &dyn Db, mutable: bool) -> Self {
         match self {
             Self::Error | Self::Unknown => self,
@@ -153,18 +161,19 @@ impl TypeRef {
     }
 
     #[must_use]
-    pub fn instantiate(self, db: &dyn Db, subs: &[Self], zelf: Option<Self>) -> Self {
+    pub fn subst(self, db: &dyn Db, subst: &Subst<'_>) -> Self {
         match self {
             Self::Concrete(id) => Self::Concrete(TypeId::new(
                 db,
                 id.def(db),
-                id.args(db).iter().map(|t| t.instantiate(db, subs, zelf)).collect(),
+                id.args(db).iter().map(|t| t.subst(db, subst)).collect(),
             )),
-            Self::Param(p) => subs[p.0], // callee-space param
-            Self::Zelf => {
-                zelf.expect("Zelf in signature but no self type on FunctionRef")
-            }
-            other => other,
+            Self::Param(p) => match subst.params {
+                Some(params) => params.get(p.0).copied().unwrap_or(Self::Error),
+                None => self,
+            },
+            Self::Zelf => subst.zelf.unwrap_or(self),
+            Self::Associated(_) | Self::Error | Self::Unknown => self,
         }
     }
 }

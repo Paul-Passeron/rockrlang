@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -81,6 +82,6 @@ impl StructRef {
     }
 
     pub fn typeof_field(&self, db: &dyn Db, field: Symbol) -> Option<TypeRef> {
-        Some(self.declared_typeof_field(db, field)?.with_substitution(db, &self.args))
+        Some(self.declared_typeof_field(db, field)?.subst(db, &Subst::params(&self.args)))
     }
 }

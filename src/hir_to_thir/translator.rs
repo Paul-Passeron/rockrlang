@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::{Either, Itertools};
 
+use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
@@ -893,7 +894,7 @@ impl<'db> ThirTranslator<'db> {
                         ScopeOwnerId::Impl(impl_id) => Some(
                             impl_id
                                 .implemented(self.db)
-                                .with_substitution(self.db, &call_infos.substitution),
+                                .subst(self.db, &Subst::params(&call_infos.substitution)),
                         ),
                         _ => None,
                     }

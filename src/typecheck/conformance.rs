@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
+use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
     common::{
@@ -287,21 +288,6 @@ pub fn method_impl_for(
     _method_impl_for(db, ty.into(), method.interned(), arity, is_static, hint).as_ref()
 }
 
-fn sub(db: &dyn Db, ty: TypeRef, subs: &[TypeRef], zelf: TypeRef) -> TypeRef {
-    match ty {
-        TypeRef::Concrete(type_id) => TypeRef::Concrete(TypeId::new(
-            db,
-            type_id.def(db),
-            type_id.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
-        )),
-        TypeRef::Param(id) => subs.get(id.0).copied().unwrap_or(TypeRef::Error),
-        TypeRef::Associated(_) => ty,
-        TypeRef::Zelf => zelf,
-        TypeRef::Error => TypeRef::Error,
-        TypeRef::Unknown => TypeRef::Unknown,
-    }
-}
-
 fn iref_sub(
     db: &dyn Db,
     iref: InterfaceRef,
@@ -311,7 +297,10 @@ fn iref_sub(
     InterfaceRef::new(
         db,
         iref.def(db),
-        iref.args(db).iter().map(|ty| sub(db, *ty, subs, zelf)).collect(),
+        iref.args(db)
+            .iter()
+            .map(|ty| ty.subst(db, &Subst::params(subs).with_zelf(Some(zelf))))
+            .collect(),
     )
 }
 
@@ -474,11 +463,12 @@ fn check_method_signature(
         subs.push(TypeRef::Param(TypeParamId(impl_template_count + k)));
     }
     let implemented = impl_id.implemented(db);
+    let iface_subst = Subst::params(&subs).with_zelf(Some(implemented));
 
     for ((_, iface_ty), (param, impl_ty)) in
         iface_sig.args.iter().zip(impl_sig.args.iter())
     {
-        let expected = sub(db, *iface_ty, &subs, implemented);
+        let expected = iface_ty.subst(db, &iface_subst);
         if is_comparable(db, expected)
             && is_comparable(db, *impl_ty)
             && expected != *impl_ty
@@ -493,7 +483,7 @@ fn check_method_signature(
         }
     }
 
-    let expected_ret = sub(db, iface_sig.ret, &subs, implemented);
+    let expected_ret = iface_sig.ret.subst(db, &iface_subst);
     if is_comparable(db, expected_ret)
         && is_comparable(db, impl_sig.ret)
         && expected_ret != impl_sig.ret
