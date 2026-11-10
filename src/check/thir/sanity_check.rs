@@ -446,6 +446,9 @@ impl<'db> SanityChecker<'db> {
     fn check_types(&mut self, expected: TypeRef, got: TypeRef, span: Span) {
         let expected = self.normalize_type(expected);
         let got = self.normalize_type(got);
+        if contains_error(self.db, expected) || contains_error(self.db, got) {
+            return;
+        }
         if expected != got {
             self.errs.push(SanityError { expected, got, span });
         }
@@ -839,6 +842,16 @@ impl WrapKind {
     pub fn wrap<T: AdtLike>(self, db: &dyn Db, ty: T::Args) -> T {
         let Self::Ref(mutability) = self;
         ref_of(db, ty, mutability.is_mut())
+    }
+}
+
+fn contains_error(db: &dyn Db, ty: TypeRef) -> bool {
+    match ty {
+        TypeRef::Error => true,
+        TypeRef::Concrete(id) => id.args(db).iter().any(|arg| contains_error(db, *arg)),
+        TypeRef::Param(_) | TypeRef::Associated(_) | TypeRef::Zelf | TypeRef::Unknown => {
+            false
+        }
     }
 }
 
