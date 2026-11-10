@@ -75,6 +75,9 @@ impl<'db> InferenceCtx<'db> {
                 InferTy::Param(id) => ConstraintSolveResult::Error(
                     TypeInferenceError::TemplateDereferencing(id),
                 ),
+                InferTy::Error => {
+                    ConstraintSolveResult::Error(TypeInferenceError::AlreadyDiagnosed)
+                }
             }
         } else {
             ConstraintSolveResult::Pending
@@ -893,12 +896,15 @@ impl<'db> InferenceCtx<'db> {
                             type_param_id.0
                         )))
                     }
+                    InferTy::Error => {
+                        ConstraintSolveResult::Error(TypeInferenceError::AlreadyDiagnosed)
+                    }
                 }
             }
             InferenceConstraintKind::IsInner { inner, ref_ty } => {
                 fn get_ref_inner(ctx: &mut InferenceCtx, ty: InferTy) -> Option<InferTy> {
                     match ty {
-                        InferTy::Var(_) => None,
+                        InferTy::Error | InferTy::Var(_) => None,
                         InferTy::Adt { def, fields } => {
                             if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
                                 assert_eq!(fields.len(), 1);

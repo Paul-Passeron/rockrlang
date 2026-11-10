@@ -85,6 +85,7 @@ impl<'a> InferenceCtx<'a> {
                     None
                 }
             }
+            InferTy::Error => None,
         }
     }
 

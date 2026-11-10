@@ -176,6 +176,7 @@ impl<'db> InferenceCtx<'db> {
                 TypeRef::Concrete(TypeId::new(self.db, def, args))
             }
             InferTy::Param(type_param_id) => TypeRef::Param(type_param_id),
+            InferTy::Error => TypeRef::Error,
         }
     }
 
@@ -615,7 +616,7 @@ impl InferTy {
         match self {
             Self::Var(var) => [*var].into(),
             Self::Adt { fields, .. } => fields.iter().flat_map(Self::listeners).collect(),
-            Self::Param(_) => HashSet::new(),
+            Self::Param(_) | Self::Error => HashSet::new(),
         }
     }
 }

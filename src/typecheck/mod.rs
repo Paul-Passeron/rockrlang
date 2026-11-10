@@ -109,12 +109,6 @@ pub struct PatternId(pub HirId);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PlaceId(pub HirId);
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum TyRef {
-    Inf(InferTy),
-    Error,
-}
-
 impl<'db> TyCtx<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
@@ -254,28 +248,46 @@ impl<'db> TyCtx<'db> {
         );
     }
 
-    fn type_check_expr(&mut self, expr: &HirExpr) -> TyRef {
+    fn type_check_expr(&mut self, expr: &HirExpr) -> InferTy {
         match self.inf_ctx.infer_expr(expr) {
-            Ok(infer_ty) => TyRef::Inf(infer_ty),
+            Ok(InferTy::Error) => {
+                Diag::emit_error(
+                    self.db,
+                    format!("Could not infer type of expression"),
+                    expr.span,
+                );
+                InferTy::Error
+            }
             Err(err) => {
                 self.report_unif(&err, expr.span);
-                TyRef::Error
+                InferTy::Error
             }
+            Ok(infer_ty) => infer_ty,
         }
     }
 
     fn check_cond(&mut self, cond: &HirExpr, what: &str) {
-        if let TyRef::Inf(ty) = self.type_check_expr(cond)
-            && let Err(err) = self.inf_ctx.unify(&ty, &self.inf_ctx.bool_ty())
-        {
-            Diag::emit_error(
-                self.db,
-                format!(
-                    "{what} condition must be of type bool: {}",
-                    err.display(self.db)
-                ),
-                cond.span,
-            );
+        let expr_ty = self.type_check_expr(cond);
+        match expr_ty {
+            InferTy::Var(_) | InferTy::Adt { .. } | InferTy::Param(_) => {
+                if let Err(err) = self.inf_ctx.unify(&expr_ty, &self.inf_ctx.bool_ty()) {
+                    Diag::emit_error(
+                        self.db,
+                        format!(
+                            "{what} condition must be of type bool: {}",
+                            err.display(self.db)
+                        ),
+                        cond.span,
+                    );
+                }
+            }
+            InferTy::Error => {
+                Diag::emit_error(
+                    self.db,
+                    format!("{what} condition must be of type bool but got an error",),
+                    cond.span,
+                );
+            }
         }
     }
 
@@ -286,11 +298,6 @@ impl<'db> TyCtx<'db> {
 
     fn type_check_match(&mut self, scrutinee: &HirExpr, branches: &[HirMatchBranch]) {
         let typeof_scrut = self.type_check_expr(scrutinee);
-        let typeof_scrut = match typeof_scrut {
-            TyRef::Inf(infer_ty) => infer_ty,
-            TyRef::Error => self.inf_ctx.fresh_var().into(),
-        };
-
         let mut errors = vec![];
 
         for branch in branches {
@@ -464,33 +471,19 @@ impl<'db> TyCtx<'db> {
     fn type_check_ret(&mut self, hir_expr: Option<&HirExpr>, span: Span) {
         let ret_ty = self.get_ret_ty();
         if let Some(expr) = &hir_expr {
-            let ty = self.type_check_expr(expr);
+            let infer_ty = self.type_check_expr(expr);
 
-            match ty {
-                TyRef::Inf(infer_ty) => {
-                    if let Err(err) = self.inf_ctx.unify(&ret_ty, &infer_ty) {
-                        let _ = err;
-                        Diag::emit_error(
-                            self.db,
-                            format!(
-                                "Cannot return {} form a function expected to return {}",
-                                self.inf_ctx.show(&infer_ty),
-                                self.inf_ctx.show(&ret_ty)
-                            ),
-                            expr.span,
-                        );
-                    }
-                }
-                TyRef::Error => {
-                    Diag::emit_error(
-                        self.db,
-                        format!(
-                            "Cannot return error type form a function expected to return {}",
-                            self.inf_ctx.show(&ret_ty)
-                        ),
-                        expr.span,
-                    );
-                }
+            if let Err(err) = self.inf_ctx.unify(&ret_ty, &infer_ty) {
+                let _ = err;
+                Diag::emit_error(
+                    self.db,
+                    format!(
+                        "Cannot return {} form a function expected to return {}",
+                        self.inf_ctx.show(&infer_ty),
+                        self.inf_ctx.show(&ret_ty)
+                    ),
+                    expr.span,
+                );
             }
         } else {
             let void_ty = self.inf_ctx.void_ty();
@@ -510,23 +503,20 @@ impl<'db> TyCtx<'db> {
     fn type_check_assign(&mut self, lhs: &HirPlace, rhs: &HirExpr, span: Span) {
         let rhs_ty = self.type_check_expr(rhs);
         match self.inf_ctx.infer_place(lhs) {
-            Ok(lhs_ty) => match rhs_ty {
-                TyRef::Inf(rhs_ty) => {
-                    if let Err(err) = self.inf_ctx.unify(&lhs_ty, &rhs_ty) {
-                        let lstr = self.inf_ctx.show(&lhs_ty);
-                        let rstr = self.inf_ctx.show(&rhs_ty);
-                        Diag::emit_error(
-                            self.db,
-                            format!(
-                                "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
-                                err.display(self.db)
-                            ),
-                            span,
-                        );
-                    }
+            Ok(lhs_ty) => {
+                if let Err(err) = self.inf_ctx.unify(&lhs_ty, &rhs_ty) {
+                    let lstr = self.inf_ctx.show(&lhs_ty);
+                    let rstr = self.inf_ctx.show(&rhs_ty);
+                    Diag::emit_error(
+                        self.db,
+                        format!(
+                            "Cannot assign value of type {rstr} to a place of type {lstr}: {}",
+                            err.display(self.db)
+                        ),
+                        span,
+                    );
                 }
-                TyRef::Error => (),
-            },
+            }
             Err(err) => {
                 self.report_unif(&err, lhs.span);
             }

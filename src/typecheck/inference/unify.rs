@@ -28,6 +28,7 @@ impl InferTy {
             Self::Var(this_var) => *this_var == var,
             Self::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
             Self::Param(_) => false,
+            Self::Error => false,
         }
     }
 
@@ -90,7 +91,7 @@ impl InferTy {
 impl UnifyValue for InferTy {
     type Error = TypeInferenceError;
 
-    fn unify_values(a: &Self, b: &Self) -> Result<Self, Self::Error> {
+    fn unify_values(a: &Self, b: &Self) -> Result<Self, <Self as UnifyValue>::Error> {
         a.unify(b)
     }
 }
@@ -108,6 +109,10 @@ impl InferenceCtx<'_> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
+            (InferTy::Var(a), InferTy::Error) | (InferTy::Error, InferTy::Var(a)) => {
+                self.table.unify_var_value(*a, Some(InferTy::Error))
+            }
+            (_, InferTy::Error) | (InferTy::Error, _) => Ok(()),
             (InferTy::Var(a), InferTy::Var(b)) => self
                 .table
                 .unify_var_var(*a, *b)
@@ -174,6 +179,7 @@ impl InferenceCtx<'_> {
                 fields: fields.iter().map(|ty| self.find(ty)).collect(),
             },
             InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
+            InferTy::Error => InferTy::Error,
         }
     }
 
@@ -192,6 +198,7 @@ impl InferenceCtx<'_> {
                     fields: fields.iter().map(|ty| find(ty, table)).collect(),
                 },
                 InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
+                InferTy::Error => InferTy::Error,
             }
         }
         // For the moment, ena does not let us find the value without the table

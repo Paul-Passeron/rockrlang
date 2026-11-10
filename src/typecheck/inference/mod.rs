@@ -69,6 +69,7 @@ pub enum InferTy {
     Var(InferVar),
     Adt { def: TypeDefId, fields: Vec<Self> },
     Param(TypeParamId),
+    Error,
 }
 
 impl InferTy {
@@ -558,6 +559,7 @@ impl InferenceCtx<'_> {
                     .collect::<Option<Vec<_>>>()?,
             ))),
             InferTy::Param(type_param_id) => Some(TypeRef::Param(type_param_id)),
+            InferTy::Error => Some(TypeRef::Error),
         }
     }
 

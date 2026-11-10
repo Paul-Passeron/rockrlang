@@ -169,6 +169,7 @@ impl TypePrinter {
                 }
             }
             InferTy::Param(type_param_id) => format!("T{}", type_param_id.0),
+            InferTy::Error => "<ERROR>".to_owned(),
         }
     }
 

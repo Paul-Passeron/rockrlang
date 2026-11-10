@@ -36,6 +36,7 @@ impl InferenceCtx<'_> {
                 args: fields.iter().map(|f| self.canonize(f)).collect(),
             },
             InferTy::Param(type_param_id) => CanonTy::Param(type_param_id.0),
+            InferTy::Error => CanonTy::Hole,
         }
     }
 }
