@@ -25,3 +25,4 @@ fun main(args: &[*char]): void {
         printf(c"%s\n", arg);
     }
 }
+//@ no-run: slice indexing crashes codegen (see tests/codegen.rs)

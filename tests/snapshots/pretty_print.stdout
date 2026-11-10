@@ -1,0 +1,4 @@
+Some(Some(Some(123456)))
+opt::opt<opt::opt<opt::opt<i32>>>
+MyStruct<opt::opt<opt::opt<opt::opt<i32>>>> { .x: 5, .y: Some(Some(Some(Some(123456)))) }
+[exit: 0]

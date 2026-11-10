@@ -1,0 +1,47 @@
+@include core::io
+
+struct Pt { x: int; y: int; z: int; }
+
+enum Only { O(int, int) }
+
+struct Holder { o: Only; tag: int; }
+
+fun reversed(p: &Pt): void {
+    match p {
+        Pt { z, y, x } => { printf(c"reversed %d %d %d\n", x$, y$, z$); }
+    }
+}
+
+fun twice(p: &&Pt): void {
+    match p {
+        Pt { x, y, z } => { printf(c"twice %d %d %d\n", x$, y$, z$); }
+    }
+}
+
+fun by_value(p: Pt): void {
+    match p {
+        Pt { y, z, x } => { printf(c"by_value %d %d %d\n", x, y, z); }
+    }
+}
+
+fun holder(h: &Holder): void {
+    match h {
+        Holder { tag, o: Only::O(a, b) } => { printf(c"holder %d %d %d\n", a$, b$, tag$); }
+    }
+}
+
+fun let_destructure(p: &Pt): void {
+    let Pt { z, x, y } = p;
+    printf(c"let %d %d %d\n", x$, y$, z$);
+}
+
+fun main(): int {
+    let p = Pt { .x: 1, .y: 2, .z: 3 };
+    let r = &p;
+    reversed(&p);
+    twice(&r);
+    let_destructure(&p);
+    holder(&Holder { .o: Only::O(7, 8), .tag: 9 });
+    by_value(p);
+    return 0;
+}

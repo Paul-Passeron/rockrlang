@@ -44,3 +44,4 @@ fun h_ref(val: Foo): str {
 fun main(): int {
     return 0;
 }
+//@ no-run: rejected by the borrow checker on purpose

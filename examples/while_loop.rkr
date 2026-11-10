@@ -7,3 +7,4 @@ fun main(): int {
     }
     return 0;
 }
+//@ no-run: loops forever
