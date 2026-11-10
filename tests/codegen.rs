@@ -74,8 +74,8 @@ fn every_example_has_its_expected_outcome() {
         let want = expected(&name);
         let (got, stderr) = compile(path);
         if got != want {
-            let tail: Vec<_> = stderr.lines().rev().take(8).collect();
-            let tail: Vec<_> = tail.into_iter().rev().collect();
+            let lines: Vec<_> = stderr.lines().collect();
+            let tail = &lines[lines.len().saturating_sub(8)..];
             failures.push(format!(
                 "{name}: expected {want:?}, got {got:?}\n    {}",
                 tail.join("\n    ")
