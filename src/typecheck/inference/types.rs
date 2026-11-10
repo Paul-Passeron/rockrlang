@@ -196,7 +196,7 @@ impl InferenceCtx<'_> {
                 if let Some(zelf) = ctx.zelf() {
                     zelf.clone()
                 } else {
-                    unreachable!()
+                    panic!("`Self` used outside of an impl")
                 }
             }
             TypeRef::Associated(_symbol) => {

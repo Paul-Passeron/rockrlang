@@ -339,6 +339,7 @@ mod neg {
     negative_test!(assign, "examples/fail/assign.rkr");
     negative_test!(bad_type_defs, "examples/fail/bad_type_defs.rkr");
     negative_test!(r#match, "examples/fail/match.rkr");
+    negative_test!(patterns, "examples/fail/patterns.rkr");
     negative_test!(ret, "examples/fail/ret.rkr");
     negative_test!(unresolved, "examples/fail/unresolved.rkr");
 }

@@ -149,7 +149,8 @@ impl<'db> SanityChecker<'db> {
             ThirPatternKind::Struct { def, fields } => {
                 let actual = def.get_fields_ty(self.db);
                 for (sym, fpat) in fields {
-                    let ty = wrap_type_ref(self.db, &peeled.refs, actual[sym]);
+                    let Some(fty) = actual.get(sym) else { continue };
+                    let ty = wrap_type_ref(self.db, &peeled.refs, *fty);
                     self.check_pattern(ty, fpat);
                 }
                 let bare = TypeRef::Concrete(TypeId::new(
@@ -568,13 +569,14 @@ impl<'db> SanityChecker<'db> {
                 ConstructorType::Struct(field_tys),
                 ThirConstructorArgs::Struct(pat_tys),
             ) => {
-                assert_eq!(field_tys.len(), pat_tys.len());
-                for field in field_tys {
-                    let field_expr =
-                        pat_tys.iter().find(|p| p.field == field.0).unwrap().expr;
-                    let field_ty = self.check_expr(field_expr);
-                    let span = self.thir.exprs[field_expr].span;
-                    self.check_types(field.1, field_ty, span);
+                for p in pat_tys {
+                    let field_ty = self.check_expr(p.expr);
+                    let span = self.thir.exprs[p.expr].span;
+                    if let Some((_, expected)) =
+                        field_tys.iter().find(|(sym, _)| *sym == p.field)
+                    {
+                        self.check_types(*expected, field_ty, span);
+                    }
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(exprs)) => {
@@ -607,15 +609,16 @@ impl<'db> SanityChecker<'db> {
         match (ty, pat) {
             (ConstructorType::None, ThirConstructorArgs::None) => (),
             (ConstructorType::Struct(tys), ThirConstructorArgs::Struct(pats)) => {
-                assert_eq!(tys.len(), pats.len());
-                for (sym, fty) in tys {
-                    let fpat = &pats.iter().find(|p| p.field == *sym).unwrap().expr;
+                for p in pats {
+                    let Some((_, fty)) = tys.iter().find(|(sym, _)| *sym == p.field)
+                    else {
+                        continue;
+                    };
                     let ty = wrap_type_ref(self.db, &peeled.refs, *fty);
-                    self.check_pattern(ty, fpat);
+                    self.check_pattern(ty, &p.expr);
                 }
             }
             (ConstructorType::Tuple(tys), ThirConstructorArgs::Tuple(pats)) => {
-                assert_eq!(tys.len(), pats.len());
                 tys.iter().zip(pats).for_each(|(ty, pat)| {
                     let ty = wrap_type_ref(self.db, &peeled.refs, *ty);
                     self.check_pattern(ty, pat);

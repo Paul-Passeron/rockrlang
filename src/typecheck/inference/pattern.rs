@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::typecheck::inference::expr::report_field_mismatches;
 use itertools::EitherOrBoth;
 use salsa::Accumulator;
 
@@ -186,6 +187,16 @@ impl InferenceCtx<'_> {
             infos.template_tys,
             span,
         );
+        if !field_types.is_empty() {
+            let expected = field_types.keys().copied().collect();
+            let got = infos.children.iter().map(HirStructFieldPattern::name).collect();
+            let what = format!(
+                "pattern for variant `{}` of `{}`",
+                infos.name.to_string(self.db),
+                enum_id.name(self.db).to_string(self.db)
+            );
+            report_field_mismatches(self.db, &expected, &got, &what, span);
+        }
         self.infer_fields_aux(infos.children, &field_types, infos.binds_like);
     }
 

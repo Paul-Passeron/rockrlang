@@ -517,7 +517,17 @@ impl<'db> LowerFundef<'db> {
                         if !type_args.is_empty() {
                             let temps = get_templates_of_fun(self.db, fid.into());
                             if temps.len() != type_args.len() {
-                                todo!("Diag type args mismatch")
+                                Diag::emit_error(
+                                    self.db,
+                                    format!(
+                                        "`{}` takes {} type argument(s) but {} were given",
+                                        symbol.display(self.db),
+                                        temps.len(),
+                                        type_args.len()
+                                    ),
+                                    span,
+                                );
+                                return HirExprDesc::Error;
                             }
                         }
                         HirExprDesc::CallDirect { target: fid, args, type_args }
@@ -1061,14 +1071,27 @@ impl<'db> LowerFundef<'db> {
                                     is_synthetic: false,
                                 }
                             }
-                            Some(_) => todo!(
-                                "error: `{}` in pattern is not a module",
-                                from.data.to_string(this.db)
-                            ),
-                            None => todo!(
-                                "error: `{}` not found in pattern path",
-                                from.data.to_string(this.db)
-                            ),
+                            found => {
+                                let what = if found.is_some() {
+                                    "is not an enum or module"
+                                } else {
+                                    "not found"
+                                };
+                                Diag::emit_error(
+                                    this.db,
+                                    format!(
+                                        "`{}` in pattern {what}",
+                                        from.data.to_string(this.db)
+                                    ),
+                                    from.span,
+                                );
+                                HirPattern {
+                                    id: this.alloc.fresh(),
+                                    data: HirPatternDesc::Error,
+                                    span: pat.span,
+                                    is_synthetic: false,
+                                }
+                            }
                         }
                     }
                     AstNamedPattern::Tuple { fields } => HirPattern {

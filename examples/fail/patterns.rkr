@@ -1,0 +1,43 @@
+struct Pt { x: int; y: int; }
+
+enum E { A { a: int; b: int }, T(int, int) }
+
+fun id<T>(x: T): T { return x; }
+
+fun unknown_enum(n: int): void {
+    match n {
+        Nope::A { a, b } => {}  //~ ERROR `Nope` in pattern not found
+    }
+}
+
+fun bad_struct_field(p: Pt): void {
+    match p {
+        Pt { x, w } => {}  //~ ERROR Invalid field `w` //~ ERROR Missing field `y`
+    }
+}
+
+fun bad_variant_field(e: E): void {
+    match e {
+        E::A { a, c } => {}  //~ ERROR Invalid field `c` in pattern for variant `A` //~ ERROR Missing field `b` in pattern for variant `A`
+        E::T(x, y) => {}
+    }
+}
+
+fun wrong_tuple_arity(e: E): void {
+    match e {
+        E::A { a, b } => {}
+        E::T(x) => {}  //~ ERROR Mismatched length in tuple variant `T`
+    }
+}
+
+fun bad_ctor(): E {
+    return E::A { .a: 1, .c: 2 };  //~ ERROR Invalid field `c` in struct lit variant `A` //~ ERROR Missing field `b` in struct lit variant `A`
+}
+
+fun bad_tuple_ctor(): E {
+    return E::T(1);  //~ ERROR Wrong number of args for the tuple variant constructor
+}
+
+fun type_args(): int {
+    return id::<int, int>(1);  //~ ERROR `id` takes 1 type argument(s) but 2 were given
+}

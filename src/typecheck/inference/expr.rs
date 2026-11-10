@@ -331,34 +331,14 @@ impl InferenceCtx<'_> {
         ast_fields: &[AstStructDefField],
         span: Span,
     ) {
-        let expected_fields: HashSet<Symbol> =
-            ast_fields.iter().map(|f| f.name).collect();
-        let got_fields: HashSet<Symbol> = fields.iter().map(|f| f.field).collect();
-        for field in got_fields.difference(&expected_fields) {
-            Diag::emit_error(
-                self.db,
-                format!(
-                    "Missing field `{}` in struct lit variant `{}` for type `{}`",
-                    field.to_string(self.db),
-                    variant.to_string(self.db),
-                    enum_id.name(self.db).to_string(self.db)
-                ),
-                span,
-            );
-        }
-        // For inferred fields not in ast fields
-        for field in expected_fields.difference(&got_fields) {
-            Diag::emit_error(
-                self.db,
-                format!(
-                    "Invalid field `{}` in struct lit variant `{}` for type `{}`",
-                    field.to_string(self.db),
-                    variant.to_string(self.db),
-                    enum_id.name(self.db).to_string(self.db)
-                ),
-                span,
-            );
-        }
+        let expected: HashSet<Symbol> = ast_fields.iter().map(|f| f.name).collect();
+        let got: HashSet<Symbol> = fields.iter().map(|f| f.field).collect();
+        let what = format!(
+            "struct lit variant `{}` for type `{}`",
+            variant.to_string(self.db),
+            enum_id.name(self.db).to_string(self.db)
+        );
+        report_field_mismatches(self.db, &expected, &got, &what, span);
     }
 
     fn infer_constructor(
@@ -413,7 +393,6 @@ impl InferenceCtx<'_> {
                 HirConstructorArgs::TupleLike(hir_exprs),
                 AstEnumVariantKind::TupleLike(spanneds),
             ) => {
-                assert_eq!(hir_exprs.len(), spanneds.len());
                 for (hir, ast) in hir_exprs.iter().zip(spanneds) {
                     let hir_ty = self.infer_expr(hir)?;
                     let in_ctx = self.allocate_ast_type_expr(&ast.data, &ctx);
@@ -602,6 +581,22 @@ impl InferenceCtx<'_> {
     }
 }
 
+pub fn report_field_mismatches(
+    db: &dyn Db,
+    expected: &HashSet<Symbol>,
+    got: &HashSet<Symbol>,
+    what: &str,
+    span: Span,
+) {
+    let sorted = |set: Vec<&Symbol>| set.into_iter().map(|s| s.display(db)).sorted();
+    for field in sorted(expected.difference(got).collect()) {
+        Diag::emit_error(db, format!("Missing field `{field}` in {what}"), span);
+    }
+    for field in sorted(got.difference(expected).collect()) {
+        Diag::emit_error(db, format!("Invalid field `{field}` in {what}"), span);
+    }
+}
+
 pub fn diagnose_bad_struct_fields(
     db: &dyn Db,
     span: Span,
@@ -616,29 +611,7 @@ pub fn diagnose_bad_struct_fields(
     if field_sets.0 == field_sets.1 {
         return true;
     }
-    // For ast fields not in inferred fields
-    for field in field_sets.1.difference(&field_sets.0) {
-        Diag::emit_error(
-            db,
-            format!(
-                "Missing field `{}` in struct lit for type `{}`",
-                field.to_string(db),
-                struct_id.name(db).to_string(db)
-            ),
-            span,
-        );
-    }
-    // For inferred fields not in ast fields
-    for field in field_sets.0.difference(&field_sets.1) {
-        Diag::emit_error(
-            db,
-            format!(
-                "Invalid field `{}` in struct lit for type `{}`",
-                field.to_string(db),
-                struct_id.name(db).to_string(db)
-            ),
-            span,
-        );
-    }
+    let what = format!("struct lit for type `{}`", struct_id.name(db).to_string(db));
+    report_field_mismatches(db, &field_sets.1, &field_sets.0, &what, span);
     false
 }
