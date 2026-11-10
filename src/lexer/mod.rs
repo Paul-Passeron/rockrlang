@@ -39,3 +39,6 @@ pub fn lex_file(db: &dyn Db, file: SourceFile) -> Result<Vec<Token>, LexError> {
     }
     Ok(v)
 }
+
+#[cfg(test)]
+mod tests;
