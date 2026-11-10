@@ -304,7 +304,7 @@ impl<'db> InferenceCtx<'db> {
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 #[allow(dead_code)]
-pub enum UnificationError {
+pub enum TypeInferenceError {
     TypeDefIdMismatch(TypeDefId, TypeDefId),
     FieldCountMismatch(usize, usize),
     RecursiveDefinition(InferVar),
@@ -326,16 +326,16 @@ pub enum UnificationError {
     NonIntegerTypesInBitwiseOperation { lhs: String, rhs: String },
 }
 
-impl UnificationError {
+impl TypeInferenceError {
     pub fn display<'a, 'db>(&'a self, db: &'db dyn Db) -> Display<'db, &'a Self> {
         Display { value: self, db }
     }
 }
 
-impl fmt::Display for Display<'_, &UnificationError> {
+impl fmt::Display for Display<'_, &TypeInferenceError> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.value {
-            UnificationError::TypeDefIdMismatch(type_def_id, type_def_id1) => {
+            TypeInferenceError::TypeDefIdMismatch(type_def_id, type_def_id1) => {
                 write!(
                     f,
                     "TypeDefId mismatch: {} != {}",
@@ -343,13 +343,13 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     type_def_id1.name(self.db).display(self.db)
                 )
             }
-            UnificationError::FieldCountMismatch(x, y) => {
+            TypeInferenceError::FieldCountMismatch(x, y) => {
                 write!(f, "Field count mismatch: {x} != {y}")
             }
-            UnificationError::RecursiveDefinition(infer_var) => {
+            TypeInferenceError::RecursiveDefinition(infer_var) => {
                 write!(f, "Recursive definition: {infer_var}")
             }
-            UnificationError::UnmetConstraint(
+            TypeInferenceError::UnmetConstraint(
                 inference_constraint,
                 unification_error,
             ) => {
@@ -360,27 +360,27 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     unification_error.display(self.db)
                 )
             }
-            UnificationError::ExpectedPtrLike(type_def_id) => write!(
+            TypeInferenceError::ExpectedPtrLike(type_def_id) => write!(
                 f,
                 "Expected ptr-like: {}",
                 type_def_id.name(self.db).display(self.db)
             ),
-            UnificationError::MinTupleLengthMismatch { expected, got } => {
+            TypeInferenceError::MinTupleLengthMismatch { expected, got } => {
                 write!(f, "Min tuple length mismatch: expexted {expected} but got {got}")
             }
-            UnificationError::ExpectedStructWithField { def, field } => write!(
+            TypeInferenceError::ExpectedStructWithField { def, field } => write!(
                 f,
                 "Expected struct with field: {} (field: {})",
                 def.name(self.db).display(self.db),
                 field.display(self.db)
             ),
-            UnificationError::IncompleteStructLit { id, missing } => write!(
+            TypeInferenceError::IncompleteStructLit { id, missing } => write!(
                 f,
                 "Incomplete struct lit: {} (missing: {})",
                 id.name(self.db).display(self.db),
                 missing.display(self.db)
             ),
-            UnificationError::InvalidStructField { id, invalid } => {
+            TypeInferenceError::InvalidStructField { id, invalid } => {
                 write!(
                     f,
                     "Invalid field in struct lit: {} (invalid: {})",
@@ -389,23 +389,23 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 )
             }
 
-            UnificationError::NonStructForStructLit(partial_type_ref) => {
+            TypeInferenceError::NonStructForStructLit(partial_type_ref) => {
                 write!(f, "Non struct for struct-lit: {partial_type_ref:?}")
             }
-            UnificationError::TemplateDereferencing(type_param_id) => {
+            TypeInferenceError::TemplateDereferencing(type_param_id) => {
                 write!(f, "Template T{} dereferenced", type_param_id.0)
             }
-            UnificationError::TemplateConstraining(type_param_id) => {
+            TypeInferenceError::TemplateConstraining(type_param_id) => {
                 write!(f, "Template T{} constrained", type_param_id.0)
             }
-            UnificationError::ArgCountMismatch(function_id, count) => {
+            TypeInferenceError::ArgCountMismatch(function_id, count) => {
                 write!(
                     f,
                     "Argument count mismatch for function {} (expected {count})",
                     function_id.name(self.db).display(self.db)
                 )
             }
-            UnificationError::StaticMethodCallOnReceiver(expr_id, function_id) => {
+            TypeInferenceError::StaticMethodCallOnReceiver(expr_id, function_id) => {
                 write!(
                     f,
                     "Static method call on receiver: {:?} (function: {})",
@@ -413,7 +413,7 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     function_id.name(self.db).display(self.db)
                 )
             }
-            UnificationError::NoImplemCandidateFor(infer_ty, interface_id, items) => {
+            TypeInferenceError::NoImplemCandidateFor(infer_ty, interface_id, items) => {
                 write!(
                     f,
                     "No implementation candidate found for type {} with interface {}{}",
@@ -429,15 +429,15 @@ impl fmt::Display for Display<'_, &UnificationError> {
                     }
                 )
             }
-            UnificationError::AlreadyDiagnosed => Ok(()),
-            UnificationError::Custom(s) => write!(f, "Custom : {s}"),
-            UnificationError::InvalidCast { from, to, reason } => write!(
+            TypeInferenceError::AlreadyDiagnosed => Ok(()),
+            TypeInferenceError::Custom(s) => write!(f, "Custom : {s}"),
+            TypeInferenceError::InvalidCast { from, to, reason } => write!(
                 f,
                 "cannot cast `{}` to `{}`: {reason}",
                 from.to_string(self.db),
                 to.to_string(self.db)
             ),
-            UnificationError::NonIntegerTypesInBitwiseOperation { lhs, rhs } => {
+            TypeInferenceError::NonIntegerTypesInBitwiseOperation { lhs, rhs } => {
                 write!(
                     f,
                     "non-integer types in bitwise operation `{}` and `{}`",
@@ -451,8 +451,8 @@ impl fmt::Display for Display<'_, &UnificationError> {
 impl InferenceCtx<'_> {
     pub fn snapshot<T>(
         &mut self,
-        f: impl Fn(&mut Self) -> Result<T, UnificationError>,
-    ) -> Result<T, UnificationError> {
+        f: impl Fn(&mut Self) -> Result<T, TypeInferenceError>,
+    ) -> Result<T, TypeInferenceError> {
         let mark = self.undo_log.len();
         self.snapshot_depth += 1;
         let snapshot = self.table.snapshot();

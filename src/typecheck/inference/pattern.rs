@@ -30,7 +30,7 @@ use crate::{
 
 use super::{
     Definition, HashMap, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId,
-    PatternId, StructId, Symbol, TypeDefId, UnificationError,
+    PatternId, StructId, Symbol, TypeDefId, TypeInferenceError,
 };
 
 impl InferenceCtx<'_> {
@@ -38,7 +38,7 @@ impl InferenceCtx<'_> {
         &mut self,
         pattern: &HirPattern,
         binds_like: Option<&InferTy>,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         self.snapshot(|this| {
             let ty = this.infer_pattern_aux(pattern, binds_like)?;
             this.set_inferred_pattern(PatternId(pattern.id), ty.clone());
@@ -54,7 +54,7 @@ impl InferenceCtx<'_> {
         &mut self,
         pattern: &HirPattern,
         binds_like: Option<&InferTy>,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         match &pattern.data {
             HirPatternDesc::Error | HirPatternDesc::Any => Ok(self.fresh_var().into()),
             HirPatternDesc::Bind { id, .. } => Ok(InferTy::Var(self.local_map[id])),

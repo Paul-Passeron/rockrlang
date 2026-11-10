@@ -40,7 +40,7 @@ use crate::{
     typecheck::{
         CallKind, ExprId, InferCallInfos,
         inference::{
-            InferTy, InferenceCtx, InterfaceImplem, UnificationError,
+            InferTy, InferenceCtx, InterfaceImplem, TypeInferenceError,
             implems::PotentialBlockRes, implicit::ImplicitContext, var::InferVar,
         },
     },
@@ -100,12 +100,12 @@ impl InferenceConstraintKind {
 enum ConstraintSolveResult {
     Solved,
     Pending,
-    Error(UnificationError),
+    Error(TypeInferenceError),
 }
 
 enum ConstraintSolveResultResidual {
     Pending,
-    Error(UnificationError),
+    Error(TypeInferenceError),
 }
 
 impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
@@ -117,15 +117,15 @@ impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
     }
 }
 
-impl FromResidual<Result<Infallible, UnificationError>> for ConstraintSolveResult {
-    fn from_residual(residual: Result<Infallible, UnificationError>) -> Self {
+impl FromResidual<Result<Infallible, TypeInferenceError>> for ConstraintSolveResult {
+    fn from_residual(residual: Result<Infallible, TypeInferenceError>) -> Self {
         let Err(err) = residual;
         Self::Error(err)
     }
 }
 
-impl From<Result<(), UnificationError>> for ConstraintSolveResult {
-    fn from(res: Result<(), UnificationError>) -> Self {
+impl From<Result<(), TypeInferenceError>> for ConstraintSolveResult {
+    fn from(res: Result<(), TypeInferenceError>) -> Self {
         res.map_or_else(Self::Error, |()| Self::Solved)
     }
 }

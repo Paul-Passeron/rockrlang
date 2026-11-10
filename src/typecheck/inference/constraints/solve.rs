@@ -37,7 +37,7 @@ use crate::{
         CallKind, ExprId, InferCallInfos, ReceiverAdjustment,
         conformance::{MethodImpl, method_impl_for},
         inference::{
-            InferTy, InferenceCtx, UnificationError,
+            InferTy, InferenceCtx, TypeInferenceError,
             constraints::{
                 ConstraintSolveResult, InferenceConstraint, InferenceConstraintId,
                 InferenceConstraintKind, MAX_IMPL_DEPTH, MethodConstraint,
@@ -61,19 +61,19 @@ impl<'db> InferenceCtx<'db> {
                 InferTy::Adt { def, fields } => {
                     if def.is_ptr_like(self.db).is_none() || fields.len() != 1 {
                         return ConstraintSolveResult::Error(
-                            UnificationError::ExpectedPtrLike(def),
+                            TypeInferenceError::ExpectedPtrLike(def),
                         );
                     }
                     let Some(field) = fields.first() else {
                         return ConstraintSolveResult::Error(
-                            UnificationError::AlreadyDiagnosed,
+                            TypeInferenceError::AlreadyDiagnosed,
                         );
                     };
 
                     self.unify(target, field).into()
                 }
                 InferTy::Param(id) => ConstraintSolveResult::Error(
-                    UnificationError::TemplateDereferencing(id),
+                    TypeInferenceError::TemplateDereferencing(id),
                 ),
             }
         } else {
@@ -126,7 +126,7 @@ impl<'db> InferenceCtx<'db> {
         if let Some(fields) = self.is_tuple(&found) {
             if fields.len() <= has_index as usize {
                 return ConstraintSolveResult::Error(
-                    UnificationError::MinTupleLengthMismatch {
+                    TypeInferenceError::MinTupleLengthMismatch {
                         expected: has_index as usize,
                         got: fields.len(),
                     },
@@ -134,7 +134,7 @@ impl<'db> InferenceCtx<'db> {
             }
             self.unify(&elem_var.into(), &fields[has_index as usize]).into()
         } else if let Some((def, _)) = found.as_adt() {
-            ConstraintSolveResult::Error(UnificationError::TypeDefIdMismatch(
+            ConstraintSolveResult::Error(TypeInferenceError::TypeDefIdMismatch(
                 def,
                 TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
             ))
@@ -154,13 +154,15 @@ impl<'db> InferenceCtx<'db> {
             if let Some(ty) = &fields.get(&field) {
                 self.unify(&elem_var.into(), ty).into()
             } else {
-                ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField {
-                    def: TypeDefId::Struct(struct_id),
-                    field,
-                })
+                ConstraintSolveResult::Error(
+                    TypeInferenceError::ExpectedStructWithField {
+                        def: TypeDefId::Struct(struct_id),
+                        field,
+                    },
+                )
             }
         } else if let Some((def, _)) = found.as_adt() {
-            ConstraintSolveResult::Error(UnificationError::ExpectedStructWithField {
+            ConstraintSolveResult::Error(TypeInferenceError::ExpectedStructWithField {
                 def,
                 field,
             })
@@ -213,7 +215,7 @@ impl<'db> InferenceCtx<'db> {
             }
             (lhs_ty, rhs_ty) => {
                 return ConstraintSolveResult::Error(
-                    UnificationError::NonIntegerTypesInBitwiseOperation {
+                    TypeInferenceError::NonIntegerTypesInBitwiseOperation {
                         lhs: self.find(lhs_ty).to_string(self.db),
                         rhs: self.find(rhs_ty).to_string(self.db),
                     },
@@ -500,7 +502,7 @@ impl<'db> InferenceCtx<'db> {
         };
 
         if possible_blocks.is_empty() {
-            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+            return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Could not find an implementation for {} with arity {} on {}",
                 method.display(self.db),
                 args.len(),
@@ -538,12 +540,12 @@ impl<'db> InferenceCtx<'db> {
 
         if ast.data.receiver.is_static() != *is_static {
             return ConstraintSolveResult::Error(
-                UnificationError::StaticMethodCallOnReceiver(*id, method_id),
+                TypeInferenceError::StaticMethodCallOnReceiver(*id, method_id),
             );
         }
 
         if ast.data.args.len() != args.len() {
-            return ConstraintSolveResult::Error(UnificationError::ArgCountMismatch(
+            return ConstraintSolveResult::Error(TypeInferenceError::ArgCountMismatch(
                 method_id,
                 args.len(),
             ));
@@ -665,7 +667,7 @@ impl<'db> InferenceCtx<'db> {
             (Some((_, impl_)), None) => impl_,
             (None, _) => {
                 return ConstraintSolveResult::Error(
-                    UnificationError::NoImplemCandidateFor(
+                    TypeInferenceError::NoImplemCandidateFor(
                         self.find(ty),
                         interface_id,
                         args.iter().cloned().collect(),
@@ -678,8 +680,9 @@ impl<'db> InferenceCtx<'db> {
             self.emit_constraint(constraint);
         }
 
-        self.solve_constraints()
-            .map_err(|(cs, err)| UnificationError::UnmetConstraint(cs, Box::new(err)))?;
+        self.solve_constraints().map_err(|(cs, err)| {
+            TypeInferenceError::UnmetConstraint(cs, Box::new(err))
+        })?;
         ConstraintSolveResult::Solved
     }
 
@@ -695,7 +698,7 @@ impl<'db> InferenceCtx<'db> {
             return ConstraintSolveResult::Pending;
         }
         if ty.as_slice(self.db).is_none() {
-            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+            return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)
             )));
@@ -712,7 +715,7 @@ impl<'db> InferenceCtx<'db> {
 
         // Only fat ptr type supported for now is ref to slices
         if fat_ptr_ty.as_ref_slice(self.db).is_none() {
-            return ConstraintSolveResult::Error(UnificationError::Custom(format!(
+            return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)
             )));
@@ -733,7 +736,7 @@ impl<'db> InferenceCtx<'db> {
         }
 
         let reject = |reason: &'static str| {
-            ConstraintSolveResult::Error(UnificationError::InvalidCast {
+            ConstraintSolveResult::Error(TypeInferenceError::InvalidCast {
                 from: from.clone(),
                 to: to.clone(),
                 reason,
@@ -771,7 +774,7 @@ impl<'db> InferenceCtx<'db> {
 
     pub fn solve_constraints(
         &mut self,
-    ) -> Result<(), (Arc<InferenceConstraint>, UnificationError)> {
+    ) -> Result<(), (Arc<InferenceConstraint>, TypeInferenceError)> {
         debug_assert!(
             !self.in_snapshot(),
             "solve_constraints must not run inside a snapshot"
@@ -876,7 +879,7 @@ impl<'db> InferenceCtx<'db> {
                         if def.is_int_like(self.db).is_some() {
                             ConstraintSolveResult::Solved
                         } else {
-                            ConstraintSolveResult::Error(UnificationError::Custom(
+                            ConstraintSolveResult::Error(TypeInferenceError::Custom(
                                 format!(
                                     "`{}` is not an integer-like type",
                                     t.to_string(self.db)
@@ -885,7 +888,7 @@ impl<'db> InferenceCtx<'db> {
                         }
                     }
                     InferTy::Param(type_param_id) => {
-                        ConstraintSolveResult::Error(UnificationError::Custom(format!(
+                        ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                             "type parameter `T{}` is not known to be integer-like",
                             type_param_id.0
                         )))

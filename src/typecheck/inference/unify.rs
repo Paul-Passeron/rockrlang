@@ -20,7 +20,7 @@ use itertools::Itertools;
 
 use crate::typecheck::inference::InferenceCtx;
 
-use super::{InferTy, InferVar, UnificationError, UnifyValue};
+use super::{InferTy, InferVar, TypeInferenceError, UnifyValue};
 
 impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
@@ -31,12 +31,12 @@ impl InferTy {
         }
     }
 
-    fn unify(&self, other: &Self) -> Result<Self, UnificationError> {
+    fn unify(&self, other: &Self) -> Result<Self, TypeInferenceError> {
         fn unify_aux(
             a: &InferTy,
             b: &InferTy,
             flag: bool,
-        ) -> Result<InferTy, UnificationError> {
+        ) -> Result<InferTy, TypeInferenceError> {
             match (a, b) {
                 (InferTy::Var(var_a), InferTy::Var(_)) => Ok(InferTy::Var(*var_a)),
                 (
@@ -44,11 +44,11 @@ impl InferTy {
                     InferTy::Adt { def: def_b, fields: fields_b },
                 ) => {
                     if def_a != def_b {
-                        Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
+                        Err(TypeInferenceError::TypeDefIdMismatch(*def_a, *def_b))
                     } else if let (len_a, len_b) = (fields_a.len(), fields_b.len())
                         && len_a != len_b
                     {
-                        Err(UnificationError::FieldCountMismatch(len_a, len_b))
+                        Err(TypeInferenceError::FieldCountMismatch(len_a, len_b))
                     } else {
                         let fields = fields_a
                             .iter()
@@ -60,7 +60,7 @@ impl InferTy {
                 }
                 (InferTy::Adt { def, fields }, InferTy::Var(infer_var)) => {
                     if fields.iter().any(|field| field.occurs(*infer_var)) {
-                        Err(UnificationError::RecursiveDefinition(*infer_var))
+                        Err(TypeInferenceError::RecursiveDefinition(*infer_var))
                     } else {
                         Ok(InferTy::Adt { def: *def, fields: fields.clone() })
                     }
@@ -71,11 +71,11 @@ impl InferTy {
                     if pa == pb {
                         Ok(InferTy::Param(*pa))
                     } else {
-                        Err(UnificationError::TemplateConstraining(*pa))
+                        Err(TypeInferenceError::TemplateConstraining(*pa))
                     }
                 }
                 (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
-                    Err(UnificationError::TemplateConstraining(*p))
+                    Err(TypeInferenceError::TemplateConstraining(*p))
                 }
                 _ if !flag => unify_aux(b, a, true),
                 _ => panic!(
@@ -88,7 +88,7 @@ impl InferTy {
 }
 
 impl UnifyValue for InferTy {
-    type Error = UnificationError;
+    type Error = TypeInferenceError;
 
     fn unify_values(a: &Self, b: &Self) -> Result<Self, Self::Error> {
         a.unify(b)
@@ -104,7 +104,7 @@ impl InferenceCtx<'_> {
         let flattened = self.listeners.remove(&other).into_iter().flatten().collect_vec();
         self.listeners.entry(root).or_default().extend(flattened);
     }
-    fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
+    fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), TypeInferenceError> {
         let a = &self.find(a);
         let b = &self.find(b);
         match (a, b) {
@@ -115,7 +115,7 @@ impl InferenceCtx<'_> {
             (InferTy::Var(infer_var), value) | (value, InferTy::Var(infer_var)) => {
                 let resolved = self.find(value);
                 if resolved.occurs(*infer_var) {
-                    return Err(UnificationError::RecursiveDefinition(*infer_var));
+                    return Err(TypeInferenceError::RecursiveDefinition(*infer_var));
                 }
                 self.table.unify_var_value(*infer_var, Some(resolved))?;
                 let root = self.table.find(*infer_var);
@@ -134,11 +134,11 @@ impl InferenceCtx<'_> {
                 InferTy::Adt { def: def_b, fields: fields_b },
             ) => {
                 if def_a != def_b {
-                    Err(UnificationError::TypeDefIdMismatch(*def_a, *def_b))
+                    Err(TypeInferenceError::TypeDefIdMismatch(*def_a, *def_b))
                 } else if let (len_a, len_b) = (fields_a.len(), fields_b.len())
                     && len_a != len_b
                 {
-                    Err(UnificationError::FieldCountMismatch(len_a, len_b))
+                    Err(TypeInferenceError::FieldCountMismatch(len_a, len_b))
                 } else {
                     fields_a
                         .iter()
@@ -147,15 +147,15 @@ impl InferenceCtx<'_> {
                 }
             }
             (InferTy::Param(pa), InferTy::Param(pb)) => {
-                (pa == pb).ok_or(UnificationError::TemplateConstraining(*pa))
+                (pa == pb).ok_or(TypeInferenceError::TemplateConstraining(*pa))
             }
             (InferTy::Param(p), _) | (_, InferTy::Param(p)) => {
-                Err(UnificationError::TemplateConstraining(*p))
+                Err(TypeInferenceError::TemplateConstraining(*p))
             }
         }
     }
 
-    pub fn unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), UnificationError> {
+    pub fn unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), TypeInferenceError> {
         self.snapshot(|this| this.try_unify(a, b))
     }
 

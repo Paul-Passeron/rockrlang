@@ -42,14 +42,14 @@ use crate::{
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
         inference::{
-            InferTy, InferenceCtx, UnificationError, implicit::ImplicitContext,
+            InferTy, InferenceCtx, TypeInferenceError, implicit::ImplicitContext,
             var::InferVar,
         },
     },
 };
 
 impl InferenceCtx<'_> {
-    fn infer_expr_aux(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
+    fn infer_expr_aux(&mut self, expr: &HirExpr) -> Result<InferTy, TypeInferenceError> {
         match &expr.data {
             HirExprDesc::IntLit(_) => Ok(self.emit_intlike_constraint().into()),
             HirExprDesc::CharLit(_) => Ok(self.char_ty()),
@@ -163,14 +163,17 @@ impl InferenceCtx<'_> {
         &mut self,
         castee: &HirExpr,
         ty: &TypeRef,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         let expr_ty = self.infer_expr(castee)?;
         let casted_to = self.allocate_type_ref(*ty, &self.implicit_ctx());
         self.emit_cast_constraint(expr_ty, casted_to.clone());
         Ok(casted_to)
     }
 
-    fn infer_place_aux(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
+    fn infer_place_aux(
+        &mut self,
+        place: &HirPlace,
+    ) -> Result<InferTy, TypeInferenceError> {
         let val = match &place.kind {
             HirPlaceKind::Local(local_id) => Ok(self.infer_local(*local_id)),
             HirPlaceKind::Field { base, field } => {
@@ -202,11 +205,14 @@ impl InferenceCtx<'_> {
         Ok(val)
     }
 
-    pub fn infer_place(&mut self, place: &HirPlace) -> Result<InferTy, UnificationError> {
+    pub fn infer_place(
+        &mut self,
+        place: &HirPlace,
+    ) -> Result<InferTy, TypeInferenceError> {
         self.snapshot(|this| this.infer_place_aux(place))
     }
 
-    pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, UnificationError> {
+    pub fn infer_expr(&mut self, expr: &HirExpr) -> Result<InferTy, TypeInferenceError> {
         let prev_span = self.set_current_span(expr.span);
         let res = self.snapshot(|this| {
             let ty = this.infer_expr_aux(expr)?;
@@ -277,7 +283,7 @@ impl InferenceCtx<'_> {
         ty: &TypeRef,
         fields: &[HirStructField],
         span: Span,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         if let Some((struct_id, templates)) = self.allocate_struct_partial_ref(ty) {
             let ast = struct_id.item(self.db);
             let inferred_fields = fields
@@ -287,7 +293,7 @@ impl InferenceCtx<'_> {
 
             let field_keys: HashSet<_> = inferred_fields.keys().copied().collect();
             if !diagnose_bad_struct_fields(self.db, span, struct_id, &field_keys) {
-                return Err(UnificationError::AlreadyDiagnosed);
+                return Err(TypeInferenceError::AlreadyDiagnosed);
             }
 
             let module = struct_id.parent(self.db);
@@ -319,7 +325,7 @@ impl InferenceCtx<'_> {
 
             Ok(as_struct)
         } else {
-            Err(UnificationError::NonStructForStructLit(*ty))
+            Err(TypeInferenceError::NonStructForStructLit(*ty))
         }
     }
 
@@ -348,7 +354,7 @@ impl InferenceCtx<'_> {
         args: &HirConstructorArgs,
         template_hints: &[TypeRef],
         span: Span,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         let variants = &enum_def.item(self.db).variants;
         let Some(variant) = variants.iter().find(|variant| variant.name == name) else {
             Diag::generic_error(
@@ -359,7 +365,7 @@ impl InferenceCtx<'_> {
                 ),
                 span,
             );
-            return Err(UnificationError::AlreadyDiagnosed);
+            return Err(TypeInferenceError::AlreadyDiagnosed);
         };
 
         let enum_templates = templates_of_enum(self.db, enum_def.interned());
@@ -454,7 +460,7 @@ impl InferenceCtx<'_> {
         type_args: &[TypeRef],
         args: &[HirExpr],
         span: Span,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         if !type_args.is_empty() {
             Diag::todo(
                 "Turbofish on static method call is not supported yet.".into(),
@@ -482,14 +488,14 @@ impl InferenceCtx<'_> {
         &self,
         target: FunctionId,
         arg_count: usize,
-    ) -> Result<(), UnificationError> {
+    ) -> Result<(), TypeInferenceError> {
         let (_, args) = target.args(self.db);
         if args.len() == arg_count
             || (target.is_var_args(self.db) && args.len() <= arg_count)
         {
             Ok(())
         } else {
-            Err(UnificationError::ArgCountMismatch(target, arg_count))
+            Err(TypeInferenceError::ArgCountMismatch(target, arg_count))
         }
     }
 
@@ -518,7 +524,7 @@ impl InferenceCtx<'_> {
         target: FunctionId,
         type_args: &[TypeRef],
         args: &[HirExpr],
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         self.check_args_count(target, args.len())?;
         let (receiver, ast_args) = target.args(self.db);
         assert!(receiver.is_none());
@@ -573,7 +579,7 @@ impl InferenceCtx<'_> {
         lhs: &HirExpr,
         op: BinaryOperator,
         rhs: &HirExpr,
-    ) -> Result<InferTy, UnificationError> {
+    ) -> Result<InferTy, TypeInferenceError> {
         let lhs_ty = self.infer_expr(lhs)?;
         let rhs_ty = self.infer_expr(rhs)?;
         let res = self.emit_binop_constraint(lhs_ty, rhs_ty, op);

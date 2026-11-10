@@ -35,7 +35,7 @@ use crate::{
     name_resolve::type_expr::get_templates_of_fun,
     parse_tree::top_level::AstTemplateArg,
     resolved::{FunctionId, InternedFunctionId, TypeRef},
-    typecheck::inference::{InferTy, InferenceCtx, UnificationError},
+    typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 
 pub mod conformance;
@@ -246,7 +246,7 @@ impl<'db> TyCtx<'db> {
         )
     }
 
-    fn report_unif(&self, err: &UnificationError, span: Span) {
+    fn report_unif(&self, err: &TypeInferenceError, span: Span) {
         Diag::emit_error(
             self.db,
             format!("unification error: `{}`", err.display(self.db)),
