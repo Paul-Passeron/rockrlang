@@ -110,7 +110,7 @@ impl<'db> ThirBuilder<'db> {
         tc_results: TypeCheckResults<'_>,
     ) {
         let local = ThirLocal {
-            ty: tc_results.locals(self.db)[&infos.id].unwrap_or(TypeRef::Unknown),
+            ty: tc_results.locals(self.db)[&infos.id].unwrap_or(TypeRef::Error),
             mutability: infos.mutability,
             span: infos.span,
             source: Some((infos.id, infos.name)),

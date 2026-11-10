@@ -386,7 +386,7 @@ pub trait AsAstImplCtx {
     }
 
     fn resolve_any(&self, db: &dyn Db, ty: &AstAnyTypeExpr) -> Option<TypeRef> {
-        ty.as_known().map_or(Some(TypeRef::Unknown), |ty| self.resolve(db, &ty.data))
+        ty.as_known().map_or(Some(TypeRef::Error), |ty| self.resolve(db, &ty.data))
     }
 }
 

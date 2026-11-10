@@ -746,7 +746,7 @@ impl<'db> ThirTranslator<'db> {
             .expr_types(self.db)
             .get(&typecheck::ExprId(expr.id))
             .copied()
-            .unwrap_or(TypeRef::Unknown);
+            .unwrap_or(TypeRef::Error);
         let ty = self.canonicalize_type(ty);
         let kind = match &expr.data {
             HirExprDesc::IntLit(x) => ExprKind::IntLit(*x),

@@ -197,7 +197,7 @@ impl<'db> TyCtx<'db> {
         let node_types = drain
             .iter()
             .map(|(id, infer_ty)| {
-                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Error))
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -207,7 +207,7 @@ impl<'db> TyCtx<'db> {
         let pat_types = drain
             .iter()
             .map(|(id, infer_ty)| {
-                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Error))
             })
             .collect::<BTreeMap<_, _>>();
 
@@ -217,7 +217,7 @@ impl<'db> TyCtx<'db> {
         let place_types = drain
             .iter()
             .map(|(id, infer_ty)| {
-                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Unknown))
+                (*id, self.inf_ctx.solve(infer_ty).unwrap_or(TypeRef::Error))
             })
             .collect::<BTreeMap<_, _>>();
 
