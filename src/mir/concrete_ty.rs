@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::resolved::BuiltinTypeId;
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::ConstructorType,
@@ -143,43 +145,28 @@ impl ConcreteTy {
         self.interned().as_struct(db)
     }
 
-    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
-        self.as_type_ref(db).as_tuple_ref(db).map(|tys| {
-            tys.iter()
-                .map(|ty| {
-                    ty.to_concrete(db, &Substitution::empty())
-                        .expect("Tuple element of a concrete type must be concrete")
-                })
-                .collect()
-        })
-    }
-
-    pub fn as_ptr(self, db: &dyn Db) -> Option<(crate::hir::Mutability, Self)> {
-        self.as_type_ref(db).as_ptr(db).map(|(m, ty)| {
-            (
-                m,
-                ty.to_concrete(db, &Substitution::empty())
-                    .expect("Pointee of a concrete type must be concrete"),
-            )
-        })
-    }
-
-    pub fn as_ref(self, db: &dyn Db) -> Option<(crate::hir::Mutability, Self)> {
-        self.as_type_ref(db).as_ref(db).map(|(m, ty)| {
-            (
-                m,
-                ty.to_concrete(db, &Substitution::empty())
-                    .expect("Referent of a concrete type must be concrete"),
-            )
-        })
-    }
-
     pub fn is_copy(self, db: &dyn Db) -> bool {
         self.interned().is_copy(db)
     }
 
     pub fn is_drop(self, db: &dyn Db) -> bool {
         self.interned().is_drop(db)
+    }
+}
+
+impl TyLike for ConcreteTy {
+    type Sub<'a> = Self;
+
+    fn as_builtin<'a>(&'a self, db: &'a dyn Db) -> Option<(BuiltinTypeId, &'a [Self])> {
+        let ty = *self;
+        match ty.def(db) {
+            TypeDefId::Builtin(bid) => Some((bid, ty.args(db))),
+            _ => None,
+        }
+    }
+
+    fn sub(ty: &Self) -> Self {
+        *ty
     }
 }
 

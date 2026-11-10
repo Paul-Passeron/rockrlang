@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -87,22 +88,11 @@ impl InferenceCtx<'_> {
     }
 
     pub fn is_slice(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = ty.as_builtin()?;
-        match builtin.kind(self.db) {
-            BuiltinTypeKind::Slice => Some(fields[0].clone()),
-            _ => None,
-        }
+        ty.as_slice(self.db).cloned()
     }
 
     pub fn is_ref(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = ty.as_builtin()?;
-        match builtin.kind(self.db) {
-            BuiltinTypeKind::Ref { .. } => {
-                assert_eq!(fields.len(), 1);
-                Some(fields[0].clone())
-            }
-            _ => None,
-        }
+        ty.as_ref(self.db).map(|(_, inner)| inner.clone())
     }
 
     pub fn is_ref_to_slice(&self, ty: &InferTy) -> Option<InferTy> {
@@ -110,22 +100,7 @@ impl InferenceCtx<'_> {
     }
 
     pub fn is_ptr(&self, ty: &InferTy) -> Option<InferTy> {
-        let (builtin, fields) = ty.as_builtin()?;
-        match builtin.kind(self.db) {
-            BuiltinTypeKind::Ptr { .. } => {
-                assert_eq!(fields.len(), 1);
-                Some(fields[0].clone())
-            }
-            _ => None,
-        }
-    }
-
-    pub fn is_tuple<'a>(&self, ty: &'a InferTy) -> Option<&'a [InferTy]> {
-        let (builtin, fields) = ty.as_builtin()?;
-        match builtin.kind(self.db) {
-            BuiltinTypeKind::Tuple => Some(fields),
-            _ => None,
-        }
+        ty.as_ptr(self.db).map(|(_, inner)| inner.clone())
     }
 
     pub fn infer_cast_class(&self, ty: &InferTy) -> Option<CastClass> {

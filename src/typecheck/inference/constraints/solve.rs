@@ -19,6 +19,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use itertools::Itertools;
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -126,7 +127,7 @@ impl<'db> InferenceCtx<'db> {
         has_index: u32,
     ) -> ConstraintSolveResult {
         let found = self.find(tuple_ty);
-        if let Some(fields) = self.is_tuple(&found) {
+        if let Some(fields) = found.as_tuple(self.db) {
             if fields.len() <= has_index as usize {
                 return ConstraintSolveResult::Error(
                     TypeInferenceError::MinTupleLengthMismatch {
@@ -694,7 +695,7 @@ impl<'db> InferenceCtx<'db> {
         fat_ptr_var: InferVar,
     ) -> ConstraintSolveResult {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
-        let Some((_, ty)) = fat_ptr_ty.as_ref(self.db) else {
+        let Some((_, ty)) = fat_ptr_ty.as_ptr_like(self.db) else {
             return ConstraintSolveResult::Pending;
         };
         if !ty.is_adt() {
@@ -717,7 +718,11 @@ impl<'db> InferenceCtx<'db> {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
 
         // Only fat ptr type supported for now is ref to slices
-        if fat_ptr_ty.as_ref_slice(self.db).is_none() {
+        if fat_ptr_ty
+            .as_ptr_like(self.db)
+            .and_then(|(_, ty)| ty.as_slice(self.db))
+            .is_none()
+        {
             return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)

@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::resolved::type_ref::Subst;
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -535,7 +536,7 @@ impl<'db> SanityChecker<'db> {
                 Some(typeof_field)
             }
             Projection::TupleField(idx, type_ref) => {
-                let as_tuple = before.as_tuple_ref(self.db)?;
+                let as_tuple = before.as_tuple(self.db)?;
                 let typeof_field = *as_tuple.get(*idx as usize)?;
                 self.check_types(typeof_field, *type_ref, span);
                 Some(typeof_field)
@@ -807,7 +808,7 @@ impl<T: AdtLike> RefWrappedTy<T> {
         let mut refs = vec![];
         let mut inner = to_peel;
         while inner != target
-            && let Some((mutability, ty)) = inner.as_ref(db)
+            && let Some((mutability, ty)) = inner.peel_ref(db)
         {
             inner = ty.try_into().ok()?;
             refs.push(WrapKind::Ref(mutability));
@@ -821,7 +822,7 @@ impl<T: AdtLike> RefWrappedTy<T> {
     pub fn from_type(db: &dyn Db, ty: T) -> Self {
         let mut refs = vec![];
         let mut inner = ty;
-        while let Some((mutability, ty)) = inner.as_ref(db) {
+        while let Some((mutability, ty)) = inner.peel_ref(db) {
             inner = ty.try_into().ok().unwrap();
             refs.push(WrapKind::Ref(mutability));
         }

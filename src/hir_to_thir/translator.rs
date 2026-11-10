@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use itertools::{Either, Itertools};
 
 use crate::resolved::type_ref::Subst;
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
@@ -1173,7 +1174,7 @@ impl<'db> ThirTranslator<'db> {
                     let place = b.get_place(place);
                     (place.ty, place.span)
                 };
-                let idx_ty = if let Some(tuple_ref) = ty.as_tuple_ref(self.db) {
+                let idx_ty = if let Some(tuple_ref) = ty.as_tuple(self.db) {
                     tuple_ref.get(*index as usize).copied().unwrap_or_else(|| {
                         Diag::emit_error(
                             self.db,

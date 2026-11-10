@@ -74,8 +74,54 @@ impl TryFrom<TypeRef> for TypeId {
     }
 }
 
-impl TypeRef {
-    pub fn as_builtin(self, db: &dyn Db) -> Option<(BuiltinTypeId, &[Self])> {
+pub trait TyLike: Sized {
+    type Sub<'a>
+    where
+        Self: 'a;
+
+    fn as_builtin<'a>(&'a self, db: &'a dyn Db) -> Option<(BuiltinTypeId, &'a [Self])>;
+
+    fn sub(ty: &Self) -> Self::Sub<'_>;
+
+    fn as_ptr_like<'a>(&'a self, db: &'a dyn Db) -> Option<(Mutability, Self::Sub<'a>)> {
+        let (kind, inner) = ptr_like(self, db)?;
+        Some((kind.mutability(), Self::sub(inner)))
+    }
+
+    fn as_ref<'a>(&'a self, db: &'a dyn Db) -> Option<(Mutability, Self::Sub<'a>)> {
+        match ptr_like(self, db)? {
+            (PtrKind::Ref(mutability), inner) => Some((mutability, Self::sub(inner))),
+            (PtrKind::RawPtr(_), _) => None,
+        }
+    }
+
+    fn as_ptr<'a>(&'a self, db: &'a dyn Db) -> Option<(Mutability, Self::Sub<'a>)> {
+        match ptr_like(self, db)? {
+            (PtrKind::RawPtr(mutability), inner) => Some((mutability, Self::sub(inner))),
+            (PtrKind::Ref(_), _) => None,
+        }
+    }
+
+    fn as_slice<'a>(&'a self, db: &'a dyn Db) -> Option<Self::Sub<'a>> {
+        let (b, args) = self.as_builtin(db)?;
+        matches!(b.kind(db), BuiltinTypeKind::Slice).then(|| Self::sub(&args[0]))
+    }
+
+    fn as_tuple<'a>(&'a self, db: &'a dyn Db) -> Option<&'a [Self]> {
+        let (b, args) = self.as_builtin(db)?;
+        matches!(b.kind(db), BuiltinTypeKind::Tuple).then_some(args)
+    }
+}
+
+fn ptr_like<'a, T: TyLike>(ty: &'a T, db: &'a dyn Db) -> Option<(PtrKind, &'a T)> {
+    let (b, args) = ty.as_builtin(db)?;
+    Some((b.is_ptr_like(db)?, &args[0]))
+}
+
+impl TyLike for TypeRef {
+    type Sub<'a> = Self;
+
+    fn as_builtin<'a>(&'a self, db: &'a dyn Db) -> Option<(BuiltinTypeId, &'a [Self])> {
         let id = self.as_type_id()?;
         match id.def(db) {
             TypeDefId::Builtin(bid) => Some((bid, id.args(db))),
@@ -83,35 +129,12 @@ impl TypeRef {
         }
     }
 
-    pub fn as_tuple_ref(self, db: &dyn Db) -> Option<Vec<Self>> {
-        let (b, args) = self.as_builtin(db)?;
-        matches!(b.kind(db), BuiltinTypeKind::Tuple).then(|| args.to_vec())
+    fn sub(ty: &Self) -> Self {
+        *ty
     }
+}
 
-    pub fn as_ref(self, db: &dyn Db) -> Option<(Mutability, Self)> {
-        let type_id = self.as_type_id()?;
-        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
-        match ptr_kind {
-            PtrKind::Ref(mutability) => Some((mutability, type_id.args(db)[0])),
-            PtrKind::RawPtr(_) => None,
-        }
-    }
-
-    pub fn as_ptr(self, db: &dyn Db) -> Option<(Mutability, Self)> {
-        let type_id = self.as_type_id()?;
-        let ptr_kind = type_id.def(db).is_ptr_like(db)?;
-        match ptr_kind {
-            PtrKind::RawPtr(mutability) => Some((mutability, type_id.args(db)[0])),
-            PtrKind::Ref(_) => None,
-        }
-    }
-
-    pub fn as_ptr_like(self, db: &dyn Db) -> Option<(Mutability, Self)> {
-        let type_id = self.as_type_id()?;
-        let mutability = type_id.def(db).is_ptr_like(db)?.mutability();
-        Some((mutability, type_id.args(db)[0]))
-    }
-
+impl TypeRef {
     pub fn cast_class(self, db: &dyn Db) -> Option<CastClass> {
         if let Some((muta, _)) = self.as_ptr_like(db) {
             return Some(if self.is_fat_ptr(db) {
@@ -123,14 +146,6 @@ impl TypeRef {
         let (builtin, _) = self.as_builtin(db)?;
         matches!(builtin.kind(db), BuiltinTypeKind::Bool | BuiltinTypeKind::Int { .. })
             .then_some(CastClass::Int)
-    }
-
-    pub fn as_slice(self, db: &dyn Db) -> Option<Self> {
-        let (b, args) = self.as_builtin(db)?;
-        match b.kind(db) {
-            BuiltinTypeKind::Slice => Some(args[0]),
-            _ => None,
-        }
     }
 
     pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {

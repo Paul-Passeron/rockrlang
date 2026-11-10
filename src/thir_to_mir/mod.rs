@@ -23,6 +23,7 @@ use std::{
 
 use itertools::{Either, Itertools};
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::fundef::concretize_fid,

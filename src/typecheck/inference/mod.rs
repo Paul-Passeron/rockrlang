@@ -31,11 +31,12 @@ use std::{
     sync::Arc,
 };
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     compiler::diagnostic::Diag,
-    hir::{LocalId, Mutability},
+    hir::LocalId,
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -48,8 +49,8 @@ use crate::{
     parse_tree::top_level::AstTemplateArg,
     printer::type_printer::TypePrinter,
     resolved::{
-        BuiltinTypeId, BuiltinTypeKind, FunctionId, InterfaceId, Package, StructId,
-        TypeDefId, TypeId, TypeParamId, TypeRef, display::Display,
+        BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
+        TypeParamId, TypeRef, display::Display,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -595,6 +596,21 @@ impl InferenceCtx<'_> {
     }
 }
 
+impl TyLike for InferTy {
+    type Sub<'a> = &'a Self;
+
+    fn as_builtin<'a>(&'a self, _db: &'a dyn Db) -> Option<(BuiltinTypeId, &'a [Self])> {
+        match self {
+            Self::Adt { def: TypeDefId::Builtin(def), args } => Some((*def, args)),
+            _ => None,
+        }
+    }
+
+    fn sub(ty: &Self) -> &Self {
+        ty
+    }
+}
+
 impl InferTy {
     pub fn is_adt(&self) -> bool {
         matches!(self, Self::Adt { .. })
@@ -603,36 +619,6 @@ impl InferTy {
     pub fn as_adt(&self) -> Option<(TypeDefId, &[Self])> {
         match self {
             Self::Adt { def, args: fields } => Some((*def, fields)),
-            _ => None,
-        }
-    }
-
-    pub fn as_builtin(&self) -> Option<(BuiltinTypeId, &[Self])> {
-        match self {
-            Self::Adt { def: TypeDefId::Builtin(def), args: fields } => {
-                Some((*def, fields))
-            }
-            _ => None,
-        }
-    }
-
-    pub fn as_ref<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a Self)> {
-        let (def, args) = self.as_adt()?;
-        let mutability = def.is_ptr_like(db)?.mutability();
-        assert_eq!(args.len(), 1);
-        Some((mutability, &args[0]))
-    }
-
-    pub fn as_ref_slice<'a>(&'a self, db: &dyn Db) -> Option<(Mutability, &'a Self)> {
-        let (muta, ty) = self.as_ref(db)?;
-        let as_slice = ty.as_slice(db)?;
-        Some((muta, as_slice))
-    }
-
-    pub fn as_slice<'a>(&'a self, db: &dyn Db) -> Option<&'a Self> {
-        let (def, args) = self.as_builtin()?;
-        match def.kind(db) {
-            BuiltinTypeKind::Slice => Some(&args[0]),
             _ => None,
         }
     }

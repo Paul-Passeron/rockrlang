@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 
 use itertools::Itertools;
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},

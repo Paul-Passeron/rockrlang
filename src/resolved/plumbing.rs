@@ -512,7 +512,7 @@ pub trait AdtLike: Copy + Eq {
     fn def(self, db: &dyn Db) -> TypeDefId;
     fn args(self, db: &dyn Db) -> &[Self::Args];
 
-    fn as_ref(self, db: &dyn Db) -> Option<(Mutability, Self::Args)> {
+    fn peel_ref(self, db: &dyn Db) -> Option<(Mutability, Self::Args)> {
         let ptr_kind = self.def(db).is_ptr_like(db)?;
         match ptr_kind {
             PtrKind::Ref(mutability) => Some((mutability, self.args(db)[0])),

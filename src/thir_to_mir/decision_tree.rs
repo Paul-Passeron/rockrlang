@@ -19,6 +19,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use itertools::Itertools;
 
+use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::{ConstructorType, RefWrappedTy},
@@ -97,7 +98,7 @@ impl<'a> Matrix<'a> {
         let wrapped = RefWrappedTy::from_type(ctx.db, place.ty);
         let ty = wrapped.inner;
 
-        if ty.as_tuple_ref(ctx.db).is_some() || ty.as_struct(ctx.db).is_some() {
+        if ty.as_tuple(ctx.db).is_some() || ty.as_struct(ctx.db).is_some() {
             return self.expand_irrefutable(col, ctx).compile(ctx);
         }
 
@@ -115,7 +116,7 @@ impl<'a> Matrix<'a> {
         let ty = place.ty;
 
         let mut field_names: Option<Vec<Symbol>> = None;
-        let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
+        let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple(ctx.db) {
             tuple_ref
                 .iter()
                 .enumerate()
@@ -403,7 +404,7 @@ fn is_complete(db: &dyn Db, sig: &BTreeSet<Constructor>, ty: ConcreteTy) -> bool
         return sig.contains(&Constructor::BoolLit(true))
             && sig.contains(&Constructor::BoolLit(false));
     }
-    if ty.as_tuple_ref(db).is_some() || ty.as_struct(db).is_some() {
+    if ty.as_tuple(db).is_some() || ty.as_struct(db).is_some() {
         return true;
     }
     false
