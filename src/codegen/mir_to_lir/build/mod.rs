@@ -413,8 +413,16 @@ impl MTLBCtx<'_> {
             }
             ProjKind::Regular(MIRProjection::Index { index }) => {
                 let index = self.lower_operand(b, index, lower).unwrap();
-                let elem_ty =
-                    ty.as_ptr(self.db).or_else(|| ty.as_ref(self.db)).unwrap().1;
+                let elem_ty = ty
+                    .as_ptr(self.db)
+                    .or_else(|| ty.as_ref(self.db))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Cannot index into {}",
+                            ty.as_type_ref(self.db).to_string(self.db)
+                        )
+                    })
+                    .1;
                 let lir_elem = LIRTy {
                     layout: layout_of(self.db, elem_ty.as_type_ref(self.db)),
                     origin: Some(elem_ty),
