@@ -49,13 +49,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub use load::*;
+pub use workspace::*;
+
 pub mod diagnostic;
 mod load;
 pub mod timing;
 mod workspace;
-
-pub use load::*;
-pub use workspace::*;
 
 pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
     let ws = Workspace::get(db);

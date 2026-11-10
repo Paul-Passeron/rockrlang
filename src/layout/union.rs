@@ -15,8 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
+use super::LayoutData;
 use crate::{
     Db,
     check::thir::sanity_check::ConstructorType,
@@ -27,8 +26,7 @@ use crate::{
     resolved::{EnumId, TypeRef},
     thir::EnumRef,
 };
-
-use super::LayoutData;
+use itertools::Itertools;
 
 fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
     let source_ordered = match cons {

@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::range::RangeInclusive;
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     layout::{
@@ -29,6 +25,8 @@ use crate::{
     mir::concrete_ty::ConcreteTy,
     resolved::{BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef},
 };
+use itertools::Itertools;
+use std::range::RangeInclusive;
 
 pub mod aggregate;
 pub mod fat_ptr;

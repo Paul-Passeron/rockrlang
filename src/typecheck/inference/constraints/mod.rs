@@ -15,17 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet, btree_map::Entry},
-    convert::Infallible,
-    fmt,
-    iter::once,
-    ops::{ControlFlow, FromResidual, Residual, Try},
-    sync::Arc,
-};
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -44,6 +33,15 @@ use crate::{
             implems::PotentialBlockRes, implicit::ImplicitContext, var::InferVar,
         },
     },
+};
+use itertools::Itertools;
+use std::{
+    collections::{HashMap, HashSet, btree_map::Entry},
+    convert::Infallible,
+    fmt,
+    iter::once,
+    ops::{ControlFlow, FromResidual, Residual, Try},
+    sync::Arc,
 };
 
 pub mod emit;

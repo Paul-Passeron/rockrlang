@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::Db;
+use salsa::Accumulator;
 use std::cell::Cell;
 use std::time::{Duration, Instant};
-
-use salsa::Accumulator;
-
-use crate::Db;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Phase {

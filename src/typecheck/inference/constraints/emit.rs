@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
 use crate::{
     common::symbols::Symbol,
     parse_tree::expr::BinaryOperator,
@@ -30,6 +28,7 @@ use crate::{
         },
     },
 };
+use std::sync::Arc;
 
 impl InferenceCtx<'_> {
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {

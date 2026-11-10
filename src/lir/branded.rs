@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::{
@@ -34,6 +30,8 @@ use crate::{
     },
     unused,
 };
+use itertools::Itertools;
+use std::marker::PhantomData;
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
 type Terminator<'ir> = super::inst::Terminator<Branded<'ir>>;

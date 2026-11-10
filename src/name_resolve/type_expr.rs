@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -38,6 +34,8 @@ use crate::{
         slice_of, tuple_of,
     },
 };
+use itertools::Itertools;
+use std::sync::Arc;
 
 pub fn resolve_any_type_expr<'db>(
     db: &'db dyn Db,

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -37,6 +35,7 @@ use crate::{
     },
     resolved::ptr_of,
 };
+use std::marker::PhantomData;
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;
 type Terminator<'ir> = super::inst::Terminator<Branded<'ir>>;

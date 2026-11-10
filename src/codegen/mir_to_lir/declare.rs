@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
 use crate::{
     Db,
     codegen::{
@@ -28,6 +26,7 @@ use crate::{
     mir::{Mir, concrete_ty::ConcreteTy},
     thir_to_mir::FuncInst,
 };
+use itertools::Itertools;
 
 pub struct MTLDCtx<'a> {
     pub mir_map: MIRMap<'a>,

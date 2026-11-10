@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::{Either, Itertools};
-
 use crate::resolved::type_ref::Subst;
 use crate::resolved::type_ref::TyLike;
 use crate::{
@@ -40,6 +38,7 @@ use crate::{
     },
     typecheck::{self, PatternId, ReceiverAdjustment, TypeCheckResults},
 };
+use itertools::{Either, Itertools};
 
 pub struct ScopeSlot {
     id: ScopeId,

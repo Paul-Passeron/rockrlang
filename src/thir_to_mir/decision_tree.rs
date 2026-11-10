@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{BTreeSet, HashSet};
-
-use itertools::Itertools;
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -35,6 +31,8 @@ use crate::{
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
     thir_to_mir::ThirToMIR,
 };
+use itertools::Itertools;
+use std::collections::{BTreeSet, HashSet};
 
 // Compiling pattern matching to decision tree, inspired by
 // http://moscova.inria.fr/~maranget/papers/ml05e-maranget.pdf

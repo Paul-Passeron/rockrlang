@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::Lsp;
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse};
 use rockr::{
     common::location::{Location, Span},
@@ -32,8 +33,6 @@ use rockr::{
     resolved::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
-
-use crate::Lsp;
 
 impl<'a> Lsp<'a> {
     pub fn handle_goto_def(

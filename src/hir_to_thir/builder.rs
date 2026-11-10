@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
-
 use crate::{
     Db,
     common::{
@@ -31,6 +29,7 @@ use crate::{
     },
     typecheck::TypeCheckResults,
 };
+use std::collections::HashMap;
 
 pub struct ThirBuilder<'db> {
     db: &'db dyn Db,

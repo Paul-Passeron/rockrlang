@@ -15,23 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-pub mod canon;
-pub mod constraints;
-pub mod expr;
-mod implems;
-pub mod implicit;
-pub mod pattern;
-mod types;
-mod unify;
-pub mod var;
-
-use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
-    fmt, mem,
-    sync::Arc,
-};
-
-use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -50,7 +33,7 @@ use crate::{
     printer::type_printer::TypePrinter,
     resolved::{
         BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::Display,
+        TypeParamId, TypeRef, display::Display, type_ref::TyLike,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -63,7 +46,22 @@ use crate::{
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+    fmt, mem,
+    sync::Arc,
+};
 use var::InferVar;
+
+pub mod canon;
+pub mod constraints;
+pub mod expr;
+mod implems;
+pub mod implicit;
+pub mod pattern;
+mod types;
+mod unify;
+pub mod var;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferTy {

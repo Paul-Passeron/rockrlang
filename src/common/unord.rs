@@ -15,9 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::hash::Hash;
-
 use salsa::SalsaValue;
+use std::hash::Hash;
 
 /// Unordered collection of items for easy interning of set-like objects in
 /// salsa

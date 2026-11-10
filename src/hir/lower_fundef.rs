@@ -15,13 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    iter,
-};
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::{
@@ -63,6 +56,11 @@ use crate::{
     },
     thir::EnumRef,
     typecheck::inference::expr::diagnose_bad_struct_fields,
+};
+use itertools::Itertools;
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter,
 };
 
 pub struct LowerFundef<'db> {

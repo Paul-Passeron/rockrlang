@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
-
 use crate::{
     common::arena::Idx,
     layout::{LIRTy, ScalarKind},
@@ -25,6 +23,7 @@ use crate::{
         finalized::{BlockData, FunctionBody},
     },
 };
+use std::marker::PhantomData;
 
 pub mod branded;
 pub mod build;

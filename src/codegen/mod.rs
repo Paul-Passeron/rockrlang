@@ -15,13 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::marker::PhantomData;
-
 use crate::{
     Db,
     codegen::mir_to_lir::{build::MTLBCtx, declare::MTLDCtx},
     lir::{Building, Complete, Declaring, Module, ModulePhase},
 };
+use std::marker::PhantomData;
 
 mod lir_to_llvm;
 mod mir_to_lir;

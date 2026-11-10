@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    iter::once,
-};
-
 use crate::{
     common::{
         arena::{Arena, Idx},
@@ -38,6 +33,10 @@ use crate::{
     },
     thir,
     thir_to_mir::FuncInst,
+};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
 };
 
 pub mod analysis;

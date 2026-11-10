@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::unord::Set,
@@ -32,6 +30,7 @@ use crate::{
     },
     resolved::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
+use itertools::Itertools;
 
 pub fn resolve_type_expr_as_interface<'db>(
     db: &'db dyn Db,

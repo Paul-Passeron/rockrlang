@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{fmt, sync::Arc};
-
-use itertools::Itertools;
-use nonempty::NonEmpty;
-
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -34,6 +29,9 @@ use crate::{
     parser::ParseError,
     resolved::display::Display,
 };
+use itertools::Itertools;
+use nonempty::NonEmpty;
+use std::{fmt, sync::Arc};
 
 pub type AstTopLevelItem = Spanned<AstTopLevelItemDesc>;
 pub type AstAnyTopLevelItem = Spanned<AstAnyTopLevelItemDesc>;

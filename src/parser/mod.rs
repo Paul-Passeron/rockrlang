@@ -15,14 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-mod expr;
-mod pattern;
-mod stmt;
-mod top_level;
-mod type_expr;
-
-use salsa::Accumulator;
-
 use crate::{
     Db, SourceFile,
     common::{
@@ -36,6 +28,13 @@ use crate::{
         top_level::{Ast, AstAnyTopLevelItemDesc, AstTopLevelItemDesc},
     },
 };
+use salsa::Accumulator;
+
+mod expr;
+mod pattern;
+mod stmt;
+mod top_level;
+mod type_expr;
 
 pub struct Parser<'db> {
     pub file: SourceFile,

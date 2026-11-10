@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
-
 use crate::{
     Db,
     common::{
@@ -30,7 +25,7 @@ use crate::{
         BlockID, LocalID, Mir,
         analysis::{
             MIRAnalysis,
-            lattice::{BlockMap, Direction, FixedPointBlockRes, Lattice},
+            lattice::{BlockMap, Direction, FixedPointBlockRes, Lattice, LatticeChange},
         },
         basic_block::{MIRTerminator, Stmt},
         operand::{
@@ -39,8 +34,10 @@ use crate::{
         },
     },
 };
-
-use super::lattice::LatticeChange;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 pub struct MIRInitAnalysis;
 

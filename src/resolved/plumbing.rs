@@ -15,9 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use nonempty::nonempty;
-use std::marker::PhantomData;
-
+use super::{
+    BuiltinTypeDef, BuiltinTypeId, BuiltinTypeKind, Db, EnumId, FileModule, FunctionId,
+    ImplId, IntWidth, InterfaceId, InterfaceRef, InternedEnumId, InternedFunctionId,
+    InternedImplId, InternedInterfaceId, InternedInterfaceRef, InternedModuleId,
+    InternedStructId, InternedTypeId, ModuleId, Package, ScopeOwnerId, Set, SourceFile,
+    StructId, Symbol, TypeDefId, TypeId, TypeRef,
+};
 use crate::{
     hir::Mutability,
     mir::concrete_ty::ConcreteTy,
@@ -27,14 +31,8 @@ use crate::{
     },
     resolved::IntWidthKind,
 };
-
-use super::{
-    BuiltinTypeDef, BuiltinTypeId, BuiltinTypeKind, Db, EnumId, FileModule, FunctionId,
-    ImplId, IntWidth, InterfaceId, InterfaceRef, InternedEnumId, InternedFunctionId,
-    InternedImplId, InternedInterfaceId, InternedInterfaceRef, InternedModuleId,
-    InternedStructId, InternedTypeId, ModuleId, Package, ScopeOwnerId, Set, SourceFile,
-    StructId, Symbol, TypeDefId, TypeId, TypeRef,
-};
+use nonempty::nonempty;
+use std::marker::PhantomData;
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {
     fn from(v: InternedModuleId<'db>) -> Self {

@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use super::{Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 use crate::{
     compiler::{Workspace, workspace_packages},
     name_resolve::implems::impls_in_package,
@@ -23,8 +24,6 @@ use crate::{
         constraints::InferenceConstraintKind, implicit::ImplicitContext,
     },
 };
-
-use super::{Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 
 #[derive(Debug)]
 pub struct PotentialBlockRes {

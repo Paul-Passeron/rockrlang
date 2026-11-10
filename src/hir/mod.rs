@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::parse_tree::{Spanned, stmt::AstStmt, top_level::AstTemplateArg};
-use std::{fmt, sync::Arc};
-
 use crate::{
     Db,
     common::{
@@ -46,6 +44,7 @@ use crate::{
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
     },
 };
+use std::{fmt, sync::Arc};
 
 pub mod display;
 pub mod lower_fundef;

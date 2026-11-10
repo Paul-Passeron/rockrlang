@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::Arc};
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -32,6 +30,7 @@ use crate::{
         implicit::{AsAstImplCtx, ImplicitContext},
     },
 };
+use std::{collections::HashMap, sync::Arc};
 
 impl InferenceCtx<'_> {
     pub fn void_ty(&self) -> InferTy {
@@ -77,10 +76,7 @@ impl InferenceCtx<'_> {
     }
 
     pub fn tuple_of(&self, tys: Vec<InferTy>) -> InferTy {
-        InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
-            args: tys,
-        }
+        InferTy::Adt { def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)), args: tys }
     }
 
     pub fn cstr_ty(&self) -> InferTy {

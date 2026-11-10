@@ -17,12 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Db, hir::HirBody, thir::Thir, typecheck::TypeCheckResults};
 
+pub use builder::ThirBuilder;
+use translator::ThirTranslator;
+
 mod builder;
 mod refs;
 mod translator;
-
-pub use builder::ThirBuilder;
-use translator::ThirTranslator;
 
 pub fn thir_body_from_hir<'db>(
     db: &'db dyn Db,

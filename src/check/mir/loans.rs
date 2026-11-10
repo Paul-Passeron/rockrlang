@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
-
 use crate::{
     Db,
     common::bitset::BitSet,
@@ -31,6 +29,7 @@ use crate::{
         operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
     },
 };
+use std::collections::HashSet;
 
 pub(super) fn check_loans(db: &dyn Db, mir: &Mir) {
     let loans = mir.loans(db);

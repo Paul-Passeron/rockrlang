@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#![allow(dead_code)]
-// Implicit context module
-
-use std::sync::Arc;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -39,6 +34,7 @@ use crate::{
     typecheck::inference::InferTy,
     unused,
 };
+use std::sync::Arc;
 
 pub struct AstImplicitContext {
     pub owner: ScopeOwnerId,
@@ -159,21 +155,6 @@ impl AstImplicitContext {
             AstImplItem::Type { name, ty, .. } if *name == associated => Some(ty.clone()),
             _ => None,
         })
-    }
-
-    fn get_associated_type_aux(
-        &self,
-        db: &dyn Db,
-        associated: Symbol,
-    ) -> Option<TypeRef> {
-        if let Some(ast_ty) = self.get_associated_type_ast(db, associated) {
-            self.resolve(db, &ast_ty.data)
-        } else {
-            let _ = self.get_associated_type_ast_template_arg(db, associated)?;
-            // Fallback if the scope owner is an interface and actually contains
-            // the associated type
-            Some(TypeRef::Associated(associated))
-        }
     }
 
     pub fn resolve_interface(

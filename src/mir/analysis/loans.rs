@@ -15,13 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-};
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     common::{
@@ -39,6 +32,11 @@ use crate::{
         display::{StringWriter, fmt_place},
         operand::{MIRPlace, MIRRValueKind},
     },
+};
+use itertools::Itertools;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
 };
 
 pub struct MIRLoanAnalysis;

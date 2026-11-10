@@ -15,18 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use super::{InferTy, InferVar, TypeInferenceError, UnifyValue};
+use crate::typecheck::inference::InferenceCtx;
 use ena::unify::{InPlace, UnificationTable};
 use itertools::Itertools;
-
-use crate::typecheck::inference::InferenceCtx;
-
-use super::{InferTy, InferVar, TypeInferenceError, UnifyValue};
 
 impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
         match self {
             Self::Var(this_var) => *this_var == var,
-            Self::Adt { args: fields, .. } => fields.iter().any(|field| field.occurs(var)),
+            Self::Adt { args: fields, .. } => {
+                fields.iter().any(|field| field.occurs(var))
+            }
             Self::Param(_) => false,
             Self::Error => false,
         }

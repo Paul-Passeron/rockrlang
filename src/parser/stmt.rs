@@ -15,13 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
 use crate::{
     lexer::TokenKind,
     parse_tree::stmt::{AstMatchBranch, AstStmt, AstStmtDesc, CompoundAssignOp},
     parser::{ParseError, ParseErrorKind, Parser},
 };
+use salsa::Accumulator;
 
 impl Parser<'_> {
     pub(super) fn parse_block(&mut self) -> Result<Vec<AstStmt>, ParseError> {

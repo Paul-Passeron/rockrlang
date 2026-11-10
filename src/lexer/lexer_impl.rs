@@ -15,9 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use core::fmt;
-use regex::Regex;
-
 use crate::{
     Db, SourceFile,
     common::location::{Location, Span},
@@ -26,6 +23,8 @@ use crate::{
         rules::{get_skip_rules, get_token_rules},
     },
 };
+use core::fmt;
+use regex::Regex;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LexError {

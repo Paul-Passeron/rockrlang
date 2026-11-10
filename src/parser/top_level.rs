@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
-use nonempty::nonempty;
-use salsa::Accumulator;
-
 use crate::{
     common::symbols::Symbol,
     lexer::TokenKind,
@@ -37,6 +32,9 @@ use crate::{
     },
     parser::{ParseError, ParseErrorKind, Parser},
 };
+use nonempty::nonempty;
+use salsa::Accumulator;
+use std::sync::Arc;
 
 impl Parser<'_> {
     fn parse_include_path(&mut self) -> Result<AstIncludePath, ParseError> {

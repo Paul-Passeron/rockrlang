@@ -15,14 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
-
-use itertools::Itertools;
-use salsa::Accumulator;
-
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -46,6 +38,12 @@ use crate::{
             var::InferVar,
         },
     },
+};
+use itertools::Itertools;
+use salsa::Accumulator;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
 };
 
 impl InferenceCtx<'_> {

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, hash_map::Entry};
-
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -25,6 +23,7 @@ use crate::{
     parse_tree::top_level::AstInterfaceItem,
     resolved::InterfaceId,
 };
+use std::collections::{HashMap, hash_map::Entry};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
     check_ambiguous_interface_items(db, interface);

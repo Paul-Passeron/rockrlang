@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
-
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -25,6 +23,7 @@ use crate::{
     resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
+use std::collections::HashSet;
 
 pub fn check_typedef(db: &dyn Db, typedef: TypeDefId) {
     match typedef {

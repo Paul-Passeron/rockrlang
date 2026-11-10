@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::fmt::{self, Formatter};
-
 use crate::{
     Db,
     hir::{
@@ -27,6 +25,7 @@ use crate::{
     parse_tree::expr::BinaryOperator,
     resolved::{TypeDefId, display::Display},
 };
+use std::fmt::{self, Formatter};
 
 impl<'db> HirBody<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> Display<'db, &'db Self> {

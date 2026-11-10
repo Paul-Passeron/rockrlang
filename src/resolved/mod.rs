@@ -17,12 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // Rockr Intermediate Language
 
-pub mod display;
-pub mod plumbing;
-pub mod type_ref;
-
-pub use plumbing::*;
-
 use crate::{
     Db, SourceFile,
     common::{location::Span, symbols::Symbol, unord::Set},
@@ -32,6 +26,11 @@ use crate::{
     parse_tree::top_level::{AstImplItem, AstTemplateArg},
     printer::type_printer::TypePrinter,
 };
+pub use plumbing::*;
+
+pub mod display;
+pub mod plumbing;
+pub mod type_ref;
 
 #[salsa::tracked]
 #[derive(PartialOrd, Ord)]

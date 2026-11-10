@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashMap;
-
 use crate::{
     Db,
     check::fundef::check_fundef,
@@ -27,6 +25,7 @@ use crate::{
     resolved::{FunctionId, ImplSource, ScopeOwnerId},
     typecheck::conformance::{ConformanceError, interface_conformance_errors},
 };
+use std::collections::HashMap;
 
 pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
     check_ambiguous_impl_items(db, implem);

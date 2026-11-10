@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use salsa::Accumulator;
-
 use crate::{
     Db,
     common::location::Span,
@@ -28,6 +26,7 @@ use crate::{
         stmt::{StmtKind, ThirStmt},
     },
 };
+use salsa::Accumulator;
 
 pub fn check_return(db: &dyn Db, thir: &Thir) {
     let ret_ty = thir.get_ret_ty(db);

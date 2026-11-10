@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashSet, sync::OnceLock};
-
 use crate::{
     Db,
     mir::{
@@ -30,6 +28,7 @@ use crate::{
         },
     },
 };
+use std::{collections::HashSet, sync::OnceLock};
 
 pub(super) struct MIRCache {
     liveness: OnceLock<MIRLivenessResult>,

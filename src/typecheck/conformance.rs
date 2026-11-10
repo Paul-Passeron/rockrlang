@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
-
-use itertools::Itertools;
-
 use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
@@ -38,6 +34,8 @@ use crate::{
         InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
     },
 };
+use itertools::Itertools;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct CandidateImpl {

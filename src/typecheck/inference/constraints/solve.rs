@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, sync::Arc};
-
-use itertools::Itertools;
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -49,6 +45,8 @@ use crate::{
         },
     },
 };
+use itertools::Itertools;
+use std::{collections::HashMap, sync::Arc};
 
 impl<'db> InferenceCtx<'db> {
     fn solve_deref_constraint(
@@ -285,10 +283,8 @@ impl<'db> InferenceCtx<'db> {
             BinaryOperator::And => todo!(),
             BinaryOperator::Or => todo!(),
             BinaryOperator::BitAnd | BinaryOperator::BitOr | BinaryOperator::BitXor => {
-                let lty =
-                    InferTy::Adt { def: TypeDefId::Builtin(lid), args: Vec::new() };
-                let rty =
-                    InferTy::Adt { def: TypeDefId::Builtin(rid), args: Vec::new() };
+                let lty = InferTy::Adt { def: TypeDefId::Builtin(lid), args: Vec::new() };
+                let rty = InferTy::Adt { def: TypeDefId::Builtin(rid), args: Vec::new() };
                 self.unify(&lty, &rty)?;
                 self.unify(&lty, &res_ty.into())?;
                 ConstraintSolveResult::Solved

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
-
 use crate::{
     Db,
     common::arena::Arena,
@@ -26,6 +24,7 @@ use crate::{
     },
     thir_to_mir::FuncInst,
 };
+use std::collections::HashSet;
 
 pub struct MIRBuilder<'a> {
     pub db: &'a dyn Db,

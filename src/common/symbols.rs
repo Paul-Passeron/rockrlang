@@ -15,9 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{marker::PhantomData, ops::Deref};
-
 use crate::Db;
+use std::{marker::PhantomData, ops::Deref};
 
 #[salsa::interned]
 pub struct InternedSymbol {

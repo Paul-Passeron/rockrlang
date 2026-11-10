@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::common::frozen::{Frozen, FrozenIntoIter, FrozenIter};
 use std::{
     any::{TypeId, type_name},
     fmt,
@@ -23,8 +24,6 @@ use std::{
     marker::PhantomData,
     ops::{Index, IndexMut},
 };
-
-use crate::common::frozen::{Frozen, FrozenIntoIter, FrozenIter};
 
 pub struct Arena<T> {
     inner: Frozen<T>,

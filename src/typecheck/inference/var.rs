@@ -15,9 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::typecheck::inference::InferenceCtx;
-
 use super::InferTy;
+use crate::typecheck::inference::InferenceCtx;
 use ena::unify::UnifyKey;
 use std::fmt;
 

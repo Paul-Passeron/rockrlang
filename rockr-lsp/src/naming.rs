@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::Lsp;
 use itertools::Itertools;
 use rockr::{
     common::location::Location,
@@ -26,8 +27,6 @@ use rockr::{
         TypeDefId, TypeId, TypeRef,
     },
 };
-
-use crate::Lsp;
 
 impl<'a> Lsp<'a> {
     pub fn template_names(&self, loc: Location) -> Vec<String> {

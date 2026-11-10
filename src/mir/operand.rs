@@ -21,25 +21,23 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // Some ideas:
 // - Differentiate between shared / mutable borrow deref ?
 
-use std::{
-    collections::{BTreeMap, HashSet},
-    iter::once,
-};
-
 use crate::{
     Db,
     common::{bitset::BitSet, location::Span, symbols::Symbol},
     hir::Mutability,
     mir::{
-        ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Projection, RValueKind,
+        Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
+        RValueKind,
         concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
     },
     parse_tree::expr::BinaryOperator,
     resolved::{bool_id, char_id, ptr_of},
     thir::FunctionRef,
 };
-
-use super::{Constant, Place};
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::once,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum MIROperand {

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::convert::identity;
-
 use crate::{Lsp, log};
 use itertools::Itertools;
 use lsp_types::{
@@ -39,6 +37,7 @@ use rockr::{
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
     },
 };
+use std::convert::identity;
 
 impl<'a> Lsp<'a> {
     pub(super) fn handle_hover(&mut self, params: HoverParams) -> Option<Hover> {

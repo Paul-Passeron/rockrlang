@@ -15,12 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::mir::{MIRBlockID, MIRLocalID, Mir, analysis::loans::MIRStmtIndex};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
 };
-
-use crate::mir::{MIRBlockID, MIRLocalID, Mir, analysis::loans::MIRStmtIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LatticeChange {

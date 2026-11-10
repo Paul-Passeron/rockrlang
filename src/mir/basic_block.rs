@@ -15,14 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{BTreeMap, HashSet};
-
 use crate::{
     common::{bitset::BitSet, location::Span},
-    mir::{Callee, MIRLocalID, Mir, Place, RValue, Terminator},
+    mir::{
+        BlockID, Callee, LocalID, MIRLocalID, Mir, Operand, Place, RValue, Terminator,
+        operand::MIROperand,
+    },
 };
-
-use super::{BlockID, LocalID, Operand, operand::MIROperand};
+use std::collections::{BTreeMap, HashSet};
 
 /// Come with me if you want to live
 #[derive(PartialEq, Eq)]

@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
 use crate::{
     Db,
     layout::{
@@ -27,6 +25,7 @@ use crate::{
     resolved::{StructId, TypeRef},
     thir::StructRef,
 };
+use itertools::Itertools;
 
 impl FieldOrderingKind {
     pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {

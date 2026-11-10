@@ -15,13 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::{Db, SourceFile};
 use std::{
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
 };
-
-use crate::{Db, SourceFile};
 
 pub const ANCHOR_FILE_NAME: &str = "main.rkr";
 

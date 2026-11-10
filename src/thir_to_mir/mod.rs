@@ -15,14 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter::empty,
-    marker::PhantomData,
-};
-
-use itertools::{Either, Itertools};
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -64,6 +56,12 @@ use crate::{
     },
     thir_to_mir::lower_match::MatchLowerer,
     typecheck::conformance::type_implements,
+};
+use itertools::{Either, Itertools};
+use std::{
+    collections::{BTreeMap, HashMap},
+    iter::empty,
+    marker::PhantomData,
 };
 
 pub mod decision_tree;

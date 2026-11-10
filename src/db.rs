@@ -15,17 +15,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::{Path, PathBuf};
-
-use dashmap::DashMap;
-use salsa::Setter;
-
 use crate::{
     SourceFile,
     compiler::{CompilerError, Config, Workspace},
     layout::{DiscriminantStrategyKind, FieldOrderingKind, IntWidth},
     unused,
 };
+use dashmap::DashMap;
+use salsa::Setter;
+use std::path::{Path, PathBuf};
 
 #[salsa::db]
 #[derive(Default)]

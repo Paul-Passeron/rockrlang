@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{BTreeSet, HashMap, HashSet};
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     mir::{
@@ -33,6 +29,8 @@ use crate::{
     },
     thir_to_mir::{_mir, FuncInst, MIRKey},
 };
+use itertools::Itertools;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub struct DeadCodeElimination;
 

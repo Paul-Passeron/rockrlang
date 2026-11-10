@@ -15,11 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::{HashMap, HashSet};
-
-use itertools::Itertools;
-use salsa::Accumulator;
-
 use crate::{
     Db,
     check::{
@@ -40,6 +35,10 @@ use crate::{
     resolved::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
     thir_to_mir::{FuncInst, MIRKey, mir},
 };
+use itertools::Itertools;
+use salsa::Accumulator;
+use std::collections::{HashMap, HashSet};
+
 pub mod fundef;
 pub mod implem;
 pub mod interface;

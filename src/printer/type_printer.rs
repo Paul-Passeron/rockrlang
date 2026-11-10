@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-use std::collections::HashSet;
-use std::fmt::Write;
-
 use crate::{
     Db,
     hir::Mutability,
@@ -32,6 +28,8 @@ use crate::{
     },
     typecheck::inference::{InferTy, InferenceCtx},
 };
+use itertools::Itertools;
+use std::{collections::HashSet, fmt::Write};
 
 /// Whether the crate prefix of `pkg` should be elided when printing paths:
 /// true for `core`, `std`, and the current crate.

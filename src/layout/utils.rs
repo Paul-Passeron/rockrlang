@@ -15,17 +15,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{
-    marker::PhantomData,
-    ops::{Add, Mul, Sub},
-};
-
 use crate::{
     Db,
     layout::{
         AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData, LayoutID,
         Offset, ScalarKind, Size, VariantsLayout,
     },
+};
+use std::{
+    marker::PhantomData,
+    ops::{Add, Mul, Sub},
 };
 
 fn align_up(value: u64, align: u64) -> u64 {

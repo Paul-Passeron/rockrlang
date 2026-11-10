@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-//! Structural accessors and constructors on [`TypeRef`] — the low-level query
-//! API used throughout the pipeline (peeling refs/ptrs/slices, substituting
-//! params, wrapping in references, etc.).
-
 use super::{
     BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of,
     slice_of, usize_id,

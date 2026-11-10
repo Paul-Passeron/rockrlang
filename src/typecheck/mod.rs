@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::BTreeMap, panic, sync::Arc};
-
-use itertools::Itertools;
-
 use crate::common::location::Span;
 use crate::compiler::diagnostic::Diag;
 use crate::hir::{HirMatchBranch, HirPatternDesc, HirPlace};
@@ -37,6 +33,8 @@ use crate::{
     resolved::{FunctionId, InternedFunctionId, TypeRef},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
+use itertools::Itertools;
+use std::{collections::BTreeMap, panic, sync::Arc};
 
 pub mod conformance;
 pub mod inference;

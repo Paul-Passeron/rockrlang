@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use itertools::Itertools;
-
 use crate::{
     Db, SourceFile,
     common::{
@@ -34,6 +32,7 @@ use crate::{
     resolved::{FunctionId, InterfaceRef, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionParam {

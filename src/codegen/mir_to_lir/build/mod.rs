@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{cmp::Ordering, collections::HashMap, ops::Index};
-
-use itertools::Itertools;
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -49,6 +45,8 @@ use crate::{
     resolved::{BuiltinTypeId, BuiltinTypeKind, TypeDefId, bool_id, type_ref::CastClass},
     thir_to_mir::FuncInst,
 };
+use itertools::Itertools;
+use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 pub struct MIRMap<'a> {
     mir_to_lir: HashMap<FuncInst, LIRFunctionId>,

@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::collections::BTreeMap;
-
-use itertools::Itertools;
-
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -37,6 +33,8 @@ use crate::{
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },
 };
+use itertools::Itertools;
+use std::collections::BTreeMap;
 
 pub(super) struct MatchLowerer<'a, 'b> {
     db: &'b dyn Db,

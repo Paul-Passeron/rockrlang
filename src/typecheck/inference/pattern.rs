@@ -15,10 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use super::{
+    Definition, HashMap, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId,
+    PatternId, StructId, Symbol, TypeDefId, TypeInferenceError,
+};
 use crate::typecheck::inference::expr::report_field_mismatches;
-use itertools::EitherOrBoth;
-use salsa::Accumulator;
-
 use crate::{
     common::location::Span,
     compiler::diagnostic::Diag,
@@ -27,11 +28,8 @@ use crate::{
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId},
 };
-
-use super::{
-    Definition, HashMap, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId,
-    PatternId, StructId, Symbol, TypeDefId, TypeInferenceError,
-};
+use itertools::EitherOrBoth;
+use salsa::Accumulator;
 
 impl InferenceCtx<'_> {
     pub fn infer_pattern(

@@ -15,17 +15,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::HashMap, io};
-
+use crate::compiler::diagnostic::{Diag, DiagLabel, Severity};
+use crate::{Db, SourceFile};
 use codespan_reporting::diagnostic::{
     Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle, Severity as CrSeverity,
 };
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
 use codespan_reporting::term::{self, Config, termcolor::WriteColor};
-
-use crate::compiler::diagnostic::{Diag, DiagLabel, Severity};
-use crate::{Db, SourceFile};
+use std::{collections::HashMap, io};
 
 pub mod type_printer;
 

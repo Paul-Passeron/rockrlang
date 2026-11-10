@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::sync::Arc;
-
-use itertools::Itertools;
-
 use crate::{
     Db,
     hir::{FunctionLikeAst, owning_module},
@@ -30,6 +26,8 @@ use crate::{
     },
     thir_to_mir::{FuncInst, MIRKey},
 };
+use itertools::Itertools;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MangleType {
