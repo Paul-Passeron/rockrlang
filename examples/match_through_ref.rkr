@@ -1,0 +1,27 @@
+@include core::io
+
+struct Pair { a: i32; b: i32; }
+struct Outer { p: Pair; c: i32; }
+
+fun sum_ref(p: &Pair): i32 {
+    let mut r: i32 = 0;
+    match p {
+        Pair { a, b } => { r = a$ + b$; }
+    }
+    return r;
+}
+
+fun nested(o: &Outer): i32 {
+    let mut r: i32 = 0;
+    match o {
+        Outer { p: Pair { a, b }, c } => { r = a$ * 100 + b$ * 10 + c$; }
+    }
+    return r;
+}
+
+fun main(): int {
+    let p = Pair { .a: 40, .b: 2 };
+    let o = Outer { .p: Pair { .a: 1, .b: 2 }, .c: 3 };
+    printf(c"%d %d\n", sum_ref(&p), nested(&o));
+    return 0;
+}

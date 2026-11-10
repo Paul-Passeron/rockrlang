@@ -369,6 +369,22 @@ impl MTLBCtx<'_> {
         }
     }
 
+    fn variant_payload<'ir>(
+        &self,
+        b: &mut BlockBuilder<'ir, '_>,
+        ptr: ValueId<'ir>,
+        ty: LIRTy,
+        variant: u32,
+    ) -> (ValueId<'ir>, LayoutID) {
+        match ty.union_layout(self.db) {
+            Some(vlayout) => (
+                b.union_payload_ptr(ptr, ty, variant),
+                vlayout.variants[variant as usize],
+            ),
+            None => (ptr, ty.layout),
+        }
+    }
+
     fn apply_proj<'ir>(
         &mut self,
         b: &mut BlockBuilder<'ir, '_>,
@@ -441,15 +457,13 @@ impl MTLBCtx<'_> {
                         ty.as_type_ref(self.db).to_string(self.db)
                     )
                 });
+                let layout = layout_of(self.db, ty.as_type_ref(self.db));
+                let lir_ty = LIRTy { layout, origin: Some(ty) };
+                let (payload_ptr, variant_layout) =
+                    self.variant_payload(b, ptr, lir_ty, *variant);
+                let variant_ty = LIRTy { layout: variant_layout, origin: None };
                 match next {
                     MIRProjection::Field { name, resulting_ty } => {
-                        let layout = layout_of(self.db, ty.as_type_ref(self.db));
-                        let lir_ty = LIRTy { layout, origin: Some(ty) };
-                        assert!(lir_ty.is_union(self.db));
-                        let vlayout = lir_ty.union_layout(self.db).unwrap();
-                        let variant_layout = vlayout.variants[*variant as usize];
-                        let variant_ty = LIRTy { layout: variant_layout, origin: None };
-                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, *variant);
                         let Some(ConstructorType::Struct(fields)) =
                             enum_ref.get_cons(self.db, *variant as usize)
                         else {
@@ -462,13 +476,6 @@ impl MTLBCtx<'_> {
                         (field_ptr, *resulting_ty)
                     }
                     MIRProjection::TupleField { index, resulting_ty } => {
-                        let layout = layout_of(self.db, ty.as_type_ref(self.db));
-                        let lir_ty = LIRTy { layout, origin: Some(ty) };
-                        assert!(lir_ty.is_union(self.db));
-                        let vlayout = lir_ty.union_layout(self.db).unwrap();
-                        let variant_layout = vlayout.variants[*variant as usize];
-                        let variant_ty = LIRTy { layout: variant_layout, origin: None };
-                        let payload_ptr = b.union_payload_ptr(ptr, lir_ty, *variant);
                         let field_ptr = b.field_ptr(payload_ptr, variant_ty, *index);
                         (field_ptr, *resulting_ty)
                     }
@@ -544,9 +551,8 @@ impl MTLBCtx<'_> {
                 );
                 let layout = layout_of(self.db, concrete_ty.as_type_ref(self.db));
                 let ty = LIRTy { layout, origin: Some(concrete_ty) };
-                let payload_ptr = b.union_payload_ptr(ptr, ty, variant);
-                let union_layout = ty.union_layout(self.db).unwrap();
-                let variant_layout = union_layout.variants[variant as usize];
+                let (payload_ptr, variant_layout) =
+                    self.variant_payload(b, ptr, ty, variant);
                 match variant_layout.data(self.db) {
                     LayoutData::Union(_) | LayoutData::Scalar(_) => {
                         // We are expecting a single argument
@@ -611,7 +617,9 @@ impl MTLBCtx<'_> {
                     }
                     LayoutData::ZeroSized => (),
                 }
-                b.set_discriminant(ptr, ty, variant);
+                if ty.is_union(self.db) {
+                    b.set_discriminant(ptr, ty, variant);
+                }
 
                 true
             }

@@ -1,0 +1,32 @@
+@include core::io
+
+enum Wrap {
+    W { a: int; b: int }
+}
+
+enum Tup {
+    T(int, int)
+}
+
+fun sum(w: Wrap): int {
+    let mut r = 0;
+    match w {
+        Wrap::W { a: a, b: b } => { r = a + b; }
+    }
+    return r;
+}
+
+fun diff(t: &Tup): int {
+    let mut r = 0;
+    match t {
+        Tup::T(x, y) => { r = x$ - y$; }
+    }
+    return r;
+}
+
+fun main(): int {
+    let w = Wrap::W { .a: 40, .b: 2 };
+    let t = Tup::T(50, 8);
+    printf(c"%d %d\n", sum(w), diff(&t));
+    return 0;
+}

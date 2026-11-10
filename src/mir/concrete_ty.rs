@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::{
     Db,
@@ -317,7 +317,7 @@ impl ConcreteStructRef {
         ))
     }
 
-    pub fn get_fields_ty(self, db: &dyn Db) -> HashMap<Symbol, ConcreteTy> {
+    pub fn get_fields_ty(self, db: &dyn Db) -> Vec<(Symbol, ConcreteTy)> {
         struct_item(db, self.def(db).into())
             .fields
             .iter()

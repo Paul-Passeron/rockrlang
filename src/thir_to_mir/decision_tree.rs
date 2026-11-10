@@ -111,10 +111,10 @@ impl<'a> Matrix<'a> {
     }
 
     fn expand_irrefutable(&self, col: usize, ctx: &mut ThirToMIR) -> Self {
-        let place = &self.cols[col];
-        let wrapped = RefWrappedTy::from_type(ctx.db, place.ty);
-        let ty = wrapped.inner;
+        let place = &ctx.peel_refs(&self.cols[col]);
+        let ty = place.ty;
 
+        let mut field_names: Option<Vec<Symbol>> = None;
         let new_places: Vec<MIRPlace> = if let Some(tuple_ref) = ty.as_tuple_ref(ctx.db) {
             tuple_ref
                 .iter()
@@ -130,8 +130,9 @@ impl<'a> Matrix<'a> {
                 })
                 .collect()
         } else if let Some(struct_ref) = ty.as_struct(ctx.db) {
-            struct_ref
-                .get_fields_ty(ctx.db)
+            let fields = struct_ref.get_fields_ty(ctx.db);
+            field_names = Some(fields.iter().map(|(name, _)| *name).collect());
+            fields
                 .iter()
                 .map(|(name, ty)| {
                     let mut pl = place.clone();
@@ -163,7 +164,13 @@ impl<'a> Matrix<'a> {
                     Some(ThirPattern {
                         kind: ThirPatternKind::Struct { fields, .. },
                         ..
-                    }) => fields.iter().map(|(_, p)| Some(p)).collect_vec(),
+                    }) => field_names
+                        .iter()
+                        .flatten()
+                        .map(|name| {
+                            fields.iter().find(|(n, _)| n == name).map(|(_, p)| p)
+                        })
+                        .collect_vec(),
                     _ => (0..arity).map(|_| None).collect_vec(),
                 };
                 new_pats.splice(col..=col, sub_pats);
@@ -419,11 +426,14 @@ impl VariantArity {
 }
 
 impl ThirToMIR<'_> {
-    fn deref_through_refs(&self, base: &MIRPlace) -> (Vec<MIRProjection>, ConcreteTy) {
-        let mut projections = base.projections.clone();
+    pub fn peel_refs(&self, base: &MIRPlace) -> MIRPlace {
         let peeled = RefWrappedTy::from_type(self.db, base.ty);
-        projections.extend(std::iter::repeat_n(MIRProjection::Deref, peeled.depth()));
-        (projections, peeled.inner)
+        let mut place = base.clone();
+        place
+            .projections
+            .extend(std::iter::repeat_n(MIRProjection::Deref, peeled.depth()));
+        place.ty = peeled.inner;
+        place
     }
 
     pub fn project_downcast_tuple_field(
@@ -432,7 +442,7 @@ impl ThirToMIR<'_> {
         variant_idx: usize,
         tuple_idx: usize,
     ) -> MIRPlace {
-        let (mut projections, enum_ty) = self.deref_through_refs(base);
+        let MIRPlace { mut projections, ty: enum_ty, .. } = self.peel_refs(base);
         projections.push(MIRProjection::Downcast { variant: variant_idx });
 
         let ConstructorType::Tuple(tys) = enum_ty
@@ -458,7 +468,7 @@ impl ThirToMIR<'_> {
         variant_idx: usize,
         field: Symbol,
     ) -> MIRPlace {
-        let (mut projections, enum_ty) = self.deref_through_refs(base);
+        let MIRPlace { mut projections, ty: enum_ty, .. } = self.peel_refs(base);
         projections.push(MIRProjection::Downcast { variant: variant_idx });
 
         let ConstructorType::Struct(tys) = enum_ty

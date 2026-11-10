@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{collections::BTreeMap, iter::repeat_n};
+use std::collections::BTreeMap;
 
 use itertools::Itertools;
 
@@ -27,7 +27,7 @@ use crate::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
         concrete_ty::ConcreteTy,
-        operand::{MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
+        operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
     resolved::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of, usize_id},
     thir::{EnumRef, StructRef, ThirMatchBranch},
@@ -89,20 +89,21 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 self.ctx.goto(bbs[*branch_idx]);
             }
             DecisionTree::Switch { place, cases, default } => {
-                let wrapped = RefWrappedTy::from_type(self.db, place.ty);
-                let ty = wrapped.inner;
-                let depth = wrapped.depth();
+                let scrut_place = self.ctx.peel_refs(place);
+                let ty = scrut_place.ty;
                 if ty.as_enum(self.db).is_some() {
-                    let mut scrut_place = place.clone();
-                    scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
-                    scrut_place.ty = ty;
                     let span = self.ctx.builder.locals[place.local].span;
 
                     let layout = layout_of(self.db, ty.as_type_ref(self.db));
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
-                    let vlayout = lir_ty
-                        .union_layout(self.db)
-                        .expect("If this is not a variant layout, this is a bug");
+                    let Some(vlayout) = lir_ty.union_layout(self.db) else {
+                        match (cases.first(), default) {
+                            (Some((_, tree)), _) => self.lower_dt_aux(tree, bbs, diverge),
+                            (None, Some(tree)) => self.lower_dt_aux(tree, bbs, diverge),
+                            (None, None) => self.ctx.goto(diverge),
+                        }
+                        return;
+                    };
                     let Discriminant::Tagged { kind: discr_width, .. } =
                         vlayout.discriminant
                     else {
@@ -158,8 +159,6 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                     .is_int_like(self.db)
                     .is_some()
                 {
-                    let mut scrut_place = place.clone();
-                    scrut_place.projections.extend(repeat_n(MIRProjection::Deref, depth));
                     let current = self.ctx.builder.current_block();
 
                     let branches: BTreeMap<u128, MIRBlockID> = cases
