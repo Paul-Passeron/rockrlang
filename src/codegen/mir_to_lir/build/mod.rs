@@ -110,7 +110,9 @@ impl<'a> MIRMap<'a> {
     }
 
     pub fn lirs(&self) -> Vec<LIRFunctionId> {
-        self.lir_to_mir.keys().copied().collect()
+        let mut ids: Vec<_> = self.lir_to_mir.keys().copied().collect();
+        ids.sort();
+        ids
     }
 
     pub fn add_import(&mut self, inst: FuncInst, id: LIRFunctionId) {

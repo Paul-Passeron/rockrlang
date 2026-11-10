@@ -225,7 +225,7 @@ pub enum Body<S: ModulePhase> {
     Defined(DefinedLinkage, S::FnBody),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LIRFunctionId(usize);
 
 pub struct Signature {

@@ -208,12 +208,13 @@ pub fn fmt_rvalue<W: MIRWrite>(
         }
         MIRRValueKind::StructLit { struct_ref, fields, .. } => {
             mwrite!(w, "{} {{", struct_ref.def(db).name(db).to_string(db))?;
-            let mut first = true;
-            for (name, op) in fields {
-                if !first {
+            let declared = struct_ref.get_fields_ty(db);
+            let ordered =
+                declared.iter().filter_map(|(name, _)| Some((name, fields.get(name)?)));
+            for (i, (name, op)) in ordered.enumerate() {
+                if i > 0 {
                     w.write_str(", ")?;
                 }
-                first = false;
                 mwrite!(w, "{}: ", name.to_string(db))?;
                 fmt_operand(w, db, op)?;
             }
@@ -255,13 +256,14 @@ pub fn fmt_constructor_args<W: MIRWrite>(
             Ok(())
         }
         MIRConstructorArgs::Struct(fields) => {
-            let mut first = true;
-            for (name, op) in fields {
-                if !first {
+            let mut fields: Vec<_> =
+                fields.iter().map(|(n, op)| (n.to_string(db), op)).collect();
+            fields.sort_by(|(a, _), (b, _)| a.cmp(b));
+            for (i, (name, op)) in fields.into_iter().enumerate() {
+                if i > 0 {
                     w.write_str(", ")?;
                 }
-                first = false;
-                mwrite!(w, "{}: ", name.to_string(db))?;
+                mwrite!(w, "{name}: ")?;
                 fmt_operand(w, db, op)?;
             }
             Ok(())
