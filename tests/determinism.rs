@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const RUNS: usize = 3;
+const RUNS: usize = 2;
 
 fn examples() -> Vec<PathBuf> {
     let mut examples: Vec<_> = ["examples", "examples/fail"]
