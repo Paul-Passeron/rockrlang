@@ -58,27 +58,27 @@ impl InferenceCtx<'_> {
     }
 
     pub fn ptr_of(&self, ty: InferTy) -> InferTy {
-        InferTy::Adt { def: BuiltinTypeId::const_ptr(self.db).into(), fields: vec![ty] }
+        InferTy::Adt { def: BuiltinTypeId::const_ptr(self.db).into(), args: vec![ty] }
     }
 
     pub fn ref_of(&self, ty: InferTy, mutability: Mutability) -> InferTy {
         InferTy::Adt {
             def: BuiltinTypeId::ref_(self.db, mutability).into(),
-            fields: vec![ty],
+            args: vec![ty],
         }
     }
 
     pub fn slice_of(&self, ty: InferTy) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db)),
-            fields: vec![ty],
+            args: vec![ty],
         }
     }
 
     pub fn tuple_of(&self, tys: Vec<InferTy>) -> InferTy {
         InferTy::Adt {
             def: TypeDefId::Builtin(BuiltinTypeId::tuple(self.db)),
-            fields: tys,
+            args: tys,
         }
     }
 
@@ -157,7 +157,7 @@ impl InferenceCtx<'_> {
         match type_ref {
             TypeRef::Concrete(type_id) => Some(InferTy::Adt {
                 def: type_id.def(db),
-                fields: type_id
+                args: type_id
                     .args(db)
                     .iter()
                     .map(|ty| Self::static_allocate_type_ref(db, ty, ctx))
@@ -182,7 +182,7 @@ impl InferenceCtx<'_> {
         match type_ref {
             TypeRef::Concrete(type_id) => InferTy::Adt {
                 def: type_id.def(self.db),
-                fields: type_id
+                args: type_id
                     .args(self.db)
                     .iter()
                     .map(|ty| self.allocate_type_ref(*ty, ctx))
@@ -219,7 +219,7 @@ impl InferenceCtx<'_> {
         &mut self,
         ty: &InferTy,
     ) -> Option<(StructId, HashMap<Symbol, InferTy>)> {
-        if let InferTy::Adt { def, fields } = &ty {
+        if let InferTy::Adt { def, args: fields } = &ty {
             match *def {
                 TypeDefId::Struct(struct_id) => {
                     let templates = fields;

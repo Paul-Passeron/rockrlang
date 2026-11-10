@@ -243,7 +243,7 @@ impl InferenceCtx<'_> {
             TypeRef::Zelf => {
                 let zelf = self.implicit_ctx().zelf()?.clone();
                 match zelf {
-                    InferTy::Adt { def, fields } => {
+                    InferTy::Adt { def, args: fields } => {
                         let TypeDefId::Struct(struct_id) = def else {
                             return None;
                         };
@@ -319,7 +319,7 @@ impl InferenceCtx<'_> {
             })?;
 
             let as_struct =
-                InferTy::Adt { def: TypeDefId::Struct(struct_id), fields: templates };
+                InferTy::Adt { def: TypeDefId::Struct(struct_id), args: templates };
 
             self.unify(&zelf.into(), &as_struct)?;
 
@@ -446,7 +446,7 @@ impl InferenceCtx<'_> {
 
         let as_enum = InferTy::Adt {
             def: TypeDefId::Enum(enum_def),
-            fields: templates.iter().cloned().collect(),
+            args: templates.iter().cloned().collect(),
         };
         self.unify(&zelf.into(), &as_enum)?;
         Ok(InferTy::Var(zelf))

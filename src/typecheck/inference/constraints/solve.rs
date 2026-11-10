@@ -58,7 +58,7 @@ impl<'db> InferenceCtx<'db> {
         if let Some(value) = self.table.probe_value(var) {
             match value {
                 InferTy::Var(_) => ConstraintSolveResult::Pending,
-                InferTy::Adt { def, fields } => {
+                InferTy::Adt { def, args: fields } => {
                     if def.is_ptr_like(self.db).is_none() || fields.len() != 1 {
                         return ConstraintSolveResult::Error(
                             TypeInferenceError::ExpectedPtrLike(def),
@@ -208,8 +208,8 @@ impl<'db> InferenceCtx<'db> {
 
         match (&lhs_ty, &rhs_ty) {
             (InferTy::Var(_), InferTy::Var(_)) => ConstraintSolveResult::Pending,
-            (InferTy::Var(v), InferTy::Adt { def, fields })
-            | (InferTy::Adt { def, fields }, InferTy::Var(v))
+            (InferTy::Var(v), InferTy::Adt { def, args: fields })
+            | (InferTy::Adt { def, args: fields }, InferTy::Var(v))
                 if fields.is_empty()
                     && let Some(int_like) = def.is_int_like(self.db) =>
             {
@@ -285,9 +285,9 @@ impl<'db> InferenceCtx<'db> {
             BinaryOperator::Or => todo!(),
             BinaryOperator::BitAnd | BinaryOperator::BitOr | BinaryOperator::BitXor => {
                 let lty =
-                    InferTy::Adt { def: TypeDefId::Builtin(lid), fields: Vec::new() };
+                    InferTy::Adt { def: TypeDefId::Builtin(lid), args: Vec::new() };
                 let rty =
-                    InferTy::Adt { def: TypeDefId::Builtin(rid), fields: Vec::new() };
+                    InferTy::Adt { def: TypeDefId::Builtin(rid), args: Vec::new() };
                 self.unify(&lty, &rty)?;
                 self.unify(&lty, &res_ty.into())?;
                 ConstraintSolveResult::Solved
@@ -905,12 +905,12 @@ impl<'db> InferenceCtx<'db> {
                 fn get_ref_inner(ctx: &mut InferenceCtx, ty: InferTy) -> Option<InferTy> {
                     match ty {
                         InferTy::Error | InferTy::Var(_) => None,
-                        InferTy::Adt { def, fields } => {
+                        InferTy::Adt { def, args: fields } => {
                             if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
                                 assert_eq!(fields.len(), 1);
                                 get_ref_inner(ctx, fields.into_iter().next()?)
                             } else {
-                                Some(InferTy::Adt { def, fields })
+                                Some(InferTy::Adt { def, args: fields })
                             }
                         }
                         InferTy::Param(id) => Some(InferTy::Param(id)),
@@ -996,7 +996,7 @@ fn concrete_deref_target(db: &dyn Db, ty: TypeId) -> Option<TypeId> {
 fn concrete_to_infer(db: &dyn Db, ty: TypeId) -> Option<InferTy> {
     Some(InferTy::Adt {
         def: ty.def(db),
-        fields: ty
+        args: ty
             .args(db)
             .iter()
             .map(|ty| concrete_to_infer(db, ty.as_type_id()?))

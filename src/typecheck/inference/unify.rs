@@ -26,7 +26,7 @@ impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
         match self {
             Self::Var(this_var) => *this_var == var,
-            Self::Adt { fields, .. } => fields.iter().any(|field| field.occurs(var)),
+            Self::Adt { args: fields, .. } => fields.iter().any(|field| field.occurs(var)),
             Self::Param(_) => false,
             Self::Error => false,
         }
@@ -41,8 +41,8 @@ impl InferTy {
             match (a, b) {
                 (InferTy::Var(var_a), InferTy::Var(_)) => Ok(InferTy::Var(*var_a)),
                 (
-                    InferTy::Adt { def: def_a, fields: fields_a },
-                    InferTy::Adt { def: def_b, fields: fields_b },
+                    InferTy::Adt { def: def_a, args: fields_a },
+                    InferTy::Adt { def: def_b, args: fields_b },
                 ) => {
                     if def_a != def_b {
                         Err(TypeInferenceError::TypeDefIdMismatch(*def_a, *def_b))
@@ -56,14 +56,14 @@ impl InferTy {
                             .zip(fields_b)
                             .map(|(field_a, field_b)| field_a.unify(field_b))
                             .collect::<Result<_, _>>()?;
-                        Ok(InferTy::Adt { def: *def_a, fields })
+                        Ok(InferTy::Adt { def: *def_a, args: fields })
                     }
                 }
-                (InferTy::Adt { def, fields }, InferTy::Var(infer_var)) => {
+                (InferTy::Adt { def, args: fields }, InferTy::Var(infer_var)) => {
                     if fields.iter().any(|field| field.occurs(*infer_var)) {
                         Err(TypeInferenceError::RecursiveDefinition(*infer_var))
                     } else {
-                        Ok(InferTy::Adt { def: *def, fields: fields.clone() })
+                        Ok(InferTy::Adt { def: *def, args: fields.clone() })
                     }
                 }
                 (InferTy::Param(p), InferTy::Var(_))
@@ -135,8 +135,8 @@ impl InferenceCtx<'_> {
                 Ok(())
             }
             (
-                InferTy::Adt { def: def_a, fields: fields_a },
-                InferTy::Adt { def: def_b, fields: fields_b },
+                InferTy::Adt { def: def_a, args: fields_a },
+                InferTy::Adt { def: def_b, args: fields_b },
             ) => {
                 if def_a != def_b {
                     Err(TypeInferenceError::TypeDefIdMismatch(*def_a, *def_b))
@@ -174,9 +174,9 @@ impl InferenceCtx<'_> {
                 let infer_var = self.table.find(*infer_var);
                 self.table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
             }
-            InferTy::Adt { def, fields } => InferTy::Adt {
+            InferTy::Adt { def, args: fields } => InferTy::Adt {
                 def: *def,
-                fields: fields.iter().map(|ty| self.find(ty)).collect(),
+                args: fields.iter().map(|ty| self.find(ty)).collect(),
             },
             InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
             InferTy::Error => InferTy::Error,
@@ -193,9 +193,9 @@ impl InferenceCtx<'_> {
                     let infer_var = table.find(*infer_var);
                     table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
                 }
-                InferTy::Adt { def, fields } => InferTy::Adt {
+                InferTy::Adt { def, args: fields } => InferTy::Adt {
                     def: *def,
-                    fields: fields.iter().map(|ty| find(ty, table)).collect(),
+                    args: fields.iter().map(|ty| find(ty, table)).collect(),
                 },
                 InferTy::Param(type_param_id) => InferTy::Param(*type_param_id),
                 InferTy::Error => InferTy::Error,

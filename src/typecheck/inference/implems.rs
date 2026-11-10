@@ -47,7 +47,7 @@ impl<'a> InferenceCtx<'a> {
                     b: allocated,
                 }])
             }
-            InferTy::Adt { def, fields } => match matcher {
+            InferTy::Adt { def, args: fields } => match matcher {
                 TypeRef::Concrete(type_id) => {
                     let other_def = type_id.def(self.db);
                     if *def != other_def {

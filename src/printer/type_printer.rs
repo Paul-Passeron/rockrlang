@@ -150,7 +150,7 @@ impl TypePrinter {
                     String::from("_")
                 }
             }
-            InferTy::Adt { def, fields } => {
+            InferTy::Adt { def, args: fields } => {
                 let no_fields = fields.is_empty();
                 let fields_str = fields
                     .into_iter()

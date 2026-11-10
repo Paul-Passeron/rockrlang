@@ -44,11 +44,11 @@ impl ZelfArg {
             ZelfKind::Zelf => ty,
             ZelfKind::RefZelf => InferTy::Adt {
                 def: TypeDefId::Builtin(BuiltinTypeId::ref_(db, self.mutability)),
-                fields: vec![ty],
+                args: vec![ty],
             },
             ZelfKind::PtrZelf => InferTy::Adt {
                 def: TypeDefId::Builtin(BuiltinTypeId::ptr(db, self.mutability)),
-                fields: vec![ty],
+                args: vec![ty],
             },
         }
     }

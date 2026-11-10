@@ -165,7 +165,7 @@ impl<'db> InferenceCtx<'db> {
         let ty = self.find(ty);
         match ty {
             InferTy::Var(_) => TypeRef::Error,
-            InferTy::Adt { def, fields } => {
+            InferTy::Adt { def, args: fields } => {
                 let args =
                     fields.into_iter().map(|f| self.infer_to_ref(&f)).collect::<Vec<_>>();
                 for arg in &args {
@@ -615,7 +615,9 @@ impl InferTy {
     pub fn listeners(&self) -> HashSet<InferVar> {
         match self {
             Self::Var(var) => [*var].into(),
-            Self::Adt { fields, .. } => fields.iter().flat_map(Self::listeners).collect(),
+            Self::Adt { args: fields, .. } => {
+                fields.iter().flat_map(Self::listeners).collect()
+            }
             Self::Param(_) | Self::Error => HashSet::new(),
         }
     }

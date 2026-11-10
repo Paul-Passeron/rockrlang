@@ -106,7 +106,7 @@ impl InferenceCtx<'_> {
         template_tys: &[InferTy],
     ) -> ImplicitContext {
         let zelf =
-            InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys.to_vec() };
+            InferTy::Adt { def: TypeDefId::Enum(enum_id), args: template_tys.to_vec() };
         ImplicitContext::new(
             self.db,
             ScopeOwnerId::Module(enum_id.parent(self.db)),
@@ -240,7 +240,7 @@ impl InferenceCtx<'_> {
                 );
             }
         }
-        InferTy::Adt { def: TypeDefId::Enum(enum_id), fields: template_tys }
+        InferTy::Adt { def: TypeDefId::Enum(enum_id), args: template_tys }
     }
 
     fn apply_binds_like(&mut self, like: Option<&InferTy>, target: InferTy) -> InferTy {
@@ -358,7 +358,7 @@ impl InferenceCtx<'_> {
             self.get_templates_for(Definition::Type(TypeDefId::Struct(struct_id)));
         let struct_ty = InferTy::Adt {
             def: TypeDefId::Struct(struct_id),
-            fields: infer_templates.clone(),
+            args: infer_templates.clone(),
         };
         let ctx = ImplicitContext::new(
             self.db,

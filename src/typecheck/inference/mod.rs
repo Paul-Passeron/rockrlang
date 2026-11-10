@@ -67,14 +67,14 @@ use var::InferVar;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferTy {
     Var(InferVar),
-    Adt { def: TypeDefId, fields: Vec<Self> },
+    Adt { def: TypeDefId, args: Vec<Self> },
     Param(TypeParamId),
     Error,
 }
 
 impl InferTy {
     pub fn simple(def: impl Into<TypeDefId>) -> Self {
-        Self::Adt { def: def.into(), fields: Vec::new() }
+        Self::Adt { def: def.into(), args: Vec::new() }
     }
 
     pub fn to_string<'a>(&'a self, db: &'a dyn Db) -> String {
@@ -550,7 +550,7 @@ impl InferenceCtx<'_> {
         let ty = self.find(ty);
         match ty {
             InferTy::Var(_) => None,
-            InferTy::Adt { def, fields } => Some(TypeRef::Concrete(TypeId::new(
+            InferTy::Adt { def, args: fields } => Some(TypeRef::Concrete(TypeId::new(
                 self.db,
                 def,
                 fields
@@ -602,14 +602,16 @@ impl InferTy {
 
     pub fn as_adt(&self) -> Option<(TypeDefId, &[Self])> {
         match self {
-            Self::Adt { def, fields } => Some((*def, fields)),
+            Self::Adt { def, args: fields } => Some((*def, fields)),
             _ => None,
         }
     }
 
     pub fn as_builtin(&self) -> Option<(BuiltinTypeId, &[Self])> {
         match self {
-            Self::Adt { def: TypeDefId::Builtin(def), fields } => Some((*def, fields)),
+            Self::Adt { def: TypeDefId::Builtin(def), args: fields } => {
+                Some((*def, fields))
+            }
             _ => None,
         }
     }
@@ -636,7 +638,7 @@ impl InferTy {
     }
 
     pub fn as_concrete(&self, db: &dyn Db) -> Option<TypeId> {
-        let Self::Adt { def, fields } = self else {
+        let Self::Adt { def, args: fields } = self else {
             return None;
         };
         let fields: Option<Vec<_>> =
