@@ -171,7 +171,13 @@ fn builtin_layout(db: &dyn Db, builtin_id: BuiltinTypeId, args: &[TypeRef]) -> L
             let layouts = args.iter().map(|ty| layout_of(db, *ty)).collect_vec();
             finish_aggregate(db, &layouts)
         }
-        BuiltinTypeKind::Slice => todo!(),
+        BuiltinTypeKind::Slice => {
+            // {ptr, usize}
+            finish_aggregate(
+                db,
+                &[LayoutID::ptr(db), LayoutID::int(db, db.target_width())],
+            )
+        }
     }
 }
 

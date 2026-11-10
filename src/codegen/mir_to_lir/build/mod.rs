@@ -429,27 +429,7 @@ impl MTLBCtx<'_> {
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
             ProjKind::Regular(MIRProjection::Index { index }) => {
-                let index = self.lower_operand(b, index, lower).unwrap();
-                let elem_ty = ty
-                    .as_ptr(self.db)
-                    .or_else(|| ty.as_ref(self.db))
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Cannot index into {}",
-                            ty.as_type_ref(self.db).to_string(self.db)
-                        )
-                    })
-                    .1;
-                let lir_elem = LIRTy {
-                    layout: layout_of(self.db, elem_ty.as_type_ref(self.db)),
-                    origin: Some(elem_ty),
-                };
-                let ptr_ty = LIRTy {
-                    layout: layout_of(self.db, ty.as_type_ref(self.db)),
-                    origin: Some(ty),
-                };
-                let base_ptr = b.load(ptr, ptr_ty);
-                (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
+                self.apply_index(b, ptr, ty, lower, index)
             }
             ProjKind::DowncastThen { next, variant } => {
                 let enum_ref = ty.as_enum(self.db).unwrap_or_else(|| {
@@ -485,6 +465,55 @@ impl MTLBCtx<'_> {
             }
             ProjKind::Regular(MIRProjection::Downcast { .. }) => unreachable!(),
         }
+    }
+
+    fn apply_index<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        ptr: ValueId<'ir>,
+        ty: ConcreteTy,
+        lower: &LIRLower<'ir, '_>,
+        index: &MIROperand,
+    ) -> (ValueId<'ir>, ConcreteTy) {
+        let index = self.lower_operand(b, index, lower).unwrap();
+        if let Some((_, elem_ty)) = ty.as_ptr(self.db) {
+            println!("Index in ptr !");
+            self.index_in_ptr(b, ptr, ty, index, elem_ty)
+        } else if let Some(s) = ty.as_slice(self.db) {
+            // slice is a fat ptr: {ptr, slice}
+            let layout_ty = LIRTy {
+                layout: layout_of(self.db, ty.as_type_ref(self.db)),
+                origin: Some(ty),
+            };
+            let ptr = b.extract_field(ptr, layout_ty, 0);
+            let layout_of_elem_ty = LIRTy {
+                layout: layout_of(self.db, s.as_type_ref(self.db)),
+                origin: Some(s),
+            };
+            (b.index_ptr(ptr, layout_of_elem_ty, index), s)
+        } else {
+            panic!("Cannot index into {}", ty.as_type_ref(self.db).to_string(self.db))
+        }
+    }
+
+    fn index_in_ptr<'ir>(
+        &mut self,
+        b: &mut BlockBuilder<'ir, '_>,
+        ptr: ValueId<'ir>,
+        ty: ConcreteTy,
+        index: ValueId<'ir>,
+        elem_ty: ConcreteTy,
+    ) -> (ValueId<'ir>, ConcreteTy) {
+        let lir_elem = LIRTy {
+            layout: layout_of(self.db, elem_ty.as_type_ref(self.db)),
+            origin: Some(elem_ty),
+        };
+        let ptr_ty = LIRTy {
+            layout: layout_of(self.db, ty.as_type_ref(self.db)),
+            origin: Some(ty),
+        };
+        let base_ptr = b.load(ptr, ptr_ty);
+        (b.index_ptr(base_ptr, lir_elem, index), elem_ty)
     }
 
     fn get_proj_kinds(place: &MIRPlace) -> Vec<ProjKind<'_>> {
@@ -736,7 +765,15 @@ impl MTLBCtx<'_> {
                 let ptr = self.lower_place_as_ptr(b, place, lower);
                 Some(b.get_discriminant(ptr, ty).unwrap().erase())
             }
-            MIRRValueKind::Metadata(_) => todo!(),
+            MIRRValueKind::Metadata(op) => {
+                let operand = self.lower_operand(b, op, lower)?;
+                let op_ty = op.ty(self.db);
+                let lir_ty = LIRTy {
+                    layout: layout_of(self.db, op_ty.as_type_ref(self.db)),
+                    origin: Some(op_ty),
+                };
+                Some(b.extract_field(operand, lir_ty, 1))
+            }
             MIRRValueKind::SizeOf(ty) => {
                 let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let s = layout.size(self.db).bytes();

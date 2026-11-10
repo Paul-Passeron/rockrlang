@@ -442,8 +442,17 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                         }
                         res.into()
                     }
-                    ValueInstKind::ExtractField { .. } => {
-                        todo!()
+                    ValueInstKind::ExtractField { value, ty, src_idx } => {
+                        let llvm_value = ctx.values[value].into_struct_value();
+                        let layout = match ty.layout.data(self.db) {
+                            LayoutData::Aggregate(aggregate_layout) => aggregate_layout,
+                            _ => unreachable!(),
+                        };
+                        let idx = layout.source_to_layout[*src_idx as usize];
+                        self.b
+                            .build_extract_value(llvm_value, idx, "extract field")
+                            .unwrap()
+                            .into()
                     }
                     ValueInstKind::InsertField { .. } => todo!(),
                     ValueInstKind::Arith { op, lhs, rhs } => {
