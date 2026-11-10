@@ -897,6 +897,6 @@ fun main(): int {
     v.push("Hey");
     v.push("Ho");
     for x in v {x.println();}
-    
+
     return 0;
 }

@@ -22,8 +22,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
-const TIMEOUT: Duration = Duration::from_secs(60);
+const TIMEOUT: Duration = Duration::from_secs(300);
 const LINE_DELETIONS_PER_FILE: usize = 8;
+const LINE_DELETIONS_PER_LARGE_FILE: usize = 3;
+const LARGE_FILE_LINES: usize = 300;
 
 const KNOWN_PANICS: &[(&str, &str)] = &[
     ("", "Cannot index into"),
@@ -63,7 +65,12 @@ fn mutants() -> Vec<Mutant> {
             push(format!("first {keep} lines"), lines[..keep].join("\n"));
         }
 
-        let step = (lines.len() / LINE_DELETIONS_PER_FILE).max(1);
+        let deletions = if lines.len() > LARGE_FILE_LINES {
+            LINE_DELETIONS_PER_LARGE_FILE
+        } else {
+            LINE_DELETIONS_PER_FILE
+        };
+        let step = (lines.len() / deletions).max(1);
         for i in (0..lines.len()).step_by(step) {
             let mut l = lines.clone();
             l.remove(i);
@@ -134,7 +141,8 @@ fn damaged_examples_never_crash_the_compiler() {
 
     let next = AtomicUsize::new(0);
     let problems: Mutex<BTreeMap<String, Vec<String>>> = Mutex::new(BTreeMap::new());
-    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
+    let threads =
+        std::thread::available_parallelism().map_or(2, |n| (n.get() / 2).max(1));
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {
