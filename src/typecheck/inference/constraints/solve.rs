@@ -808,14 +808,13 @@ impl<'db> InferenceCtx<'db> {
             // default behaviour Might want to do this one at a
             // time, in order to avoid non-determinism issues
 
-            let pending = self
-                .all_constraints
-                .iter()
-                .find(|(id, constraint)| {
-                    !self.solved_constraints.contains(*id)
-                        && (constraint.kind.has_default_behaviour())
-                })
-                .map(|(_, val)| val.clone());
+            while let Some(&id) = self.pending_defaults.first()
+                && self.solved_constraints.contains(&id)
+            {
+                self.pending_defaults.pop_first();
+            }
+            let pending =
+                self.pending_defaults.first().map(|id| self.all_constraints[id].clone());
             match pending {
                 None => {
                     break;

@@ -395,14 +395,11 @@ impl<'db> InferenceCtx<'db> {
         if let Entry::Vacant(e) = self.implements.entry(id) {
             e.insert(once(InterfaceImplem { interface: id, ty, templates }).collect());
         } else {
-            for implem in self.implements.get(&id).iter().flat_map(|implem| implem.iter())
-            {
-                let implem_ty = self.find_const(&implem.ty);
-                let implem_templates = implem
-                    .templates
-                    .iter()
-                    .map(|t| self.find_const(t))
-                    .collect::<Box<[_]>>();
+            let existing = self.implements[&id].iter().cloned().collect::<Box<[_]>>();
+            for implem in &existing {
+                let implem_ty = self.find(&implem.ty);
+                let implem_templates =
+                    implem.templates.iter().map(|t| self.find(t)).collect::<Box<[_]>>();
                 if ty == implem_ty && templates == implem_templates {
                     return;
                 }

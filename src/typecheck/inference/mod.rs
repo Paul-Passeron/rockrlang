@@ -97,6 +97,7 @@ pub struct InferenceCtx<'a> {
 
     all_constraints: BTreeMap<InferenceConstraintId, Arc<InferenceConstraint>>,
     solved_constraints: BTreeSet<InferenceConstraintId>,
+    pending_defaults: BTreeSet<InferenceConstraintId>,
     error_constraints: BTreeSet<InferenceConstraintId>,
     listeners: BTreeMap<InferVar, Vec<InferenceConstraintId>>,
     ready: VecDeque<InferenceConstraintId>,
@@ -195,6 +196,7 @@ impl<'db> InferenceCtx<'db> {
             local_map,
             all_constraints: BTreeMap::new(),
             solved_constraints: BTreeSet::new(),
+            pending_defaults: BTreeSet::new(),
             error_constraints: BTreeSet::new(),
             call_infos: BTreeMap::new(),
             next_constraint_id: 0,

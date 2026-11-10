@@ -35,6 +35,9 @@ impl InferenceCtx<'_> {
         let constraint = Arc::new(self.fresh_constraint(constraint));
         self.ready_push(constraint.id);
         self.register_listeners(&constraint);
+        if constraint.kind.has_default_behaviour() {
+            self.pending_defaults.insert(constraint.id);
+        }
         self.all_constraints.insert(constraint.id, constraint);
     }
 
