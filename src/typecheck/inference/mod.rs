@@ -323,6 +323,7 @@ pub enum UnificationError {
     AlreadyDiagnosed,
     Custom(String),
     InvalidCast { from: InferTy, to: InferTy, reason: &'static str },
+    NonIntegerTypesInBitwiseOperation { lhs: String, rhs: String },
 }
 
 impl UnificationError {
@@ -436,6 +437,13 @@ impl fmt::Display for Display<'_, &UnificationError> {
                 from.to_string(self.db),
                 to.to_string(self.db)
             ),
+            UnificationError::NonIntegerTypesInBitwiseOperation { lhs, rhs } => {
+                write!(
+                    f,
+                    "non-integer types in bitwise operation `{}` and `{}`",
+                    lhs, rhs,
+                )
+            }
         }
     }
 }
