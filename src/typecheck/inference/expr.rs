@@ -143,9 +143,9 @@ impl InferenceCtx<'_> {
                     "function not found in current scope".into(),
                     expr.span,
                 );
-                Ok(self.fresh_var().into())
+                Ok(InferTy::Error)
             }
-            HirExprDesc::Error => Ok(self.fresh_var().into()),
+            HirExprDesc::Error => Ok(InferTy::Error),
             HirExprDesc::Metadata(hir_expr) => {
                 let fat_ptr_ty = self.infer_expr(hir_expr)?;
                 let fat_ptr_var = self.emit_fat_ptr_constraint();
@@ -299,7 +299,7 @@ impl InferenceCtx<'_> {
 
             let ctx = ImplicitContext::new(
                 self.db,
-                ScopeOwnerId::Module(module),
+                module.into(),
                 templates_of_struct(self.db, struct_id.interned()),
                 templates.iter().cloned().collect(),
                 Some(InferTy::Var(zelf)),
@@ -307,10 +307,8 @@ impl InferenceCtx<'_> {
 
             self.snapshot(|this| {
                 ast.fields.iter().try_for_each(|ast| {
-                    let ty = inferred_fields
-                        .get(&ast.name)
-                        .cloned()
-                        .unwrap_or_else(|| this.fresh_var().into());
+                    let ty =
+                        inferred_fields.get(&ast.name).cloned().unwrap_or(InferTy::Error);
                     let resolved = this.allocate_ast_type_expr(&ast.ty.data, &ctx);
                     this.unify(&ty, &resolved)
                 })

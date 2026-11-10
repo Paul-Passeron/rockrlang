@@ -192,6 +192,24 @@ pub enum ScopeOwnerId {
     Interface(InterfaceRef),
 }
 
+impl From<ImplId> for ScopeOwnerId {
+    fn from(value: ImplId) -> Self {
+        Self::Impl(value)
+    }
+}
+
+impl From<ModuleId> for ScopeOwnerId {
+    fn from(value: ModuleId) -> Self {
+        Self::Module(value)
+    }
+}
+
+impl From<InterfaceRef> for ScopeOwnerId {
+    fn from(value: InterfaceRef) -> Self {
+        Self::Interface(value)
+    }
+}
+
 impl ScopeOwnerId {
     pub fn zelf_or_error(&self, db: &dyn Db) -> TypeRef {
         self.get_canonical_zelf(db).unwrap_or(TypeRef::Error)
