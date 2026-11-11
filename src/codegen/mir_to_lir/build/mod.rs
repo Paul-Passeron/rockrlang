@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::layout::{AggregateLayout, Offset};
-use crate::resolved::slice_of;
+use crate::resolved::array_of;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -481,7 +481,7 @@ impl MTLBCtx<'_> {
         if let Some((_, elem_ty)) = ty.as_ptr(self.db) {
             println!("Index in ptr !");
             self.index_in_ptr(b, ptr, ty, index, elem_ty)
-        } else if let Some(s) = ty.as_slice(self.db) {
+        } else if let Some((s, _)) = ty.as_slice(self.db) {
             // slice is a fat ptr: {ptr, slice}
             let layout_ty = LIRTy {
                 layout: layout_of(self.db, ty.as_type_ref(self.db)),
@@ -837,7 +837,7 @@ impl MTLBCtx<'_> {
                 let align = inner_ty.layout.align(self.db);
                 let count: u32 = elements.len() as u32;
                 let array_ty = LIRTy {
-                    origin: Some(slice_of(self.db, *elem_ty)),
+                    origin: Some(array_of(self.db, *elem_ty, count as usize)),
                     layout: LayoutID::new(
                         self.db,
                         size.align_to(align) * count as u64,

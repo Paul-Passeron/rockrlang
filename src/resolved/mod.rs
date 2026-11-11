@@ -180,8 +180,9 @@ pub enum BuiltinTypeKind {
 
     Ref { mutability: Mutability },
     Ptr { mutability: Mutability },
+    Slice { mutability: Mutability },
 
-    Slice,
+    Array { length: usize },
     Tuple,
 }
 

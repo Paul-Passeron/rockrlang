@@ -202,7 +202,7 @@ pub enum HirExprDesc {
     Neg(Box<HirExpr>),
     Not(Box<HirExpr>),
     Tuple(Vec<HirExpr>),
-    SliceLit(Vec<HirExpr>),
+    ArrayLit(Vec<HirExpr>),
     SizeOf(TypeRef),
     TypeName(TypeRef),
     Constructor {

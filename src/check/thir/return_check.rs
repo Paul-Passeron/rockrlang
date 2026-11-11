@@ -74,7 +74,7 @@ pub fn expr_contains_never(db: &dyn Db, thir: &Thir, expr: ExprId) -> bool {
         ExprKind::Not(e) | ExprKind::Neg(e) => expr_contains_never(db, thir, *e),
         ExprKind::Call { args: items, .. }
         | ExprKind::Tuple(items)
-        | ExprKind::SliceLit(items) => {
+        | ExprKind::ArrayLit(items) => {
             items.iter().any(|item| expr_contains_never(db, thir, *item))
         }
         ExprKind::Constructor { args, .. } => match args {

@@ -159,7 +159,12 @@ enum ProbeOutcome {
 
 impl InferenceCtx<'_> {
     fn is_builtin_indexed_by_int(&self, ty: &InferTy) -> Option<InferTy> {
-        self.is_slice(ty).or_else(|| self.is_ref_to_slice(ty)).or_else(|| self.is_ptr(ty))
+        self.is_array(ty)
+            .map(|ty| ty.0)
+            .or_else(|| self.is_array(ty).map(|ty| ty.0))
+            .or_else(|| self.is_slice(ty).map(|ty| ty.0))
+            .or_else(|| self.is_ref(ty).and_then(|ty| self.is_array(&ty).map(|ty| ty.0)))
+            .or_else(|| self.is_ptr(ty))
     }
 }
 

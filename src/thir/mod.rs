@@ -145,7 +145,7 @@ pub enum ExprKind {
     Not(ExprId),
 
     Tuple(Vec<ExprId>),
-    SliceLit(Vec<ExprId>),
+    ArrayLit(Vec<ExprId>),
     SizeOf(TypeRef),
     TypeName(TypeRef),
 

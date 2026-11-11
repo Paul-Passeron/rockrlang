@@ -112,7 +112,7 @@ impl<'db> InferenceCtx<'db> {
             let idx = self.emit_intlike_constraint();
             self.unify(index_ty, &idx.into()).into()
         } else if found.as_adt().is_some() {
-            todo!("Trait-based indexing")
+            todo!("Trait-based indexing for {}", found.to_string(self.db))
         } else {
             ConstraintSolveResult::Pending
         }
@@ -693,7 +693,7 @@ impl<'db> InferenceCtx<'db> {
         if !ty.is_adt() {
             return ConstraintSolveResult::Pending;
         }
-        if ty.as_slice(self.db).is_none() {
+        if ty.as_array(self.db).is_none() {
             return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)
@@ -712,7 +712,7 @@ impl<'db> InferenceCtx<'db> {
         // Only fat ptr type supported for now is ref to slices
         if fat_ptr_ty
             .as_ptr_like(self.db)
-            .and_then(|(_, ty)| ty.as_slice(self.db))
+            .and_then(|(_, ty)| ty.as_array(self.db))
             .is_none()
         {
             return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(

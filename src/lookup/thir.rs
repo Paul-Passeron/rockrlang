@@ -77,7 +77,7 @@ impl Thir {
             | ExprKind::AddressOf { place, .. }
             | ExprKind::Ref { place, .. } => self.place_at(*place, loc),
             ExprKind::Tuple(items)
-            | ExprKind::SliceLit(items)
+            | ExprKind::ArrayLit(items)
             | ExprKind::Call { args: items, .. } => {
                 items.iter().find_map(|e| self.expr_at(*e, loc))
             }

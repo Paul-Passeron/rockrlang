@@ -573,10 +573,13 @@ impl<'a> ThirToMIR<'a> {
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
             }
-            ExprKind::SliceLit(exprs) => {
-                let elem_ty = ty
-                    .as_slice(self.db)
+            ExprKind::ArrayLit(exprs) => {
+                let (elem_ty, length) = ty
+                    .as_array(self.db)
                     .expect("Slice lits should have already been typechecked");
+                if length != exprs.len() {
+                    todo!("Incompatible array sizes !")
+                }
                 let elements =
                     exprs.iter().map(|expr| self.build_operand(*expr)).collect_vec();
                 MIRRValueKind::Array { elem_ty, elements }
@@ -943,8 +946,9 @@ impl TypeId {
                 | BuiltinTypeKind::Bool
                 | BuiltinTypeKind::Ptr { .. }
                 | BuiltinTypeKind::Int { .. } => true,
-                BuiltinTypeKind::Ref { mutability } => !mutability.is_mut(),
-                BuiltinTypeKind::Slice => false,
+                BuiltinTypeKind::Slice { mutability }
+                | BuiltinTypeKind::Ref { mutability } => !mutability.is_mut(),
+                BuiltinTypeKind::Array { .. } => self.args(db)[0].is_copy(db),
                 // TODO: allow copy if all elements are copy
                 #[allow(clippy::match_same_arms)]
                 BuiltinTypeKind::Tuple => false,

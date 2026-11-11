@@ -300,7 +300,7 @@ impl<'a> ThirPrinter<'a> {
                 let s = self.render_exprs(es);
                 if es.len() == 1 { format!("({s},)") } else { format!("({s})") }
             }
-            ExprKind::SliceLit(es) => format!("[{}]", self.render_exprs(es)),
+            ExprKind::ArrayLit(es) => format!("[{}]", self.render_exprs(es)),
             ExprKind::SizeOf(ty) => {
                 format!("sizeof({})", ty.to_string(self.db))
             }

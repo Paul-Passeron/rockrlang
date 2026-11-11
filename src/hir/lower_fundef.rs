@@ -292,9 +292,14 @@ impl<'db> LowerFundef<'db> {
                 )
             }
 
-            AstTypeExprDesc::Slice { ty, len: _ } => {
+            // This is an array, actually
+            AstTypeExprDesc::Slice { ty, len } => {
                 let inner = self.resolve_any(ty);
-                self.wrap_builtin_unary(BuiltinTypeId::slice(self.db), inner)
+                self.wrap_builtin_unary(
+                    // TODO: do better than just defaulting to zero
+                    BuiltinTypeId::array(self.db, len.unwrap_or_default()),
+                    inner,
+                )
             }
 
             AstTypeExprDesc::Tuple(tys) => {
@@ -730,7 +735,7 @@ impl<'db> LowerFundef<'db> {
                 self.lower_structlit(ty, *variant, fields, scope, module)
             }
             AstExprDesc::Tuple(exprs) => self.lower_tuple(exprs, scope),
-            AstExprDesc::SliceLit(exprs) => HirExprDesc::SliceLit(
+            AstExprDesc::SliceLit(exprs) => HirExprDesc::ArrayLit(
                 exprs
                     .iter()
                     .map(|expr| self.lower_expr(expr, scope, self.module))

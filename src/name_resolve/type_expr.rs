@@ -30,8 +30,8 @@ use crate::{
     },
     resolved::{
         EnumId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
-        ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of,
-        slice_of, tuple_of,
+        ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, array_of,
+        ptr_of, ref_of, tuple_of,
     },
 };
 use itertools::Itertools;
@@ -120,7 +120,8 @@ pub fn resolve_type_expr_desc<'db>(
             let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            slice_of::<TypeId>(db, elem).into()
+            // TODO: Do better than jusr defaulting to 0
+            array_of::<TypeId>(db, elem, len.unwrap_or_default()).into()
         }
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys

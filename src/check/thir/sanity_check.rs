@@ -24,8 +24,8 @@ use crate::{
     hir::{Mutability, signature::get_sig_of_function},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{
-        AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, slice_of, str_id, tuple_of, void_id,
+        AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
+        const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of, void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
@@ -359,11 +359,14 @@ impl<'db> SanityChecker<'db> {
                 let expected = TypeRef::Concrete(tuple_of(self.db, tys));
                 self.check_types(expected, infos.ty, infos.span);
             }
-            ExprKind::SliceLit(items) => {
+            ExprKind::ArrayLit(items) => {
                 if items.is_empty() {
-                    if infos.ty.as_slice(self.db).is_none() {
-                        let mock_expected =
-                            TypeRef::Concrete(slice_of(self.db, TypeRef::Unknown));
+                    if infos.ty.as_array(self.db).is_none() {
+                        let mock_expected = TypeRef::Concrete(array_of(
+                            self.db,
+                            TypeRef::Unknown,
+                            items.len(),
+                        ));
                         self.check_types(mock_expected, infos.ty, infos.span);
                     }
                 } else {
@@ -384,7 +387,8 @@ impl<'db> SanityChecker<'db> {
                         })
                         .copied()
                         .unwrap_or(TypeRef::Error);
-                    let expected = TypeRef::Concrete(slice_of(self.db, witness_type));
+                    let expected =
+                        TypeRef::Concrete(array_of(self.db, witness_type, items.len()));
                     self.check_types(expected, infos.ty, infos.span);
                 }
             }
@@ -417,7 +421,7 @@ impl<'db> SanityChecker<'db> {
             ExprKind::Metadata(idx) => {
                 let ty = self.check_expr(*idx);
                 if let Some(_value) =
-                    ty.as_ref(self.db).and_then(|(_, ty)| ty.as_slice(self.db))
+                    ty.as_ref(self.db).and_then(|(_, ty)| ty.as_array(self.db))
                 {
                     self.check_types(
                         ty.typeof_metadata(self.db).unwrap_or(TypeRef::Error),

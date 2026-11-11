@@ -81,7 +81,9 @@ impl TypePrinter {
                 Some((format!("*{muta_suffix}"), String::new()))
             }
             BuiltinTypeKind::Tuple => Some(("(".into(), ")".into())),
-            BuiltinTypeKind::Slice => Some(("[".into(), "]".into())),
+            BuiltinTypeKind::Array { length } => {
+                Some(("[".into(), format!("; {length}]")))
+            }
             _ => None,
         }
     }

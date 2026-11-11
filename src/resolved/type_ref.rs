@@ -16,10 +16,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use super::{
-    BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of,
-    slice_of, usize_id,
+    BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of, usize_id,
 };
-use crate::{Db, hir::Mutability, printer::type_printer::TypePrinter};
+use crate::{
+    Db, hir::Mutability, printer::type_printer::TypePrinter, resolved::slice_of,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CastClass {
@@ -98,9 +99,22 @@ pub trait TyLike: Sized {
         }
     }
 
-    fn as_slice<'a>(&'a self, db: &'a dyn Db) -> Option<Self::Sub<'a>> {
+    fn as_array<'a>(&'a self, db: &'a dyn Db) -> Option<(Self::Sub<'a>, usize)> {
         let (b, args) = self.as_builtin(db)?;
-        matches!(b.kind(db), BuiltinTypeKind::Slice).then(|| Self::sub(&args[0]))
+        match b.kind(db) {
+            BuiltinTypeKind::Array { length } => Some((Self::sub(&args[0]), length)),
+            _ => None,
+        }
+    }
+
+    fn as_slice<'a>(&'a self, db: &'a dyn Db) -> Option<(Self::Sub<'a>, Mutability)> {
+        let (b, args) = self.as_builtin(db)?;
+        match b.kind(db) {
+            BuiltinTypeKind::Slice { mutability } => {
+                Some((Self::sub(&args[0]), mutability))
+            }
+            _ => None,
+        }
     }
 
     fn as_tuple<'a>(&'a self, db: &'a dyn Db) -> Option<&'a [Self]> {
@@ -147,16 +161,18 @@ impl TypeRef {
     pub fn element_of_indexed(self, db: &dyn Db) -> Option<Self> {
         self.as_ptr(db)
             .map(|(_, inner)| inner)
-            .or_else(|| self.as_slice(db))
-            .or_else(|| self.as_ref(db).and_then(|t| t.1.as_slice(db)))
+            .or_else(|| self.as_array(db).map(|ty| ty.0))
+            .or_else(|| self.as_slice(db).map(|ty| ty.0))
+            .or_else(|| self.as_ref(db).and_then(|t| t.1.as_array(db).map(|ty| ty.0)))
     }
 
+    // TODO: What was the point of this, exactly ???
     pub fn ref_slice_of(db: &dyn Db, inner: Self) -> Self {
-        Self::Concrete(slice_of(db, Self::Concrete(slice_of(db, inner))))
+        Self::Concrete(slice_of(db, inner, Mutability::Const))
     }
 
     pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
-        if self.as_ref(db).and_then(|(_, ty)| ty.as_slice(db)).is_some() {
+        if self.as_ref(db).and_then(|(_, ty)| ty.as_array(db)).is_some() {
             Some(usize_id(db).as_type_ref(db))
         } else {
             None

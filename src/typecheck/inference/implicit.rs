@@ -29,7 +29,7 @@ use crate::{
     },
     resolved::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
-        const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
+        array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, tuple_of,
     },
     typecheck::inference::InferTy,
     unused,
@@ -340,7 +340,15 @@ pub trait AsAstImplCtx {
             }
             AstTypeExprDesc::Slice { ty, len } => {
                 assert!(len.is_none(), "TODO: length in slice");
-                Some(slice_of::<TypeId>(db, this.resolve_any(db, ty)?).into())
+                // TODO: do better when len is None
+                Some(
+                    array_of::<TypeId>(
+                        db,
+                        this.resolve_any(db, ty)?,
+                        len.unwrap_or_default(),
+                    )
+                    .into(),
+                )
             }
             AstTypeExprDesc::Tuple(tys) => {
                 if tys.len() == 1 {

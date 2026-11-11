@@ -68,9 +68,16 @@ impl InferenceCtx<'_> {
         }
     }
 
-    pub fn slice_of(&self, ty: InferTy) -> InferTy {
+    pub fn slice_of(&self, ty: InferTy, mutability: Mutability) -> InferTy {
         InferTy::Adt {
-            def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db)),
+            def: TypeDefId::Builtin(BuiltinTypeId::slice(self.db, mutability)),
+            args: vec![ty],
+        }
+    }
+
+    pub fn array_of(&self, ty: InferTy, length: usize) -> InferTy {
+        InferTy::Adt {
+            def: TypeDefId::Builtin(BuiltinTypeId::array(self.db, length)),
             args: vec![ty],
         }
     }
@@ -83,16 +90,16 @@ impl InferenceCtx<'_> {
         self.ptr_of(self.char_ty())
     }
 
-    pub fn is_slice(&self, ty: &InferTy) -> Option<InferTy> {
-        ty.as_slice(self.db).cloned()
+    pub fn is_array(&self, ty: &InferTy) -> Option<(InferTy, usize)> {
+        ty.as_array(self.db).map(|(a, b)| (a.clone(), b))
     }
 
     pub fn is_ref(&self, ty: &InferTy) -> Option<InferTy> {
         ty.as_ref(self.db).map(|(_, inner)| inner.clone())
     }
 
-    pub fn is_ref_to_slice(&self, ty: &InferTy) -> Option<InferTy> {
-        self.is_ref(ty).and_then(|ref ty| self.is_slice(ty))
+    pub fn is_slice(&self, ty: &InferTy) -> Option<(InferTy, Mutability)> {
+        ty.as_slice(self.db).map(|(a, b)| (a.clone(), b))
     }
 
     pub fn is_ptr(&self, ty: &InferTy) -> Option<InferTy> {
@@ -103,7 +110,7 @@ impl InferenceCtx<'_> {
         let (def, fields) = ty.as_adt()?;
         if let Some(kind) = def.is_ptr_like(self.db) {
             let is_fat =
-                matches!(kind, PtrKind::Ref(_)) && fields[0].as_slice(self.db).is_some();
+                matches!(kind, PtrKind::Ref(_)) && fields[0].as_array(self.db).is_some();
             return Some(if is_fat {
                 CastClass::FatPtr(kind.mutability())
             } else {

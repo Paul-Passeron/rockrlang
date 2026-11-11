@@ -30,7 +30,7 @@ pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
         panic!("Not a fat ptr");
     };
     // Only slices are fat ptrs for the moment
-    let Some(_) = id.as_slice(db) else {
+    let Some(_) = id.as_array(db) else {
         panic!("Not a fat ptr");
     };
 
