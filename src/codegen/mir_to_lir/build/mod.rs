@@ -487,12 +487,20 @@ impl MTLBCtx<'_> {
                 layout: layout_of(self.db, ty.as_type_ref(self.db)),
                 origin: Some(ty),
             };
-            let ptr = b.extract_field(ptr, layout_ty, 0);
+            // println!(
+            //     "Layout of {} is {:?} {:?}",
+            //     ty.as_type_ref(self.db).to_string(self.db),
+            //     layout_ty.layout,
+            //     layout_ty.layout.data(self.db),
+            // );
+            let ptr_to_ptr = b.field_ptr(ptr, layout_ty, 0);
+            let actual_ptr = b
+                .load(ptr_to_ptr, LIRTy { layout: LayoutID::ptr(self.db), origin: None });
             let layout_of_elem_ty = LIRTy {
                 layout: layout_of(self.db, s.as_type_ref(self.db)),
                 origin: Some(s),
             };
-            (b.index_ptr(ptr, layout_of_elem_ty, index), s)
+            (b.index_ptr(actual_ptr, layout_of_elem_ty, index), s)
         } else {
             panic!("Cannot index into {}", ty.as_type_ref(self.db).to_string(self.db))
         }

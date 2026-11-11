@@ -420,8 +420,11 @@ impl<'db> SanityChecker<'db> {
 
             ExprKind::Metadata(idx) => {
                 let ty = self.check_expr(*idx);
-                if let Some(_value) =
-                    ty.as_ref(self.db).and_then(|(_, ty)| ty.as_array(self.db))
+                if ty.as_slice(self.db).is_some()
+                    || ty
+                        .as_ref(self.db)
+                        .and_then(|(_, ty)| ty.as_array(self.db))
+                        .is_some()
                 {
                     self.check_types(
                         ty.typeof_metadata(self.db).unwrap_or(TypeRef::Error),

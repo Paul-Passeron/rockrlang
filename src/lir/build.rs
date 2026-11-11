@@ -408,7 +408,13 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
         src_idx: u32,
     ) -> ValueId<'ir> {
         debug_assert!(ty.is_aggregate(self.db));
-        debug_assert_eq!(self.body.defs[value.idx].ty.layout, ty.layout);
+        debug_assert_eq!(
+            self.body.defs[value.idx].ty.layout,
+            ty.layout,
+            "{:?} vs {:?}",
+            self.body.defs[value.idx].ty.layout.data(self.db),
+            ty.layout.data(self.db),
+        );
         debug_assert!(
             ty.aggregate_layout(self.db).and_then(|l| l.source_field(src_idx)).is_some()
         );

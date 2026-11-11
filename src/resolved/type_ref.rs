@@ -172,11 +172,7 @@ impl TypeRef {
     }
 
     pub fn typeof_metadata(&self, db: &dyn Db) -> Option<Self> {
-        if self.as_ref(db).and_then(|(_, ty)| ty.as_array(db)).is_some() {
-            Some(usize_id(db).as_type_ref(db))
-        } else {
-            None
-        }
+        self.is_fat_ptr(db).then(|| usize_id(db).as_type_ref(db))
     }
 
     #[must_use]
