@@ -391,8 +391,11 @@ fn type_expr_children_at(
         | AstTypeExprDesc::Pointer { pointee, .. } => {
             any_type_expr_at(db, ctx, pointee, project(db, resolved, 0), loc)
         }
-        AstTypeExprDesc::Slice { ty, .. } => {
-            any_type_expr_at(db, ctx, ty, project(db, resolved, 0), loc)
+        AstTypeExprDesc::Slice { elem, .. } => {
+            any_type_expr_at(db, ctx, elem, project(db, resolved, 0), loc)
+        }
+        AstTypeExprDesc::Array { elem, .. } => {
+            any_type_expr_at(db, ctx, elem, project(db, resolved, 0), loc)
         }
         AstTypeExprDesc::Tuple(tys) => tys.iter().enumerate().find_map(|(i, ty)| {
             any_type_expr_at(db, ctx, ty, project(db, resolved, i), loc)

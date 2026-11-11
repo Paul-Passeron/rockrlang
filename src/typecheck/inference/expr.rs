@@ -121,14 +121,14 @@ impl InferenceCtx<'_> {
                 let tys = exprs.iter().map(|expr| self.infer_expr(expr)).try_collect()?;
                 Ok(self.tuple_of(tys))
             }
-            HirExprDesc::SliceLit(exprs) => {
+            HirExprDesc::ArrayLit(exprs) => {
                 let elem_var = self.fresh_var();
                 exprs.iter().try_for_each(|expr| {
                     let ty = self.infer_expr(expr)?;
                     self.unify(&elem_var.into(), &ty)?;
                     Ok(())
                 })?;
-                Ok(self.slice_of(elem_var.into()))
+                Ok(self.array_of(elem_var.into(), exprs.len()))
             }
             HirExprDesc::SizeOf(_) => Ok(self.usize_ty()),
             HirExprDesc::Constructor { enum_def, name, args, template_hints } => {

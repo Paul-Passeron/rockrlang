@@ -317,7 +317,7 @@ impl<'a> Lsp<'a> {
             | ExprKind::Neg(_)
             | ExprKind::Not(_)
             | ExprKind::Tuple(_)
-            | ExprKind::SliceLit(_)
+            | ExprKind::ArrayLit(_)
             | ExprKind::TypeName(_)
             | ExprKind::SizeOf(_)
             | ExprKind::Constructor { .. }

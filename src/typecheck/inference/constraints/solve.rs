@@ -112,7 +112,7 @@ impl<'db> InferenceCtx<'db> {
             let idx = self.emit_intlike_constraint();
             self.unify(index_ty, &idx.into()).into()
         } else if found.as_adt().is_some() {
-            todo!("Trait-based indexing")
+            todo!("Trait-based indexing for {}", found.to_string(self.db))
         } else {
             ConstraintSolveResult::Pending
         }
@@ -687,19 +687,10 @@ impl<'db> InferenceCtx<'db> {
         fat_ptr_var: InferVar,
     ) -> ConstraintSolveResult {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
-        let Some((_, ty)) = fat_ptr_ty.as_ptr_like(self.db) else {
-            return ConstraintSolveResult::Pending;
-        };
-        if !ty.is_adt() {
-            return ConstraintSolveResult::Pending;
+        if fat_ptr_ty.as_slice(self.db).is_some() {
+            return ConstraintSolveResult::Solved;
         }
-        if ty.as_slice(self.db).is_none() {
-            return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
-                "Expected a fat ptr type but got {}",
-                fat_ptr_ty.to_string(self.db)
-            )));
-        }
-        ConstraintSolveResult::Solved
+        ConstraintSolveResult::Pending
     }
 
     fn solve_metadata_of_fat_ptr_constraint(
@@ -710,11 +701,7 @@ impl<'db> InferenceCtx<'db> {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
 
         // Only fat ptr type supported for now is ref to slices
-        if fat_ptr_ty
-            .as_ptr_like(self.db)
-            .and_then(|(_, ty)| ty.as_slice(self.db))
-            .is_none()
-        {
+        if fat_ptr_ty.as_slice(self.db).is_none() {
             return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)
@@ -763,8 +750,27 @@ impl<'db> InferenceCtx<'db> {
                     ConstraintSolveResult::Solved
                 }
             }
-            (CastClass::Int | CastClass::ThinPtr(_), CastClass::FatPtr(_)) => {
+            (CastClass::Int, CastClass::FatPtr(_)) => {
                 reject("a fat pointer's metadata cannot be created by a cast")
+            }
+            (CastClass::ThinPtr(from_m), CastClass::FatPtr(to_m)) => {
+                // test if we have &[T; N] -> &[T]
+                if to_m.is_mut() && !from_m.is_mut() {
+                    return reject(
+                        "a const pointer/reference cannot be cast to a mutable one",
+                    );
+                }
+                if let Some((inner_ty, _)) =
+                    from.as_ref(self.db).and_then(|ty| ty.1.as_array(self.db))
+                {
+                    let Some((casted_inner_ty, _)) = to.as_slice(self.db) else {
+                        unreachable!("Only slices are fat ptrs")
+                    };
+                    self.unify(inner_ty, casted_inner_ty)?;
+                    ConstraintSolveResult::Solved
+                } else {
+                    ConstraintSolveResult::Pending
+                }
             }
             (CastClass::FatPtr(_), CastClass::Int) => {
                 reject("cast the fat pointer to a thin pointer first")

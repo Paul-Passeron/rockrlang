@@ -283,8 +283,11 @@ impl BuiltinTypeDef<'_> {
             BuiltinTypeKind::Ptr { mutability } => {
                 format!("*{}", if mutability.is_mut() { "mut" } else { "" })
             }
-            BuiltinTypeKind::Slice => "[]".into(),
+            BuiltinTypeKind::Array { length } => format!("[{length}]"),
             BuiltinTypeKind::Tuple => "()".into(),
+            BuiltinTypeKind::Slice { mutability } => {
+                format!("&{}[]", if mutability.is_mut() { "mut" } else { "" })
+            }
         };
         Symbol::new(db, as_str)
     }
@@ -326,8 +329,12 @@ impl BuiltinTypeId {
         BuiltinTypeDef::new(db, BuiltinTypeKind::Tuple).into()
     }
 
-    pub fn slice(db: &dyn Db) -> Self {
-        BuiltinTypeDef::new(db, BuiltinTypeKind::Slice).into()
+    pub fn array(db: &dyn Db, length: usize) -> Self {
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Array { length }).into()
+    }
+
+    pub fn slice(db: &dyn Db, mutability: Mutability) -> Self {
+        BuiltinTypeDef::new(db, BuiltinTypeKind::Slice { mutability }).into()
     }
 
     pub fn i8(db: &dyn Db) -> Self {
@@ -459,7 +466,9 @@ impl BuiltinTypeId {
             | BuiltinTypeKind::Int { .. } => 0,
             BuiltinTypeKind::Ref { .. }
             | BuiltinTypeKind::Ptr { .. }
-            | BuiltinTypeKind::Slice => 1,
+            | BuiltinTypeKind::Slice { .. } => 1,
+            // TODO: should we count length as a template ?
+            BuiltinTypeKind::Array { .. } => 1,
         }
     }
 
@@ -575,8 +584,12 @@ pub fn ref_of<T: AdtLike>(db: &dyn Db, ty: T::Args, mutable: bool) -> T {
     if mutable { mut_ref_of(db, ty) } else { const_ref_of(db, ty) }
 }
 
-pub fn slice_of<T: AdtLike>(db: &dyn Db, ty: T::Args) -> T {
-    T::adt(db, BuiltinTypeId::slice(db).into(), vec![ty])
+pub fn array_of<T: AdtLike>(db: &dyn Db, ty: T::Args, length: usize) -> T {
+    T::adt(db, BuiltinTypeId::array(db, length).into(), vec![ty])
+}
+
+pub fn slice_of<T: AdtLike>(db: &dyn Db, ty: T::Args, mutability: Mutability) -> T {
+    T::adt(db, BuiltinTypeId::slice(db, mutability).into(), vec![ty])
 }
 
 pub fn tuple_of<T: AdtLike>(db: &dyn Db, tys: Vec<T::Args>) -> T {

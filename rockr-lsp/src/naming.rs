@@ -65,7 +65,13 @@ impl<'a> Lsp<'a> {
                 Some((format!("*{muta}"), String::new()))
             }
             BuiltinTypeKind::Tuple => Some(("(".into(), ")".into())),
-            BuiltinTypeKind::Slice => Some(("[".into(), "]".into())),
+            BuiltinTypeKind::Array { length } => {
+                Some(("[".into(), format!("; {length}]",)))
+            }
+            BuiltinTypeKind::Slice { mutability } => Some((
+                format!("&{}[", if mutability.is_mut() { "mut" } else { "" }),
+                "]".into(),
+            )),
             _ => None,
         }
     }

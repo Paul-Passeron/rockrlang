@@ -805,10 +805,10 @@ impl<'db> ThirTranslator<'db> {
                     hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect_vec();
                 ExprKind::Tuple(fields)
             }
-            HirExprDesc::SliceLit(hir_exprs) => {
+            HirExprDesc::ArrayLit(hir_exprs) => {
                 let exprs =
                     hir_exprs.iter().map(|e| self.expr(b, e, stmts)).collect_vec();
-                ExprKind::SliceLit(exprs)
+                ExprKind::ArrayLit(exprs)
             }
             HirExprDesc::SizeOf(type_ref) => ExprKind::SizeOf(rehole(self.db, *type_ref)),
             HirExprDesc::TypeName(type_ref) => {

@@ -1,8 +1,15 @@
 @include core::opt
 @include core::panic
 
-impl <T> [T] {
-    fun len(&self): usize {
+impl <T> &[T] {
+    fun len(self): usize {
+        let this = self;
+        return @metadata(self);
+    }
+}
+
+impl <T> &mut [T] {
+    fun len(self): usize {
         let this = self;
         return @metadata(self);
     }
@@ -15,7 +22,7 @@ struct SliceIter<T> {
 
 impl <T> iter::Iter for SliceIter<T> {
     type Item = &T;
-    
+
     fun next(&mut self): opt<&T> {
         panic("TODO");
     }

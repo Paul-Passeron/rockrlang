@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{function_ast, impl_sources},
+    hir::{Mutability, function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         interfaces::interface_item,
@@ -30,8 +30,8 @@ use crate::{
     },
     resolved::{
         EnumId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
-        ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, ptr_of, ref_of,
-        slice_of, tuple_of,
+        ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, array_of,
+        ptr_of, ref_of, slice_of, tuple_of,
     },
 };
 use itertools::Itertools;
@@ -115,13 +115,24 @@ pub fn resolve_type_expr_desc<'db>(
             });
             ref_of::<TypeId>(db, pointee, *mutable).into()
         }
-        AstTypeExprDesc::Slice { ty, len } => {
-            assert!(len.is_none(), "TODO: handle non value-type");
+        AstTypeExprDesc::Array { elem: ty, len } => {
             let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            slice_of::<TypeId>(db, elem).into()
+            array_of::<TypeId>(db, elem, *len).into()
         }
+        AstTypeExprDesc::Slice { elem: ty, mutable } => {
+            let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
+                resolve_type_expr(db, &ty, module, template_args, has_zelf)
+            });
+            slice_of::<TypeId>(
+                db,
+                elem,
+                if *mutable { Mutability::Mutable } else { Mutability::Const },
+            )
+            .into()
+        }
+
         AstTypeExprDesc::Tuple(tys) => {
             let types = tys
                 .iter()

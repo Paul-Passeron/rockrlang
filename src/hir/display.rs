@@ -462,7 +462,7 @@ fn write_expr(f: &mut impl fmt::Write, expr: &HirExpr, db: &dyn Db) -> fmt::Resu
             }
             write!(f, ")")
         }
-        HirExprDesc::SliceLit(elems) => {
+        HirExprDesc::ArrayLit(elems) => {
             write!(f, "[")?;
             for (i, e) in elems.iter().enumerate() {
                 if i > 0 {

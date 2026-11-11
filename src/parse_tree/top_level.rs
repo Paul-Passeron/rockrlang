@@ -226,15 +226,25 @@ impl fmt::Display for Display<'_, &AstTypeExprDesc> {
                     )
                 )
             }
-            AstTypeExprDesc::Slice { ty, len } => {
+            AstTypeExprDesc::Array { elem: ty, len } => {
                 write!(
                     f,
-                    "[{}{}]",
+                    "[{}; {len}]",
                     ty.as_known().map_or_else(
                         || "_".into(),
                         |ty| ty.data.display(self.db).to_string()
                     ),
-                    if let Some(len) = len { format!("; {len}") } else { String::new() }
+                )
+            }
+            AstTypeExprDesc::Slice { elem: ty, mutable } => {
+                write!(
+                    f,
+                    "&{}[{}]",
+                    if *mutable { "mut" } else { "" },
+                    ty.as_known().map_or_else(
+                        || "_".into(),
+                        |ty| ty.data.display(self.db).to_string()
+                    ),
                 )
             }
             AstTypeExprDesc::Tuple(spanneds) => {

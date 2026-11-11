@@ -33,7 +33,7 @@ use std::sync::Arc;
 pub enum MangleType {
     Ptr(Box<Self>),
     Tuple(Vec<Self>),
-    Array(Box<Self>),
+    Array(Box<Self>, usize),
     Bool,
     Int(IntKind), // width in bytes
     #[allow(unused)]
@@ -45,6 +45,7 @@ pub enum MangleType {
     },
     Never,
     Error,
+    Slice(Box<MangleType>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -175,7 +176,10 @@ fn mangle_builtin_id(
         BuiltinTypeKind::Ref { .. } | BuiltinTypeKind::Ptr { .. } => {
             MangleType::Ptr(Box::new(args.remove(0)))
         }
-        BuiltinTypeKind::Slice => MangleType::Array(Box::new(args.remove(0))),
+        BuiltinTypeKind::Array { length } => {
+            MangleType::Array(Box::new(args.remove(0)), length)
+        }
+        BuiltinTypeKind::Slice { .. } => MangleType::Slice(Box::new(args.remove(0))),
         BuiltinTypeKind::Tuple => MangleType::Tuple(args),
     }
 }
@@ -210,7 +214,7 @@ impl MangleType {
     pub fn mangle(&self, db: &dyn Db) -> String {
         match self {
             Self::Ptr(t) => format!("P{}", t.mangle(db)),
-            Self::Array(t) => format!("A{}", t.mangle(db)),
+            Self::Array(t, length) => format!("A{length}{}", t.mangle(db)),
             Self::Tuple(ts) => {
                 let inner: String = ts.iter().map(|t| t.mangle(db)).collect();
                 format!("T{inner}E")
@@ -229,6 +233,7 @@ impl MangleType {
             Self::Never => "z".to_owned(),
             Self::Error => "X".to_owned(),
             Self::Bool => "b".to_owned(),
+            Self::Slice(t) => format!("S{}", t.mangle(db)),
         }
     }
 }

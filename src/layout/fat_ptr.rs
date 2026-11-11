@@ -26,13 +26,9 @@ pub const FAT_PTR_DATA_FIELD: u32 = 0;
 pub const FAT_METADATA_FIELD: u32 = 1;
 
 pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
-    let Some((_, id)) = ty.as_ref(db) else {
-        panic!("Not a fat ptr");
-    };
-    // Only slices are fat ptrs for the moment
-    let Some(_) = id.as_slice(db) else {
-        panic!("Not a fat ptr");
-    };
+    if !ty.is_fat_ptr(db) {
+        panic!("Not a fat ptr")
+    }
 
     let target_witdh = db.target_width();
     let target_size: Size = target_witdh.into();
@@ -57,13 +53,6 @@ pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
 
 impl TypeRef {
     pub fn is_fat_ptr(self, db: &dyn Db) -> bool {
-        let Some((_, id)) = self.as_ref(db) else {
-            return false;
-        };
-        // Only slices are fat ptrs for the moment
-        let Some(_) = id.as_slice(db) else {
-            return false;
-        };
-        true
+        self.as_slice(db).is_some()
     }
 }

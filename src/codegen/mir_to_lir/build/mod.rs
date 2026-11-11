@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::layout::{AggregateLayout, Offset};
-use crate::resolved::slice_of;
+use crate::resolved::array_of;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -481,18 +481,26 @@ impl MTLBCtx<'_> {
         if let Some((_, elem_ty)) = ty.as_ptr(self.db) {
             println!("Index in ptr !");
             self.index_in_ptr(b, ptr, ty, index, elem_ty)
-        } else if let Some(s) = ty.as_slice(self.db) {
+        } else if let Some((s, _)) = ty.as_slice(self.db) {
             // slice is a fat ptr: {ptr, slice}
             let layout_ty = LIRTy {
                 layout: layout_of(self.db, ty.as_type_ref(self.db)),
                 origin: Some(ty),
             };
-            let ptr = b.extract_field(ptr, layout_ty, 0);
+            // println!(
+            //     "Layout of {} is {:?} {:?}",
+            //     ty.as_type_ref(self.db).to_string(self.db),
+            //     layout_ty.layout,
+            //     layout_ty.layout.data(self.db),
+            // );
+            let ptr_to_ptr = b.field_ptr(ptr, layout_ty, 0);
+            let actual_ptr = b
+                .load(ptr_to_ptr, LIRTy { layout: LayoutID::ptr(self.db), origin: None });
             let layout_of_elem_ty = LIRTy {
                 layout: layout_of(self.db, s.as_type_ref(self.db)),
                 origin: Some(s),
             };
-            (b.index_ptr(ptr, layout_of_elem_ty, index), s)
+            (b.index_ptr(actual_ptr, layout_of_elem_ty, index), s)
         } else {
             panic!("Cannot index into {}", ty.as_type_ref(self.db).to_string(self.db))
         }
@@ -837,7 +845,7 @@ impl MTLBCtx<'_> {
                 let align = inner_ty.layout.align(self.db);
                 let count: u32 = elements.len() as u32;
                 let array_ty = LIRTy {
-                    origin: Some(slice_of(self.db, *elem_ty)),
+                    origin: Some(array_of(self.db, *elem_ty, count as usize)),
                     layout: LayoutID::new(
                         self.db,
                         size.align_to(align) * count as u64,
@@ -874,6 +882,22 @@ impl MTLBCtx<'_> {
                 to.as_type_ref(self.db).to_string(self.db)
             )
         };
+        if let Some((_, length)) =
+            from.as_ref(self.db).and_then(|ty| ty.1.as_array(self.db))
+            && to.as_slice(self.db).is_some()
+        {
+            let fat_ptr_ty = LIRTy {
+                layout: layout_of(self.db, to.as_type_ref(self.db)),
+                origin: Some(to),
+            };
+            let usize_ty = LIRTy {
+                layout: LayoutID::int(self.db, self.db.target_width()),
+                origin: None,
+            };
+            let const_length = b.const_int(usize_ty, length as u128).erase();
+
+            return b.make_aggregate(fat_ptr_ty, vec![value, const_length]).erase();
+        }
         let (Some(from_class), Some(to_class)) = (
             from.as_type_ref(self.db).cast_class(self.db),
             to.as_type_ref(self.db).cast_class(self.db),
