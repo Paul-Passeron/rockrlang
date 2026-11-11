@@ -2,23 +2,44 @@
 @include core::opt
 @include core::panic
 
-fun foo(xs: &[int]): void {
-    let x = xs.len();
-    for i in 0..x as int {
-        let j = xs[i];
-        core::io::printf(c"i=%d, j=%d\n", i, j);
+interface Display {
+    fun display(&self): void;
+}
+
+impl Display for int {
+    fun display(&self): void {
+        core::io::printf(c"%d", *self);
     }
 }
 
-fun my_slices(slices: &[&[int]]): void {
+impl Display for str {
+    fun display(&self): void {
+        self.print();
+    }
+}
+
+fun print_slice<T: Display>(slice: &[T]): void {
+    for i in 0..slice.len() as int {
+        slice[i].display();
+        core::io::printf(c" ");
+    }
+}
+
+fun print_slices<T>(slices: &[&[T]]): void {
     for i in 0..slices.len() as int {
-        foo(slices[i]);
+        print_slice(slices[i]);
+        core::io::printf(c"\n");
     }
 }
 
 fun main(): int {
     let s: &[int] = &{1, 2, 4, 10000} as _;
-    let slices: &[&[int]] = &{s, s, s, s, s, s} as _;
-    my_slices(slices);
+    let s2: &[int] = &{111, 222, 333, 444} as _;
+    let slices: &[&[int]] = &{s, s2, s} as _;
+    let str_slice_0: &[str] = &{"hello", "world"} as _;
+    let str_slice_1: &[str] = &{"How", "are", "you", "?"} as _;
+    let string_slices: &[&[str]] = &{str_slice_0, str_slice_1} as _;
+    print_slices(slices);
+    print_slices(string_slices);
     return 0;
 }
