@@ -52,11 +52,30 @@ fn path_from_env(env: &str) -> Result<PathBuf, CompilerError> {
     })
 }
 
+fn enclosing_package_root(path: PathBuf) -> PathBuf {
+    let Ok(path) = path.canonicalize() else {
+        return path;
+    };
+    let Some(mut dir) = path.is_dir().then(|| path.as_path()).or_else(|| path.parent())
+    else {
+        return path;
+    };
+    if !dir.join(ANCHOR_FILE_NAME).is_file() {
+        return path;
+    }
+    while let Some(parent) = dir.parent()
+        && parent.join(ANCHOR_FILE_NAME).is_file()
+    {
+        dir = parent;
+    }
+    dir.to_path_buf()
+}
+
 pub fn compute_package_roots(
     db: &mut dyn Db,
     root: PathBuf,
 ) -> Result<(), CompilerError> {
-    add_package_root_from_disk(db, root)?;
+    add_package_root_from_disk(db, enclosing_package_root(root))?;
     add_package_root_from_disk(db, core_path()?)?;
     if !db.config().no_std {
         add_package_root_from_disk(db, std_path()?)?;
