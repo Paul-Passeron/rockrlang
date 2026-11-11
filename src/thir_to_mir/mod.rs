@@ -573,7 +573,14 @@ impl<'a> ThirToMIR<'a> {
             _ if let Some(cst) = self.build_expr_as_constant(expr) => {
                 MIRRValueKind::Use(MIROperand::Constant(cst, span))
             }
-            ExprKind::SliceLit(_) => todo!(),
+            ExprKind::SliceLit(exprs) => {
+                let elem_ty = ty
+                    .as_slice(self.db)
+                    .expect("Slice lits should have already been typechecked");
+                let elements =
+                    exprs.iter().map(|expr| self.build_operand(*expr)).collect_vec();
+                MIRRValueKind::Array { elem_ty, elements }
+            }
             ExprKind::Error => {
                 println!("Thir is:");
                 println!("{}", self.thir.display(self.db));

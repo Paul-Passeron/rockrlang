@@ -191,6 +191,10 @@ impl<'a> DCECtx<'a> {
             MIRRValueKind::Cast(operand, type_ref) => {
                 MIRRValueKind::Cast(self.copy_operand(operand), *type_ref)
             }
+            MIRRValueKind::Array { elem_ty, elements } => MIRRValueKind::Array {
+                elem_ty: *elem_ty,
+                elements: elements.iter().map(|op| self.copy_operand(op)).collect(),
+            },
         };
         MIRRValue { kind, ty: rvalue.ty, span: rvalue.span }
     }

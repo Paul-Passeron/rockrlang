@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::layout::{AggregateLayout, Offset};
+use crate::resolved::slice_of;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -821,6 +823,39 @@ impl MTLBCtx<'_> {
                 let from = op.ty(self.db);
                 let value = self.lower_operand(b, op, lower)?;
                 Some(self.lower_cast(b, value, from, *to))
+            }
+            MIRRValueKind::Array { elem_ty, elements } => {
+                let operands = elements
+                    .iter()
+                    .map(|op| self.lower_operand(b, op, lower))
+                    .collect::<Option<Vec<_>>>()?;
+                let inner_ty = LIRTy {
+                    layout: layout_of(self.db, elem_ty.as_type_ref(self.db)),
+                    origin: Some(*elem_ty),
+                };
+                let size = inner_ty.layout.size(self.db);
+                let align = inner_ty.layout.align(self.db);
+                let count: u32 = elements.len() as u32;
+                let array_ty = LIRTy {
+                    origin: Some(slice_of(self.db, *elem_ty)),
+                    layout: LayoutID::new(
+                        self.db,
+                        size.align_to(align) * count as u64,
+                        align,
+                        LayoutData::Aggregate(AggregateLayout {
+                            fields: (0..count)
+                                .map(|i| {
+                                    (
+                                        Offset::ZERO + size.align_to(align) * (i as u64),
+                                        inner_ty.layout,
+                                    )
+                                })
+                                .collect(),
+                            source_to_layout: (0..count).collect(),
+                        }),
+                    ),
+                };
+                Some(b.make_aggregate(array_ty, operands).erase())
             }
         }
     }

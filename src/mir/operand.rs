@@ -111,6 +111,10 @@ pub enum MIRRValueKind {
     },
     Tuple(Vec<Operand>, Span),
     Cast(Operand, ConcreteTy),
+    Array {
+        elem_ty: ConcreteTy,
+        elements: Vec<Operand>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -177,7 +181,7 @@ impl MIRRValue {
             MIRRValueKind::StructLit { fields, .. } => {
                 fields.values().flat_map(MIROperand::uses).collect()
             }
-            MIRRValueKind::Tuple(ops, _) => {
+            MIRRValueKind::Array { elements: ops, .. } | MIRRValueKind::Tuple(ops, _) => {
                 ops.iter().flat_map(MIROperand::uses).collect()
             }
         }
@@ -207,7 +211,7 @@ impl MIRRValue {
                 }
                 res
             }
-            MIRRValueKind::Tuple(ops, _) => {
+            MIRRValueKind::Array { elements: ops, .. } | MIRRValueKind::Tuple(ops, _) => {
                 let mut res = BitSet::new(domain);
                 for field in ops {
                     res.union(&field.bitset_uses(mir));

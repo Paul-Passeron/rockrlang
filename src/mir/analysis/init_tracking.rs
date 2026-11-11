@@ -447,6 +447,7 @@ impl IterOperand for MIRRValue {
             MIRRValueKind::Constructor { args, .. } => args.iter_each_operand().collect(),
             MIRRValueKind::StructLit { fields, .. } => fields.values().collect(),
             MIRRValueKind::Tuple(ops, _) => ops.iter().collect(),
+            MIRRValueKind::Array { elements, .. } => elements.iter().collect(),
         }
         .into_iter()
     }

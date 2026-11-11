@@ -236,6 +236,18 @@ pub fn fmt_rvalue<W: MIRWrite>(
             w.write_str(" as ")?;
             w.write_str(type_ref.as_type_ref(db).to_string(db).as_str())
         }
+        MIRRValueKind::Array { elem_ty, elements } => {
+            w.write_str("[")?;
+            w.write_str(&elem_ty.as_type_ref(db).to_string(db))?;
+            w.write_str("]{")?;
+            for (i, op) in elements.iter().enumerate() {
+                if i > 0 {
+                    w.write_str(", ")?;
+                }
+                fmt_operand(w, db, op)?;
+            }
+            w.write_str("}")
+        }
     }
 }
 

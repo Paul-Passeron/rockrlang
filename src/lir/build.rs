@@ -378,13 +378,23 @@ impl<'ir, 'b> BlockBuilder<'ir, 'b> {
 
     // TODO: make sure we correctly handle ZSTs in codegen
 
+    // pub fn make_array(
+    //     &mut self,
+    //     elem_ty: LIRTy,
+    //     values: Vec<ValueId<'ir>>,
+    // ) -> ValueId<'ir> {
+    //     self.push_value(ty, ValueInstKind::MakeAggregate { ty,
+    // fields_in_src_order })         .typed(ty, self.db)
+    //         .unwrap()
+    // }
+
     pub fn make_aggregate(
         &mut self,
         ty: LIRTy,
         // fields in source order
         fields_in_src_order: Vec<ValueId<'ir>>,
     ) -> Typed<'ir, Aggregate> {
-        debug_assert!(ty.is_aggregate(self.db));
+        debug_assert!(ty.is_aggregate(self.db), "{:?}", ty.layout.data(self.db));
         // TODO: check fields
         self.push_value(ty, ValueInstKind::MakeAggregate { ty, fields_in_src_order })
             .typed(ty, self.db)

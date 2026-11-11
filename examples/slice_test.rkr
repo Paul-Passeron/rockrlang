@@ -6,6 +6,7 @@ fun foo(xs: &[int]): void {
     let x = xs.len();
     for i in 0..x as int {
         let j = xs[i];
+        core::io::printf(c"i=%d, j=%d\n", i, j);
     }
 }
 
@@ -21,4 +22,10 @@ fun my_slices(slices: &[&[int]]): void {
             let x = inner;
         }
     }
+}
+
+fun main(): int {
+    let s: &[int] = &{1, 2, 4};
+    foo(s);
+    return 0;
 }
