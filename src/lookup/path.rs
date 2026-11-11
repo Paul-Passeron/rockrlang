@@ -357,7 +357,8 @@ fn type_expr_desc_path_node_at(
         }
         AstTypeExprDesc::Ref { pointee: ty, .. }
         | AstTypeExprDesc::Pointer { pointee: ty, .. }
-        | AstTypeExprDesc::Slice { ty, .. } => {
+        | AstTypeExprDesc::Slice { elem: ty, .. }
+        | AstTypeExprDesc::Array { elem: ty, .. } => {
             any_type_path_node_at(db, ty, enclosing_module(db, loc)?, loc)
         }
         AstTypeExprDesc::Error(_) => None,

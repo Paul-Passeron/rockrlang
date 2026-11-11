@@ -292,12 +292,18 @@ impl<'db> LowerFundef<'db> {
                 )
             }
 
-            // This is an array, actually
-            AstTypeExprDesc::Slice { ty, len } => {
-                let inner = self.resolve_any(ty);
+            AstTypeExprDesc::Array { elem, len } => {
+                let inner = self.resolve_any(elem);
+                self.wrap_builtin_unary(BuiltinTypeId::array(self.db, *len), inner)
+            }
+
+            AstTypeExprDesc::Slice { mutable, elem } => {
+                let inner = self.resolve_any(elem);
                 self.wrap_builtin_unary(
-                    // TODO: do better than just defaulting to zero
-                    BuiltinTypeId::array(self.db, len.unwrap_or_default()),
+                    BuiltinTypeId::slice(
+                        self.db,
+                        if *mutable { Mutability::Mutable } else { Mutability::Const },
+                    ),
                     inner,
                 )
             }

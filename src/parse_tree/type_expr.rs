@@ -25,7 +25,11 @@ pub enum AstTypeExprDesc {
     NameResolved { from: Spanned<Symbol>, to: Box<AstTypeExpr> },
     Ref { mutable: bool, pointee: Box<AstAnyTypeExpr> },
     Pointer { mutable: bool, pointee: Box<AstAnyTypeExpr> },
-    Slice { ty: Box<AstAnyTypeExpr>, len: Option<usize> },
+    /// `&[T]` or `&mut [T]`. A slice is itself a (fat) reference, so the `&`
+    /// is part of this node rather than a separate `Ref`.
+    Slice { mutable: bool, elem: Box<AstAnyTypeExpr> },
+    /// `[T; N]`.
+    Array { elem: Box<AstAnyTypeExpr>, len: usize },
     Tuple(Vec<AstAnyTypeExpr>),
     Error(ParseError),
 }

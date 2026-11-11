@@ -687,19 +687,10 @@ impl<'db> InferenceCtx<'db> {
         fat_ptr_var: InferVar,
     ) -> ConstraintSolveResult {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
-        let Some((_, ty)) = fat_ptr_ty.as_ptr_like(self.db) else {
-            return ConstraintSolveResult::Pending;
-        };
-        if !ty.is_adt() {
-            return ConstraintSolveResult::Pending;
+        if fat_ptr_ty.as_slice(self.db).is_some() {
+            return ConstraintSolveResult::Solved;
         }
-        if ty.as_array(self.db).is_none() {
-            return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
-                "Expected a fat ptr type but got {}",
-                fat_ptr_ty.to_string(self.db)
-            )));
-        }
-        ConstraintSolveResult::Solved
+        ConstraintSolveResult::Pending
     }
 
     fn solve_metadata_of_fat_ptr_constraint(
@@ -710,11 +701,7 @@ impl<'db> InferenceCtx<'db> {
         let fat_ptr_ty = self.find(&fat_ptr_var.into());
 
         // Only fat ptr type supported for now is ref to slices
-        if fat_ptr_ty
-            .as_ptr_like(self.db)
-            .and_then(|(_, ty)| ty.as_array(self.db))
-            .is_none()
-        {
+        if fat_ptr_ty.as_slice(self.db).is_none() {
             return ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
                 "Expected a fat ptr type but got {}",
                 fat_ptr_ty.to_string(self.db)

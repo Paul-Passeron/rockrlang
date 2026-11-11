@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
+    common::location::Location,
     lexer::TokenKind,
     parse_tree::{
         Spanned,
@@ -49,52 +50,30 @@ impl Parser<'_> {
                     false
                 };
 
-                let inner = self.parse_any_type_expr()?;
-                let end = self.get_end();
                 if two {
+                    let inner =
+                        self.parse_pointer_like(start.advance(1), false, mutable)?;
+                    let end = self.get_end();
                     Ok(Spanned::new(
                         AstTypeExprDesc::Ref {
-                            // &&<mut|""> so mutable only on the inner ref
                             mutable: false,
-                            pointee: Box::new(
-                                Spanned::new(
-                                    AstTypeExprDesc::Ref {
-                                        mutable,
-                                        pointee: Box::new(inner),
-                                    },
-                                    start.advance(1).span(end),
-                                )
-                                .into(),
-                            ),
+                            pointee: Box::new(inner.into()),
                         },
                         start.span(end),
                     ))
                 } else {
-                    Ok(Spanned::new(
-                        if is_ptr {
-                            AstTypeExprDesc::Pointer { mutable, pointee: Box::new(inner) }
-                        } else {
-                            AstTypeExprDesc::Ref { mutable, pointee: Box::new(inner) }
-                        },
-                        start.span(end),
-                    ))
+                    self.parse_pointer_like(start, is_ptr, mutable)
                 }
             }
 
             TokenKind::OpenSqr => {
-                self.consume();
-                let ty = self.parse_any_type_expr()?;
-                let len = if self.peek_n(0).map(|t| t.kind) == Some(TokenKind::Semicolon)
-                {
-                    self.consume();
-                    Some(self.parse_int_lit()?.data)
-                } else {
-                    None
+                let (elem, len) = self.parse_bracketed_type()?;
+                let Some(len) = len else {
+                    return Err(self.parse_error(ParseErrorKind::SliceMustBeBehindRef));
                 };
-                self.eat(TokenKind::CloseSqr)?;
                 let end = self.get_end();
                 Ok(Spanned::new(
-                    AstTypeExprDesc::Slice { ty: Box::new(ty), len },
+                    AstTypeExprDesc::Array { elem: Box::new(elem), len },
                     start.span(end),
                 ))
             }
@@ -157,6 +136,66 @@ impl Parser<'_> {
                 kind.display(self.db).to_string(),
             ))),
         }
+    }
+
+    /// Parses what follows `&`, `&mut`, `*` or `*mut` (already consumed;
+    /// `start` is where that prefix began).
+    ///
+    /// `&[T]` / `&mut [T]` become a `Slice`, `&[T; N]` a `Ref` to an `Array`.
+    /// For `*`, the pointee is parsed as a normal type, so `*[T; N]` is a
+    /// pointer to an array and `*[T]` is rejected.
+    fn parse_pointer_like(
+        &mut self,
+        start: Location,
+        is_ptr: bool,
+        mutable: bool,
+    ) -> Result<AstTypeExpr, ParseError> {
+        if !is_ptr && self.peek_n(0).is_some_and(|t| t.kind == TokenKind::OpenSqr) {
+            let array_start = self.get_start();
+            let (elem, len) = self.parse_bracketed_type()?;
+            let end = self.get_end();
+            let desc = match len {
+                None => AstTypeExprDesc::Slice { mutable, elem: Box::new(elem) },
+                Some(len) => AstTypeExprDesc::Ref {
+                    mutable,
+                    pointee: Box::new(
+                        Spanned::new(
+                            AstTypeExprDesc::Array { elem: Box::new(elem), len },
+                            array_start.span(end),
+                        )
+                        .into(),
+                    ),
+                },
+            };
+            return Ok(Spanned::new(desc, start.span(end)));
+        }
+
+        let pointee = Box::new(self.parse_any_type_expr()?);
+        let end = self.get_end();
+        Ok(Spanned::new(
+            if is_ptr {
+                AstTypeExprDesc::Pointer { mutable, pointee }
+            } else {
+                AstTypeExprDesc::Ref { mutable, pointee }
+            },
+            start.span(end),
+        ))
+    }
+
+    /// Parses `[T]` or `[T; N]`, returning `T` and `N` if present.
+    fn parse_bracketed_type(
+        &mut self,
+    ) -> Result<(AstAnyTypeExpr, Option<usize>), ParseError> {
+        self.eat(TokenKind::OpenSqr)?;
+        let elem = self.parse_any_type_expr()?;
+        let len = if self.peek_n(0).is_some_and(|t| t.kind == TokenKind::Semicolon) {
+            self.consume();
+            Some(self.parse_int_lit()?.data)
+        } else {
+            None
+        };
+        self.eat(TokenKind::CloseSqr)?;
+        Ok((elem, len))
     }
 
     pub(super) fn parse_any_type_expr(&mut self) -> Result<AstAnyTypeExpr, ParseError> {

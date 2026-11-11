@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     common::symbols::Symbol,
-    hir::{impl_items, interface_items, owning_module},
+    hir::{Mutability, impl_items, interface_items, owning_module},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         type_expr::{get_templates_of_fun, templates_of_owner},
@@ -29,7 +29,7 @@ use crate::{
     },
     resolved::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
-        array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, tuple_of,
+        array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
     },
     typecheck::inference::InferTy,
     unused,
@@ -196,7 +196,8 @@ impl AstImplicitContext {
                 | AstTypeExprDesc::Slice { .. }
                 | AstTypeExprDesc::Pointer { .. }
                 | AstTypeExprDesc::Ref { .. }
-                | AstTypeExprDesc::Error(_) => None,
+                | AstTypeExprDesc::Error(_)
+                | AstTypeExprDesc::Array { .. } => None,
             }
         }
         resolve(self, db, ty, self.owning_module(db))
@@ -338,17 +339,16 @@ pub trait AsAstImplCtx {
                     const_ptr_of::<TypeId>(db, pointee).into()
                 })
             }
-            AstTypeExprDesc::Slice { ty, len } => {
-                assert!(len.is_none(), "TODO: length in slice");
-                // TODO: do better when len is None
-                Some(
-                    array_of::<TypeId>(
-                        db,
-                        this.resolve_any(db, ty)?,
-                        len.unwrap_or_default(),
-                    )
-                    .into(),
+            AstTypeExprDesc::Slice { mutable, elem } => Some(
+                slice_of::<TypeId>(
+                    db,
+                    this.resolve_any(db, elem)?,
+                    if *mutable { Mutability::Mutable } else { Mutability::Const },
                 )
+                .into(),
+            ),
+            AstTypeExprDesc::Array { elem, len } => {
+                Some(array_of::<TypeId>(db, this.resolve_any(db, elem)?, *len).into())
             }
             AstTypeExprDesc::Tuple(tys) => {
                 if tys.len() == 1 {

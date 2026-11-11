@@ -62,6 +62,8 @@ pub enum ParseErrorKind {
     ExpectedIntLit(TokenKind),
     ExpectedTypeName,
     NotATopLevelItem,
+    /// `[T]` used other than as `&[T]` / `&mut [T]`, e.g. bare or as `*[T]`.
+    SliceMustBeBehindRef,
 }
 
 impl<'db> Parser<'db> {
