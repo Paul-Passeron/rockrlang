@@ -658,8 +658,8 @@ impl Parser<'_> {
                     found: x,
                 },
                 file: self.file,
-                start: self.current_token()?.location.start_offset,
-                end: self.current_token()?.location.end_offset,
+                start: self.current_token()?.span.start_offset,
+                end: self.current_token()?.span.end_offset,
             }),
         }
     }

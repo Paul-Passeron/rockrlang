@@ -32,8 +32,8 @@ fn lex_in(db: &RockrDb, src: &str) -> Vec<Lexed> {
         match lexer.next_token() {
             Ok(tok) => out.push(Ok((
                 tok.kind,
-                tok.location.start_offset,
-                tok.location.end_offset,
+                tok.span.start_offset,
+                tok.span.end_offset,
             ))),
             Err(e) if e.message == "EOF" => return out,
             Err(e) => {

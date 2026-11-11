@@ -58,7 +58,10 @@ pub enum ParseErrorKind {
     LexError(LexError),
     UnexpectedEOF,
     ExpectedSymbol(String),
-    ExpectedToken { expected: TokenKind, found: TokenKind },
+    ExpectedToken {
+        expected: TokenKind,
+        found: TokenKind,
+    },
     ExpectedIntLit(TokenKind),
     ExpectedTypeName,
     NotATopLevelItem,
@@ -88,7 +91,7 @@ impl<'db> Parser<'db> {
         {
             (0, 0)
         } else {
-            let span = &self.tokens[self.position].location;
+            let span = &self.tokens[self.position].span;
             (span.start_offset, span.end_offset)
         };
         Span::new(self.file, start, end)
@@ -118,7 +121,7 @@ impl<'db> Parser<'db> {
             self.tokens
                 .get(self.position)
                 .or_else(|| self.get_last_token())
-                .map_or(0, |tok| tok.location.start_offset),
+                .map_or(0, |tok| tok.span.start_offset),
         )
     }
 
@@ -128,7 +131,7 @@ impl<'db> Parser<'db> {
             self.tokens
                 .get(self.position - 1)
                 .or_else(|| self.get_last_token())
-                .map_or(0, |tok| tok.location.end_offset),
+                .map_or(0, |tok| tok.span.end_offset),
         )
     }
 
@@ -147,7 +150,7 @@ impl<'db> Parser<'db> {
         match current.kind {
             TokenKind::Identifier(s) => {
                 self.consume();
-                Ok(Spanned::new(s, current.location))
+                Ok(Spanned::new(s, current.span))
             }
             kind => Err(self.parse_error(ParseErrorKind::ExpectedSymbol(
                 kind.display(self.db).to_string(),

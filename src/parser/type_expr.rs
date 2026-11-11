@@ -88,7 +88,7 @@ impl Parser<'_> {
             }
 
             TokenKind::Identifier(name) => {
-                let span = tok.location;
+                let span = tok.span;
                 self.consume();
 
                 match self.peek_n(0).map(|t| t.kind) {

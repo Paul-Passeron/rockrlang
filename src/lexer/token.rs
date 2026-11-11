@@ -207,6 +207,6 @@ impl fmt::Display for TokenKindDisplay<'_, '_> {
 
 #[derive(Clone)]
 pub struct Token {
-    pub location: Span,
+    pub span: Span,
     pub kind: TokenKind,
 }

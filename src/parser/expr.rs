@@ -265,7 +265,7 @@ impl Parser<'_> {
                 Some(TokenKind::Dot) => {
                     self.consume();
                     if let Some((TokenKind::IntLit(index), index_span)) =
-                        self.peek_n(0).map(|t| (t.kind, t.location))
+                        self.peek_n(0).map(|t| (t.kind, t.span))
                     {
                         self.consume();
                         let end = self.get_end();
@@ -450,7 +450,7 @@ impl Parser<'_> {
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(v as usize, tok.location))
+                Ok(Spanned::new(v as usize, tok.span))
             }
             x => Err(self.parse_error(ParseErrorKind::ExpectedIntLit(x))),
         }
@@ -463,27 +463,27 @@ impl Parser<'_> {
         match tok.kind {
             TokenKind::IntLit(v) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::IntLit(v), tok.location))
+                Ok(Spanned::new(AstExprDesc::IntLit(v), tok.span))
             }
             TokenKind::CharLit(c) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::CharLit(c), tok.location))
+                Ok(Spanned::new(AstExprDesc::CharLit(c), tok.span))
             }
             TokenKind::StrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::StrLit(s), tok.location))
+                Ok(Spanned::new(AstExprDesc::StrLit(s), tok.span))
             }
             TokenKind::CStrLit(s) => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::CStrLit(s), tok.location))
+                Ok(Spanned::new(AstExprDesc::CStrLit(s), tok.span))
             }
             TokenKind::True => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::BoolLit(true), tok.location))
+                Ok(Spanned::new(AstExprDesc::BoolLit(true), tok.span))
             }
             TokenKind::False => {
                 self.consume();
-                Ok(Spanned::new(AstExprDesc::BoolLit(false), tok.location))
+                Ok(Spanned::new(AstExprDesc::BoolLit(false), tok.span))
             }
             TokenKind::OpenBra => {
                 self.consume();
@@ -493,7 +493,7 @@ impl Parser<'_> {
                     |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
                 )?;
                 self.eat(TokenKind::CloseBra)?;
-                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), tok.location))
+                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), tok.span))
             }
             TokenKind::OpenPar => {
                 self.consume();
@@ -551,7 +551,7 @@ impl Parser<'_> {
                         let end = self.get_end();
                         Ok(Spanned::new(
                             AstExprDesc::NameResolved {
-                                from: Spanned::new(name, tok.location),
+                                from: Spanned::new(name, tok.span),
                                 to: Box::new(rhs),
                             },
                             start.span(end),
@@ -570,7 +570,7 @@ impl Parser<'_> {
                         let ty_span = start.span(start);
                         let ty = Spanned::new(
                             AstTypeExprDesc::Named {
-                                name: Spanned { data: name, span: tok.location },
+                                name: Spanned { data: name, span: tok.span },
                                 args: vec![],
                             },
                             ty_span,

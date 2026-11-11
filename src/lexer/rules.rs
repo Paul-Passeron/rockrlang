@@ -31,8 +31,8 @@ fn anchored(re: &str) -> Regex {
 
 macro_rules! get_simple_rule {
     ($regex: literal, $kind: expr) => {
-        (anchored($regex), |_, _: &str, location: Span| -> Result<Token, LexError> {
-            Ok(super::Token { location, kind: $kind })
+        (anchored($regex), |_, _: &str, span: Span| -> Result<Token, LexError> {
+            Ok(super::Token { span, kind: $kind })
         })
     };
 }
@@ -43,16 +43,13 @@ pub(super) fn get_skip_rules() -> Vec<Regex> {
 
 pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
     vec![
-        (
-            anchored(r#"c"(\\.|[^"\\])*""#),
-            |db: &'db dyn Db, lexeme: &str, location: Span| {
-                let len = lexeme.len();
-                Ok(Token {
-                    location,
-                    kind: TokenKind::CStrLit(StrLit::new(db, &lexeme[2..len - 1])),
-                })
-            },
-        ),
+        (anchored(r#"c"(\\.|[^"\\])*""#), |db: &'db dyn Db, lexeme: &str, span: Span| {
+            let len = lexeme.len();
+            Ok(Token {
+                span,
+                kind: TokenKind::CStrLit(StrLit::new(db, &lexeme[2..len - 1])),
+            })
+        }),
         get_simple_rule!(r"\$", TokenKind::Deref),
         get_simple_rule!(r"::", TokenKind::Access),
         get_simple_rule!("\\.\\.\\.", TokenKind::DotDotDot),
@@ -94,9 +91,9 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("!", TokenKind::Not),
         (
             anchored("#[A-Za-z_][A-Za-z0-9_]*"),
-            |db: &'db dyn Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, span: Span| {
                 Ok(Token {
-                    location,
+                    span,
                     kind: TokenKind::Hashed(Symbol::new(db, String::from(&lexeme[1..]))),
                 })
             },
@@ -104,9 +101,9 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("#", TokenKind::HashPound),
         (
             anchored("@[A-Za-z_][A-Za-z0-9_]*"),
-            |db: &'db dyn Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, span: Span| {
                 Ok(Token {
-                    location,
+                    span,
                     kind: TokenKind::Directive(Symbol::new(
                         db,
                         String::from(&lexeme[1..]),
@@ -117,9 +114,9 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
         get_simple_rule!("@", TokenKind::AddressOf),
         (
             anchored("[A-Za-z_][A-Za-z0-9_]*"),
-            |db: &'db dyn Db, lexeme: &str, location: Span| {
+            |db: &'db dyn Db, lexeme: &str, span: Span| {
                 Ok(Token {
-                    location,
+                    span,
                     kind: match lexeme {
                         "let" => TokenKind::Let,
                         "mut" => TokenKind::Mut,
@@ -149,48 +146,45 @@ pub(super) fn get_token_rules<'db>() -> Vec<TokenPattern<'db, Token>> {
                 })
             },
         ),
-        (
-            anchored(r#""(\\.|[^"\\])*""#),
-            |db: &'db dyn Db, lexeme: &str, location: Span| {
-                let len = lexeme.len();
-                Ok(Token {
-                    location,
-                    kind: TokenKind::StrLit(StrLit::new(db, &lexeme[1..len - 1])),
-                })
-            },
-        ),
-        (anchored(r"'(\\.|[^'\\])*'"), |_, lexeme: &str, location: Span| {
+        (anchored(r#""(\\.|[^"\\])*""#), |db: &'db dyn Db, lexeme: &str, span: Span| {
             let len = lexeme.len();
             Ok(Token {
-                location,
+                span,
+                kind: TokenKind::StrLit(StrLit::new(db, &lexeme[1..len - 1])),
+            })
+        }),
+        (anchored(r"'(\\.|[^'\\])*'"), |_, lexeme: &str, span: Span| {
+            let len = lexeme.len();
+            Ok(Token {
+                span,
                 kind: TokenKind::CharLit(
                     rustc_literal_escaper::unescape_char(&lexeme[1..len - 1]).map_err(
                         |_| LexError {
                             message: format!("Invalid escape character {lexeme}"),
-                            file: location.file,
-                            offset: location.start_offset,
+                            file: span.file,
+                            offset: span.start_offset,
                         },
                     )?,
                 ),
             })
         }),
-        (anchored(r"[0-9]+\.[0-9]+"), |_, lexeme: &str, location: Span| {
+        (anchored(r"[0-9]+\.[0-9]+"), |_, lexeme: &str, span: Span| {
             let parsed = lexeme.parse::<f64>().map_err(|_| LexError {
                 message: format!("Invalid float lit: `{lexeme}`"),
-                file: location.file,
-                offset: location.start_offset,
+                file: span.file,
+                offset: span.start_offset,
             })?;
 
-            Ok(Token { location, kind: TokenKind::FloatLit(parsed.to_bits()) })
+            Ok(Token { span, kind: TokenKind::FloatLit(parsed.to_bits()) })
         }),
-        (anchored("[0-9]+"), |_, lexeme: &str, location: Span| {
+        (anchored("[0-9]+"), |_, lexeme: &str, span: Span| {
             let parsed = lexeme.parse::<i64>().map_err(|_| LexError {
                 message: format!("Int lit too large: `{lexeme}`"),
-                file: location.file,
-                offset: location.start_offset,
+                file: span.file,
+                offset: span.start_offset,
             })?;
 
-            Ok(Token { location, kind: TokenKind::IntLit(parsed) })
+            Ok(Token { span, kind: TokenKind::IntLit(parsed) })
         }),
     ]
 }
