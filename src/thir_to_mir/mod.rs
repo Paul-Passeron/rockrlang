@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::mir::operand::MIRProjectionKind;
 use crate::resolved::type_ref::TyLike;
+use crate::thir::ProjectionKind;
 use crate::{
     Db,
     check::fundef::concretize_fid,
@@ -410,21 +412,22 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn build_projection(&mut self, projection: Projection) -> MIRProjection {
-        match projection {
-            Projection::Deref => MIRProjection::Deref,
-            Projection::Field(name, ty) => {
+        let kind = match projection.kind {
+            ProjectionKind::Deref => MIRProjectionKind::Deref,
+            ProjectionKind::Field(name, ty) => {
                 let resulting_ty = self.ty(ty);
-                MIRProjection::Field { name, resulting_ty }
+                MIRProjectionKind::Field { name, resulting_ty }
             }
-            Projection::TupleField(index, ty) => {
+            ProjectionKind::TupleField(index, ty) => {
                 let resulting_ty = self.ty(ty);
-                MIRProjection::TupleField { index, resulting_ty }
+                MIRProjectionKind::TupleField { index, resulting_ty }
             }
-            Projection::Index(expr) => {
+            ProjectionKind::Index(expr) => {
                 let index = self.build_operand(expr);
-                MIRProjection::Index { index }
+                MIRProjectionKind::Index { index }
             }
-        }
+        };
+        MIRProjection { span: projection.span, kind }
     }
 
     fn build_projections(&mut self, projections: &[Projection]) -> Vec<MIRProjection> {

@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::resolved::type_ref::Subst;
 use crate::resolved::type_ref::TyLike;
+use crate::thir::ProjectionKind;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
@@ -561,7 +562,7 @@ impl<'db> ThirTranslator<'db> {
                     );
                     let idx_place = b.with_synthetic_projection(
                         the_tuple_place,
-                        Projection::TupleField(idx as u32, ty),
+                        ProjectionKind::TupleField(idx as u32, ty),
                         ty,
                     );
                     self.destructure_pattern_init_aux(
@@ -626,13 +627,13 @@ impl<'db> ThirTranslator<'db> {
                                 );
                                 place = b.with_synthetic_projection(
                                     place,
-                                    Projection::Deref,
+                                    ProjectionKind::Deref,
                                     new_ty,
                                 );
                             }
                             let field_place = b.with_synthetic_projection(
                                 place,
-                                Projection::Field(name, field_ty),
+                                ProjectionKind::Field(name, field_ty),
                                 field_ty,
                             );
 
@@ -1046,8 +1047,11 @@ impl<'db> ThirTranslator<'db> {
                     for _ in 0..depth {
                         cur_ty =
                             cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                        place =
-                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                        place = b.with_synthetic_projection(
+                            place,
+                            ProjectionKind::Deref,
+                            cur_ty,
+                        );
                     }
                     b.new_expr(ThirExpr::use_place(place, b, span))
                 }
@@ -1065,8 +1069,11 @@ impl<'db> ThirTranslator<'db> {
                     for _ in 0..depth {
                         cur_ty =
                             cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                        place =
-                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                        place = b.with_synthetic_projection(
+                            place,
+                            ProjectionKind::Deref,
+                            cur_ty,
+                        );
                     }
                     b.new_expr(ThirExpr {
                         kind: ExprKind::Ref { place, mutability: Mutability::Const },
@@ -1089,8 +1096,11 @@ impl<'db> ThirTranslator<'db> {
                     for _ in 0..depth {
                         cur_ty =
                             cur_ty.as_ref(self.db).map_or(TypeRef::Error, |(_, ty)| ty);
-                        place =
-                            b.with_synthetic_projection(place, Projection::Deref, cur_ty);
+                        place = b.with_synthetic_projection(
+                            place,
+                            ProjectionKind::Deref,
+                            cur_ty,
+                        );
                     }
                     b.new_expr(ThirExpr {
                         kind: ExprKind::Ref { place, mutability: Mutability::Mutable },
@@ -1107,19 +1117,16 @@ impl<'db> ThirTranslator<'db> {
     }
 
     fn auto_deref_place_if_needed(&self, b: &mut ThirBuilder, place: PlaceId) -> PlaceId {
-        let (ty, span) = {
-            let place = b.get_place(place);
-            (place.ty, place.span)
-        };
+        let ty = b.get_place(place).ty;
         let (proj, inner) = {
             if let Some((_, inner)) = ty.as_ref(self.db) {
-                (Some(Projection::Deref), inner)
+                (Some(ProjectionKind::Deref), inner)
             } else {
                 (None, ty)
             }
         };
         if let Some(proj) = proj {
-            b.with_projection(place, proj, inner, span)
+            b.with_synthetic_projection(place, proj, inner)
         } else {
             place
         }
@@ -1146,9 +1153,9 @@ impl<'db> ThirTranslator<'db> {
                 let thir_local = b.local_map[local_id];
                 b.new_place(ThirPlace::local(thir_local, b, place.span))
             }
-            HirPlaceKind::Field { base, field } => {
-                let base = self.place(b, base, stmts);
-                let place = self.auto_deref_place_if_needed(b, base);
+            HirPlaceKind::Field { base, field, field_span } => {
+                let thir_base = self.place(b, base, stmts);
+                let place = self.auto_deref_place_if_needed(b, thir_base);
                 let (ty, span) = {
                     let place = b.get_place(place);
                     (place.ty, place.span)
@@ -1161,12 +1168,15 @@ impl<'db> ThirTranslator<'db> {
                 };
                 b.with_projection(
                     place,
-                    Projection::Field(*field, field_ty),
+                    Projection {
+                        span: *field_span,
+                        kind: ProjectionKind::Field(*field, field_ty),
+                    },
                     field_ty,
-                    span,
+                    base.span.start().span(field_span.end()),
                 )
             }
-            HirPlaceKind::TupleField { base, index } => {
+            HirPlaceKind::TupleField { base, index, index_span } => {
                 let base = self.place(b, base, stmts);
                 let place = self.auto_deref_place_if_needed(b, base);
                 let (ty, span) = {
@@ -1187,7 +1197,10 @@ impl<'db> ThirTranslator<'db> {
                 };
                 b.with_projection(
                     place,
-                    Projection::TupleField(*index, idx_ty),
+                    Projection {
+                        kind: ProjectionKind::TupleField(*index, idx_ty),
+                        span: *index_span,
+                    },
                     idx_ty,
                     span,
                 )
@@ -1207,7 +1220,12 @@ impl<'db> ThirTranslator<'db> {
                         },
                         |(_, inner)| inner,
                     );
-                b.with_projection(base, Projection::Deref, deref_ty, place.span)
+                b.with_projection(
+                    base,
+                    Projection { kind: ProjectionKind::Deref, span: place.span },
+                    deref_ty,
+                    place.span,
+                )
             }
             HirPlaceKind::Index { base, index } => {
                 let base = self.place(b, base, stmts);
@@ -1224,8 +1242,16 @@ impl<'db> ThirTranslator<'db> {
                     );
                     TypeRef::Error
                 });
-                let index = self.expr(b, index, stmts);
-                b.with_projection(place, Projection::Index(index), deref_ty, place_span)
+                let thir_index = self.expr(b, index, stmts);
+                b.with_projection(
+                    place,
+                    Projection {
+                        span: index.span,
+                        kind: ProjectionKind::Index(thir_index),
+                    },
+                    deref_ty,
+                    place_span,
+                )
             }
             HirPlaceKind::Temporary(hir_expr) => {
                 let value = self.expr(b, hir_expr, stmts);

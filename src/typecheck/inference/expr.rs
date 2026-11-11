@@ -174,12 +174,12 @@ impl InferenceCtx<'_> {
     ) -> Result<InferTy, TypeInferenceError> {
         let val = match &place.kind {
             HirPlaceKind::Local(local_id) => Ok(self.infer_local(*local_id)),
-            HirPlaceKind::Field { base, field } => {
+            HirPlaceKind::Field { base, field, .. } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_struct_field_constraint(base_ty, *field);
                 Ok(elem_var.into())
             }
-            HirPlaceKind::TupleField { base, index } => {
+            HirPlaceKind::TupleField { base, index, .. } => {
                 let base_ty = self.infer_place(base)?;
                 let elem_var = self.emit_tuple_constraint(base_ty, *index);
                 Ok(elem_var.into())

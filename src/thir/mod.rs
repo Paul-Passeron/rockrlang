@@ -75,7 +75,13 @@ pub struct ThirPlace {
 }
 
 #[derive(Clone, Copy)]
-pub enum Projection {
+pub struct Projection {
+    pub span: Span,
+    pub kind: ProjectionKind,
+}
+
+#[derive(Clone, Copy)]
+pub enum ProjectionKind {
     Deref,
     Field(Symbol, TypeRef),
     TupleField(u32, TypeRef),

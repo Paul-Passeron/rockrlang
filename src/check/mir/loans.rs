@@ -26,7 +26,7 @@ use crate::{
             loans::{LoanID, MIRLoanOut, MIRStmtIndex},
         },
         basic_block::{MIRTerminator, Stmt},
-        operand::{MIROperand, MIRPlace, MIRProjection, MIRRValue, MIRRValueKind},
+        operand::{MIROperand, MIRPlace, MIRProjectionKind, MIRRValue, MIRRValueKind},
     },
 };
 use std::collections::HashSet;
@@ -198,22 +198,22 @@ fn places_conflict(place: &MIRPlace, other: &MIRPlace) -> bool {
     }
 
     for (pa, pb) in place.projections.iter().zip(&other.projections) {
-        match (pa, pb) {
+        match (&pa.kind, &pb.kind) {
             (
-                MIRProjection::Field { name: n1, .. },
-                MIRProjection::Field { name: n2, .. },
+                MIRProjectionKind::Field { name: n1, .. },
+                MIRProjectionKind::Field { name: n2, .. },
             ) if n1 != n2 => {
                 return false;
             }
             (
-                MIRProjection::TupleField { index: i1, .. },
-                MIRProjection::TupleField { index: i2, .. },
+                MIRProjectionKind::TupleField { index: i1, .. },
+                MIRProjectionKind::TupleField { index: i2, .. },
             ) if i1 != i2 => {
                 return false;
             }
             (
-                MIRProjection::Downcast { variant: v1 },
-                MIRProjection::Downcast { variant: v2 },
+                MIRProjectionKind::Downcast { variant: v1 },
+                MIRProjectionKind::Downcast { variant: v2 },
             ) if v1 != v2 => {
                 return false;
             }

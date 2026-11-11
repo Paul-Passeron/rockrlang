@@ -22,8 +22,8 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
-            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-            MIRRValueKind,
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRProjectionKind,
+            MIRRValue, MIRRValueKind,
         },
         passes::MIRPass,
     },
@@ -209,19 +209,26 @@ impl<'a> DCECtx<'a> {
     }
 
     fn copy_projection(&mut self, proj: &MIRProjection) -> MIRProjection {
+        MIRProjection { span: proj.span, kind: self.copy_projection_kind(&proj.kind) }
+    }
+
+    fn copy_projection_kind(&mut self, proj: &MIRProjectionKind) -> MIRProjectionKind {
         match proj {
-            MIRProjection::Deref => MIRProjection::Deref,
-            MIRProjection::Field { name, resulting_ty } => {
-                MIRProjection::Field { name: *name, resulting_ty: *resulting_ty }
+            MIRProjectionKind::Deref => MIRProjectionKind::Deref,
+            MIRProjectionKind::Field { name, resulting_ty } => {
+                MIRProjectionKind::Field { name: *name, resulting_ty: *resulting_ty }
             }
-            MIRProjection::TupleField { index, resulting_ty } => {
-                MIRProjection::TupleField { index: *index, resulting_ty: *resulting_ty }
+            MIRProjectionKind::TupleField { index, resulting_ty } => {
+                MIRProjectionKind::TupleField {
+                    index: *index,
+                    resulting_ty: *resulting_ty,
+                }
             }
-            MIRProjection::Index { index } => {
-                MIRProjection::Index { index: self.copy_operand(index) }
+            MIRProjectionKind::Index { index } => {
+                MIRProjectionKind::Index { index: self.copy_operand(index) }
             }
-            MIRProjection::Downcast { variant } => {
-                MIRProjection::Downcast { variant: *variant }
+            MIRProjectionKind::Downcast { variant } => {
+                MIRProjectionKind::Downcast { variant: *variant }
             }
         }
     }

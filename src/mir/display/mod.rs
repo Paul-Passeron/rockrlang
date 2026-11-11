@@ -20,7 +20,7 @@ use crate::mir::{
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
         MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection,
-        MIRRValue, MIRRValueKind,
+        MIRProjectionKind, MIRRValue, MIRRValueKind,
     },
 };
 use crate::{Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
@@ -106,18 +106,18 @@ pub fn fmt_projection<W: MIRWrite>(
     db: &dyn Db,
     proj: &MIRProjection,
 ) -> fmt::Result {
-    match proj {
-        MIRProjection::Deref => w.write_str(".*"),
-        MIRProjection::Field { name, .. } => {
+    match &proj.kind {
+        MIRProjectionKind::Deref => w.write_str(".*"),
+        MIRProjectionKind::Field { name, .. } => {
             mwrite!(w, ".{}", name.to_string(db))
         }
-        MIRProjection::TupleField { index, .. } => mwrite!(w, ".{index}"),
-        MIRProjection::Index { index } => {
+        MIRProjectionKind::TupleField { index, .. } => mwrite!(w, ".{index}"),
+        MIRProjectionKind::Index { index } => {
             w.write_str("[")?;
             fmt_operand(w, db, index)?;
             w.write_str("]")
         }
-        MIRProjection::Downcast { variant } => {
+        MIRProjectionKind::Downcast { variant } => {
             mwrite!(w, ".downcast#{variant}")
         }
     }

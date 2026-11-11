@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::resolved::type_ref::Subst;
 use crate::resolved::type_ref::TyLike;
+use crate::thir::ProjectionKind;
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
@@ -485,10 +486,9 @@ impl<'db> SanityChecker<'db> {
             PlaceBase::Local(idx) => self.thir.locals[idx].ty,
         };
         let end_ty = info.projections.iter().fold(base_ty, |before, projection| {
-            let expected = match projection {
-                Projection::Field(_, type_ref) | Projection::TupleField(_, type_ref) => {
-                    Some(*type_ref)
-                }
+            let expected = match &projection.kind {
+                ProjectionKind::Field(_, type_ref)
+                | ProjectionKind::TupleField(_, type_ref) => Some(*type_ref),
                 _ => None,
             };
             let expected = expected
@@ -528,8 +528,8 @@ impl<'db> SanityChecker<'db> {
         projection: &Projection,
         span: Span,
     ) -> Option<TypeRef> {
-        match projection {
-            Projection::Deref => {
+        match &projection.kind {
+            ProjectionKind::Deref => {
                 let before = before.as_type_id()?;
                 if before.def(self.db).is_ptr_like(self.db).is_none() {
                     None
@@ -539,19 +539,19 @@ impl<'db> SanityChecker<'db> {
                     Some(args[0])
                 }
             }
-            Projection::Field(symbol, type_ref) => {
+            ProjectionKind::Field(symbol, type_ref) => {
                 let struct_ref = before.as_struct_ref(self.db)?;
                 let typeof_field = struct_ref.typeof_field(self.db, *symbol)?;
                 self.check_types(typeof_field, *type_ref, span);
                 Some(typeof_field)
             }
-            Projection::TupleField(idx, type_ref) => {
+            ProjectionKind::TupleField(idx, type_ref) => {
                 let as_tuple = before.as_tuple(self.db)?;
                 let typeof_field = *as_tuple.get(*idx as usize)?;
                 self.check_types(typeof_field, *type_ref, span);
                 Some(typeof_field)
             }
-            Projection::Index(idx_expr) => {
+            ProjectionKind::Index(idx_expr) => {
                 let ty = self.check_expr(*idx_expr);
                 if ty
                     .as_type_id()

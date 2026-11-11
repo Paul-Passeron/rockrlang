@@ -76,11 +76,11 @@ pub enum AstExprDesc {
 
     FieldAccess {
         object: Box<AstExpr>,
-        field: Symbol,
+        field: Spanned<Symbol>,
     },
     TupleAccess {
         object: Box<AstExpr>,
-        index: u32,
+        index: Spanned<u32>,
     },
 
     Call {

@@ -172,7 +172,10 @@ impl InferenceCtx<'_> {
         match ty {
             InferTy::Var(infer_var) => {
                 let infer_var = self.table.find(*infer_var);
-                self.table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
+                match self.table.probe_value(infer_var) {
+                    Some(v) => self.find(&v),
+                    None => InferTy::Var(infer_var),
+                }
             }
             InferTy::Adt { def, args: fields } => InferTy::Adt {
                 def: *def,
@@ -191,7 +194,10 @@ impl InferenceCtx<'_> {
             match ty {
                 InferTy::Var(infer_var) => {
                     let infer_var = table.find(*infer_var);
-                    table.probe_value(infer_var).unwrap_or_else(|| ty.clone())
+                    match table.probe_value(infer_var) {
+                        Some(v) => find(&v, table),
+                        None => infer_var.into(),
+                    }
                 }
                 InferTy::Adt { def, args: fields } => InferTy::Adt {
                     def: *def,

@@ -19,15 +19,15 @@ impl Display for str {
 }
 
 fun print_slice<T: Display>(slice: &[T]): void {
-    for i in 0..slice.len() as int {
-        slice[i].display();
+    for x in slice {
+        x.display();
         core::io::printf(c" ");
     }
 }
 
-fun print_slices<T>(slices: &[&[T]]): void {
-    for i in 0..slices.len() as int {
-        print_slice(slices[i]);
+fun print_slices<T: Display>(slices: &[&[T]]): void {
+    for slice in slices {
+        print_slice(*slice);
         core::io::printf(c"\n");
     }
 }

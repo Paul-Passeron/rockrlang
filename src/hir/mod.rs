@@ -92,8 +92,8 @@ pub struct HirPlace {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum HirPlaceKind {
     Local(LocalId),
-    Field { base: Box<HirPlace>, field: Symbol },
-    TupleField { base: Box<HirPlace>, index: u32 },
+    Field { base: Box<HirPlace>, field: Symbol, field_span: Span },
+    TupleField { base: Box<HirPlace>, index: u32, index_span: Span },
     Deref(Box<HirPlace>),
     Index { base: Box<HirPlace>, index: Box<HirExpr> },
     Temporary(Box<HirExpr>),
