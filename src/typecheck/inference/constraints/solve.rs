@@ -750,8 +750,27 @@ impl<'db> InferenceCtx<'db> {
                     ConstraintSolveResult::Solved
                 }
             }
-            (CastClass::Int | CastClass::ThinPtr(_), CastClass::FatPtr(_)) => {
+            (CastClass::Int, CastClass::FatPtr(_)) => {
                 reject("a fat pointer's metadata cannot be created by a cast")
+            }
+            (CastClass::ThinPtr(from_m), CastClass::FatPtr(to_m)) => {
+                // test if we have &[T; N] -> &[T]
+                if to_m.is_mut() && !from_m.is_mut() {
+                    return reject(
+                        "a const pointer/reference cannot be cast to a mutable one",
+                    );
+                }
+                if let Some((inner_ty, _)) =
+                    from.as_ref(self.db).and_then(|ty| ty.1.as_array(self.db))
+                {
+                    let Some((casted_inner_ty, _)) = to.as_slice(self.db) else {
+                        unreachable!("Only slices are fat ptrs")
+                    };
+                    self.unify(inner_ty, casted_inner_ty)?;
+                    ConstraintSolveResult::Solved
+                } else {
+                    ConstraintSolveResult::Pending
+                }
             }
             (CastClass::FatPtr(_), CastClass::Int) => {
                 reject("cast the fat pointer to a thin pointer first")

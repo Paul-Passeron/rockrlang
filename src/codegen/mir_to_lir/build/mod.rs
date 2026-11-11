@@ -882,6 +882,22 @@ impl MTLBCtx<'_> {
                 to.as_type_ref(self.db).to_string(self.db)
             )
         };
+        if let Some((_, length)) =
+            from.as_ref(self.db).and_then(|ty| ty.1.as_array(self.db))
+            && to.as_slice(self.db).is_some()
+        {
+            let fat_ptr_ty = LIRTy {
+                layout: layout_of(self.db, to.as_type_ref(self.db)),
+                origin: Some(to),
+            };
+            let usize_ty = LIRTy {
+                layout: LayoutID::int(self.db, self.db.target_width()),
+                origin: None,
+            };
+            let const_length = b.const_int(usize_ty, length as u128).erase();
+
+            return b.make_aggregate(fat_ptr_ty, vec![value, const_length]).erase();
+        }
         let (Some(from_class), Some(to_class)) = (
             from.as_type_ref(self.db).cast_class(self.db),
             to.as_type_ref(self.db).cast_class(self.db),

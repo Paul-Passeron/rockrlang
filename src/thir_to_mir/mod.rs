@@ -609,6 +609,13 @@ impl<'a> ThirToMIR<'a> {
             );
         };
 
+        if from.as_ref(self.db).and_then(|ty| ty.1.as_array(self.db)).is_some() {
+            let Some(_) = to.as_slice(self.db) else {
+                unreachable!("Only slices are fat ptrs")
+            };
+            return;
+        }
+
         let (Some(from_class), Some(to_class)) =
             (from.cast_class(self.db), to.cast_class(self.db))
         else {

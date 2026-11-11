@@ -25,7 +25,7 @@ fun my_slices(slices: &[&[int]]): void {
 }
 
 fun main(): int {
-    let s: &[int] = &{1, 2, 4};
+    let s: &[int] = &{1, 2, 4, 10000} as _;
     foo(s);
     return 0;
 }
