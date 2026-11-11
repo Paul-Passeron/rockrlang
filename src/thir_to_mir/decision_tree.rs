@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::mir::operand::MIRProjectionKind;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -121,9 +122,13 @@ impl<'a> Matrix<'a> {
                 .map(|(i, ty)| {
                     let mut pl = place.clone();
                     pl.ty = *ty;
-                    pl.projections.push(MIRProjection::TupleField {
-                        index: i as u32,
-                        resulting_ty: *ty,
+                    pl.projections.push(MIRProjection {
+                        // Synthetic span
+                        span: place.span,
+                        kind: MIRProjectionKind::TupleField {
+                            index: i as u32,
+                            resulting_ty: *ty,
+                        },
                     });
                     pl
                 })
@@ -136,8 +141,11 @@ impl<'a> Matrix<'a> {
                 .map(|(name, ty)| {
                     let mut pl = place.clone();
                     pl.ty = *ty;
-                    pl.projections
-                        .push(MIRProjection::Field { name: *name, resulting_ty: *ty });
+                    pl.projections.push(MIRProjection {
+                        // Synthetic span
+                        span: place.span,
+                        kind: MIRProjectionKind::Field { name: *name, resulting_ty: *ty },
+                    });
                     pl
                 })
                 .collect_vec()
@@ -428,9 +436,14 @@ impl ThirToMIR<'_> {
     pub fn peel_refs(&self, base: &MIRPlace) -> MIRPlace {
         let peeled = RefWrappedTy::from_type(self.db, base.ty);
         let mut place = base.clone();
-        place
-            .projections
-            .extend(std::iter::repeat_n(MIRProjection::Deref, peeled.depth()));
+        place.projections.extend(std::iter::repeat_n(
+            MIRProjection {
+                // Synthetic span
+                span: base.span,
+                kind: MIRProjectionKind::Deref,
+            },
+            peeled.depth(),
+        ));
         place.ty = peeled.inner;
         place
     }
@@ -442,7 +455,11 @@ impl ThirToMIR<'_> {
         tuple_idx: usize,
     ) -> MIRPlace {
         let MIRPlace { mut projections, ty: enum_ty, .. } = self.peel_refs(base);
-        projections.push(MIRProjection::Downcast { variant: variant_idx });
+        projections.push(MIRProjection {
+            // Synthetic span
+            span: base.span,
+            kind: MIRProjectionKind::Downcast { variant: variant_idx },
+        });
 
         let ConstructorType::Tuple(tys) = enum_ty
             .as_enum(self.db)
@@ -456,8 +473,11 @@ impl ThirToMIR<'_> {
             .to_concrete(self.db, &Substitution::empty())
             .expect("Constructor field type should be concrete");
 
-        projections
-            .push(MIRProjection::TupleField { index: tuple_idx as u32, resulting_ty });
+        projections.push(MIRProjection {
+            // Synthetic span
+            span: base.span,
+            kind: MIRProjectionKind::TupleField { index: tuple_idx as u32, resulting_ty },
+        });
         MIRPlace { local: base.local, projections, ty: resulting_ty, span: base.span }
     }
 
@@ -468,7 +488,10 @@ impl ThirToMIR<'_> {
         field: Symbol,
     ) -> MIRPlace {
         let MIRPlace { mut projections, ty: enum_ty, .. } = self.peel_refs(base);
-        projections.push(MIRProjection::Downcast { variant: variant_idx });
+        projections.push(MIRProjection {
+            span: base.span,
+            kind: MIRProjectionKind::Downcast { variant: variant_idx },
+        });
 
         let ConstructorType::Struct(tys) = enum_ty
             .as_enum(self.db)
@@ -483,7 +506,10 @@ impl ThirToMIR<'_> {
             .to_concrete(self.db, &Substitution::empty())
             .expect("Constructor field type should be concrete");
 
-        projections.push(MIRProjection::Field { name: field, resulting_ty });
+        projections.push(MIRProjection {
+            span: base.span,
+            kind: MIRProjectionKind::Field { name: field, resulting_ty },
+        });
         MIRPlace { local: base.local, projections, ty: resulting_ty, span: base.span }
     }
 }

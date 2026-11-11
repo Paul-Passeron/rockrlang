@@ -275,11 +275,11 @@ fn write_pattern(
 fn write_place(f: &mut impl fmt::Write, place: &HirPlace, db: &dyn Db) -> fmt::Result {
     match &place.kind {
         HirPlaceKind::Local(id) => write!(f, "_{}", id.raw()),
-        HirPlaceKind::Field { base, field } => {
+        HirPlaceKind::Field { base, field, .. } => {
             write_place(f, base, db)?;
             write!(f, ".{}", field.display(db))
         }
-        HirPlaceKind::TupleField { base, index } => {
+        HirPlaceKind::TupleField { base, index, .. } => {
             write_place(f, base, db)?;
             write!(f, ".{index}")
         }

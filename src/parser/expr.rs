@@ -264,17 +264,18 @@ impl Parser<'_> {
 
                 Some(TokenKind::Dot) => {
                     self.consume();
-                    if let Some(TokenKind::IntLit(index)) = self.peek_n(0).map(|t| t.kind)
+                    if let Some((TokenKind::IntLit(index), index_span)) =
+                        self.peek_n(0).map(|t| (t.kind, t.location))
                     {
                         self.consume();
                         let end = self.get_end();
-                        let span = expr.span.start().span(end);
+                        let total_span = expr.span.start().span(end);
                         expr = Spanned::new(
                             AstExprDesc::TupleAccess {
                                 object: Box::new(expr),
-                                index: index as u32,
+                                index: Spanned { data: index as u32, span: index_span },
                             },
-                            span,
+                            total_span,
                         );
                         continue;
                     }
@@ -305,10 +306,7 @@ impl Parser<'_> {
                         let end = self.get_end();
                         let span = expr.span.start().span(end);
                         expr = Spanned::new(
-                            AstExprDesc::FieldAccess {
-                                object: Box::new(expr),
-                                field: field.data,
-                            },
+                            AstExprDesc::FieldAccess { object: Box::new(expr), field },
                             span,
                         );
                     }

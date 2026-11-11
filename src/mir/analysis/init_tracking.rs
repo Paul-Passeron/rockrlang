@@ -29,8 +29,8 @@ use crate::{
         },
         basic_block::{MIRTerminator, Stmt},
         operand::{
-            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRRValue,
-            MIRRValueKind,
+            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRProjectionKind,
+            MIRRValue, MIRRValueKind,
         },
     },
 };
@@ -78,12 +78,18 @@ pub struct MoveKey {
 
 impl MIRProjection {
     fn as_tracked_projection(&self) -> Option<TrackedProjection> {
-        match self {
-            Self::Deref => Some(TrackedProjection::Deref),
-            Self::Field { name, .. } => Some(TrackedProjection::StructField(*name)),
-            Self::TupleField { index, .. } => Some(TrackedProjection::TupleField(*index)),
-            Self::Index { .. } => None,
-            Self::Downcast { variant } => Some(TrackedProjection::Downcast(*variant)),
+        match &self.kind {
+            MIRProjectionKind::Deref => Some(TrackedProjection::Deref),
+            MIRProjectionKind::Field { name, .. } => {
+                Some(TrackedProjection::StructField(*name))
+            }
+            MIRProjectionKind::TupleField { index, .. } => {
+                Some(TrackedProjection::TupleField(*index))
+            }
+            MIRProjectionKind::Index { .. } => None,
+            MIRProjectionKind::Downcast { variant } => {
+                Some(TrackedProjection::Downcast(*variant))
+            }
         }
     }
 }
@@ -122,7 +128,7 @@ impl MIRPlace {
 
     fn for_all_operands_dyn(&self, f: &mut dyn FnMut(&MIROperand)) {
         self.projections.iter().for_each(|proj| {
-            if let MIRProjection::Index { index } = proj {
+            if let MIRProjectionKind::Index { index } = &proj.kind {
                 index.for_all_operands_dyn(f);
             }
         });
@@ -140,7 +146,7 @@ fn record_place(db: &dyn Db, mir: &Mir, place: &MIRPlace, out: &mut HashSet<Move
         out.insert(place.as_move_key());
     }
     for proj in &place.projections {
-        if let MIRProjection::Index { index } = proj {
+        if let MIRProjectionKind::Index { index } = &proj.kind {
             record_operand(db, mir, index, out);
         }
     }
@@ -466,12 +472,12 @@ impl IterOperand for MIRConstructorArgs {
 
 impl IterOperand for MIRPlace {
     fn iter_each_operand(&self) -> impl Iterator<Item = &MIROperand> {
-        self.projections.iter().filter_map(|proj| match proj {
-            MIRProjection::Field { .. }
-            | MIRProjection::TupleField { .. }
-            | MIRProjection::Downcast { .. }
-            | MIRProjection::Deref => None,
-            MIRProjection::Index { index } => Some(index),
+        self.projections.iter().filter_map(|proj| match &proj.kind {
+            MIRProjectionKind::Field { .. }
+            | MIRProjectionKind::TupleField { .. }
+            | MIRProjectionKind::Downcast { .. }
+            | MIRProjectionKind::Deref => None,
+            MIRProjectionKind::Index { index } => Some(index),
         })
     }
 }

@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::layout::{AggregateLayout, Offset};
+use crate::mir::operand::MIRProjectionKind;
 use crate::resolved::array_of;
 use crate::resolved::type_ref::TyLike;
 use crate::{
@@ -38,8 +39,8 @@ use crate::{
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
         concrete_ty::ConcreteTy,
         operand::{
-            MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
-            MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
+            MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRRValue,
+            MIRRValueKind, UnaryOperator,
         },
     },
     name_resolve::type_expr::struct_item,
@@ -76,8 +77,8 @@ struct LIRLower<'ir, 'db> {
 }
 
 enum ProjKind<'a> {
-    Regular(&'a MIRProjection),
-    DowncastThen { variant: u32, next: &'a MIRProjection },
+    Regular(&'a MIRProjectionKind),
+    DowncastThen { variant: u32, next: &'a MIRProjectionKind },
 }
 
 impl<'ir> LocalSlot<'ir> {
@@ -397,14 +398,14 @@ impl MTLBCtx<'_> {
         lower: &LIRLower<'ir, '_>,
     ) -> (ValueId<'ir>, ConcreteTy) {
         match proj {
-            ProjKind::Regular(MIRProjection::Deref) => {
+            ProjKind::Regular(MIRProjectionKind::Deref) => {
                 let new_ty =
                     ty.as_ptr(self.db).unwrap_or_else(|| ty.as_ref(self.db).unwrap()).1;
                 let ptr_layout = layout_of(self.db, ty.as_type_ref(self.db)); // layout of the pointer type itself
                 let lir_ty = LIRTy { layout: ptr_layout, origin: Some(ty) };
                 (b.load(ptr, lir_ty), new_ty)
             }
-            ProjKind::Regular(MIRProjection::Field { name, resulting_ty }) => {
+            ProjKind::Regular(MIRProjectionKind::Field { name, resulting_ty }) => {
                 let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 let src_idx = {
@@ -425,12 +426,12 @@ impl MTLBCtx<'_> {
                 };
                 (b.field_ptr(ptr, lir_ty, src_idx), *resulting_ty)
             }
-            ProjKind::Regular(MIRProjection::TupleField { index, resulting_ty }) => {
+            ProjKind::Regular(MIRProjectionKind::TupleField { index, resulting_ty }) => {
                 let layout = layout_of(self.db, ty.as_type_ref(self.db));
                 let lir_ty = LIRTy { layout, origin: Some(ty) };
                 (b.field_ptr(ptr, lir_ty, *index), *resulting_ty)
             }
-            ProjKind::Regular(MIRProjection::Index { index }) => {
+            ProjKind::Regular(MIRProjectionKind::Index { index }) => {
                 self.apply_index(b, ptr, ty, lower, index)
             }
             ProjKind::DowncastThen { next, variant } => {
@@ -446,7 +447,7 @@ impl MTLBCtx<'_> {
                     self.variant_payload(b, ptr, lir_ty, *variant);
                 let variant_ty = LIRTy { layout: variant_layout, origin: None };
                 match next {
-                    MIRProjection::Field { name, resulting_ty } => {
+                    MIRProjectionKind::Field { name, resulting_ty } => {
                         let Some(ConstructorType::Struct(fields)) =
                             enum_ref.get_cons(self.db, *variant as usize)
                         else {
@@ -458,14 +459,14 @@ impl MTLBCtx<'_> {
                             b.field_ptr(payload_ptr, variant_ty, source_index as u32);
                         (field_ptr, *resulting_ty)
                     }
-                    MIRProjection::TupleField { index, resulting_ty } => {
+                    MIRProjectionKind::TupleField { index, resulting_ty } => {
                         let field_ptr = b.field_ptr(payload_ptr, variant_ty, *index);
                         (field_ptr, *resulting_ty)
                     }
                     _ => unreachable!(),
                 }
             }
-            ProjKind::Regular(MIRProjection::Downcast { .. }) => unreachable!(),
+            ProjKind::Regular(MIRProjectionKind::Downcast { .. }) => unreachable!(),
         }
     }
 
@@ -531,11 +532,11 @@ impl MTLBCtx<'_> {
         projs.reverse();
         let mut res = vec![];
         while let Some(proj) = projs.pop() {
-            if let MIRProjection::Downcast { variant } = proj {
-                let next = projs.pop().unwrap();
+            if let MIRProjectionKind::Downcast { variant } = &proj.kind {
+                let next = &projs.pop().unwrap().kind;
                 res.push(ProjKind::DowncastThen { variant: *variant as u32, next });
             } else {
-                res.push(ProjKind::Regular(proj));
+                res.push(ProjKind::Regular(&proj.kind));
             }
         }
         res

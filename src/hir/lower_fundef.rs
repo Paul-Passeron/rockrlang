@@ -164,7 +164,11 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::FieldAccess { object, field } => {
                 let base = self.expr_as_place(object, scope, module);
                 self.new_place(
-                    HirPlaceKind::Field { base: base.boxed(), field: *field },
+                    HirPlaceKind::Field {
+                        base: base.boxed(),
+                        field: field.data,
+                        field_span: field.span,
+                    },
                     expr.span,
                     false,
                 )
@@ -172,7 +176,11 @@ impl<'db> LowerFundef<'db> {
             AstExprDesc::TupleAccess { object, index } => {
                 let base = self.expr_as_place(object, scope, module);
                 self.new_place(
-                    HirPlaceKind::TupleField { base: base.boxed(), index: *index },
+                    HirPlaceKind::TupleField {
+                        base: base.boxed(),
+                        index: index.data,
+                        index_span: index.span,
+                    },
                     expr.span,
                     false,
                 )

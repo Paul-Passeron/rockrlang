@@ -24,8 +24,8 @@ use crate::{
     hir::{self, LocalInfo, Mutability},
     resolved::{FunctionId, TypeRef},
     thir::{
-        ExprId, LocalId, PlaceId, Projection, ScopeId, Thir, ThirExpr, ThirLocal,
-        ThirPlace, ThirScope, stmt::ThirStmt,
+        ExprId, LocalId, PlaceId, Projection, ProjectionKind, ScopeId, Thir, ThirExpr,
+        ThirLocal, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::TypeCheckResults,
 };
@@ -122,11 +122,11 @@ impl<'db> ThirBuilder<'db> {
     pub(super) fn with_synthetic_projection(
         &self,
         place: PlaceId,
-        proj: Projection,
+        proj: ProjectionKind,
         ty: TypeRef,
     ) -> PlaceId {
         let mut place = self.get_place(place).clone();
-        place.projections.push(proj);
+        place.projections.push(Projection { span: place.span, kind: proj });
         place.ty = ty;
         self.new_place(place)
     }

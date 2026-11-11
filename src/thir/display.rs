@@ -17,13 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::stmt::{StmtKind, ThirStmt};
 use super::{
-    Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Projection, ScopeId, Thir,
+    Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, ScopeId, Thir,
     ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
     ThirPatternKind,
 };
 use crate::resolved::TypeDefId;
-use crate::thir::ThirStructField;
 use crate::thir::stmt::BlockSemanticInfo;
+use crate::thir::{ProjectionKind, ThirStructField};
 use crate::{Db, hir::Mutability, resolved::TypeRef};
 
 const INDENT: &str = "    ";
@@ -360,13 +360,13 @@ impl<'a> ThirPrinter<'a> {
             PlaceBase::Local(l) => self.local_name(*l),
         };
         for proj in &place.projections {
-            match proj {
-                Projection::Deref => s = format!("(*{s})"),
-                Projection::Field(sym, _) => {
+            match &proj.kind {
+                ProjectionKind::Deref => s = format!("(*{s})"),
+                ProjectionKind::Field(sym, _) => {
                     s = format!("{s}.{}", sym.to_string(self.db));
                 }
-                Projection::TupleField(n, _) => s = format!("{s}.{n}"),
-                Projection::Index(e) => s = format!("{s}[{}]", self.render_expr(*e)),
+                ProjectionKind::TupleField(n, _) => s = format!("{s}.{n}"),
+                ProjectionKind::Index(e) => s = format!("{s}[{}]", self.render_expr(*e)),
             }
         }
         s

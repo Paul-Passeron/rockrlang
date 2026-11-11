@@ -62,12 +62,18 @@ pub struct MIRPlace {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum MIRProjection {
+pub enum MIRProjectionKind {
     Deref,
     Field { name: Symbol, resulting_ty: ConcreteTy },
     TupleField { index: u32, resulting_ty: ConcreteTy },
     Index { index: Operand },
     Downcast { variant: usize },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct MIRProjection {
+    pub span: Span,
+    pub kind: MIRProjectionKind,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -288,22 +294,22 @@ impl MIRPlace {
 impl MIRProjection {
     pub fn bitset_uses(&self, mir: &Mir) -> BitSet<MIRLocalID> {
         let domain = mir.locals.len();
-        match self {
-            Self::TupleField { .. }
-            | Self::Field { .. }
-            | Self::Downcast { .. }
-            | Self::Deref => BitSet::new(domain),
-            Self::Index { index } => index.bitset_uses(mir),
+        match &self.kind {
+            MIRProjectionKind::TupleField { .. }
+            | MIRProjectionKind::Field { .. }
+            | MIRProjectionKind::Downcast { .. }
+            | MIRProjectionKind::Deref => BitSet::new(domain),
+            MIRProjectionKind::Index { index } => index.bitset_uses(mir),
         }
     }
 
     pub fn uses(&self) -> HashSet<MIRLocalID> {
-        match self {
-            Self::TupleField { .. }
-            | Self::Field { .. }
-            | Self::Downcast { .. }
-            | Self::Deref => HashSet::new(),
-            Self::Index { index } => index.uses(),
+        match &self.kind {
+            MIRProjectionKind::TupleField { .. }
+            | MIRProjectionKind::Field { .. }
+            | MIRProjectionKind::Downcast { .. }
+            | MIRProjectionKind::Deref => HashSet::new(),
+            MIRProjectionKind::Index { index } => index.uses(),
         }
     }
 }
