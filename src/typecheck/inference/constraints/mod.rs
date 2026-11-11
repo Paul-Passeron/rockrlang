@@ -701,7 +701,7 @@ impl InferenceConstraintKind {
                 .flat_map(|t| ctx.find(t).listeners())
                 .collect::<Box<_>>()
                 .into_iter()
-                .chain(ty.listeners())
+                .chain(ctx.find(ty).listeners())
                 .chain(ctx.find(&ret_var.into()).listeners())
                 .collect(),
             Self::Implements { ty, args, .. } => args
