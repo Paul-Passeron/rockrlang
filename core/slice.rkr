@@ -24,7 +24,13 @@ impl <T> iter::Iter for SliceIter<T> {
     type Item = &T;
 
     fun next(&mut self): opt<&T> {
-        panic("TODO");
+        if self.slice.len() < self.idx {
+            let res = &self.slice[self.idx];
+            self.idx = self.idx + 1;
+            return opt::Some(res);
+        } else {
+            return opt::None;
+        }
     }
 }
 
