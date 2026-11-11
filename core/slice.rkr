@@ -1,5 +1,6 @@
 @include core::opt
 @include core::panic
+@include core::iter
 
 impl <T> &[T] {
     fun len(self): usize {
@@ -20,7 +21,7 @@ struct SliceIter<T> {
     idx: usize;
 }
 
-impl <T> iter::Iter for SliceIter<T> {
+impl <T> Iter for SliceIter<T> {
     type Item = &T;
 
     fun next(&mut self): opt<&T> {
@@ -34,7 +35,7 @@ impl <T> iter::Iter for SliceIter<T> {
     }
 }
 
-impl <T> iter::IntoIterator for &[T] {
+impl <T> IntoIterator for &[T] {
     type Out = SliceIter<T>;
     fun into_iter(self): SliceIter<T> {
         return SliceIter {
