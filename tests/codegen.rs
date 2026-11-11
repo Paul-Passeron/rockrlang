@@ -28,7 +28,7 @@ enum Outcome {
 const REJECTED: &[&str] =
     &["bad_move", "early_return", "match_tuple", "mut_method", "opt_ref", "partial_move"];
 
-const KNOWN_CRASHES: &[&str] = &["idx", "iter", "slice_test"];
+const KNOWN_CRASHES: &[&str] = &[];
 
 fn expected(name: &str) -> Outcome {
     if REJECTED.contains(&name) {
