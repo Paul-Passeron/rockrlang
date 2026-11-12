@@ -15,14 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::LexError;
-use super::Token;
-use super::TokenKind;
 use crate::Db;
-use crate::common::location::Span;
-use crate::common::symbols::StrLit;
-use crate::common::symbols::Symbol;
-use crate::lexer::TokenPattern;
+use crate::{
+    common::{
+        location::Span,
+        symbols::{StrLit, Symbol},
+    },
+    lexer::{LexError, Token, TokenKind, TokenPattern},
+};
 use regex::Regex;
 
 fn anchored(re: &str) -> Regex {
