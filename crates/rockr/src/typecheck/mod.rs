@@ -33,6 +33,7 @@ use crate::{
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 use itertools::Itertools;
+use rockr_constraint_solver::SolverHostExt;
 use std::{collections::BTreeMap, panic, sync::Arc};
 
 pub mod conformance;
@@ -170,7 +171,7 @@ impl<'db> TyCtx<'db> {
             Diag::emit_error(
                 self.db,
                 format!("unsolved constraint: {}", unsolved.kind.display(&self.inf_ctx)),
-                unsolved.span,
+                self.function.span(self.db),
             );
         }
 

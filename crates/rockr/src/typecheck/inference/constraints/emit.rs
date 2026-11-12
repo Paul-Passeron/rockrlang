@@ -28,21 +28,10 @@ use crate::{
         },
     },
 };
-use std::sync::Arc;
 
 impl InferenceCtx<'_> {
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {
-        if let Some(queue) = &mut self.probe_queue {
-            queue.push(constraint);
-            return;
-        }
-        let constraint = Arc::new(self.fresh_constraint(constraint));
-        self.ready_push(constraint.id);
-        self.register_listeners(&constraint);
-        if constraint.kind.has_default_behaviour() {
-            self.pending_defaults.insert(constraint.id);
-        }
-        self.all_constraints.insert(constraint.id, constraint);
+        self.solver.emit(constraint, ());
     }
 
     pub fn emit_deref_constraint(&mut self, pointee: InferTy) -> InferVar {

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
+    common::symbols::Symbol,
     hir::{Mutability, interface_items},
     parse_tree::{
         expr::BinaryOperator,
@@ -35,28 +35,23 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_constraint_solver::{ProbeOutcome, SolverHost, SolverHostExt};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    convert::Infallible,
+    collections::{HashMap, HashSet},
     fmt,
-    ops::{ControlFlow, FromResidual, Residual, Try},
     sync::Arc,
 };
 
 pub mod emit;
 pub mod solve;
 
+pub type ConstraintSolveResult =
+    rockr_constraint_solver::ConstraintSolveResult<TypeInferenceError>;
+
 const MAX_IMPL_DEPTH: usize = 1_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct InferenceConstraintId(pub usize);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InferenceConstraint {
-    pub id: InferenceConstraintId,
-    pub kind: InferenceConstraintKind,
-    pub span: Span,
-}
+pub type InferenceConstraint<'db> =
+    rockr_constraint_solver::Constraint<InferenceCtx<'db>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InferenceConstraintKind {
@@ -91,70 +86,6 @@ impl InferenceConstraintKind {
     pub fn has_default_behaviour(&self) -> bool {
         matches!(self, Self::Deref { .. } | Self::IntLike { .. })
     }
-}
-
-#[derive(Debug)]
-pub(crate) enum ConstraintSolveResult {
-    Solved,
-    Pending,
-    Error(TypeInferenceError),
-}
-
-pub(crate) enum ConstraintSolveResultResidual {
-    Pending,
-    Error(TypeInferenceError),
-}
-
-impl FromResidual<ConstraintSolveResultResidual> for ConstraintSolveResult {
-    fn from_residual(residual: ConstraintSolveResultResidual) -> Self {
-        match residual {
-            ConstraintSolveResultResidual::Pending => Self::Pending,
-            ConstraintSolveResultResidual::Error(err) => Self::Error(err),
-        }
-    }
-}
-
-impl FromResidual<Result<Infallible, TypeInferenceError>> for ConstraintSolveResult {
-    fn from_residual(residual: Result<Infallible, TypeInferenceError>) -> Self {
-        let Err(err) = residual;
-        Self::Error(err)
-    }
-}
-
-impl From<Result<(), TypeInferenceError>> for ConstraintSolveResult {
-    fn from(res: Result<(), TypeInferenceError>) -> Self {
-        res.map_or_else(Self::Error, |()| Self::Solved)
-    }
-}
-
-impl Residual<()> for ConstraintSolveResultResidual {
-    type TryType = ConstraintSolveResult;
-}
-
-impl Try for ConstraintSolveResult {
-    type Output = ();
-
-    type Residual = ConstraintSolveResultResidual;
-
-    fn from_output((): Self::Output) -> Self {
-        Self::Solved
-    }
-
-    fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
-        match self {
-            Self::Solved => ControlFlow::Continue(()),
-            Self::Pending => ControlFlow::Break(ConstraintSolveResultResidual::Pending),
-            Self::Error(err) => {
-                ControlFlow::Break(ConstraintSolveResultResidual::Error(err))
-            }
-        }
-    }
-}
-
-enum ProbeOutcome {
-    Holds,
-    Fails,
-    Ambiguous,
 }
 
 impl InferenceCtx<'_> {
@@ -282,9 +213,7 @@ impl<'db> InferenceCtx<'db> {
 
         let zelf_ty = self.peel_receiver(receiver, depth);
 
-        if let Err(e) = self.unify(&zelf_ty, &implem.ty) {
-            return ConstraintSolveResult::Error(e);
-        }
+        self.unify(&zelf_ty, &implem.ty)?;
 
         let method_id =
             FunctionId::new(self.db, *method, ScopeOwnerId::Interface(iface_ref));
@@ -339,49 +268,15 @@ impl<'db> InferenceCtx<'db> {
         ConstraintSolveResult::Solved
     }
 
-    fn run_probe(&mut self, constraints: Vec<InferenceConstraintKind>) -> ProbeOutcome {
-        let outer = self.probe_queue.replace(Vec::new()); // nested probes stack
-        let mut pending: VecDeque<InferenceConstraint> =
-            constraints.into_iter().map(|k| self.fresh_constraint(k)).collect();
-
-        let outcome = 'outer: loop {
-            let mut progressed = false;
-            for _ in 0..pending.len() {
-                let c = pending.pop_front().expect("len checked");
-                match self.try_solve_constraint(&c) {
-                    ConstraintSolveResult::Solved => progressed = true,
-                    ConstraintSolveResult::Pending => pending.push_back(c),
-                    ConstraintSolveResult::Error(_) => break 'outer ProbeOutcome::Fails,
-                }
-
-                let emitted =
-                    std::mem::take(self.probe_queue.as_mut().expect("in probe"));
-                if !emitted.is_empty() {
-                    progressed = true;
-                    pending.extend(emitted.into_iter().map(|k| self.fresh_constraint(k)));
-                }
-            }
-            if pending.is_empty() {
-                break ProbeOutcome::Holds;
-            }
-            if !progressed {
-                break ProbeOutcome::Ambiguous;
-            }
-        };
-
-        self.probe_queue = outer;
-        outcome
-    }
-
     pub fn probe<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let mark = self.undo_log.len();
-        self.snapshot_depth += 1;
-        let snap = self.table.snapshot();
+        let solver_snap = self.solver.start_snapshot();
+        let table_snap = self.table.snapshot();
         let res = f(self);
-        self.snapshot_depth -= 1;
-        self.table.rollback_to(snap);
+        self.table.rollback_to(table_snap);
+        self.solver.rollback_to(solver_snap);
         self.rollback_undo_log(mark);
-        if self.snapshot_depth == 0 {
+        if !self.solver.in_snapshot() {
             self.undo_log.clear();
         }
         res
@@ -398,7 +293,7 @@ impl<'db> InferenceCtx<'db> {
         competing
             .into_iter()
             .filter(|(_, res)| {
-                let cs = res.constraints.clone();
+                let cs = res.constraints.iter().cloned().map(|c| (c, ())).collect_vec();
                 !matches!(self.probe(|this| this.run_probe(cs)), ProbeOutcome::Fails)
             })
             .collect()
@@ -476,26 +371,6 @@ impl<'db> InferenceCtx<'db> {
                     "`try_default_constraint` is not in sync with `has_default_behaviour`"
                 )
             }
-        }
-    }
-
-    fn fresh_constraint(
-        &mut self,
-        constraint: InferenceConstraintKind,
-    ) -> InferenceConstraint {
-        let res = InferenceConstraint {
-            id: InferenceConstraintId(self.next_constraint_id),
-            kind: constraint,
-            span: self.current_span,
-        };
-        self.next_constraint_id += 1;
-        res
-    }
-
-    pub fn register_listeners(&mut self, constraint: &InferenceConstraint) {
-        for listener in constraint.listeners(self) {
-            self.record_listeners(listener);
-            self.listeners.entry(listener).or_default().push(constraint.id);
         }
     }
 }
@@ -643,12 +518,6 @@ impl fmt::Display for ICKDisplay<'_, '_, &InferenceConstraintKind> {
     }
 }
 
-impl InferenceConstraint {
-    pub fn listeners(&self, ctx: &mut InferenceCtx) -> HashSet<InferVar> {
-        self.kind.listeners(ctx)
-    }
-}
-
 impl InferTy {
     pub fn listeners(&self) -> HashSet<InferVar> {
         match self {
@@ -744,5 +613,49 @@ impl InferenceConstraintKind {
                 .chain(ctx.find(to).listeners())
                 .collect(),
         }
+    }
+}
+
+impl<'a> SolverHost for InferenceCtx<'a> {
+    type Kind = InferenceConstraintKind;
+
+    type Listener = InferVar;
+
+    // TODO: Have this be Span instead
+    type Metadata = ();
+
+    type Err = TypeInferenceError;
+
+    fn solver(&self) -> &rockr_constraint_solver::ConstraintSolver<Self> {
+        &self.solver
+    }
+
+    fn solver_mut(&mut self) -> &mut rockr_constraint_solver::ConstraintSolver<Self> {
+        &mut self.solver
+    }
+
+    fn solve(
+        &mut self,
+        constraint: &rockr_constraint_solver::Constraint<Self>,
+    ) -> rockr_constraint_solver::ConstraintSolveResult<Self::Err> {
+        self.try_solve_constraint(constraint)
+    }
+
+    fn listeners(
+        &mut self,
+        kind: &Self::Kind,
+    ) -> impl IntoIterator<Item = Self::Listener> {
+        kind.listeners(self)
+    }
+
+    fn has_default(kind: &Self::Kind) -> bool {
+        kind.has_default_behaviour()
+    }
+
+    fn apply_default(
+        &mut self,
+        constraint: &rockr_constraint_solver::Constraint<Self>,
+    ) -> rockr_constraint_solver::ConstraintSolveResult<Self::Err> {
+        self.try_default_constraint(constraint)
     }
 }

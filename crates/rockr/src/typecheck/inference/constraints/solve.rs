@@ -36,8 +36,8 @@ use crate::{
         inference::{
             InferTy, InferenceCtx, TypeInferenceError,
             constraints::{
-                ConstraintSolveResult, InferenceConstraint, InferenceConstraintId,
-                InferenceConstraintKind, MAX_IMPL_DEPTH, MethodConstraint,
+                ConstraintSolveResult, InferenceConstraint, InferenceConstraintKind,
+                MAX_IMPL_DEPTH, MethodConstraint,
             },
             implems::PotentialBlockRes,
             implicit::{AsAstImplCtx, ImplicitContext},
@@ -46,7 +46,9 @@ use crate::{
     },
 };
 use itertools::Itertools;
-use std::{collections::HashMap, sync::Arc};
+use rockr_constraint_solver::{ConstraintId, SolverHostExt};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 impl<'db> InferenceCtx<'db> {
     fn solve_deref_constraint(
@@ -606,7 +608,7 @@ impl<'db> InferenceCtx<'db> {
 
     fn solve_implements_constraint(
         &mut self,
-        _id: InferenceConstraintId,
+        _id: ConstraintId,
         ty: &InferTy,
         interface_id: InterfaceId,
         args: &[InferTy],
@@ -677,7 +679,10 @@ impl<'db> InferenceCtx<'db> {
         }
 
         self.solve_constraints().map_err(|(cs, err)| {
-            TypeInferenceError::UnmetConstraint(cs, Box::new(err))
+            TypeInferenceError::UnmetConstraint(
+                Arc::new(cs.kind.clone()),
+                Box::new(err),
+            )
         })?;
         ConstraintSolveResult::Solved
     }
@@ -778,79 +783,11 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub fn solve_constraints(
-        &mut self,
-    ) -> Result<(), (Arc<InferenceConstraint>, TypeInferenceError)> {
-        if self.probe_queue.is_some() {
-            return Ok(());
-        }
-        debug_assert!(
-            !self.in_snapshot(),
-            "solve_constraints must not run inside a snapshot"
-        );
-        loop {
-            while let Some(id) = self.ready.pop_front() {
-                self.ready_set.remove(&id);
-                if self.error_constraints.contains(&id) {
-                    continue;
-                }
-                let constraint = self.all_constraints[&id].clone();
-                match self.try_solve_constraint(&constraint) {
-                    ConstraintSolveResult::Solved => {
-                        self.solved_constraints.insert(id);
-                    }
-                    ConstraintSolveResult::Pending => {
-                        self.register_listeners(&constraint);
-                    }
-                    ConstraintSolveResult::Error(e) => {
-                        self.error_constraints.insert(constraint.id);
-                        return Err((constraint, e));
-                    }
-                }
-            }
-
-            // For all pending constraints remaining, solve them using the
-            // default behaviour Might want to do this one at a
-            // time, in order to avoid non-determinism issues
-
-            while let Some(&id) = self.pending_defaults.first()
-                && self.solved_constraints.contains(&id)
-            {
-                self.pending_defaults.pop_first();
-            }
-            let pending =
-                self.pending_defaults.first().map(|id| self.all_constraints[id].clone());
-            match pending {
-                None => {
-                    break;
-                }
-                Some(constraint) => {
-                    let res = self.try_default_constraint(constraint.as_ref());
-                    match res {
-                        ConstraintSolveResult::Solved => {
-                            self.solved_constraints.insert(constraint.id);
-                        }
-                        ConstraintSolveResult::Pending => {
-                            panic!(
-                                "Default constraint solving should never return pending"
-                            )
-                        }
-                        ConstraintSolveResult::Error(e) => {
-                            return Err((constraint, e));
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     pub(crate) fn try_solve_constraint(
         &mut self,
         constraint: &InferenceConstraint,
     ) -> ConstraintSolveResult {
-        if self.solved_constraints.contains(&constraint.id) {
+        if self.solver.is_solved(constraint.id) {
             return ConstraintSolveResult::Solved;
         }
         match &constraint.kind {

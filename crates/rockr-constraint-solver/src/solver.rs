@@ -24,6 +24,7 @@ use crate::{Constraint, ConstraintId, SolverHost, snapshot::Undo};
 
 /// Bookkeeping state of the solver. Embedded in the host, which exposes it
 /// through [`SolverHost::solver`] / [`SolverHost::solver_mut`].
+#[derive(Clone)]
 pub struct ConstraintSolver<H: SolverHost> {
     next_id: usize,
 
@@ -127,7 +128,11 @@ impl<H: SolverHost> ConstraintSolver<H> {
         self.probe_queue.is_some()
     }
 
-    pub(crate) fn fresh(&mut self, kind: H::Kind, metadata: H::Metadata) -> Constraint<H> {
+    pub(crate) fn fresh(
+        &mut self,
+        kind: H::Kind,
+        metadata: H::Metadata,
+    ) -> Constraint<H> {
         let id = ConstraintId(self.next_id);
         self.next_id += 1;
         Constraint { id, kind, metadata }
@@ -146,7 +151,10 @@ impl<H: SolverHost> ConstraintSolver<H> {
 
     /// Only valid outside snapshots: popping from `ready` isn't undoable.
     pub(crate) fn pop_ready(&mut self) -> Option<ConstraintId> {
-        debug_assert!(!self.in_snapshot(), "`ready` must be append-only inside a snapshot");
+        debug_assert!(
+            !self.in_snapshot(),
+            "`ready` must be append-only inside a snapshot"
+        );
         let id = self.ready.pop_front()?;
         self.ready_set.remove(&id);
         Some(id)

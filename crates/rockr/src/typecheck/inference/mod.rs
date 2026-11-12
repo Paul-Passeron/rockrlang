@@ -38,17 +38,16 @@ use crate::{
         ExprId, InferCallInfos, PatternId, PlaceId,
         inference::{
             canon::CanonTy,
-            constraints::{
-                InferenceConstraint, InferenceConstraintId, InferenceConstraintKind,
-            },
+            constraints::{InferenceConstraint, InferenceConstraintKind},
             implicit::{AsAstImplCtx, ImplicitContext},
         },
     },
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
+use rockr_constraint_solver::ConstraintSolver;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt, mem,
     sync::Arc,
 };
@@ -96,19 +95,14 @@ pub struct InferenceCtx<'a> {
     local_map: BTreeMap<LocalId, InferVar>,
     implicit_ctx: Arc<ImplicitContext>,
 
-    all_constraints: BTreeMap<InferenceConstraintId, Arc<InferenceConstraint>>,
-    solved_constraints: BTreeSet<InferenceConstraintId>,
-    pending_defaults: BTreeSet<InferenceConstraintId>,
-    error_constraints: BTreeSet<InferenceConstraintId>,
-    listeners: BTreeMap<InferVar, Vec<InferenceConstraintId>>,
-    ready: VecDeque<InferenceConstraintId>,
-    ready_set: HashSet<InferenceConstraintId>,
+    solver: ConstraintSolver<Self>,
+    undo_log: Vec<SnapshotUndo>,
 
     implements: BTreeMap<InterfaceId, HashSet<InterfaceImplem>>,
     call_infos: BTreeMap<ExprId, InferCallInfos>,
-    next_constraint_id: usize,
     impl_depth: usize,
 
+    #[allow(unused)]
     current_span: Span,
 
     pub inferred_exprs: BTreeMap<ExprId, InferTy>,
@@ -116,10 +110,6 @@ pub struct InferenceCtx<'a> {
     pub inferred_places: BTreeMap<PlaceId, InferTy>,
 
     in_flight_impls: HashSet<(InterfaceId, CanonTy)>,
-
-    undo_log: Vec<SnapshotUndo>,
-    snapshot_depth: usize,
-    probe_queue: Option<Vec<InferenceConstraintKind>>,
 }
 
 #[derive(Clone)]
@@ -127,9 +117,6 @@ enum SnapshotUndo {
     InferredExpr(ExprId, Option<InferTy>),
     InferredPattern(PatternId, Option<InferTy>),
     InferredPlace(PlaceId, Option<InferTy>),
-    Listeners(InferVar, Option<Vec<InferenceConstraintId>>),
-    ReadySet(InferenceConstraintId),
-    ReadyPush(InferenceConstraintId),
     Implemented(InterfaceId, InterfaceImplem),
     CallInfo(ExprId, Option<InferCallInfos>),
 }
@@ -198,26 +185,20 @@ impl<'db> InferenceCtx<'db> {
             db,
             table,
             local_map,
-            all_constraints: BTreeMap::new(),
-            solved_constraints: BTreeSet::new(),
-            pending_defaults: BTreeSet::new(),
-            error_constraints: BTreeSet::new(),
+
+            solver: ConstraintSolver::new(),
+
             call_infos: BTreeMap::new(),
-            next_constraint_id: 0,
             current_span: func.span(db),
             implements: BTreeMap::new(),
             implicit_ctx: Arc::new(ctx),
             impl_depth: 0,
-            listeners: BTreeMap::new(),
-            ready: VecDeque::new(),
-            ready_set: HashSet::new(),
+
             in_flight_impls: HashSet::new(),
             inferred_exprs: BTreeMap::new(),
             inferred_patterns: BTreeMap::new(),
             inferred_places: BTreeMap::new(),
             undo_log: Vec::new(),
-            snapshot_depth: 0,
-            probe_queue: None,
         };
 
         let ast = func.ast(this.db);
@@ -294,18 +275,12 @@ impl<'db> InferenceCtx<'db> {
         self.implicit_ctx.clone()
     }
 
-    pub fn set_current_span(&mut self, span: Span) -> Span {
-        mem::replace(&mut self.current_span, span)
-    }
+    // pub fn set_current_span(&mut self, span: Span) -> Span {
+    //     mem::replace(&mut self.current_span, span)
+    // }
 
-    pub fn unsolved_constraints(&self) -> Vec<Arc<InferenceConstraint>> {
-        self.all_constraints
-            .keys()
-            .copied()
-            .collect::<BTreeSet<_>>()
-            .difference(&self.solved_constraints)
-            .map(|id| self.all_constraints[id].clone())
-            .collect()
+    pub fn unsolved_constraints(&self) -> Vec<Arc<InferenceConstraint<'db>>> {
+        self.solver.unsolved_constraints().cloned().collect()
     }
 }
 
@@ -315,7 +290,7 @@ pub enum TypeInferenceError {
     TypeDefIdMismatch(TypeDefId, TypeDefId),
     FieldCountMismatch(usize, usize),
     RecursiveDefinition(InferVar),
-    UnmetConstraint(Arc<InferenceConstraint>, Box<Self>),
+    UnmetConstraint(Arc<InferenceConstraintKind>, Box<Self>),
     ExpectedPtrLike(TypeDefId),
     MinTupleLengthMismatch { expected: usize, got: usize },
     ExpectedStructWithField { def: TypeDefId, field: Symbol },
@@ -362,8 +337,8 @@ impl fmt::Display for Display<'_, &TypeInferenceError> {
             ) => {
                 write!(
                     f,
-                    "Unmet constraint: {} (reason: {})",
-                    inference_constraint.id.0,
+                    "Unmet constraint: {:?} (reason: {})",
+                    inference_constraint,
                     unification_error.display(self.db)
                 )
             }
@@ -461,17 +436,18 @@ impl InferenceCtx<'_> {
         f: impl Fn(&mut Self) -> Result<T, TypeInferenceError>,
     ) -> Result<T, TypeInferenceError> {
         let mark = self.undo_log.len();
-        self.snapshot_depth += 1;
+        let solver_snap = self.solver.start_snapshot();
         let snapshot = self.table.snapshot();
         let res = f(self);
-        self.snapshot_depth -= 1;
         if res.is_ok() {
             self.table.commit(snapshot);
+            self.solver.commit(solver_snap);
         } else {
             self.table.rollback_to(snapshot);
+            self.solver.rollback_to(solver_snap);
             self.rollback_undo_log(mark);
         }
-        if self.snapshot_depth == 0 {
+        if !self.solver.in_snapshot() {
             self.undo_log.clear();
         }
         res
@@ -489,12 +465,6 @@ impl InferenceCtx<'_> {
                 SnapshotUndo::InferredPlace(id, old) => {
                     restore(&mut self.inferred_places, id, old);
                 }
-                SnapshotUndo::Listeners(var, old) => {
-                    restore(&mut self.listeners, var, old);
-                }
-                SnapshotUndo::ReadySet(id) => {
-                    self.ready_set.remove(&id);
-                }
                 SnapshotUndo::Implemented(id, implem) => {
                     if let Some(set) = self.implements.get_mut(&id) {
                         set.remove(&implem);
@@ -502,14 +472,6 @@ impl InferenceCtx<'_> {
                 }
                 SnapshotUndo::CallInfo(id, old) => {
                     restore(&mut self.call_infos, id, old);
-                }
-                SnapshotUndo::ReadyPush(id) => {
-                    let popped = self.ready.pop_back();
-                    debug_assert_eq!(
-                        popped,
-                        Some(id),
-                        "`ready` must be append-only inside a snapshot"
-                    );
                 }
             }
         }
@@ -520,23 +482,11 @@ impl InferenceCtx<'_> {
         self.push_undo(SnapshotUndo::CallInfo(id, old));
     }
 
-    fn in_snapshot(&self) -> bool {
-        self.snapshot_depth > 0
-    }
-
     fn push_undo(&mut self, undo: SnapshotUndo) {
-        if self.in_snapshot() {
+        if self.solver.in_snapshot() {
             self.undo_log.push(undo);
         }
     }
-
-    pub(super) fn record_listeners(&mut self, var: InferVar) {
-        if self.in_snapshot() {
-            let old = self.listeners.get(&var).cloned();
-            self.undo_log.push(SnapshotUndo::Listeners(var, old));
-        }
-    }
-
     pub(super) fn set_inferred_expr(&mut self, id: ExprId, ty: InferTy) {
         let old = self.inferred_exprs.insert(id, ty);
         self.push_undo(SnapshotUndo::InferredExpr(id, old));
@@ -550,19 +500,6 @@ impl InferenceCtx<'_> {
     pub(super) fn set_inferred_place(&mut self, id: PlaceId, ty: InferTy) {
         let old = self.inferred_places.insert(id, ty);
         self.push_undo(SnapshotUndo::InferredPlace(id, old));
-    }
-
-    pub(super) fn ready_push(&mut self, id: InferenceConstraintId) {
-        self.ready.push_back(id);
-        self.push_undo(SnapshotUndo::ReadyPush(id));
-    }
-
-    pub(super) fn ready_set_insert(&mut self, id: InferenceConstraintId) -> bool {
-        let inserted = self.ready_set.insert(id);
-        if inserted {
-            self.push_undo(SnapshotUndo::ReadySet(id));
-        }
-        inserted
     }
 
     pub fn solve(&mut self, ty: &InferTy) -> Option<TypeRef> {

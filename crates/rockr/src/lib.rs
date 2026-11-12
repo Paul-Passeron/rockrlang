@@ -14,9 +14,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
-#![feature(try_trait_v2, try_trait_v2_residual)]
-
 pub use common::location::SourceFile;
 pub use db::*;
 

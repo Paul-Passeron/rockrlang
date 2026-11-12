@@ -11,6 +11,8 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+rockr-constraint-solver.workspace = true
+
 clap.workspace = true
 clap_derive.workspace = true
 codespan-reporting.workspace = true

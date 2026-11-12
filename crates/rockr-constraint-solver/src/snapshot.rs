@@ -15,10 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::{ConstraintId, ConstraintSolver, SolverHost};
 use std::collections::BTreeMap;
 
-use crate::{ConstraintId, ConstraintSolver, SolverHost};
-
+#[derive(Clone)]
 pub(crate) enum Undo<L> {
     Listeners(L, Option<Vec<ConstraintId>>),
     ReadySet(ConstraintId),

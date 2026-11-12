@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use super::{InferTy, InferVar, TypeInferenceError, UnifyValue};
 use crate::typecheck::inference::InferenceCtx;
 use ena::unify::{InPlace, UnificationTable};
-use itertools::Itertools;
 
 impl InferTy {
     fn occurs(&self, var: InferVar) -> bool {
@@ -100,10 +99,7 @@ impl InferenceCtx<'_> {
     fn merge_listeners(&mut self, a: InferVar, b: InferVar) {
         let root = self.table.find(a);
         let other = if root == a { b } else { a };
-        self.record_listeners(other);
-        self.record_listeners(root);
-        let flattened = self.listeners.remove(&other).into_iter().flatten().collect_vec();
-        self.listeners.entry(root).or_default().extend(flattened);
+        self.solver.merge_listeners(other, root);
     }
     fn try_unify(&mut self, a: &InferTy, b: &InferTy) -> Result<(), TypeInferenceError> {
         let a = &self.find(a);
@@ -124,14 +120,7 @@ impl InferenceCtx<'_> {
                 }
                 self.table.unify_var_value(*infer_var, Some(resolved))?;
                 let root = self.table.find(*infer_var);
-                self.record_listeners(root);
-                let woken =
-                    self.listeners.remove(&root).into_iter().flatten().collect_vec();
-                for l in woken {
-                    if self.ready_set_insert(l) {
-                        self.ready_push(l);
-                    }
-                }
+                self.solver.wake(root);
                 Ok(())
             }
             (
