@@ -18,20 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr::Db;
 
 use crate::{
-    codegen::mir_to_lir::{build::MTLBCtx, declare::MTLDCtx},
     lir::{Building, Complete, Declaring, Module, ModulePhase},
+    mir_to_lir::{build::MTLBCtx, declare::MTLDCtx},
 };
 use std::marker::PhantomData;
-
-mod lir_to_llvm;
-mod mir_to_lir;
 
 pub type IModule<'a> = inkwell::module::Module<'a>;
 
 pub struct Codegen<'db, State: CGState<'db>> {
-    db: &'db dyn Db,
-    lir: Module<State::LIRState>,
-    ctx: State::Ctx,
+    pub(crate) db: &'db dyn Db,
+    pub(crate) lir: Module<State::LIRState>,
+    pub(crate) ctx: State::Ctx,
 }
 
 pub trait CGState<'db>: Sized {

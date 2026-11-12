@@ -16,12 +16,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    codegen::{
-        Codegen, MIRToLIRBuild, MIRToLIRDeclare,
-        mir_to_lir::build::{MIRMap, MTLBCtx},
-    },
+    codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
     lir::{DefinedLinkage::Export, Module, Signature},
     mangle::fun_mangle,
+    mir_to_lir::build::{MIRMap, MTLBCtx},
 };
 
 use itertools::Itertools;

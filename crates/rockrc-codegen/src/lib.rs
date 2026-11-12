@@ -17,4 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod codegen;
 pub mod lir;
+pub mod lir_to_llvm;
 pub mod mangle;
+pub mod mir_to_lir;
