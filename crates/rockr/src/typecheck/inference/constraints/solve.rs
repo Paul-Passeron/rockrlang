@@ -35,10 +35,7 @@ use crate::{
         conformance::{MethodImpl, method_impl_for},
         inference::{
             InferTy, InferenceCtx, TypeInferenceError,
-            constraints::{
-                ConstraintSolveResult, InferenceConstraint, InferenceConstraintKind,
-                MAX_IMPL_DEPTH, MethodConstraint,
-            },
+            constraints::{ConstraintSolveResult, MAX_IMPL_DEPTH, MethodConstraint},
             implems::PotentialBlockRes,
             implicit::{AsAstImplCtx, ImplicitContext},
             var::InferVar,
@@ -51,7 +48,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 impl<'db> InferenceCtx<'db> {
-    fn solve_deref_constraint(
+    pub(crate) fn solve_deref_constraint(
         &mut self,
         var: InferVar,
         target: &InferTy,
@@ -85,7 +82,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn solve_binds_like_constraint(
+    pub(crate) fn solve_binds_like_constraint(
         &mut self,
         ty: InferVar,
         inner: &InferTy,
@@ -102,7 +99,7 @@ impl<'db> InferenceCtx<'db> {
         self.unify(&ty.into(), to_unify).into()
     }
 
-    fn solve_indexed_by_constraint(
+    pub(crate) fn solve_indexed_by_constraint(
         &mut self,
         elem_var: InferVar,
         base_ty: &InferTy,
@@ -120,7 +117,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn solve_tuple_constraint(
+    pub(crate) fn solve_tuple_constraint(
         &mut self,
         elem_var: InferVar,
         tuple_ty: &InferTy,
@@ -147,7 +144,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn solve_struct_field_constraint(
+    pub(crate) fn solve_struct_field_constraint(
         &mut self,
         elem_var: InferVar,
         struct_ty: &InferTy,
@@ -176,7 +173,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    fn solve_binop_constraint(
+    pub(crate) fn solve_binop_constraint(
         &mut self,
         res_ty: InferVar,
         lhs_ty: &InferTy,
@@ -444,7 +441,7 @@ impl<'db> InferenceCtx<'db> {
         ConstraintSolveResult::Solved
     }
 
-    fn solve_method_constraint(
+    pub(crate) fn solve_method_constraint(
         &mut self,
         method_constraint: &MethodConstraint,
     ) -> ConstraintSolveResult {
@@ -606,7 +603,7 @@ impl<'db> InferenceCtx<'db> {
         None
     }
 
-    fn solve_implements_constraint(
+    pub(crate) fn solve_implements_constraint(
         &mut self,
         _id: ConstraintId,
         ty: &InferTy,
@@ -679,15 +676,12 @@ impl<'db> InferenceCtx<'db> {
         }
 
         self.solve_constraints().map_err(|(cs, err)| {
-            TypeInferenceError::UnmetConstraint(
-                Arc::new(cs.kind.clone()),
-                Box::new(err),
-            )
+            TypeInferenceError::UnmetConstraint(Arc::new(cs.kind.clone()), Box::new(err))
         })?;
         ConstraintSolveResult::Solved
     }
 
-    fn solve_fat_ptr_constraint(
+    pub(crate) fn solve_fat_ptr_constraint(
         &mut self,
         fat_ptr_var: InferVar,
     ) -> ConstraintSolveResult {
@@ -698,7 +692,7 @@ impl<'db> InferenceCtx<'db> {
         ConstraintSolveResult::Pending
     }
 
-    fn solve_metadata_of_fat_ptr_constraint(
+    pub(crate) fn solve_metadata_of_fat_ptr_constraint(
         &mut self,
         fat_ptr_var: InferVar,
         metadata_var: InferVar,
@@ -716,7 +710,7 @@ impl<'db> InferenceCtx<'db> {
         self.unify(&metadata_var.into(), &self.usize_ty()).into()
     }
 
-    fn solve_cast_constraint(
+    pub(crate) fn solve_cast_constraint(
         &mut self,
         from: &InferTy,
         to: &InferTy,
@@ -783,105 +777,7 @@ impl<'db> InferenceCtx<'db> {
         }
     }
 
-    pub(crate) fn try_solve_constraint(
-        &mut self,
-        constraint: &InferenceConstraint,
-    ) -> ConstraintSolveResult {
-        if self.solver.is_solved(constraint.id) {
-            return ConstraintSolveResult::Solved;
-        }
-        match &constraint.kind {
-            InferenceConstraintKind::Deref { var, target } => {
-                self.solve_deref_constraint(*var, target)
-            }
-            InferenceConstraintKind::BindsLike { ty, inner, like } => {
-                self.solve_binds_like_constraint(*ty, inner, *like)
-            }
-            InferenceConstraintKind::IndexedBy { elem_var, base_ty, index_ty } => {
-                self.solve_indexed_by_constraint(*elem_var, base_ty, index_ty)
-            }
-            InferenceConstraintKind::Tuple { elem_var, tuple_ty, has_index } => {
-                self.solve_tuple_constraint(*elem_var, tuple_ty, *has_index)
-            }
-            InferenceConstraintKind::StructField { elem_var, struct_ty, field } => {
-                self.solve_struct_field_constraint(*elem_var, struct_ty, *field)
-            }
-            InferenceConstraintKind::Method(method) => {
-                self.solve_method_constraint(method)
-            }
-            InferenceConstraintKind::Implements { ty, id, args } => {
-                self.solve_implements_constraint(constraint.id, ty, *id, args)
-            }
-            InferenceConstraintKind::Unify { a, b } => self.solve_unify_constraint(a, b),
-            InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, op } => {
-                self.solve_binop_constraint(*res_ty, lhs_ty, rhs_ty, *op)
-            }
-            InferenceConstraintKind::IntLike { res_ty } => {
-                let t = self.find(&res_ty.into());
-                match t {
-                    InferTy::Var(_) => ConstraintSolveResult::Pending,
-                    InferTy::Adt { def, .. } => {
-                        if def.is_int_like(self.db).is_some() {
-                            ConstraintSolveResult::Solved
-                        } else {
-                            ConstraintSolveResult::Error(TypeInferenceError::Custom(
-                                format!(
-                                    "`{}` is not an integer-like type",
-                                    t.to_string(self.db)
-                                ),
-                            ))
-                        }
-                    }
-                    InferTy::Param(type_param_id) => {
-                        ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
-                            "type parameter `T{}` is not known to be integer-like",
-                            type_param_id.0
-                        )))
-                    }
-                    InferTy::Error => {
-                        ConstraintSolveResult::Error(TypeInferenceError::AlreadyDiagnosed)
-                    }
-                }
-            }
-            InferenceConstraintKind::IsInner { inner, ref_ty } => {
-                fn get_ref_inner(ctx: &mut InferenceCtx, ty: InferTy) -> Option<InferTy> {
-                    match ty {
-                        InferTy::Error | InferTy::Var(_) => None,
-                        InferTy::Adt { def, args: fields } => {
-                            if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
-                                assert_eq!(fields.len(), 1);
-                                get_ref_inner(ctx, fields.into_iter().next()?)
-                            } else {
-                                Some(InferTy::Adt { def, args: fields })
-                            }
-                        }
-                        InferTy::Param(id) => Some(InferTy::Param(id)),
-                    }
-                }
-                let ref_ty = self.find(ref_ty);
-                let inner = self.find(inner);
-                if ref_ty == inner {
-                    // We're done
-                    ConstraintSolveResult::Solved
-                } else if let Some(ty) = get_ref_inner(self, ref_ty) {
-                    self.unify(&inner, &ty).into()
-                } else {
-                    ConstraintSolveResult::Pending
-                }
-            }
-            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
-                self.solve_fat_ptr_constraint(*fat_ptr_var)
-            }
-            InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
-                self.solve_metadata_of_fat_ptr_constraint(*fat_ptr_var, *metadata_var)
-            }
-            InferenceConstraintKind::Cast { from, to } => {
-                self.solve_cast_constraint(from, to)
-            }
-        }
-    }
-
-    fn solve_unify_constraint(
+    pub(crate) fn solve_unify_constraint(
         &mut self,
         a: &InferTy,
         b: &InferTy,

@@ -24,7 +24,8 @@ use crate::{
         top_level::{AstInterfaceItem, AstMethodsig},
     },
     resolved::{
-        FunctionId, ImplSource, InterfaceId, InterfaceRef, ScopeOwnerId, TypeId, TypeRef,
+        FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId, TypeId,
+        TypeRef,
     },
     typecheck::{
         CallKind, ExprId, InferCallInfos,
@@ -349,30 +350,6 @@ impl<'db> InferenceCtx<'db> {
         self.push_undo(SnapshotUndo::Implemented(id, implem.clone()));
         self.implements.entry(id).or_default().insert(implem);
     }
-
-    fn try_default_constraint(
-        &mut self,
-        constraint: &InferenceConstraint,
-    ) -> ConstraintSolveResult {
-        assert!(
-            constraint.kind.has_default_behaviour(),
-            "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
-        );
-        match &constraint.kind {
-            InferenceConstraintKind::IntLike { res_ty } => {
-                self.unify(&res_ty.into(), &self.int_ty()).into()
-            }
-            InferenceConstraintKind::Deref { var, target } => {
-                let adt = self.ref_of(target.clone(), Mutability::Const);
-                self.unify(&var.into(), &adt).into()
-            }
-            _ => {
-                unreachable!(
-                    "`try_default_constraint` is not in sync with `has_default_behaviour`"
-                )
-            }
-        }
-    }
 }
 
 pub struct ICKDisplay<'db, 'a, T> {
@@ -638,7 +615,95 @@ impl<'a> SolverHost for InferenceCtx<'a> {
         &mut self,
         constraint: &rockr_constraint_solver::Constraint<Self>,
     ) -> rockr_constraint_solver::ConstraintSolveResult<Self::Err> {
-        self.try_solve_constraint(constraint)
+        match &constraint.kind {
+            InferenceConstraintKind::Deref { var, target } => {
+                self.solve_deref_constraint(*var, target)
+            }
+            InferenceConstraintKind::BindsLike { ty, inner, like } => {
+                self.solve_binds_like_constraint(*ty, inner, *like)
+            }
+            InferenceConstraintKind::IndexedBy { elem_var, base_ty, index_ty } => {
+                self.solve_indexed_by_constraint(*elem_var, base_ty, index_ty)
+            }
+            InferenceConstraintKind::Tuple { elem_var, tuple_ty, has_index } => {
+                self.solve_tuple_constraint(*elem_var, tuple_ty, *has_index)
+            }
+            InferenceConstraintKind::StructField { elem_var, struct_ty, field } => {
+                self.solve_struct_field_constraint(*elem_var, struct_ty, *field)
+            }
+            InferenceConstraintKind::Method(method) => {
+                self.solve_method_constraint(method)
+            }
+            InferenceConstraintKind::Implements { ty, id, args } => {
+                self.solve_implements_constraint(constraint.id, ty, *id, args)
+            }
+            InferenceConstraintKind::Unify { a, b } => self.solve_unify_constraint(a, b),
+            InferenceConstraintKind::Binop { res_ty, lhs_ty, rhs_ty, op } => {
+                self.solve_binop_constraint(*res_ty, lhs_ty, rhs_ty, *op)
+            }
+            InferenceConstraintKind::IntLike { res_ty } => {
+                let t = self.find(&res_ty.into());
+                match t {
+                    InferTy::Var(_) => ConstraintSolveResult::Pending,
+                    InferTy::Adt { def, .. } => {
+                        if def.is_int_like(self.db).is_some() {
+                            ConstraintSolveResult::Solved
+                        } else {
+                            ConstraintSolveResult::Error(TypeInferenceError::Custom(
+                                format!(
+                                    "`{}` is not an integer-like type",
+                                    t.to_string(self.db)
+                                ),
+                            ))
+                        }
+                    }
+                    InferTy::Param(type_param_id) => {
+                        ConstraintSolveResult::Error(TypeInferenceError::Custom(format!(
+                            "type parameter `T{}` is not known to be integer-like",
+                            type_param_id.0
+                        )))
+                    }
+                    InferTy::Error => {
+                        ConstraintSolveResult::Error(TypeInferenceError::AlreadyDiagnosed)
+                    }
+                }
+            }
+            InferenceConstraintKind::IsInner { inner, ref_ty } => {
+                fn get_ref_inner(ctx: &mut InferenceCtx, ty: InferTy) -> Option<InferTy> {
+                    match ty {
+                        InferTy::Error | InferTy::Var(_) => None,
+                        InferTy::Adt { def, args: fields } => {
+                            if matches!(def.is_ptr_like(ctx.db), Some(PtrKind::Ref(_))) {
+                                assert_eq!(fields.len(), 1);
+                                get_ref_inner(ctx, fields.into_iter().next()?)
+                            } else {
+                                Some(InferTy::Adt { def, args: fields })
+                            }
+                        }
+                        InferTy::Param(id) => Some(InferTy::Param(id)),
+                    }
+                }
+                let ref_ty = self.find(ref_ty);
+                let inner = self.find(inner);
+                if ref_ty == inner {
+                    // We're done
+                    ConstraintSolveResult::Solved
+                } else if let Some(ty) = get_ref_inner(self, ref_ty) {
+                    self.unify(&inner, &ty).into()
+                } else {
+                    ConstraintSolveResult::Pending
+                }
+            }
+            InferenceConstraintKind::FatPtr { fat_ptr_var } => {
+                self.solve_fat_ptr_constraint(*fat_ptr_var)
+            }
+            InferenceConstraintKind::MetadataOfFatPtr { fat_ptr_var, metadata_var } => {
+                self.solve_metadata_of_fat_ptr_constraint(*fat_ptr_var, *metadata_var)
+            }
+            InferenceConstraintKind::Cast { from, to } => {
+                self.solve_cast_constraint(from, to)
+            }
+        }
     }
 
     fn listeners(
@@ -656,6 +721,23 @@ impl<'a> SolverHost for InferenceCtx<'a> {
         &mut self,
         constraint: &rockr_constraint_solver::Constraint<Self>,
     ) -> rockr_constraint_solver::ConstraintSolveResult<Self::Err> {
-        self.try_default_constraint(constraint)
+        assert!(
+            constraint.kind.has_default_behaviour(),
+            "Cannot call `try_default_constraint` method on constraint that has no default behaviour"
+        );
+        match &constraint.kind {
+            InferenceConstraintKind::IntLike { res_ty } => {
+                self.unify(&res_ty.into(), &self.int_ty()).into()
+            }
+            InferenceConstraintKind::Deref { var, target } => {
+                let adt = self.ref_of(target.clone(), Mutability::Const);
+                self.unify(&var.into(), &adt).into()
+            }
+            _ => {
+                unreachable!(
+                    "`try_default_constraint` is not in sync with `has_default_behaviour`"
+                )
+            }
+        }
     }
 }
