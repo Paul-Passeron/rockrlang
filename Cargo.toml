@@ -1,15 +1,20 @@
-[package]
-name = "rockr"
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
-default-run = "rockrc"
-repository="https://codeberg.org/norezap/Rockr"
-license="GNU-3"
+authors = ["Norezap <norezap@proton.me>"]
+repository = "https://codeberg.org/norezap/Rockr"
+license = "GNU-3"
 
-[lib]
-bench = false
+[workspace.dependencies]
+rockr = { path = "crates/rockr" }
+rockr-lsp = { path = "crates/rockr-lsp" }
+rockrc = { path = "crates/rockrc" }
+rockrc-codegen = { path = "crates/rockrc-codegen" }
 
-[dependencies]
 clap = "4.5.60"
 clap_derive = "4.5.55"
 codespan-reporting = "0.13.1"
@@ -24,58 +29,54 @@ parking_lot = "0.12.5"
 pathdiff = "0.2.3"
 regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
-salsa = {version = "0.28.4", features = []}
+salsa = { version = "0.28.4", features = [] }
 salsa-macros = "0.28.4"
 unescaper = "0.1.8"
 walkdir = "2.5.0"
+lsp-server = "0.10.0"
+lsp-types = "0.97"
+serde_json = "1"
 
-[[bin]]
-name = "rockrc"
-path = "src/compiler/rockrc.rs"
-
-[workspace]
-members = ["rockr-lsp"]
-
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
-nursery  = { level = "warn", priority = -1 }
-cargo    = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
 
-undocumented_unsafe_blocks      = "warn"
-unnecessary_safety_comment      = "warn"
-dbg_macro                       = "warn"
+undocumented_unsafe_blocks = "warn"
+unnecessary_safety_comment = "warn"
+dbg_macro = "warn"
 # todo                            = "warn"
 # unwrap_used                     = "warn"
 # unwrap_in_result                = "warn"
-semicolon_if_nothing_returned   = "warn"
-str_to_string                   = "warn"
-implicit_clone                  = "warn"
-rc_buffer                       = "warn"
-mem_forget                      = "warn"
-empty_drop                      = "warn"
-exit                            = "warn"
+semicolon_if_nothing_returned = "warn"
+str_to_string = "warn"
+implicit_clone = "warn"
+rc_buffer = "warn"
+mem_forget = "warn"
+empty_drop = "warn"
+exit = "warn"
 rest_pat_in_fully_bound_structs = "warn"
-lossy_float_literal             = "warn"
-verbose_file_reads              = "warn"
-self_named_module_files         = "warn"
-implicit_hasher                 = "allow"
+lossy_float_literal = "warn"
+verbose_file_reads = "warn"
+self_named_module_files = "warn"
+implicit_hasher = "allow"
 
-module_name_repetitions  = "allow"
-missing_errors_doc       = "allow"
-missing_panics_doc       = "allow"
-similar_names            = "allow"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+similar_names = "allow"
 cast_possible_truncation = "allow"
-cast_possible_wrap       = "allow"
-cast_sign_loss           = "allow"
-must_use_candidate       = "allow"
-missing_const_for_fn     = "allow"  # nursery, extremely churny
-option_if_let_else       = "allow"
-multiple_crate_versions  = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+must_use_candidate = "allow"
+missing_const_for_fn = "allow"     # nursery, extremely churny
+option_if_let_else = "allow"
+multiple_crate_versions = "allow"
 
 cargo_common_metadata = "allow"
 
 trivial_regex = "allow"
 
-[lints.rust]
-unused_qualifications    = "warn"
-unsafe_op_in_unsafe_fn   = "warn"
+[workspace.lints.rust]
+unused_qualifications = "warn"
+unsafe_op_in_unsafe_fn = "warn"

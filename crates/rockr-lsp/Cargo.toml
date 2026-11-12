@@ -1,0 +1,19 @@
+[package]
+name = "rockr-lsp"
+description = "LSP implementation for the Rockr programming language"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rockr.workspace = true
+lsp-server.workspace = true
+lsp-types.workspace = true
+serde_json.workspace = true
+salsa.workspace = true
+itertools.workspace = true

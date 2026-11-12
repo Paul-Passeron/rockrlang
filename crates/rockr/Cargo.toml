@@ -1,0 +1,31 @@
+[package]
+name = "rockr"
+description = "Frontend for the Rockr programming language, usable by both the compiler itself and the LSP"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+clap.workspace = true
+clap_derive.workspace = true
+codespan-reporting.workspace = true
+dashmap.workspace = true
+ena.workspace = true
+generativity.workspace = true
+inkwell.workspace = true
+itertools.workspace = true
+llvm-sys.workspace = true
+nonempty.workspace = true
+parking_lot.workspace = true
+pathdiff.workspace = true
+regex.workspace = true
+rustc-literal-escaper.workspace = true
+salsa.workspace = true
+salsa-macros.workspace = true
+unescaper.workspace = true
+walkdir.workspace = true
