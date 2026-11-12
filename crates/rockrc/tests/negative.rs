@@ -18,13 +18,18 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use rockr::check::check;
 use rockr::common::diagnostic::Severity;
 use rockr::common::load::load_workspace_from_disk;
 use rockr::common::location::LocationInfo;
-use rockr::compiler::{Config, OptLevel, Workspace};
+use rockr::workspace::Workspace;
+use rockr::workspace::config::{Config, OptLevel};
+use rockr::workspace::load::program_has_errors;
+
+mod common;
+use common::workspace_root;
 
 const FAIL_DIR: &str = "examples/fail";
 
@@ -145,7 +150,7 @@ fn diagnostics_for(path: &Path, no_std: bool) -> Result<Vec<Reported>, String> {
     check(&db, ws);
 
     let want = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    let mut reported: Vec<Reported> = rockr::compiler::program_has_errors(&db)
+    let mut reported: Vec<Reported> = program_has_errors(&db)
         .1
         .into_iter()
         .filter_map(|diag| {
@@ -329,7 +334,7 @@ macro_rules! negative_test {
     ($fn_name:ident, $path:literal) => {
         #[test]
         fn $fn_name() {
-            test_negative_file(&PathBuf::from($path));
+            test_negative_file(&workspace_root().join($path));
         }
     };
 }

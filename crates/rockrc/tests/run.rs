@@ -19,10 +19,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+mod common;
+use common::{tests_dir, workspace_root};
+
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 fn runnable_examples() -> Vec<PathBuf> {
-    let mut examples: Vec<_> = std::fs::read_dir("examples")
+    let mut examples: Vec<_> = std::fs::read_dir(workspace_root().join("examples"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|e| e == "rkr"))
@@ -94,7 +97,7 @@ fn examples_run_with_expected_output() {
     let mut failures = vec![];
     for path in runnable_examples() {
         let name = path.file_stem().unwrap().to_string_lossy().into_owned();
-        let snapshot = Path::new("tests/snapshots").join(format!("{name}.stdout"));
+        let snapshot = tests_dir().join("snapshots").join(format!("{name}.stdout"));
         let actual = match run_example(&path, &workdir) {
             Ok(actual) => actual,
             Err(e) => {

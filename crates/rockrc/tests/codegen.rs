@@ -18,6 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::path::Path;
 use std::process::Command;
 
+mod common;
+use common::workspace_root;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Outcome {
     Compiles,
@@ -44,6 +47,7 @@ fn compile(path: &Path) -> (Outcome, String) {
     let name = path.file_stem().unwrap().to_string_lossy();
     let obj = std::env::temp_dir().join(format!("rockr-codegen-{name}.o"));
     let output = Command::new(env!("CARGO_BIN_EXE_rockrc"))
+        .current_dir(workspace_root())
         .arg(path)
         .args(["-c", "-o"])
         .arg(&obj)
@@ -61,7 +65,7 @@ fn compile(path: &Path) -> (Outcome, String) {
 
 #[test]
 fn every_example_has_its_expected_outcome() {
-    let mut examples: Vec<_> = std::fs::read_dir("examples")
+    let mut examples: Vec<_> = std::fs::read_dir(workspace_root().join("examples"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|e| e == "rkr"))

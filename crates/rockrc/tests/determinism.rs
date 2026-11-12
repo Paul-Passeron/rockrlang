@@ -18,12 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod common;
+use common::workspace_root;
+
 const RUNS: usize = 2;
 
 fn examples() -> Vec<PathBuf> {
     let mut examples: Vec<_> = ["examples", "examples/fail"]
         .iter()
-        .flat_map(|dir| std::fs::read_dir(dir).unwrap())
+        .flat_map(|dir| std::fs::read_dir(workspace_root().join(dir)).unwrap())
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|e| e == "rkr"))
         .collect();
@@ -36,6 +39,7 @@ fn compile(path: &Path) -> String {
     let obj = std::env::temp_dir()
         .join(format!("rockr-determinism-{}-{name}.o", std::process::id()));
     let output = Command::new(env!("CARGO_BIN_EXE_rockrc"))
+        .current_dir(workspace_root())
         .arg(path)
         .args(["--display-thir", "--display-mir", "-c", "-o"])
         .arg(&obj)

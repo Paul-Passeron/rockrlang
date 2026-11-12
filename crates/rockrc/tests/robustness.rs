@@ -22,6 +22,9 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
+mod common;
+use common::workspace_root;
+
 const TIMEOUT: Duration = Duration::from_secs(120);
 const LINE_DELETIONS_PER_FILE: usize = 8;
 
@@ -42,7 +45,7 @@ struct Mutant {
 }
 
 fn mutants() -> Vec<Mutant> {
-    let mut paths: Vec<PathBuf> = std::fs::read_dir("examples")
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(workspace_root().join("examples"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|e| e == "rkr"))
@@ -109,7 +112,7 @@ fn compile(source: &str, workdir: &std::path::Path, id: usize) -> Verdict {
         if start.elapsed() > TIMEOUT {
             let _ = child.kill();
             let _ = child.wait();
-            let keep = PathBuf::from("target/robustness-timeouts");
+            let keep = workspace_root().join("target/robustness-timeouts");
             std::fs::create_dir_all(&keep).unwrap();
             let saved = keep.join(format!("m{id}.rkr"));
             std::fs::copy(&file, &saved).unwrap();

@@ -15,13 +15,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::path::Path;
 use std::process::Command;
+
+mod common;
+use common::{tests_dir, workspace_root};
 
 fn run_snapshot_with_args(name: &str, folder: &str, args: &[&str]) {
     let example = format!("examples/{name}.rkr");
     let obj = std::env::temp_dir().join(format!("rockr-snapshot-{name}-{folder}.o"));
     let output = Command::new(env!("CARGO_BIN_EXE_rockrc"))
+        .current_dir(workspace_root())
         .args([example.as_str()])
         .args(args)
         .args(["-c", "-o"])
@@ -39,7 +42,7 @@ fn run_snapshot_with_args(name: &str, folder: &str, args: &[&str]) {
     let actual = String::from_utf8(output.stdout)
         .unwrap_or_else(|e| panic!("non-utf8 output for {example}: {e}"));
 
-    let snapshot_path = Path::new("tests/snapshots/").join(format!("{name}.{folder}"));
+    let snapshot_path = tests_dir().join("snapshots").join(format!("{name}.{folder}"));
 
     if std::env::var_os("ROCKR_UPDATE_SNAPSHOTS").is_some() {
         std::fs::create_dir_all(
