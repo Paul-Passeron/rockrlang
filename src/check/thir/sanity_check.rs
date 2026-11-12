@@ -20,8 +20,7 @@ use crate::resolved::type_ref::TyLike;
 use crate::thir::ProjectionKind;
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
-    compiler::diagnostic::Diag,
+    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::{Mutability, signature::get_sig_of_function},
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{

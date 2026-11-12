@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::location::Span,
-    compiler::diagnostic::Diag,
+    common::{diagnostic::Diag, location::Span},
     hir::signature::get_sig_of_function,
     resolved::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{

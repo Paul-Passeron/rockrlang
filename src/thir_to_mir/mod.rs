@@ -21,13 +21,13 @@ use crate::thir::ProjectionKind;
 use crate::{
     Db,
     check::fundef::concretize_fid,
-    common::{location::Span, symbols::Symbol},
-    compiler::{
-        Workspace,
+    common::{
         diagnostic::Diag,
+        location::Span,
+        symbols::Symbol,
         timing::{Counts, Phase, timed},
-        workspace_packages,
     },
+    compiler::{Workspace, workspace_packages},
     hir::{Mutability, signature::get_sig_of_function},
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,

@@ -22,8 +22,8 @@ use crate::{
         arena,
         location::Span,
         symbols::{StrLit, Symbol},
+        timing::{Counts, Phase, timed},
     },
-    compiler::timing::{Counts, Phase, timed},
     hir::lower_fundef::{lower_fundef_body, lower_method_body},
     name_resolve::{
         implems::module_impls,

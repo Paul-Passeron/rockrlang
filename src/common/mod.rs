@@ -17,10 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod arena;
 pub mod bitset;
+pub mod diagnostic;
 pub mod frozen;
 pub mod ids;
+pub mod load;
 pub mod location;
 pub mod symbols;
+pub mod timing;
 pub mod unord;
 
 #[macro_export]

@@ -20,8 +20,8 @@ use crate::{
     common::{
         location::{Location, Span},
         symbols::Symbol,
+        timing::{Counts, Phase, timed},
     },
-    compiler::timing::{Counts, Phase, timed},
     lexer::{LexError, Token, TokenKind, lex_file},
     parse_tree::{
         Spanned,

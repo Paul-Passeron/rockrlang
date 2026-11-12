@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
-    compiler::diagnostic::Diag,
+    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::interface_items,
     parse_tree::top_level::AstInterfaceItem,
     resolved::InterfaceId,

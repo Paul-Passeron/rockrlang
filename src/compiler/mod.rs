@@ -21,9 +21,10 @@ use crate::{
         check, collect_module_functions, fundef::reachable_mir_instances, reachable_frefs,
     },
     codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare},
-    common::location::LocationInfo,
-    compiler::{
+    common::{
         diagnostic::Diag,
+        load::load_workspace_from_disk,
+        location::LocationInfo,
         timing::{PhaseStat, render_timings},
     },
     mir::{concrete_ty::Substitution, passes::dead_code_elimination::dce},
@@ -49,12 +50,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub use load::*;
 pub use workspace::*;
 
-pub mod diagnostic;
-mod load;
-pub mod timing;
 mod workspace;
 
 pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {

@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::bitset::BitSet,
-    compiler::diagnostic::Diag,
+    common::{bitset::BitSet, diagnostic::Diag},
     mir::{
         MIRBlockID, MIRLocalID, Mir,
         analysis::{

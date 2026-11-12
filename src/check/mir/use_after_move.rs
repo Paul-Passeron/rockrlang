@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    compiler::diagnostic::Diag,
+    common::diagnostic::Diag,
     mir::{
         Mir,
         analysis::init_tracking::{

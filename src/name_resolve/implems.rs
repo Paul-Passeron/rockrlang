@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::unord::Set,
-    compiler::diagnostic::Diag,
+    common::{diagnostic::Diag, unord::Set},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items, modules_in_package,

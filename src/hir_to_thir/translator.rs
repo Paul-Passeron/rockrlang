@@ -21,8 +21,7 @@ use crate::thir::ProjectionKind;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    common::{arena::Idx, location::Span},
-    compiler::diagnostic::Diag,
+    common::{arena::Idx, diagnostic::Diag, location::Span},
     hir::{
         self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,

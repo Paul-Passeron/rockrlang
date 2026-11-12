@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
-    compiler::diagnostic::Diag,
+    common::diagnostic::Diag,
     resolved::{FunctionId, InternedFunctionId},
     thir::{Thir, thir_body},
 };

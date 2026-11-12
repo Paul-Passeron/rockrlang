@@ -24,8 +24,8 @@ use crate::{
         thir::thir_is_valid,
         types::check_typedef,
     },
-    common::symbols::Symbol,
-    compiler::{Workspace, diagnostic::Diag, workspace_packages},
+    common::{diagnostic::Diag, symbols::Symbol},
+    compiler::{Workspace, workspace_packages},
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},

@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::symbols::Symbol,
-    compiler::diagnostic::Diag,
+    common::{diagnostic::Diag, symbols::Symbol},
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},

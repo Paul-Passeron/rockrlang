@@ -21,7 +21,7 @@ use crate::{
         mir::check_mir,
         thir::{checked_thir_body, thir_is_valid},
     },
-    compiler::timing::{Counts, Phase, timed},
+    common::timing::{Counts, Phase, timed},
     mir::{
         concrete_ty::{ConcreteTy, Substitution},
         passes::dead_code_elimination::dce,

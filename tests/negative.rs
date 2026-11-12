@@ -21,9 +21,10 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 
 use rockr::check::check;
+use rockr::common::diagnostic::Severity;
+use rockr::common::load::load_workspace_from_disk;
 use rockr::common::location::LocationInfo;
-use rockr::compiler::diagnostic::Severity;
-use rockr::compiler::{Config, OptLevel, Workspace, load_workspace_from_disk};
+use rockr::compiler::{Config, OptLevel, Workspace};
 
 const FAIL_DIR: &str = "examples/fail";
 

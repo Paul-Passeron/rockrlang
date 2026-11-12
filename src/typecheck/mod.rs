@@ -15,22 +15,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::location::Span;
-use crate::compiler::diagnostic::Diag;
-use crate::hir::{HirMatchBranch, HirPatternDesc, HirPlace};
-use crate::parse_tree::type_expr::AstAnyTypeExpr;
-use crate::printer::render_diagnostics;
-use crate::resolved::type_ref::Subst;
 use crate::{
     Db,
-    compiler::timing::{Counts, Phase, timed},
+    common::{
+        diagnostic::Diag,
+        location::Span,
+        timing::{Counts, Phase, timed},
+    },
     hir::{
-        HirBody, HirExpr, HirId, HirPattern, HirStmt, HirStmtKind, LocalId, LocalInfo,
-        hir_body,
+        HirBody, HirExpr, HirId, HirMatchBranch, HirPattern, HirPatternDesc, HirPlace,
+        HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
     },
     name_resolve::type_expr::get_templates_of_fun,
-    parse_tree::top_level::AstTemplateArg,
-    resolved::{FunctionId, InternedFunctionId, TypeRef},
+    parse_tree::{top_level::AstTemplateArg, type_expr::AstAnyTypeExpr},
+    printer::render_diagnostics,
+    resolved::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 use itertools::Itertools;

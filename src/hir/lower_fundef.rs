@@ -19,11 +19,11 @@ use crate::{
     Db,
     common::{
         arena::Arena,
+        diagnostic::Diag,
         ids::{IdGen, IdWrapper},
         location::Span,
         symbols::Symbol,
     },
-    compiler::diagnostic::Diag,
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
