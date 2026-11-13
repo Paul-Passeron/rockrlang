@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::frozen::{Frozen, FrozenIntoIter, FrozenIter};
+use crate::collections::frozen::{Frozen, FrozenIntoIter, FrozenIter};
 use std::{
     any::{TypeId, type_name},
     fmt,
