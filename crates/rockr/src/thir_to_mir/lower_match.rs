@@ -15,11 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::common::arch::IntWidth;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    layout::{Discriminant, IntWidth, LIRTy, layout_of},
+    layout::{Discriminant, LIRTy, layout_of},
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},

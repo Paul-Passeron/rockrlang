@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
+    common::arch::{FloatWidth, IntWidth},
     layout::{
         aggregate::{finish_aggregate, struct_layout},
         fat_ptr::fat_ptr_layout_for,
@@ -42,21 +43,6 @@ pub struct Size(u64);
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Align(u8);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum IntWidth {
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FloatWidth {
-    F32,
-    F64,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScalarKind {

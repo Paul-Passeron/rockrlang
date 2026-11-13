@@ -24,9 +24,9 @@ use crate::lir::{
 };
 use rockr::{
     Db,
-    common::symbols::Symbol,
+    common::{arch::IntWidth, symbols::Symbol},
     layout::{
-        Aggregate, AggregateLayout, Discriminant, IntWidth, LIRTy, LayoutData, LayoutID,
+        Aggregate, AggregateLayout, Discriminant, LIRTy, LayoutData, LayoutID,
         ScalarKind, Union, ValueClass, VariantsLayout,
     },
     resolved::ptr_of,

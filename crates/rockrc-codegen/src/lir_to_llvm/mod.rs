@@ -31,8 +31,8 @@ use inkwell::{
 use itertools::Itertools;
 use rockr::{
     Db,
-    common::arena::Idx,
-    layout::{Discriminant, IntWidth, LIRTy, LayoutData, LayoutID, Offset, ScalarKind},
+    common::{arch::IntWidth, arena::Idx},
+    layout::{Discriminant, LIRTy, LayoutData, LayoutID, Offset, ScalarKind},
     resolved::never_id,
 };
 use std::{collections::HashMap, num::NonZero};

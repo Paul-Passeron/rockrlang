@@ -23,13 +23,14 @@ use crate::lir::{
     inst::{CastKind, Terminator},
 };
 use itertools::Itertools;
+use rockr::common::arch::IntWidth;
 use rockr::layout::target_width;
 use rockr::{
     Db,
     check::thir::sanity_check::ConstructorType,
     common::symbols::Symbol,
     layout::{
-        AggregateLayout, IntWidth, LIRTy, LayoutData, LayoutID, Offset, ScalarKind,
+        AggregateLayout, LIRTy, LayoutData, LayoutID, Offset, ScalarKind,
         fat_ptr::FAT_PTR_DATA_FIELD, layout_of,
     },
     mir::{
