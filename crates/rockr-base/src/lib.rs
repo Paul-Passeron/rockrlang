@@ -20,7 +20,6 @@ pub use crate::collections::bitset;
 pub use crate::collections::frozen;
 pub use crate::collections::unord;
 pub use crate::db::Db;
-pub use crate::lang::diagnostic;
 pub use crate::lang::mutability;
 pub use crate::lang::strlit;
 pub use crate::lang::symbol;
@@ -30,6 +29,7 @@ pub use crate::source::location::Span;
 
 pub mod collections;
 pub mod db;
+pub mod diagnostic;
 pub mod ids;
 pub mod lang;
 pub mod source;

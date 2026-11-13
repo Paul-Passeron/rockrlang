@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 pub mod arch;
-pub mod diagnostic;
 pub mod mutability;
 pub mod strlit;
 pub mod symbol;
