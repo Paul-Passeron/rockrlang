@@ -22,7 +22,6 @@ use rockr_base::workspace::config::{Config, OptLevel};
 use std::path::PathBuf;
 
 pub mod compiler;
-pub mod driver;
 
 #[derive(Debug, Parser)]
 #[allow(clippy::struct_excessive_bools)]
