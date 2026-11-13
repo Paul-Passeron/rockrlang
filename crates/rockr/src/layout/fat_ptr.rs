@@ -27,9 +27,7 @@ pub const FAT_PTR_DATA_FIELD: u32 = 0;
 pub const FAT_METADATA_FIELD: u32 = 1;
 
 pub(super) fn fat_ptr_layout_for(db: &dyn Db, ty: TypeRef) -> LayoutID {
-    if !ty.is_fat_ptr(db) {
-        panic!("Not a fat ptr")
-    }
+    assert!(ty.is_fat_ptr(db), "Not a fat ptr");
 
     let target_witdh = target_width(db);
     let target_size: Size = target_witdh.into();

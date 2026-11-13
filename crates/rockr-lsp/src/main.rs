@@ -112,7 +112,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
     Ok(())
 }
 
-impl<'a> Lsp<'a> {
+impl Lsp<'_> {
     fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error + Sync + Send>> {
         for msg in &self.connection.receiver {
             match msg {
@@ -140,7 +140,7 @@ impl<'a> Lsp<'a> {
         Range::new(self.loc(span.start()), self.loc(span.end()))
     }
 
-    fn sev(&self, severity: Severity) -> DiagnosticSeverity {
+    fn sev(severity: Severity) -> DiagnosticSeverity {
         match severity {
             Severity::Error => DiagnosticSeverity::ERROR,
             Severity::Warning => DiagnosticSeverity::WARNING,
@@ -152,7 +152,7 @@ impl<'a> Lsp<'a> {
     fn diag(&self, diag: &Diag) -> Diagnostic {
         Diagnostic::new(
             self.span(diag.primary.span),
-            Some(self.sev(diag.severity)),
+            Some(Self::sev(diag.severity)),
             None,
             diag.primary.message.clone(),
             diag.message.clone(),
@@ -167,9 +167,9 @@ impl<'a> Lsp<'a> {
         for diag in diags {
             diags_per_file.entry(diag.primary.span.file).or_default().push(diag);
         }
-        for file in self.db.files.iter() {
+        for file in &self.db.files {
             let diags = diags_per_file.remove(file.value()).unwrap_or_default();
-            let uri = self.uri_of_path(file.path(&self.db));
+            let uri = Self::uri_of_path(file.path(&self.db));
             let lsp_diags = diags.iter().map(|diag| self.diag(diag)).collect_vec();
             self.send_diagnostics(uri, lsp_diags);
         }
@@ -183,25 +183,25 @@ impl<'a> Lsp<'a> {
         self.connection.sender.send(Message::Notification(n)).unwrap();
     }
 
-    fn path_of_uri(&self, uri: Uri) -> Option<PathBuf> {
+    fn path_of_uri(uri: &Uri) -> Option<PathBuf> {
         PathBuf::from(uri.path().as_str()).canonicalize().ok()
     }
 
-    fn uri_of_path(&self, p: impl AsRef<Path>) -> Uri {
+    fn uri_of_path(p: impl AsRef<Path>) -> Uri {
         Uri::from_str(format!("file://{}", p.as_ref().display()).as_str()).unwrap()
     }
 
-    fn sf_of_uri(&self, uri: Uri) -> Option<SourceFile> {
-        let path = self.path_of_uri(uri)?;
+    fn sf_of_uri(&self, uri: &Uri) -> Option<SourceFile> {
+        let path = Self::path_of_uri(uri)?;
         let sf = *self.db.files.get(&path)?.value();
         Some(sf)
     }
 
     fn uri_of_sf(&self, sf: SourceFile) -> Uri {
-        self.uri_of_path(sf.path(&self.db))
+        Self::uri_of_path(sf.path(&self.db))
     }
 
-    fn rockr_loc(&self, uri: Uri, pos: Position) -> Option<Location> {
+    fn rockr_loc(&self, uri: &Uri, pos: Position) -> Option<Location> {
         let sf = self.sf_of_uri(uri)?;
         let offset =
             offset_at(&self.db, sf, pos.line as usize + 1, pos.character as usize + 1);
@@ -210,7 +210,7 @@ impl<'a> Lsp<'a> {
 }
 
 fn time<T, S: Display>(name: Option<S>, mut f: impl FnMut() -> T) -> T {
-    let prefix = name.map_or("operation".into(), |x| format!("`{x}`"));
+    let prefix = name.map_or_else(|| "operation".into(), |x| format!("`{x}`"));
     let start = SystemTime::now();
     log!("Starting operation {prefix}");
     let res = f();

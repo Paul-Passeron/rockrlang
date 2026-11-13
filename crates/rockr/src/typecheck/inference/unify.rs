@@ -26,8 +26,7 @@ impl InferTy {
             Self::Adt { args: fields, .. } => {
                 fields.iter().any(|field| field.occurs(var))
             }
-            Self::Param(_) => false,
-            Self::Error => false,
+            Self::Param(_) | Self::Error => false,
         }
     }
 

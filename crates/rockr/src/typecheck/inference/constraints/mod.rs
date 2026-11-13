@@ -104,7 +104,6 @@ impl<'db> InferenceCtx<'db> {
     fn infer_to_ref(&mut self, ty: &InferTy) -> TypeRef {
         let ty = self.find(ty);
         match ty {
-            InferTy::Var(_) => TypeRef::Error,
             InferTy::Adt { def, args: fields } => {
                 let args =
                     fields.into_iter().map(|f| self.infer_to_ref(&f)).collect::<Vec<_>>();
@@ -116,7 +115,7 @@ impl<'db> InferenceCtx<'db> {
                 TypeRef::Concrete(TypeId::new(self.db, def, args))
             }
             InferTy::Param(type_param_id) => TypeRef::Param(type_param_id),
-            InferTy::Error => TypeRef::Error,
+            InferTy::Var(_) | InferTy::Error => TypeRef::Error,
         }
     }
 
@@ -593,7 +592,7 @@ impl InferenceConstraintKind {
     }
 }
 
-impl<'a> SolverHost for InferenceCtx<'a> {
+impl SolverHost for InferenceCtx<'_> {
     type Kind = InferenceConstraintKind;
 
     type Listener = InferVar;

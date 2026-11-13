@@ -45,10 +45,11 @@ pub enum MangleType {
     },
     Never,
     Error,
-    Slice(Box<MangleType>),
+    Slice(Box<Self>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(clippy::empty_enums, reason = "No float support in the language yet")]
 pub enum FloatKind {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

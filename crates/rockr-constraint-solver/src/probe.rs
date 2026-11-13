@@ -29,7 +29,7 @@ pub enum ProbeOutcome {
     Ambiguous,
 }
 
-pub(crate) fn run_probe<H: SolverHost>(
+pub fn run_probe<H: SolverHost>(
     host: &mut H,
     constraints: impl IntoIterator<Item = (H::Kind, H::Metadata)>,
 ) -> ProbeOutcome {

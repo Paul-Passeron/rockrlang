@@ -67,8 +67,12 @@ impl dyn Db {
         Workspace::initialize(self, config)
     }
 
-    pub fn add_source_file(&mut self, path: PathBuf, text: String) -> Option<SourceFile> {
-        let path = path.canonicalize().ok()?;
+    pub fn add_source_file(
+        &mut self,
+        path: impl AsRef<Path>,
+        text: String,
+    ) -> Option<SourceFile> {
+        let path = path.as_ref().canonicalize().ok()?;
         if let Some(existing) = self.get_ref_files().get(&path) {
             // We do not change the contents here. If that's the intent use this
             // in cunjunction with set_source_file_text.

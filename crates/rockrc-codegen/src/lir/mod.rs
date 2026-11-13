@@ -240,6 +240,7 @@ pub struct Module<S: ModulePhase> {
 }
 
 #[derive(Debug)]
+#[allow(clippy::empty_enums, reason = "We don't verify yet")]
 pub enum VerifyError {}
 
 impl<S: ModulePhase> Module<S> {

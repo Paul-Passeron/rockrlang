@@ -65,7 +65,7 @@ impl Diag {
     }
 
     pub fn redefinition(db: &dyn Db, defs: Vec<Definition>) -> Self {
-        assert!(!defs.is_empty());
+        assert_ne!(defs, []);
         let (first, others) = {
             let mut defs = defs;
             let head = defs.remove(0);

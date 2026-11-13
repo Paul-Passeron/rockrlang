@@ -283,7 +283,7 @@ impl<T> IntoIterator for Frozen<T> {
                 }
             } else {
                 res.extend(values.into_iter().map(|item|
-                    // SAFETY: This value is assumed to be initialized since it's coming from a full bucket 
+                    // SAFETY: This value is assumed to be initialized since it's coming from a full bucket
                     unsafe { item.assume_init() }));
             }
         }
@@ -702,6 +702,6 @@ mod tests {
         f.push(2);
         // Just make sure it doesn't panic; exact format is up to you.
         let s = format!("{f:?}");
-        assert!(!s.is_empty());
+        assert_ne!(s, "");
     }
 }

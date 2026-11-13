@@ -19,6 +19,8 @@ use std::sync::Arc;
 
 use crate::{Constraint, ConstraintSolveResult, ProbeOutcome, SolverHost, probe};
 
+type ConstraintResult<S> = Result<(), (Arc<Constraint<S>>, <S as SolverHost>::Err)>;
+
 /// Driving loops, available on every [`SolverHost`].
 pub trait SolverHostExt: SolverHost {
     /// Solve ready constraints until none are left, then apply default
@@ -30,7 +32,7 @@ pub trait SolverHostExt: SolverHost {
     /// the error.
     ///
     /// Does nothing while a probe is running.
-    fn solve_constraints(&mut self) -> Result<(), (Arc<Constraint<Self>>, Self::Err)>;
+    fn solve_constraints(&mut self) -> ConstraintResult<Self>;
 
     /// Solve `constraints` in isolation. Constraints they emit are solved
     /// as part of the probe, not registered globally.

@@ -23,19 +23,19 @@ use std::fmt::Display;
 pub mod def;
 pub mod hover;
 
-impl<'a> Lsp<'a> {
+impl Lsp<'_> {
     fn dispatch_request<R: IRequest, Err: Display>(
         &mut self,
         r: Request,
         mut handler: impl FnMut(&mut Self, R::Params) -> Result<R::Result, Err>,
     ) {
-        if r.method != R::METHOD {
-            panic!(
-                "Tried to handle request method `{}` using `{}` handler",
-                r.method,
-                R::METHOD
-            )
-        }
+        assert_eq!(
+            r.method,
+            R::METHOD,
+            "Tried to handle request method `{}` using `{}` handler",
+            r.method,
+            R::METHOD
+        );
         let parsed = serde_json::from_value::<R::Params>(r.params).unwrap();
         let response = match handler(self, parsed) {
             Ok(result) => Response::new_ok(r.id, result),
@@ -46,16 +46,18 @@ impl<'a> Lsp<'a> {
 
     pub fn handle_request(&mut self, req: Request) {
         match req.method.as_str() {
-            HoverRequest::METHOD => self
-                .dispatch_request::<HoverRequest, String>(req, |this, params| {
+            HoverRequest::METHOD => {
+                self.dispatch_request::<HoverRequest, String>(req, |this, params| {
                     Ok(this.handle_hover(params))
-                }),
-            GotoDefinition::METHOD => self
-                .dispatch_request::<GotoDefinition, String>(req, |this, params| {
+                });
+            }
+            GotoDefinition::METHOD => {
+                self.dispatch_request::<GotoDefinition, String>(req, |this, params| {
                     Ok(this.handle_goto_def(params))
-                }),
+                });
+            }
             References::METHOD => {
-                self.dispatch_request::<References, String>(req, |_, _| Ok(None))
+                self.dispatch_request::<References, String>(req, |_, _| Ok(None));
             }
             _ => log!("TODO: Unhandled request ! {}", req.method),
         }

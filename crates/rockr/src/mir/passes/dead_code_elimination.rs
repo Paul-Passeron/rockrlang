@@ -327,7 +327,7 @@ impl<'a> DCECtx<'a> {
         let bbs = paths
             .iter()
             .map(|p| {
-                assert!(!p.is_empty());
+                assert_ne!(p, &[]);
                 let name = self.salvage_path_name(p);
                 if *p.first().unwrap() == self.mir.entry {
                     self.b.blocks[self.b.entry].name = name;

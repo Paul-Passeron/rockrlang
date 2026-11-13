@@ -27,11 +27,11 @@ use lsp_types::{
 use rockr::common::load::{compute_all_files_from_roots, compute_package_roots};
 use salsa::Setter;
 
-impl<'a> Lsp<'a> {
+impl Lsp<'_> {
     pub fn handle_notif(&mut self, notif: Notification) {
         match notif.method.as_str() {
             DidOpenTextDocument::METHOD => {
-                self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open)
+                self.dispatch_notification::<DidOpenTextDocument>(notif, Self::did_open);
             }
             DidChangeTextDocument::METHOD => self
                 .dispatch_notification::<DidChangeTextDocument>(notif, Self::did_change),
@@ -47,21 +47,21 @@ impl<'a> Lsp<'a> {
     fn dispatch_notification<N: INotification>(
         &mut self,
         n: Notification,
-        mut handler: impl FnMut(&mut Self, N::Params),
+        mut handler: impl FnMut(&mut Self, &N::Params),
     ) {
-        if n.method != N::METHOD {
-            panic!(
-                "Tried to handle notification method `{}` using `{}` handler",
-                n.method,
-                N::METHOD
-            )
-        }
+        assert_eq!(
+            n.method,
+            N::METHOD,
+            "Tried to handle notification method `{}` using `{}` handler",
+            n.method,
+            N::METHOD
+        );
         let parsed = serde_json::from_value::<N::Params>(n.params).unwrap();
-        handler(self, parsed);
+        handler(self, &parsed);
     }
 
-    fn did_open(&mut self, params: DidOpenTextDocumentParams) {
-        let path = self.path_of_uri(params.text_document.uri).unwrap();
+    fn did_open(&mut self, params: &DidOpenTextDocumentParams) {
+        let path = Self::path_of_uri(&params.text_document.uri).unwrap();
         if !self.db.files.contains_key(&path) {
             compute_package_roots(&mut self.db, path)
                 .unwrap_or_else(|err| panic!("{err}"));
@@ -71,17 +71,18 @@ impl<'a> Lsp<'a> {
         time(Some("recheck didOpen"), || self.recheck());
     }
 
-    fn did_change(&mut self, did_change: DidChangeTextDocumentParams) {
+    fn did_change(&mut self, did_change: &DidChangeTextDocumentParams) {
         if did_change.content_changes.is_empty() {
             return;
         }
-        let sf = self.sf_of_uri(did_change.text_document.uri).unwrap();
+        let sf = self.sf_of_uri(&did_change.text_document.uri).unwrap();
         sf.set_content(&mut self.db)
             .to(did_change.content_changes[0].text.as_str().into());
         time(Some("recheck didChange"), || self.recheck());
     }
 
-    fn did_change_configuration(&mut self, _: DidChangeConfigurationParams) {
-        log!("TODO: handle didChangeConfiguration")
+    #[allow(clippy::unused_self, reason = "Not implemented")]
+    fn did_change_configuration(&mut self, _: &DidChangeConfigurationParams) {
+        log!("TODO: handle didChangeConfiguration");
     }
 }

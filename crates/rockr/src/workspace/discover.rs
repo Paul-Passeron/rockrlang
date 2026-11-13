@@ -75,5 +75,5 @@ pub struct SalsaPath<'db> {
 pub fn read_source_file(db: &mut dyn Db, path: &Path) -> Option<SourceFile> {
     let mut s = String::new();
     File::open(path).ok()?.read_to_string(&mut s).ok()?;
-    db.add_source_file(path.to_path_buf(), s)
+    db.add_source_file(path, s)
 }

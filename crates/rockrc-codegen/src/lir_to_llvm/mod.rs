@@ -265,7 +265,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
         }
     }
 
-    fn ty_as_int_bitcast(&mut self, ty: LIRTy) -> IntType<'ctx> {
+    fn ty_as_int_bitcast(&self, ty: LIRTy) -> IntType<'ctx> {
         debug_assert!(!ty.is_zst(self.db));
         let bitwidth = ty.layout.size(self.db).bytes() * 8;
         self.c.custom_width_int_type(NonZero::new(bitwidth as u32).unwrap()).unwrap()
@@ -447,15 +447,14 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                     }
                     ValueInstKind::ExtractField { value, ty, src_idx } => {
                         let llvm_value = ctx.values[value].into_struct_value();
-                        let layout = match ty.layout.data(self.db) {
-                            LayoutData::Aggregate(aggregate_layout) => aggregate_layout,
-                            _ => unreachable!(),
+                        let LayoutData::Aggregate(layout) = ty.layout.data(self.db)
+                        else {
+                            unreachable!()
                         };
                         let idx = layout.source_to_layout[*src_idx as usize];
                         self.b
                             .build_extract_value(llvm_value, idx, "extract field")
                             .unwrap()
-                            .into()
                     }
                     ValueInstKind::InsertField { .. } => todo!(),
                     ValueInstKind::Arith { op, lhs, rhs } => {
@@ -600,10 +599,7 @@ impl<'ctx> Ctx<'_, '_, 'ctx> {
                                 .into(),
                         };
 
-                        self.b
-                            .build_bit_cast(bits, result_ty, "bits to value")
-                            .unwrap()
-                            .into()
+                        self.b.build_bit_cast(bits, result_ty, "bits to value").unwrap()
                     }
                 };
                 ctx.values.insert(*def, value);

@@ -30,13 +30,12 @@ pub enum CanonTy {
 impl InferenceCtx<'_> {
     pub fn canonize(&mut self, ty: &InferTy) -> CanonTy {
         match self.find(ty) {
-            InferTy::Var(_) => CanonTy::Hole,
             InferTy::Adt { def, args: fields } => CanonTy::Adt {
                 id: def,
                 args: fields.iter().map(|f| self.canonize(f)).collect(),
             },
             InferTy::Param(type_param_id) => CanonTy::Param(type_param_id.0),
-            InferTy::Error => CanonTy::Hole,
+            InferTy::Var(_) | InferTy::Error => CanonTy::Hole,
         }
     }
 }

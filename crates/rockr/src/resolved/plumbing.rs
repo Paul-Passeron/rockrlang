@@ -466,9 +466,8 @@ impl BuiltinTypeId {
             | BuiltinTypeKind::Int { .. } => 0,
             BuiltinTypeKind::Ref { .. }
             | BuiltinTypeKind::Ptr { .. }
-            | BuiltinTypeKind::Slice { .. } => 1,
-            // TODO: should we count length as a template ?
-            BuiltinTypeKind::Array { .. } => 1,
+            | BuiltinTypeKind::Slice { .. }
+            | BuiltinTypeKind::Array { .. } => 1,
         }
     }
 

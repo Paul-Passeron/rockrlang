@@ -27,8 +27,9 @@ use rockr::{
         TypeDefId, TypeId, TypeRef,
     },
 };
+use std::fmt::Write;
 
-impl<'a> Lsp<'a> {
+impl Lsp<'_> {
     pub fn template_names(&self, loc: Location) -> Vec<String> {
         self.templates_at_loc(loc).iter().map(|t| t.name.to_string(&self.db)).collect()
     }
@@ -37,11 +38,11 @@ impl<'a> Lsp<'a> {
         self.type_ref_to_named_string(&self.template_names(loc), ty)
     }
 
-    fn param_name(&self, names: &[String], index: usize) -> String {
+    fn param_name(names: &[String], index: usize) -> String {
         names.get(index).cloned().unwrap_or_else(|| format!("T{index}"))
     }
 
-    fn is_def_builtin(&self, def: TypeDefId) -> Option<BuiltinTypeId> {
+    fn is_def_builtin(def: TypeDefId) -> Option<BuiltinTypeId> {
         match def {
             TypeDefId::Builtin(id) => Some(id),
             _ => None,
@@ -66,7 +67,7 @@ impl<'a> Lsp<'a> {
             }
             BuiltinTypeKind::Tuple => Some(("(".into(), ")".into())),
             BuiltinTypeKind::Array { length } => {
-                Some(("[".into(), format!("; {length}]",)))
+                Some(("[".into(), format!("; {length}]")))
             }
             BuiltinTypeKind::Slice { mutability } => Some((
                 format!("&{}[", if mutability.is_mut() { "mut" } else { "" }),
@@ -82,10 +83,10 @@ impl<'a> Lsp<'a> {
             TypeRef::Associated(symbol) => {
                 format!("Self::{}", symbol.to_string(&self.db))
             }
-            TypeRef::Param(type_param_id) => self.param_name(names, type_param_id.0),
-            TypeRef::Zelf => "Self".to_string(),
-            TypeRef::Error => "<ERROR>".to_string(),
-            TypeRef::Unknown => "<???>".to_string(),
+            TypeRef::Param(type_param_id) => Self::param_name(names, type_param_id.0),
+            TypeRef::Zelf => "Self".to_owned(),
+            TypeRef::Error => "<ERROR>".to_owned(),
+            TypeRef::Unknown => "<???>".to_owned(),
         }
     }
 
@@ -97,7 +98,7 @@ impl<'a> Lsp<'a> {
         }
         let args_str =
             args.iter().map(|ty| self.type_ref_to_named_string(names, *ty)).join(", ");
-        if let Some(id) = self.is_def_builtin(def)
+        if let Some(id) = Self::is_def_builtin(def)
             && let Some((prefix, suffix)) = self.builtin_pretty_print(id)
         {
             format!("{prefix}{args_str}{suffix}")
@@ -159,7 +160,7 @@ impl<'a> Lsp<'a> {
         names: &[String],
         sig: &FunctionSignature,
     ) -> String {
-        let mut s = sig.name.display(&self.db).to_string();
+        let mut s = sig.name.display(&self.db);
         if !sig.added_templates.is_empty() || !sig.implicit_templates.is_empty() {
             let templates_str = sig
                 .implicit_templates
@@ -167,7 +168,7 @@ impl<'a> Lsp<'a> {
                 .chain(&sig.added_templates)
                 .enumerate()
                 .map(|(i, bounds)| {
-                    let name = self.param_name(names, i);
+                    let name = Self::param_name(names, i);
                     if bounds.is_empty() {
                         name
                     } else {
@@ -181,7 +182,7 @@ impl<'a> Lsp<'a> {
                     }
                 })
                 .join(", ");
-            s.push_str(&format!("<{templates_str}>"));
+            let _ = write!(s, "<{templates_str}>");
         }
         s.push('(');
         if let Some(arg) = sig.zelf {

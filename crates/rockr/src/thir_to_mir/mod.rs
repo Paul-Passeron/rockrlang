@@ -109,7 +109,7 @@ impl FuncInst {
         self.interned().subs(db)
     }
 
-    pub fn from_funcref(db: &dyn Db, fref: FunctionRef) -> Self {
+    pub fn from_funcref(db: &dyn Db, fref: &FunctionRef) -> Self {
         assert_eq!(get_templates_of_fun(db, fref.id.interned()).len(), fref.args.len());
         let empty_sub = Substitution::new(empty());
         let concrete_tys = fref.args.iter().map(|ty| {

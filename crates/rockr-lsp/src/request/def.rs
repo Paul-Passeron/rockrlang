@@ -34,15 +34,13 @@ use rockr::{
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 
-impl<'a> Lsp<'a> {
+impl Lsp<'_> {
     pub fn handle_goto_def(
-        &mut self,
+        &self,
         params: GotoDefinitionParams,
     ) -> Option<GotoDefinitionResponse> {
         let pos_params = params.text_document_position_params;
-        let uri = pos_params.text_document.uri;
-        let pos = pos_params.position;
-        let loc = self.rockr_loc(uri, pos)?;
+        let loc = self.rockr_loc(&pos_params.text_document.uri, pos_params.position)?;
         let node = ast_node_at(&self.db, loc)?;
         match node {
             AstNode::ThirNode(thir, thir_node) => match thir_node {
@@ -64,10 +62,10 @@ impl<'a> Lsp<'a> {
             },
             AstNode::SigNode(sig_node) => match sig_node {
                 SigNode::ParamType(p) => self.goto_def_ty_at(p.ty, loc),
-                SigNode::ParamName(_) => None,
+                SigNode::TemplateParam { .. }
+                | SigNode::FunctionName { .. }
+                | SigNode::ParamName(_) => None,
                 SigNode::ReturnTy(return_ty) => self.goto_def_ty_at(return_ty.ty, loc),
-                SigNode::TemplateParam { .. } => None,
-                SigNode::FunctionName { .. } => None,
                 SigNode::TemplateConstraint { constraint, .. } => {
                     Some(self.goto_def_interface(constraint.iref.def(&self.db)))
                 }
@@ -114,7 +112,11 @@ impl<'a> Lsp<'a> {
                     Some(self.goto_def_interface(interface_ref.def(&self.db)))
                 }
             },
-            TypeRef::Associated(_) => None,
+
+            TypeRef::Associated(_) => {
+                // TODO: Handle them when they have better compiler support
+                None
+            }
             _ => None,
         }
     }
@@ -182,9 +184,7 @@ impl<'a> Lsp<'a> {
         thir: &Thir,
         place: PlaceId,
     ) -> Option<GotoDefinitionResponse> {
-        let base = match thir.places[place].base {
-            rockr::thir::PlaceBase::Local(idx) => idx,
-        };
+        let rockr::thir::PlaceBase::Local(base) = thir.places[place].base;
         self.goto_def_local(thir, base)
     }
 

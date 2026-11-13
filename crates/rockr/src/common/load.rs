@@ -60,7 +60,7 @@ fn enclosing_package_root(path: PathBuf) -> PathBuf {
     let Ok(path) = path.canonicalize() else {
         return path;
     };
-    let Some(mut dir) = path.is_dir().then(|| path.as_path()).or_else(|| path.parent())
+    let Some(mut dir) = path.is_dir().then_some(path.as_path()).or_else(|| path.parent())
     else {
         return path;
     };

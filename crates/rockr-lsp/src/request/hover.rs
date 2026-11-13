@@ -37,14 +37,11 @@ use rockr::{
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
     },
 };
-use std::convert::identity;
 
-impl<'a> Lsp<'a> {
-    pub(super) fn handle_hover(&mut self, params: HoverParams) -> Option<Hover> {
+impl Lsp<'_> {
+    pub(super) fn handle_hover(&self, params: HoverParams) -> Option<Hover> {
         let pos_params = params.text_document_position_params;
-        let uri = pos_params.text_document.uri;
-        let pos = pos_params.position;
-        let loc = self.rockr_loc(uri, pos)?;
+        let loc = self.rockr_loc(&pos_params.text_document.uri, pos_params.position)?;
         match ast_node_at(&self.db, loc)? {
             AstNode::ThirNode(thir, node) => {
                 self.hover_thir(enclosing_fun(&self.db, loc)?, thir, node, loc)
@@ -62,14 +59,10 @@ impl<'a> Lsp<'a> {
     fn hover_type_span_response(&self, ty: TypeRef, span: Span) -> Hover {
         if let Some(struct_ref) = ty.as_struct_ref(&self.db)
             && let Some(blocks) = self
-                .struct_display(
-                    struct_ref.clone(),
-                    StructDisplayOption::AllFields,
-                    span.start(),
-                )
-                .map(|s| s.to_vec())
+                .struct_display(&struct_ref, StructDisplayOption::AllFields, span.start())
+                .map(StructDisplay::into_vec)
         {
-            self.hover_span_response_blocks(blocks, span)
+            self.hover_span_response_blocks(&blocks, span)
         } else {
             let ty_str =
                 format!("`{}`", self.type_ref_to_named_string_at(span.start(), ty));
@@ -83,7 +76,7 @@ impl<'a> Lsp<'a> {
         Hover { contents, range: Some(range) }
     }
 
-    fn hover_span_response_blocks(&self, mds: Vec<String>, span: Span) -> Hover {
+    fn hover_span_response_blocks(&self, mds: &[String], span: Span) -> Hover {
         let value = mds.join("\n\n---\n\n");
         let contents =
             HoverContents::Markup(MarkupContent { kind: MarkupKind::Markdown, value });
@@ -115,7 +108,7 @@ impl<'a> Lsp<'a> {
             SigNode::TemplateParam { param, constraints } => {
                 let constraints_str = constraints
                     .into_iter()
-                    .filter_map(identity)
+                    .flatten()
                     .map(|cs| format!("`{}`", cs.to_string(&self.db)))
                     .join(" + ");
 
@@ -176,14 +169,10 @@ impl<'a> Lsp<'a> {
                     ..
                 } => {
                     let blocks = self
-                        .struct_display(
-                            struct_ref.clone(),
-                            StructDisplayOption::AllFields,
-                            loc,
-                        )?
-                        .to_vec();
+                        .struct_display(struct_ref, StructDisplayOption::AllFields, loc)?
+                        .into_vec();
 
-                    Some(self.hover_span_response_blocks(blocks, stmt.span))
+                    Some(self.hover_span_response_blocks(&blocks, stmt.span))
                 }
                 _ => None,
             },
@@ -198,13 +187,13 @@ impl<'a> Lsp<'a> {
             ThirNode::StructField { struct_def, field, span } => {
                 let blocks = self
                     .struct_display(
-                        struct_def,
+                        &struct_def,
                         StructDisplayOption::Fields(&[field]),
                         loc,
                     )?
-                    .to_vec();
+                    .into_vec();
 
-                Some(self.hover_span_response_blocks(blocks, span))
+                Some(self.hover_span_response_blocks(&blocks, span))
             }
         }
     }
@@ -215,11 +204,11 @@ impl<'a> Lsp<'a> {
                 .map(|i| TypeRef::Param(TypeParamId(i)))
                 .collect();
             let display = self.struct_display(
-                StructRef { def: struct_id, args },
+                &StructRef { def: struct_id, args },
                 StructDisplayOption::AllFields,
                 span.start(),
             )?;
-            Some(self.hover_span_response_blocks(vec![display.struct_def], span))
+            Some(self.hover_span_response_blocks(&[display.struct_def], span))
         } else {
             Some(self.hover_span_response(
                 format!("`{}`", definition.to_string(&self.db)),
@@ -271,10 +260,10 @@ impl<'a> Lsp<'a> {
         }
         let templates = get_templates_of_fun(&self.db, target_func.id.interned());
         let template_string =
-            self.template_substitutions(span.start(), &templates, &target_func.args);
+            self.template_substitutions(span.start(), templates, &target_func.args);
 
         self.hover_span_response_blocks(
-            vec![format!("```rockr\n{function_name}\n```"), template_string],
+            &[format!("```rockr\n{function_name}\n```"), template_string],
             span,
         )
     }
@@ -328,13 +317,13 @@ impl<'a> Lsp<'a> {
             ExprKind::StructLit { struct_def, .. } => {
                 let blocks = self
                     .struct_display(
-                        struct_def.clone(),
+                        struct_def,
                         StructDisplayOption::AllFields,
                         expr.span.start(),
                     )?
-                    .to_vec();
+                    .into_vec();
 
-                Some(self.hover_span_response_blocks(blocks, expr.span))
+                Some(self.hover_span_response_blocks(&blocks, expr.span))
             }
 
             _ => None,
@@ -343,7 +332,7 @@ impl<'a> Lsp<'a> {
 
     fn struct_display(
         &self,
-        struct_def: StructRef,
+        struct_def: &StructRef,
         opt: StructDisplayOption<'_>,
         loc: Location,
     ) -> Option<StructDisplay> {
@@ -391,10 +380,10 @@ impl<'a> Lsp<'a> {
         };
 
         let struct_def_extract =
-            format!("```rockr\nstruct {struct_name} {{\n{fields}}}\n```",);
+            format!("```rockr\nstruct {struct_name} {{\n{fields}}}\n```");
 
         let templates = (!template_defs.is_empty())
-            .then(|| self.template_substitutions(loc, &template_defs, &struct_def.args));
+            .then(|| self.template_substitutions(loc, template_defs, &struct_def.args));
 
         Some(StructDisplay { struct_def: struct_def_extract, templates })
     }
@@ -406,7 +395,7 @@ struct StructDisplay {
 }
 
 impl StructDisplay {
-    pub fn to_vec(self) -> Vec<String> {
+    pub fn into_vec(self) -> Vec<String> {
         match self.templates {
             Some(templates) => vec![self.struct_def, templates],
             None => vec![self.struct_def],
@@ -414,6 +403,7 @@ impl StructDisplay {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum StructDisplayOption<'a> {
     AllFields,
     Fields(&'a [Symbol]),

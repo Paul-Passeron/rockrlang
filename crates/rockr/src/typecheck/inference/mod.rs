@@ -420,11 +420,7 @@ impl fmt::Display for Display<'_, &TypeInferenceError> {
                 to.to_string(self.db)
             ),
             TypeInferenceError::NonIntegerTypesInBitwiseOperation { lhs, rhs } => {
-                write!(
-                    f,
-                    "non-integer types in bitwise operation `{}` and `{}`",
-                    lhs, rhs,
-                )
+                write!(f, "non-integer types in bitwise operation `{lhs}` and `{rhs}`")
             }
         }
     }

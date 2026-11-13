@@ -214,14 +214,12 @@ impl<'db> InferenceCtx<'db> {
                 self.unify(&v.into(), &rhs_ty)?;
                 self.solve_int_binop(res_ty, int_like, int_like, op)
             }
-            (lhs_ty, rhs_ty) => {
-                return ConstraintSolveResult::Error(
-                    TypeInferenceError::NonIntegerTypesInBitwiseOperation {
-                        lhs: self.find(lhs_ty).to_string(self.db),
-                        rhs: self.find(rhs_ty).to_string(self.db),
-                    },
-                );
-            }
+            (lhs_ty, rhs_ty) => ConstraintSolveResult::Error(
+                TypeInferenceError::NonIntegerTypesInBitwiseOperation {
+                    lhs: self.find(lhs_ty).to_string(self.db),
+                    rhs: self.find(rhs_ty).to_string(self.db),
+                },
+            ),
         }
     }
 

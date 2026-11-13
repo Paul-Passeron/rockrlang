@@ -277,8 +277,8 @@ impl MTLBCtx<'_> {
                 let f = match callee {
                     MIRCallee::Direct(fref) => {
                         let caller_subs = lower.mir.func.subs(self.db);
-                        let mut fref = fref.clone();
-                        fref.args = fref
+                        let mut subst_fref = fref.clone();
+                        subst_fref.args = subst_fref
                             .args
                             .iter()
                             .map(|ty| {
@@ -289,7 +289,7 @@ impl MTLBCtx<'_> {
                                     .as_type_ref(self.db)
                             })
                             .collect();
-                        let inst = FuncInst::from_funcref(self.db, fref);
+                        let inst = FuncInst::from_funcref(self.db, &subst_fref);
                         self.mir_map.mir_to_lir[&inst]
                     }
                 };
@@ -508,7 +508,7 @@ impl MTLBCtx<'_> {
     }
 
     fn index_in_ptr<'ir>(
-        &mut self,
+        &self,
         b: &mut BlockBuilder<'ir, '_>,
         ptr: ValueId<'ir>,
         ty: ConcreteTy,
@@ -849,13 +849,13 @@ impl MTLBCtx<'_> {
                     origin: Some(array_of(self.db, *elem_ty, count as usize)),
                     layout: LayoutID::new(
                         self.db,
-                        size.align_to(align) * count as u64,
+                        size.align_to(align) * count.into(),
                         align,
                         LayoutData::Aggregate(AggregateLayout {
                             fields: (0..count)
                                 .map(|i| {
                                     (
-                                        Offset::ZERO + size.align_to(align) * (i as u64),
+                                        Offset::ZERO + size.align_to(align) * i.into(),
                                         inner_ty.layout,
                                     )
                                 })

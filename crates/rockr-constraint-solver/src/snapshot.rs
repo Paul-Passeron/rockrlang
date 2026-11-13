@@ -19,7 +19,7 @@ use crate::{ConstraintId, ConstraintSolver, SolverHost};
 use std::collections::BTreeMap;
 
 #[derive(Clone)]
-pub(crate) enum Undo<L> {
+pub enum Undo<L> {
     Listeners(L, Option<Vec<ConstraintId>>),
     ReadySet(ConstraintId),
     ReadyPush(ConstraintId),

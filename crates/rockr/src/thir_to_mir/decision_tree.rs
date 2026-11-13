@@ -312,7 +312,7 @@ impl<'a> Matrix<'a> {
     }
 
     fn choose_col(&self) -> usize {
-        assert!(!self.cols.is_empty());
+        assert_ne!(self.cols, []);
         for i in 0..self.cols.len() {
             if let Some(row) = self.rows.first()
                 && !row.pats[i].is_none_or(ThirPattern::is_wildcard_like)
