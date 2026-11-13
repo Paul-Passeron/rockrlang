@@ -27,6 +27,7 @@ pub use crate::source::location::Span;
 pub mod arch;
 pub mod collections;
 pub mod db;
+pub mod diagnostic;
 pub mod mutability;
 pub mod source;
 pub mod unused;
