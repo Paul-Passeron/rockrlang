@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub use crate::collections::arena;
 pub use crate::collections::bitset;
 pub use crate::collections::frozen;
+pub use crate::collections::unord;
 pub use crate::db::Db;
 pub use crate::source::SourceFile;
 pub use crate::source::location::Location;
@@ -28,4 +29,5 @@ pub mod collections;
 pub mod db;
 pub mod mutability;
 pub mod source;
+pub mod unused;
 pub mod workspace;
