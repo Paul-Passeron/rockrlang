@@ -20,6 +20,11 @@ pub use crate::source::SourceFile;
 pub use crate::source::location::Location;
 pub use crate::source::location::Span;
 
+pub mod arch;
+pub mod arena;
+pub mod bitset;
 pub mod db;
+pub mod frozen;
+pub mod mutability;
 pub mod source;
 pub mod workspace;
