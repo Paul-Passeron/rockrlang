@@ -17,13 +17,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
+    common::display::Display,
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
         HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern, Mutability,
     },
     parse_tree::expr::BinaryOperator,
-    resolved::{TypeDefId, display::Display},
+    resolved::TypeDefId,
 };
 use std::fmt::{self, Formatter};
 

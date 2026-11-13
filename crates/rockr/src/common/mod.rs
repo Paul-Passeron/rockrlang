@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod arena;
 pub mod bitset;
 pub mod diagnostic;
+pub mod display;
 pub mod frozen;
 pub mod ids;
 pub mod location;

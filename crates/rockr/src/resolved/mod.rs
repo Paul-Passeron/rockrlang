@@ -28,7 +28,6 @@ use crate::{
 };
 pub use plumbing::*;
 
-pub mod display;
 pub mod plumbing;
 pub mod type_ref;
 

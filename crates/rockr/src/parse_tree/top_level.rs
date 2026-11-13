@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{location::Span, symbols::Symbol},
+    common::{display::Display, location::Span, symbols::Symbol},
     parse_tree::{
         ParseError, Spanned,
         annotation::AstAnnotation,
@@ -26,7 +26,6 @@ use crate::{
         stmt::AstStmt,
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    resolved::display::Display,
 };
 use itertools::Itertools;
 use nonempty::NonEmpty;

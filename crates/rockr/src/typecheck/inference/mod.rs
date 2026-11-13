@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
+    common::{diagnostic::Diag, display::Display, location::Span, symbols::Symbol},
     hir::LocalId,
     name_resolve::{
         definition::Definition,
@@ -32,7 +32,7 @@ use crate::{
     printer::type_printer::TypePrinter,
     resolved::{
         BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, display::Display, type_ref::TyLike,
+        TypeParamId, TypeRef, type_ref::TyLike,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
