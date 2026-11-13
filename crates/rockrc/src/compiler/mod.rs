@@ -33,7 +33,6 @@ use rockr::{
     hir_to_thir::thir_body,
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::file_module_id,
-    printer::render_diagnostics,
     resolved::{FunctionId, concrete_ty::Substitution, packages::workspace_packages},
     thir::ExprKind,
     thir_to_mir::mir,
@@ -41,6 +40,7 @@ use rockr::{
 use rockr_base::{
     Db,
     diagnostic::Diag,
+    printer::render_diagnostics,
     source::location::LocationInfo,
     timing::{PhaseStat, render_timings},
     workspace::{

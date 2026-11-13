@@ -26,7 +26,6 @@ pub mod mir;
 pub mod name_resolve;
 pub mod parse_tree;
 pub mod parser;
-pub mod printer;
 pub mod resolved;
 pub mod thir;
 pub mod thir_to_mir;

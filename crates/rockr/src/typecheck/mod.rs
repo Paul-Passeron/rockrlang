@@ -22,7 +22,6 @@ use crate::{
     },
     name_resolve::type_expr::get_templates_of_fun,
     parse_tree::{top_level::AstTemplateArg, type_expr::AstAnyTypeExpr},
-    printer::render_diagnostics,
     resolved::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
@@ -30,6 +29,7 @@ use itertools::Itertools;
 use rockr_base::{
     Db, Span,
     diagnostic::Diag,
+    printer::render_diagnostics,
     timing::{Counts, Phase, timed},
 };
 use rockr_constraint_solver::SolverHostExt;

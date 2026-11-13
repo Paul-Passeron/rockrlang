@@ -25,7 +25,7 @@ use codespan_reporting::{
         termcolor::{ColorChoice, StandardStream, WriteColor},
     },
 };
-use rockr_base::{
+use crate::{
     Db, SourceFile,
     diagnostic::{Diag, DiagLabel, Severity},
 };

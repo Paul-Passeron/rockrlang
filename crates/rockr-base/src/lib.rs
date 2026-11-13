@@ -32,6 +32,7 @@ pub mod db;
 pub mod diagnostic;
 pub mod ids;
 pub mod lang;
+pub mod printer;
 pub mod source;
 pub mod timing;
 pub mod unused;
