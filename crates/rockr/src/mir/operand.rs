@@ -28,7 +28,7 @@ use crate::{
     },
     model::{
         bool_id, char_id,
-        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
+        concrete::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
         ptr_of,
     },
     thir::FunctionRef,

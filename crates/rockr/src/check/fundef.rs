@@ -28,7 +28,7 @@ use crate::{
     mir::{MIRKey, passes::dead_code_elimination::dce},
     model::{
         FunctionId,
-        concrete_ty::{Substitution, concretize_fid},
+        concrete::{Substitution, concretize_fid},
     },
     name_resolve::type_expr::get_templates_of_fun,
     phases::thir_to_mir::mir,

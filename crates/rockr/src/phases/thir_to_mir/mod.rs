@@ -28,7 +28,7 @@ use crate::{
     model::{
         BuiltinTypeKind, CastClass, EnumRef, FunctionId, InterfaceRef, ScopeOwnerId,
         StructRef, TyLike, TypeDefId, TypeId, TypeRef, char_id,
-        concrete_ty::{
+        concrete::{
             ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution, concretize_fid,
         },
         never_id, str_id, void_id,

@@ -28,7 +28,7 @@ use rockr_syntax::parse_tree::top_level::{AstImplItem, AstTemplateArg};
 use std::collections::HashMap;
 
 pub mod builtin;
-pub mod concrete_ty;
+pub mod concrete;
 pub mod packages;
 pub mod type_printer;
 

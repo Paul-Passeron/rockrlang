@@ -20,11 +20,11 @@ use rockr::{
     hir::{FunctionLikeAst, owning_module},
     layout::{Size, target_width},
     mir::{FuncInst, MIRKey},
-    name_resolve::builtin_module,
     model::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, ModuleId, TypeDefId, TypeRef,
-        concrete_ty::{ConcreteTy, InternedConcreteTy},
+        concrete::{ConcreteTy, InternedConcreteTy},
     },
+    name_resolve::builtin_module,
 };
 use rockr_base::Db;
 use std::sync::Arc;

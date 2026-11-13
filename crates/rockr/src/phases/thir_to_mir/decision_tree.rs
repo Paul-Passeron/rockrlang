@@ -22,7 +22,7 @@ use crate::{
     },
     model::{
         ConstructorType, RefWrappedTy, TyLike, bool_id,
-        concrete_ty::{ConcreteTy, Substitution},
+        concrete::{ConcreteTy, Substitution},
     },
     name_resolve::type_expr::enum_item,
     phases::thir_to_mir::ThirToMIR,

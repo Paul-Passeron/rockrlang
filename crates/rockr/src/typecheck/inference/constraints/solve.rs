@@ -20,7 +20,7 @@ use crate::{
     layout::{LIRTy, ScalarKind, layout_of},
     model::{
         BuiltinTypeId, CastClass, FunctionId, ImplSource, InterfaceId, PtrKind,
-        ScopeOwnerId, TyLike, TypeDefId, TypeId, TypeRef, concrete_ty::int_ty_with_width,
+        ScopeOwnerId, TyLike, TypeDefId, TypeId, TypeRef, concrete::int_ty_with_width,
     },
     typecheck::{
         CallKind, ExprId, InferCallInfos, ReceiverAdjustment,

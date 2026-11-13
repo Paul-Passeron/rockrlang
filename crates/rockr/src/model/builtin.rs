@@ -23,7 +23,7 @@ use super::{
     StructId, Symbol, TypeDefId, TypeId, TypeRef,
 };
 use crate::{
-    model::{IntWidthKind, concrete_ty::ConcreteTy},
+    model::{IntWidthKind, concrete::ConcreteTy},
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},

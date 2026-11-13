@@ -38,7 +38,7 @@ use rockr::{
     },
     model::{
         CastClass, ConstructorType, TyLike, TypeDefId, array_of, bool_id,
-        concrete_ty::ConcreteTy,
+        concrete::ConcreteTy,
     },
     name_resolve::type_expr::struct_item,
 };

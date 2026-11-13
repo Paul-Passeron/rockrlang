@@ -23,7 +23,7 @@ use crate::{
     },
     model::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef,
-        concrete_ty::ConcreteTy,
+        concrete::ConcreteTy,
     },
 };
 use itertools::Itertools;

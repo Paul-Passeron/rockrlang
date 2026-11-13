@@ -33,13 +33,13 @@ use crate::{
             MIRProjection, MIRRValue, MIRRValueKind,
         },
     },
-    name_resolve::{
-        core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
-    },
     model::{
         FunctionId, ScopeOwnerId, TypeRef,
-        concrete_ty::{ConcreteTy, Substitution},
+        concrete::{ConcreteTy, Substitution},
         packages::workspace_packages,
+    },
+    name_resolve::{
+        core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
     },
     thir::{self, FunctionRef},
 };
