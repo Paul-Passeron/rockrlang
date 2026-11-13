@@ -19,6 +19,7 @@ use crate::{
     Db, SourceFile,
     common::location::{Location, Span},
     hir::{impl_items, interface_items},
+    hir_to_thir::thir_body,
     lookup::{
         path::path_node_at,
         sig::{SigNode, sig_node_at},
@@ -33,7 +34,7 @@ use crate::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef,
     },
-    thir::{Thir, thir_body},
+    thir::Thir,
     workspace::{Workspace, workspace_packages},
 };
 

@@ -22,14 +22,11 @@ use crate::{
         arena::{Arena, Idx},
         location::Span,
         symbols::{StrLit, Symbol},
-        timing::{Counts, Phase, timed},
     },
-    hir::{self, function_ast, hir_body},
-    hir_to_thir::thir_body_from_hir,
+    hir::{self, function_ast},
     parse_tree::expr::BinaryOperator,
-    resolved::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},
+    resolved::{EnumId, FunctionId, InterfaceRef, StructId, TypeRef},
     thir::stmt::ThirStmt,
-    typecheck::type_check_function,
 };
 
 pub mod display;
@@ -226,33 +223,6 @@ impl PartialEq for Thir {
     fn eq(&self, _: &Self) -> bool {
         false
     }
-}
-
-pub fn thir_body(db: &dyn Db, function: FunctionId) -> Option<&Thir> {
-    _thir_body(db, function.interned()).as_ref()
-}
-
-#[salsa::tracked]
-pub fn _thir_body<'db>(
-    db: &'db dyn Db,
-    function: InternedFunctionId<'db>,
-) -> Option<Thir> {
-    timed(
-        db,
-        Phase::Thir,
-        || {
-            let f_id: FunctionId = function.into();
-            let hir = hir_body(db, function.into())?;
-            let tc = type_check_function(db, f_id)?;
-            let thir = thir_body_from_hir(db, hir, tc);
-            Some(thir)
-        },
-        |res| Counts {
-            functions: usize::from(res.is_some()),
-            stmts: res.as_ref().map(|t| t.root.len()),
-            exprs: res.as_ref().map(|t| t.exprs.len()),
-        },
-    )
 }
 
 fn get_thir_body_span(db: &dyn Db, thir: &Thir) -> Span {

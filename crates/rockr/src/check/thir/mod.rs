@@ -19,8 +19,9 @@ use crate::{
     Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
     common::diagnostic::Diag,
+    hir_to_thir::thir_body,
     resolved::{FunctionId, InternedFunctionId},
-    thir::{Thir, thir_body},
+    thir::Thir,
 };
 
 pub mod return_check;

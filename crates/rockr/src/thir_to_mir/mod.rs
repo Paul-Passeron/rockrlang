@@ -26,6 +26,7 @@ use crate::{
         timing::{Counts, Phase, timed},
     },
     hir::signature::get_sig_of_function,
+    hir_to_thir::thir_body,
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
@@ -54,7 +55,6 @@ use crate::{
         ProjectionKind, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch, ThirStructField,
         stmt::{StmtKind, ThirStmt},
-        thir_body,
     },
     thir_to_mir::lower_match::MatchLowerer,
     typecheck::conformance::type_implements,

@@ -15,8 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, hir::HirBody, thir::Thir, typecheck::TypeCheckResults};
-
+use crate::{
+    Db,
+    common::timing::{Counts, Phase, timed},
+    hir::{HirBody, hir_body},
+    resolved::{FunctionId, InternedFunctionId},
+    thir::Thir,
+    typecheck::{TypeCheckResults, type_check_function},
+};
 pub use builder::ThirBuilder;
 use translator::ThirTranslator;
 
@@ -30,4 +36,31 @@ pub fn thir_body_from_hir<'db>(
     tc: TypeCheckResults<'db>,
 ) -> Thir {
     ThirTranslator::new(db, hir, tc).translate()
+}
+
+pub fn thir_body(db: &dyn Db, function: FunctionId) -> Option<&Thir> {
+    thir_body_impl(db, function.interned()).as_ref()
+}
+
+#[salsa::tracked]
+fn thir_body_impl<'db>(
+    db: &'db dyn Db,
+    function: InternedFunctionId<'db>,
+) -> Option<Thir> {
+    timed(
+        db,
+        Phase::Thir,
+        || {
+            let f_id: FunctionId = function.into();
+            let hir = hir_body(db, function.into())?;
+            let tc = type_check_function(db, f_id)?;
+            let thir = thir_body_from_hir(db, hir, tc);
+            Some(thir)
+        },
+        |res| Counts {
+            functions: usize::from(res.is_some()),
+            stmts: res.as_ref().map(|t| t.root.len()),
+            exprs: res.as_ref().map(|t| t.exprs.len()),
+        },
+    )
 }
