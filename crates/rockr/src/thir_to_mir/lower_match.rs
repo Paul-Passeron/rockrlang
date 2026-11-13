@@ -24,10 +24,12 @@ use crate::{
     mir::{
         MIRBlockID,
         basic_block::{MIRTerminator, Stmt},
-        concrete_ty::ConcreteTy,
         operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
-    resolved::{TypeDefId, TypeId, TypeRef, char_id, int_id, ref_of, usize_id},
+    resolved::{
+        TypeDefId, TypeId, TypeRef, char_id, concrete_ty::ConcreteTy, int_id, ref_of,
+        usize_id,
+    },
     thir::{EnumRef, StructRef, ThirMatchBranch},
     thir_to_mir::{
         ThirToMIR,

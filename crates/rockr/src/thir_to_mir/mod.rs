@@ -30,7 +30,6 @@ use crate::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
-        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
@@ -44,7 +43,9 @@ use crate::{
     },
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
-        TypeRef, char_id, never_id, str_id,
+        TypeRef, char_id,
+        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
+        never_id, str_id,
         type_ref::{CastClass, TyLike},
         void_id,
     },

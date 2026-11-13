@@ -24,12 +24,11 @@ use super::{
 };
 use crate::{
     common::mutability::Mutability,
-    mir::concrete_ty::ConcreteTy,
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
     },
-    resolved::IntWidthKind,
+    resolved::{IntWidthKind, concrete_ty::ConcreteTy},
 };
 use nonempty::nonempty;
 use std::marker::PhantomData;

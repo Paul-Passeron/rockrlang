@@ -35,10 +35,10 @@ use rockr::{
         location::LocationInfo,
         timing::{PhaseStat, render_timings},
     },
-    mir::{concrete_ty::Substitution, passes::dead_code_elimination::dce},
+    mir::passes::dead_code_elimination::dce,
     name_resolve::file_module_id,
     printer::render_diagnostics,
-    resolved::FunctionId,
+    resolved::{FunctionId, concrete_ty::Substitution},
     thir::{ExprKind, thir_body},
     thir_to_mir::{MIRKey, mir},
     workspace::{

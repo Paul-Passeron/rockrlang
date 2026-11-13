@@ -23,8 +23,10 @@ use crate::{
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
     },
-    mir::concrete_ty::ConcreteTy,
-    resolved::{BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef},
+    resolved::{
+        BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef,
+        concrete_ty::ConcreteTy,
+    },
     unused,
 };
 use itertools::Itertools;

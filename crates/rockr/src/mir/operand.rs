@@ -27,10 +27,13 @@ use crate::{
     mir::{
         Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
         RValueKind,
-        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
     },
     parse_tree::expr::BinaryOperator,
-    resolved::{bool_id, char_id, ptr_of},
+    resolved::{
+        bool_id, char_id,
+        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
+        ptr_of,
+    },
     thir::FunctionRef,
 };
 use std::{

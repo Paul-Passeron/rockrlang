@@ -20,10 +20,10 @@ use rockr::{
     Db,
     hir::{FunctionLikeAst, owning_module},
     layout::{Size, target_width},
-    mir::concrete_ty::{ConcreteTy, InternedConcreteTy},
     name_resolve::builtin_module,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, ModuleId, TypeDefId, TypeRef,
+        concrete_ty::{ConcreteTy, InternedConcreteTy},
     },
     thir_to_mir::{FuncInst, MIRKey},
 };

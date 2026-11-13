@@ -36,7 +36,6 @@ use rockr::{
     mir::{
         MIRBlockID, MIRLocalID, Mir,
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
-        concrete_ty::ConcreteTy,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
@@ -46,6 +45,7 @@ use rockr::{
     parse_tree::expr::BinaryOperator,
     resolved::{
         TypeDefId, array_of, bool_id,
+        concrete_ty::ConcreteTy,
         type_ref::{CastClass, TyLike},
     },
     thir_to_mir::FuncInst,

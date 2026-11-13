@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-// Rockr Intermediate Language
-
 use crate::{
     Db, SourceFile,
     common::{
@@ -29,6 +27,7 @@ use crate::{
 };
 pub use plumbing::*;
 
+pub mod concrete_ty;
 pub mod plumbing;
 pub mod type_ref;
 

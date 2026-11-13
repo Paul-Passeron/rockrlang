@@ -15,20 +15,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::mir::operand::MIRProjectionKind;
-use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     check::thir::sanity_check::{ConstructorType, RefWrappedTy},
     common::symbols::Symbol,
     mir::{
         MIRLocalID,
-        concrete_ty::{ConcreteTy, Substitution},
-        operand::{MIRPlace, MIRProjection},
+        operand::{MIRPlace, MIRProjection, MIRProjectionKind},
     },
     name_resolve::type_expr::enum_item,
     parse_tree::top_level::AstEnumVariantKind,
-    resolved::bool_id,
+    resolved::{
+        bool_id,
+        concrete_ty::{ConcreteTy, Substitution},
+        type_ref::TyLike,
+    },
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
     thir_to_mir::ThirToMIR,
 };

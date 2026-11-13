@@ -26,7 +26,8 @@ use itertools::Itertools;
 use rockr::{
     Db,
     layout::{LIRTy, layout_of},
-    mir::{Mir, concrete_ty::ConcreteTy},
+    mir::Mir,
+    resolved::concrete_ty::ConcreteTy,
     thir_to_mir::FuncInst,
 };
 

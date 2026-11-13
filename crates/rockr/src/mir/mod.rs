@@ -26,12 +26,12 @@ use crate::{
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         cache::MIRCache,
-        concrete_ty::ConcreteTy,
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
             MIRProjection, MIRRValue, MIRRValueKind,
         },
     },
+    resolved::concrete_ty::ConcreteTy,
     thir,
     thir_to_mir::FuncInst,
 };
@@ -44,7 +44,6 @@ pub mod analysis;
 pub mod basic_block;
 pub mod builder;
 pub mod cache;
-pub mod concrete_ty;
 pub mod display;
 pub mod operand;
 pub mod passes;
