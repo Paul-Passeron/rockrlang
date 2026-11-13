@@ -23,13 +23,10 @@ use crate::lir::{
     inst::{CastKind, Terminator},
 };
 use itertools::Itertools;
-use rockr::common::arch::IntWidth;
 use rockr::layout::target_width;
 use rockr::mir::FuncInst;
 use rockr::resolved::type_ref::ConstructorType;
 use rockr::{
-    Db,
-    common::symbols::Symbol,
     layout::{
         AggregateLayout, LIRTy, LayoutData, LayoutID, Offset, ScalarKind,
         fat_ptr::FAT_PTR_DATA_FIELD, layout_of,
@@ -50,6 +47,9 @@ use rockr::{
         type_ref::{CastClass, TyLike},
     },
 };
+use rockr_base::Db;
+use rockr_base::lang::arch::IntWidth;
+use rockr_base::symbol::Symbol;
 use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 pub struct MIRMap<'a> {
@@ -185,7 +185,7 @@ impl MTLBCtx<'_> {
             LIRLower { mir, block_map: HashMap::new(), value_map: HashMap::new() };
         mir.blocks
             .iter()
-            .for_each(|(blk, data)| self.add_block(b, blk, data, &mut lower));
+            .for_each(|(blk, data)| self.add_block(b, MIRBlockID(blk), data, &mut lower));
         let params = b.body.blocks[b.body.entry.idx]
             .params
             .iter()
@@ -194,11 +194,11 @@ impl MTLBCtx<'_> {
         for (local, decl) in mir.locals.iter() {
             let layout = layout_of(self.db, decl.ty.as_type_ref(self.db));
             if layout.is_zst(self.db) {
-                lower.value_map.insert(local, LocalSlot::Zst);
+                lower.value_map.insert(MIRLocalID(local), LocalSlot::Zst);
             } else {
                 let ty = LIRTy { layout, origin: Some(decl.ty) };
                 let ptr = b.stack_slot(ty);
-                lower.value_map.insert(local, LocalSlot::Ptr { ptr, ty });
+                lower.value_map.insert(MIRLocalID(local), LocalSlot::Ptr { ptr, ty });
             }
         }
         b.build_block(b.body.entry, |mut bb| {
@@ -206,7 +206,7 @@ impl MTLBCtx<'_> {
                 .parameters
                 .iter()
                 .filter(|param| {
-                    let tref = lower.mir.locals[**param].ty;
+                    let tref = lower.mir.locals[param.0].ty;
                     let layout = layout_of(self.db, tref.as_type_ref(self.db));
                     !layout.is_zst(self.db)
                 })
@@ -222,7 +222,7 @@ impl MTLBCtx<'_> {
                 BlockBuilder::target(lower.block_map[&mir.entry], vec![]);
             bb.goto(mir_entry_target)
         });
-        mir.blocks.keys().for_each(|blk| {
+        mir.blocks.keys().map(MIRBlockID).for_each(|blk| {
             b.build_block(lower.block_map[&blk], |bb| self.lower_block(bb, blk, &lower));
         });
     }
@@ -234,7 +234,7 @@ impl MTLBCtx<'_> {
         lower: &LIRLower<'ir, '_>,
     ) -> Terminated<()> {
         let mir = lower.mir;
-        let data = &mir.blocks[blk];
+        let data = &mir.blocks[blk.0];
         data.stmts.iter().for_each(|stmt| self.lower_stmt(&mut b, stmt, lower));
         self.lower_terminator(b, &data.terminator, lower)
     }
@@ -555,7 +555,7 @@ impl MTLBCtx<'_> {
         }
         Self::get_proj_kinds(place)
             .iter()
-            .fold((slot.ptr(), lower.mir.locals[place.local].ty), |(ptr, ty), proj| {
+            .fold((slot.ptr(), lower.mir.locals[place.local.0].ty), |(ptr, ty), proj| {
                 self.apply_proj(b, ptr, ty, proj, lower)
             })
             .0

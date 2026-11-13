@@ -15,13 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::Db;
+
 use super::{FmtWriter, fmt_block, fmt_local_id};
-use crate::{
-    Db,
-    mir::{
-        MIRLocal, Mir,
-        display::{MIRWrite, mwrite},
-    },
+use crate::mir::{
+    MIRLocal, MIRLocalID, Mir,
+    display::{MIRWrite, mwrite},
 };
 use std::fmt;
 
@@ -47,7 +46,7 @@ impl fmt::Display for MIRDisplay<'_, Mir> {
         mwrite!(w, "  locals:\n")?;
         for (id, local) in mir.locals.iter() {
             mwrite!(w, "    ")?;
-            fmt_local_id(&mut w, id)?;
+            fmt_local_id(&mut w, MIRLocalID(id))?;
             mwrite!(w, ": ")?;
             fmt_local(&mut w, db, local)?;
             mwrite!(w, "\n")?;
@@ -61,7 +60,7 @@ impl fmt::Display for MIRDisplay<'_, Mir> {
         }
         mwrite!(w, "  ]\n")?;
 
-        mwrite!(w, "\n  entry: bb{}\n", mir.entry.into_raw())?;
+        mwrite!(w, "\n  entry: bb{}\n", mir.entry.0.into_raw())?;
 
         for (id, block) in mir.blocks.iter() {
             let idx = id.into_raw();

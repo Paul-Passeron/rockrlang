@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, Location, SourceFile, Span, workspace::Workspace};
+
 use crate::{
-    Db, SourceFile,
-    common::location::{Location, Span},
     hir::{impl_items, interface_items},
     hir_to_thir::thir_body,
     lookup::{
@@ -35,7 +35,7 @@ use crate::{
         ScopeOwnerId, TypeParamId, TypeRef,
     },
     thir::Thir,
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 
 pub mod path;

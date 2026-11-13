@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
+
 use crate::{
-    Db,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
-    hir::interface_items,
-    parse_tree::top_level::AstInterfaceItem,
-    resolved::InterfaceId,
+    hir::interface_items, parse_tree::top_level::AstInterfaceItem, resolved::InterfaceId,
 };
 use std::collections::{HashMap, hash_map::Entry};
 

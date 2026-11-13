@@ -16,8 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{diagnostic::Diag, display::Display, location::Span, symbols::Symbol},
+    display::Display,
     hir::LocalId,
     name_resolve::{
         definition::Definition,
@@ -44,6 +43,7 @@ use crate::{
 };
 use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
+use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use rockr_constraint_solver::ConstraintSolver;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},

@@ -15,7 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, mir::Mir};
+use crate::mir::Mir;
+use rockr_base::Db;
 
 pub mod dead_code_elimination;
 

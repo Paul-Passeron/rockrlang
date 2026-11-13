@@ -16,11 +16,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
     resolved::type_printer::{TypePrinter, TypePrinterOption},
     typecheck::inference::{InferTy, InferenceCtx},
 };
 use itertools::Itertools;
+use rockr_base::Db;
 
 impl TypePrinter {
     pub fn infer_ty_to_string(

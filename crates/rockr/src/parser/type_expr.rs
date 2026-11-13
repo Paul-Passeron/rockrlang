@@ -15,8 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::Location;
+
 use crate::{
-    common::location::Location,
     lexer::TokenKind,
     parse_tree::{
         Spanned,
@@ -51,8 +52,11 @@ impl Parser<'_> {
                 };
 
                 if two {
-                    let inner =
-                        self.parse_pointer_like(start.advance(1), false, mutable)?;
+                    let inner = self.parse_pointer_like(
+                        start.advance(self.db, 1),
+                        false,
+                        mutable,
+                    )?;
                     let end = self.get_end();
                     Ok(Spanned::new(
                         AstTypeExprDesc::Ref {

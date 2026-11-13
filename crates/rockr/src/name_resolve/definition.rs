@@ -16,11 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{
-        location::Span,
-        symbols::{InternedSymbol, Symbol},
-    },
     hir::FunctionLikeAst,
     name_resolve::{
         builtin_module, core_module, core_package, file_module_id,
@@ -29,13 +24,17 @@ use crate::{
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
     resolved::{
-        EnumId, FunctionId, type_printer::TypePrinter, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
+        EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
         StructId, TypeDefId, bool_id, char_id, i8_id, i16_id, i32_id, i64_id, i128_id,
-        int_id, isize_id, never_id, u8_id, u16_id, u32_id, u64_id, u128_id, usize_id,
-        void_id,
+        int_id, isize_id, never_id, type_printer::TypePrinter, u8_id, u16_id, u32_id,
+        u64_id, u128_id, usize_id, void_id,
     },
 };
 use nonempty::NonEmpty;
+use rockr_base::{
+    Db, Span,
+    symbol::{InternedSymbol, Symbol},
+};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

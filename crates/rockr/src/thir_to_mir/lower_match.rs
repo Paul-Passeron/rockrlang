@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::resolved::concrete_ty::int_ty_with_width;
 use crate::resolved::type_ref::{RefWrappedTy, TyLike, WrapKind};
 use crate::{
-    Db,
     layout::{Discriminant, LIRTy, layout_of},
     mir::{
         MIRBlockID,
@@ -33,6 +32,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::Db;
 use std::collections::BTreeMap;
 
 pub(super) struct MatchLowerer<'a, 'b> {
@@ -77,7 +77,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         match dt {
             DecisionTree::Leaf { branch_idx, bindings } => {
                 for (local, place) in bindings {
-                    let ty = self.ctx.builder.locals[*local].ty;
+                    let ty = self.ctx.builder.locals[local.0].ty;
                     let rvalue = self.ctx.wrap_ref_to_fit(ty, place);
                     self.ctx.builder.emit(Stmt::Assign {
                         dest: self.ctx.place_of_local(*local, place.span),
@@ -90,7 +90,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                 let scrut_place = self.ctx.peel_refs(place);
                 let ty = scrut_place.ty;
                 if ty.as_enum(self.db).is_some() {
-                    let span = self.ctx.builder.locals[place.local].span;
+                    let span = self.ctx.builder.locals[place.local.0].span;
 
                     let layout = layout_of(self.db, ty.as_type_ref(self.db));
                     let lir_ty = LIRTy { layout, origin: Some(ty) };
@@ -229,7 +229,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
 
 impl ThirToMIR<'_> {
     pub fn wrap_ref_to_fit(&mut self, target: ConcreteTy, place: &MIRPlace) -> MIRRValue {
-        let span = self.builder.locals[place.local].span;
+        let span = self.builder.locals[place.local.0].span;
         if place.ty == target || target.as_ref(self.db).is_none() {
             return MIRRValue {
                 kind: MIRRValueKind::Use(self.move_or_copy(place.clone())),

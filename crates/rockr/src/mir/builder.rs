@@ -15,15 +15,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::arena::Arena,
-    mir::{
-        BasicBlock, BlockID, FuncInst, Local, LocalID, Mir, Terminator,
-        basic_block::Stmt, cache::MIRCache,
-    },
+use rockr_base::{Db, arena::Arena};
+
+use crate::mir::{
+    BasicBlock, BlockID, FuncInst, Local, LocalID, MIRLocalID, Mir, Terminator,
+    basic_block::Stmt, cache::MIRCache,
 };
 use std::collections::HashSet;
+
+use super::MIRBlockID;
 
 pub struct MIRBuilder<'a> {
     pub db: &'a dyn Db,
@@ -39,11 +39,11 @@ pub struct MIRBuilder<'a> {
 
 impl<'a> MIRBuilder<'a> {
     fn current_mut(&mut self) -> &mut BasicBlock {
-        self.blocks.get_mut(self.current_block)
+        self.blocks.get_mut(self.current_block.0)
     }
 
     fn current(&self) -> &BasicBlock {
-        self.blocks.get(self.current_block)
+        self.blocks.get(self.current_block.0)
     }
 
     pub fn new(db: &'a dyn Db, entry_name: Option<String>) -> Self {
@@ -54,9 +54,9 @@ impl<'a> MIRBuilder<'a> {
             db,
             blocks: arena,
             locals: Arena::new(),
-            entry: entry_id,
+            entry: MIRBlockID(entry_id),
             parameters: None,
-            current_block: entry_id,
+            current_block: MIRBlockID(entry_id),
             finalized_blocks: HashSet::new(),
         }
     }
@@ -91,11 +91,11 @@ impl<'a> MIRBuilder<'a> {
     }
 
     pub fn new_block(&self, name: Option<String>) -> BlockID {
-        self.blocks.insert(BasicBlock::empty(name))
+        MIRBlockID(self.blocks.insert(BasicBlock::empty(name)))
     }
 
     pub fn new_local(&self, local: Local) -> LocalID {
-        self.locals.insert(local)
+        MIRLocalID(self.locals.insert(local))
     }
 
     pub fn current_block(&self) -> BlockID {
@@ -118,7 +118,7 @@ impl<'a> MIRBuilder<'a> {
         if self.finalized_blocks.len() != self.blocks.len() {
             eprintln!("Not all blocks were finalized: ");
             for (id, bl) in self.blocks.iter() {
-                if self.finalized_blocks.contains(&id) {
+                if self.finalized_blocks.contains(&MIRBlockID(id)) {
                     continue;
                 }
                 eprintln!("{:?}", bl.name);

@@ -15,10 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
+
 use crate::{
-    Db,
     check::fundef::check_fundef,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::{impl_items, signature::ZelfArg},
     parse_tree::top_level::AstImplItem,
     resolved::{FunctionId, ImplSource, ScopeOwnerId},

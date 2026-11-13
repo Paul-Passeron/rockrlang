@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::mutability::Mutability,
     name_resolve::{builtin_module, core_package, main_package, std_package},
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
@@ -25,6 +23,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, mutability::Mutability};
 use std::collections::HashSet;
 
 fn is_elided_package(db: &dyn Db, pkg: Package) -> bool {

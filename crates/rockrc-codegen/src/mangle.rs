@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use itertools::Itertools;
 use rockr::{
-    Db,
     hir::{FunctionLikeAst, owning_module},
     layout::{Size, target_width},
     mir::{FuncInst, MIRKey},
@@ -27,6 +26,7 @@ use rockr::{
         concrete_ty::{ConcreteTy, InternedConcreteTy},
     },
 };
+use rockr_base::Db;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

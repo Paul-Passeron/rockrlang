@@ -16,15 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{
-        arena::Arena,
-        diagnostic::Diag,
-        ids::{IdGen, IdWrapper},
-        location::Span,
-        mutability::Mutability,
-        symbols::Symbol,
-    },
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
@@ -59,6 +50,14 @@ use crate::{
     typecheck::inference::expr::diagnose_bad_struct_fields,
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db, Span,
+    arena::Arena,
+    diagnostic::Diag,
+    ids::{IdGen, IdWrapper},
+    mutability::Mutability,
+    symbol::Symbol,
+};
 use std::{
     collections::{BTreeMap, HashSet},
     iter,

@@ -15,13 +15,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
+use rockr_base::{
     Db,
+    timing::{Counts, Phase, timed},
+};
+
+use crate::{
     check::{
         mir::check_mir,
         thir::{checked_thir_body, thir_is_valid},
     },
-    common::timing::{Counts, Phase, timed},
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::type_expr::get_templates_of_fun,
     resolved::{

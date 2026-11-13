@@ -14,12 +14,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-pub use common::location::SourceFile;
-pub use db::*;
 
 pub mod check;
-pub mod common;
-pub mod db;
+pub mod display;
 pub mod hir;
 pub mod hir_to_thir;
 pub mod layout;

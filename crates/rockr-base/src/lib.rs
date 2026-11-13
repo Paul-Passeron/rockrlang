@@ -30,7 +30,6 @@ pub use crate::source::location::Span;
 
 pub mod collections;
 pub mod db;
-pub mod display;
 pub mod ids;
 pub mod lang;
 pub mod source;

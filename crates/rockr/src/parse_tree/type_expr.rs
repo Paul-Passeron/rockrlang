@@ -15,10 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    common::symbols::Symbol,
-    parse_tree::{ParseError, Spanned},
-};
+use rockr_base::symbol::Symbol;
+
+use crate::parse_tree::{ParseError, Spanned};
 
 pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 

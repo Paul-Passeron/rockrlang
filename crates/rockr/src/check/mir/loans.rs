@@ -15,42 +15,40 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::{bitset::BitSet, diagnostic::Diag},
-    mir::{
-        MIRBlockID, MIRLocalID, Mir,
-        analysis::{
-            init_tracking::IterOperand,
-            loans::{LoanID, MIRLoanOut, MIRStmtIndex},
-        },
-        basic_block::{MIRTerminator, Stmt},
-        operand::{MIROperand, MIRPlace, MIRProjectionKind, MIRRValue, MIRRValueKind},
+use rockr_base::{Db, bitset::BitSet, diagnostic::Diag};
+
+use crate::mir::{
+    MIRBlockID, MIRLocalID, Mir,
+    analysis::{
+        init_tracking::IterOperand,
+        loans::{LoanID, MIRLoanOut, MIRStmtIndex},
     },
+    basic_block::{MIRTerminator, Stmt},
+    operand::{MIROperand, MIRPlace, MIRProjectionKind, MIRRValue, MIRRValueKind},
 };
 use std::collections::HashSet;
 
 pub(super) fn check_loans(db: &dyn Db, mir: &Mir) {
     let loans = mir.loans(db);
     for idx in mir.blocks.keys() {
-        check_block(db, mir, idx, loans);
+        check_block(db, mir, MIRBlockID(idx), loans);
     }
 }
 
 fn check_block(db: &dyn Db, mir: &Mir, blk: MIRBlockID, loans: &MIRLoanOut) {
     let mut state = loans.loans_live_in[&blk].clone();
-    let block = &mir.blocks[blk];
+    let block = &mir.blocks[blk.0];
     let live_in_per_stmt = live_in_per_stmt(db, mir, blk);
     block.stmts.iter().enumerate().for_each(|(i, stmt)| {
         check_stmt(db, blk, stmt, i, loans, &live_in_per_stmt[i], &mut state);
     });
     let term_live = &live_in_per_stmt[block.stmts.len()];
-    state.retain(|loan_id| term_live.contains(&loans.loans[*loan_id].holder));
+    state.retain(|loan_id| term_live.contains(&loans.loans[loan_id.0].holder));
     check_terminator(db, &block.terminator, loans, &state);
 }
 
 fn live_in_per_stmt(db: &dyn Db, mir: &Mir, blk: MIRBlockID) -> Vec<BitSet<MIRLocalID>> {
-    let block = &mir.blocks[blk];
+    let block = &mir.blocks[blk.0];
     let mut seed = mir.liveness(db).live_out[&blk].clone();
     for def in block.terminator.defs() {
         seed.remove(&def);
@@ -80,7 +78,7 @@ fn check_stmt(
     let Stmt::Assign { dest, rvalue } = stmt;
 
     state.retain(|loan_id| {
-        let holder = loans.loans[*loan_id].holder;
+        let holder = loans.loans[loan_id.0].holder;
         holder != dest.local && live_in_this_stmt.contains(&holder)
     });
 
@@ -129,7 +127,7 @@ fn check_access(
 ) {
     place.for_each_operand(|op| check_operand(db, op, state, loans));
     for loan_id in state {
-        let loan = &loans.loans[*loan_id];
+        let loan = &loans.loans[loan_id.0];
         if !places_conflict(&loan.place, place) {
             continue;
         }
@@ -177,7 +175,7 @@ fn check_rvalue_conflicts(
             p.for_each_operand(|op| check_operand(db, op, state, loans));
 
             for loan_id in state {
-                let existing = &loans.loans[*loan_id];
+                let existing = &loans.loans[loan_id.0];
                 if places_conflict(p, &existing.place) {
                     let incompatible =
                         mutability.is_mut() || existing.mutability.is_mut();

@@ -15,18 +15,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::bitset::{BitSet, BitSetIdx},
-    mir::{
-        MIRBlockID, MIRLocalID, Mir,
-        analysis::{
-            MIRAnalysis,
-            lattice::{Direction, FixedPointBlockRes, Lattice, LatticeChange},
-        },
+use crate::mir::{
+    MIRBlockID, MIRLocalID, Mir,
+    analysis::{
+        MIRAnalysis,
+        lattice::{Direction, FixedPointBlockRes, Lattice, LatticeChange},
     },
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db,
+    arena::Idx,
+    bitset::{BitSet, BitSetIdx},
+};
 use std::{collections::HashMap, fmt};
 
 pub struct MIRLivenessAnalysis;
@@ -39,11 +40,11 @@ pub struct MIRLivenessResult {
 
 impl BitSetIdx for MIRLocalID {
     fn as_idx(&self) -> usize {
-        self.into_raw()
+        self.0.into_raw()
     }
 
     fn from_idx(idx: usize) -> Self {
-        Self::from_raw(idx)
+        Self(Idx::from_raw(idx))
     }
 }
 
@@ -84,7 +85,7 @@ impl MIRAnalysis<'_, '_> for MIRLivenessAnalysis {
             .keys()
             .map(|blk| {
                 let infos = &mir.blocks[blk];
-                (blk, (infos.bitset_uses(mir), infos.bitset_defs(mir)))
+                (MIRBlockID(blk), (infos.bitset_uses(mir), infos.bitset_defs(mir)))
             })
             .collect();
 
@@ -111,8 +112,8 @@ impl fmt::Display for MIRLivenessResult {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",
-                bb.raw(),
-                live.iter().map(|local| format!("_{}", local.raw())).join(", ")
+                bb.0.raw(),
+                live.iter().map(|local| format!("_{}", local.0.raw())).join(", ")
             )?;
         }
         writeln!(f, "live-out:")?;
@@ -120,8 +121,8 @@ impl fmt::Display for MIRLivenessResult {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",
-                bb.raw(),
-                live.iter().map(|local| format!("_{}", local.raw())).join(", ")
+                bb.0.raw(),
+                live.iter().map(|local| format!("_{}", local.0.raw())).join(", ")
             )?;
         }
         Ok(())

@@ -15,10 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr::{
-    common::arena::Idx,
-    layout::{Aggregate, LIRTy, ScalarKind, Union, ValueClass, Zst},
-};
+use rockr::layout::{Aggregate, LIRTy, ScalarKind, Union, ValueClass, Zst};
+use rockr_base::arena::Idx;
 use std::marker::PhantomData;
 
 use crate::lir::{

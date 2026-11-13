@@ -17,11 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::resolved::type_ref::Subst;
 use crate::{
-    Db,
-    common::{
-        location::Span,
-        symbols::{InternedSymbol, Symbol},
-    },
     hir::{
         impl_items, interface_items,
         signature::{ZelfArg, get_sig_of_function},
@@ -32,9 +27,12 @@ use crate::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
         InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
     },
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 use itertools::Itertools;
+use rockr_base::symbol::{InternedSymbol, Symbol};
+use rockr_base::workspace::Workspace;
+use rockr_base::{Db, Span};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, PartialEq, Eq, Hash)]

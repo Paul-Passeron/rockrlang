@@ -15,10 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db, SourceFile,
-    common::diagnostic::{Diag, DiagLabel, Severity},
-};
 use codespan_reporting::{
     diagnostic::{
         Diagnostic as CrDiagnostic, Label as CrLabel, LabelStyle, Severity as CrSeverity,
@@ -28,6 +24,10 @@ use codespan_reporting::{
         self, Config,
         termcolor::{ColorChoice, StandardStream, WriteColor},
     },
+};
+use rockr_base::{
+    Db, SourceFile,
+    diagnostic::{Diag, DiagLabel, Severity},
 };
 use std::{collections::HashMap, io};
 

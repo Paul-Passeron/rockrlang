@@ -15,15 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::mutability::Mutability;
+use rockr_base::arena::{Arena, Idx};
+use rockr_base::mutability::Mutability;
+use rockr_base::strlit::StrLit;
+use rockr_base::symbol::Symbol;
+use rockr_base::{Db, Span};
+
 use crate::resolved::type_ref::{EnumRef, StructRef};
 use crate::{
-    Db,
-    common::{
-        arena::{Arena, Idx},
-        location::Span,
-        symbols::{StrLit, Symbol},
-    },
     hir::{self, function_ast},
     parse_tree::expr::BinaryOperator,
     resolved::{FunctionId, InterfaceRef, TypeRef},

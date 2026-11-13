@@ -21,9 +21,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // Some ideas:
 // - Differentiate between shared / mutable borrow deref ?
 
+use rockr_base::{Db, Span, bitset::BitSet, mutability::Mutability, symbol::Symbol};
+
 use crate::{
-    Db,
-    common::{bitset::BitSet, location::Span, mutability::Mutability, symbols::Symbol},
     mir::{
         Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
         RValueKind,

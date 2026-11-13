@@ -15,10 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::Db;
+
 use crate::layout::target_width;
 use crate::resolved::type_ref::TyLike;
 use crate::{
-    Db,
     layout::{AggregateLayout, LayoutData, LayoutID, Offset, Size},
     resolved::TypeRef,
 };

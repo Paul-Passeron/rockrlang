@@ -23,14 +23,13 @@ use crate::lir::{
     inst::{BlockTarget, CastKind, ConstValue, ValueInstKind, VoidInstKind},
 };
 use rockr::{
-    Db,
-    common::{arch::IntWidth, symbols::Symbol},
     layout::{
         Aggregate, AggregateLayout, Discriminant, LIRTy, LayoutData, LayoutID,
         ScalarKind, Union, ValueClass, VariantsLayout,
     },
     resolved::ptr_of,
 };
+use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
 use std::marker::PhantomData;
 
 type Instruction<'ir> = super::inst::Instruction<Branded<'ir>>;

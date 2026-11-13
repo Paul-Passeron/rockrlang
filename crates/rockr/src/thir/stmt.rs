@@ -15,11 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    common::location::Span,
-    thir::{
-        ExprId, LocalId, PlaceId, ScopeId, StructRef, ThirExprWithSetup, ThirMatchBranch,
-    },
+use rockr_base::Span;
+
+use crate::thir::{
+    ExprId, LocalId, PlaceId, ScopeId, StructRef, ThirExprWithSetup, ThirMatchBranch,
 };
 
 #[derive(Clone, PartialEq, Eq, Hash)]

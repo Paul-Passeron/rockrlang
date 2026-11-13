@@ -15,25 +15,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::{
-        arena::{Arena, Idx},
-        bitset::{BitSet, BitSetIdx},
-        mutability::Mutability,
+use crate::mir::{
+    MIRBlockID, MIRLocalID, Mir,
+    analysis::{
+        MIRAnalysis,
+        lattice::{BlockMap, LocalMap},
     },
-    mir::{
-        MIRBlockID, MIRLocalID, Mir,
-        analysis::{
-            MIRAnalysis,
-            lattice::{BlockMap, LocalMap},
-        },
-        basic_block::Stmt,
-        display::{StringWriter, fmt_place},
-        operand::{MIRPlace, MIRRValueKind},
-    },
+    basic_block::Stmt,
+    display::{StringWriter, fmt_place},
+    operand::{MIRPlace, MIRRValueKind},
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db,
+    arena::{Arena, Idx},
+    bitset::{BitSet, BitSetIdx},
+    mutability::Mutability,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -41,15 +39,16 @@ use std::{
 
 pub struct MIRLoanAnalysis;
 
-pub type LoanID = Idx<Loan>;
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub struct LoanID(pub Idx<Loan>);
 
 impl BitSetIdx for LoanID {
     fn as_idx(&self) -> usize {
-        self.into_raw()
+        self.0.into_raw()
     }
 
     fn from_idx(idx: usize) -> Self {
-        Self::from_raw(idx)
+        Self(Idx::from_raw(idx))
     }
 }
 
@@ -77,13 +76,14 @@ impl MIRAnalysis<'_, '_> for MIRLoanAnalysis {
     fn run(&self, db: &dyn Db, mir: &Mir) -> Self::Out {
         let loans = Self::collect_loans(mir);
         let loan_count = loans.len();
-        let by_holder = loans.by_holder();
+        let by_holder = loans_by_holder(&loans);
         let liveness = mir.liveness(db);
         let loans_live_in =
             Self::project_liveness(&liveness.live_in, &by_holder, loan_count);
         let loans_live_out =
             Self::project_liveness(&liveness.live_out, &by_holder, loan_count);
-        let indices = loans.iter().map(|(id, loan)| (loan.created_at, id)).collect();
+        let indices =
+            loans.iter().map(|(id, loan)| (loan.created_at, LoanID(id))).collect();
         MIRLoanOut {
             loans,
             indices,
@@ -112,7 +112,7 @@ impl MIRLoanAnalysis {
                             let loan = Loan {
                                 place: place.clone(),
                                 mutability: *mutability,
-                                created_at: MIRStmtIndex(blk, idx),
+                                created_at: MIRStmtIndex(MIRBlockID(blk), idx),
                                 holder: dest.local,
                             };
                             loans.insert(loan);
@@ -149,14 +149,12 @@ impl MIRLoanAnalysis {
     }
 }
 
-impl Arena<Loan> {
-    pub fn by_holder(&self) -> LocalMap<Vec<LoanID>> {
-        let mut res: LocalMap<Vec<LoanID>> = LocalMap::new();
-        for (idx, loan) in self {
-            res.entry(loan.holder).or_default().push(idx);
-        }
-        res
+pub fn loans_by_holder(a: &Arena<Loan>) -> LocalMap<Vec<LoanID>> {
+    let mut res: LocalMap<Vec<LoanID>> = LocalMap::new();
+    for (idx, loan) in a {
+        res.entry(loan.holder).or_default().push(LoanID(idx));
     }
+    res
 }
 
 struct MIRLoanOutDisplay<'a, 'b> {
@@ -183,9 +181,9 @@ impl fmt::Display for MIRLoanOutDisplay<'_, '_> {
                 id.raw(),
                 if loan.mutability.is_mut() { "&mut " } else { "&" },
                 w.0,
-                loan.created_at.0.raw(),
+                loan.created_at.0.0.raw(),
                 loan.created_at.1,
-                loan.holder.raw(),
+                loan.holder.0.raw(),
             )?;
         }
 
@@ -194,8 +192,8 @@ impl fmt::Display for MIRLoanOutDisplay<'_, '_> {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",
-                blk.raw(),
-                ids.iter().map(|id| format!("L{}", id.raw())).join(", ")
+                blk.0.raw(),
+                ids.iter().map(|id| format!("L{}", id.0.raw())).join(", ")
             )?;
         }
 
@@ -204,8 +202,8 @@ impl fmt::Display for MIRLoanOutDisplay<'_, '_> {
             writeln!(
                 f,
                 "    bb{}: {{{}}}",
-                blk.raw(),
-                ids.iter().map(|id| format!("L{}", id.raw())).join(", ")
+                blk.0.raw(),
+                ids.iter().map(|id| format!("L{}", id.0.raw())).join(", ")
             )?;
         }
 

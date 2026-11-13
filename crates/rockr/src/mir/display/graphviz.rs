@@ -15,11 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::Db;
+
 use super::{FmtWriter, MIRWrite, StringWriter, fmt_stmt, fmt_terminator, mwrite};
-use crate::{
-    Db,
-    mir::{Mir, basic_block::MIRTerminator},
-};
+use crate::mir::{Mir, basic_block::MIRTerminator};
 use std::fmt::{self, Write};
 
 pub struct MIRDotDisplay<'a> {
@@ -44,7 +43,7 @@ impl fmt::Display for MIRDotDisplay<'_> {
         mwrite!(w, "  node [shape=record fontname=\"Courier New\" fontsize=10]\n")?;
         mwrite!(w, "  edge [fontname=\"Courier New\" fontsize=9]\n\n")?;
 
-        let entry_idx = mir.entry.into_raw();
+        let entry_idx = mir.entry.0.into_raw();
 
         for (id, block) in mir.blocks.iter() {
             let idx = id.into_raw();
@@ -106,17 +105,21 @@ fn fmt_dot_edges<W: MIRWrite>(
         MIRTerminator::Diverge | MIRTerminator::Return { .. } => Ok(()),
 
         MIRTerminator::Branch { then, else_, .. } => {
-            mwrite!(w, "  bb{from} -> bb{} [label=\"true\"]\n", then.into_raw())?;
-            mwrite!(w, "  bb{from} -> bb{} [label=\"false\"]\n", else_.into_raw())
+            mwrite!(w, "  bb{from} -> bb{} [label=\"true\"]\n", then.0.into_raw())?;
+            mwrite!(w, "  bb{from} -> bb{} [label=\"false\"]\n", else_.0.into_raw())
         }
         MIRTerminator::Switch { branches, default, .. } => {
             for (value, block) in branches {
-                mwrite!(w, "  bb{from} -> bb{} [label=\"{value}\"]\n", block.into_raw())?;
+                mwrite!(
+                    w,
+                    "  bb{from} -> bb{} [label=\"{value}\"]\n",
+                    block.0.into_raw()
+                )?;
             }
-            mwrite!(w, "  bb{from} -> bb{} [label=\"_\"]\n", default.into_raw())
+            mwrite!(w, "  bb{from} -> bb{} [label=\"_\"]\n", default.0.into_raw())
         }
         MIRTerminator::Goto { next, .. } | MIRTerminator::Call { next, .. } => {
-            mwrite!(w, "  bb{from} -> bb{}\n", next.into_raw())
+            mwrite!(w, "  bb{from} -> bb{}\n", next.0.into_raw())
         }
     }
 }

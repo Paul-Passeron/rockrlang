@@ -15,10 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::symbol::Symbol;
+use rockr_base::{Db, Span};
+
 use crate::resolved::type_ref::{EnumRef, StructRef, Subst};
 use crate::{
-    Db,
-    common::{location::Span, symbols::Symbol},
     hir_to_thir::builder::ThirBuilder,
     name_resolve::type_expr::templates_of_struct,
     resolved::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},

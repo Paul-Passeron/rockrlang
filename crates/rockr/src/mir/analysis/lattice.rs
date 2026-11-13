@@ -211,7 +211,7 @@ pub type FixedPointStmtRes<L> = FixedPointIterRes<MIRStmtIndex, L>;
 
 impl Mir {
     pub fn get_block_bottoms<L: Lattice>(&self) -> impl Iterator<Item = (MIRBlockID, L)> {
-        self.blocks.keys().map(|blk| (blk, L::bottom()))
+        self.blocks.keys().map(|blk| (MIRBlockID(blk), L::bottom()))
     }
 
     pub fn rpo_ranks(&self) -> HashMap<MIRBlockID, usize> {
@@ -243,7 +243,7 @@ impl Mir {
 
         let mut next = postorder.len();
         for blk in self.blocks.keys() {
-            ranks.entry(blk).or_insert_with(|| {
+            ranks.entry(MIRBlockID(blk)).or_insert_with(|| {
                 let r = next;
                 next += 1;
                 r
@@ -268,19 +268,24 @@ impl Mir {
         entry_seed: Option<&L>,
         bottom: impl Fn() -> L,
     ) -> FixedPointBlockRes<L> {
-        let mut block_in =
-            BlockMap::from_iter(self.blocks.keys().map(|blk| (blk, bottom())));
+        let mut block_in = BlockMap::from_iter(
+            self.blocks.keys().map(|blk| (MIRBlockID(blk), bottom())),
+        );
 
-        let mut block_out =
-            BlockMap::from_iter(self.blocks.keys().map(|blk| (blk, bottom())));
+        let mut block_out = BlockMap::from_iter(
+            self.blocks.keys().map(|blk| (MIRBlockID(blk), bottom())),
+        );
 
         let succs = self.successors();
         let preds = self.predecessors();
 
         let ranks = self.rpo_ranks();
 
-        let mut worklist: BTreeSet<(usize, MIRBlockID)> =
-            self.blocks.keys().map(|blk| (ranks[&blk], blk)).collect();
+        let mut worklist: BTreeSet<(usize, MIRBlockID)> = self
+            .blocks
+            .keys()
+            .map(|blk| (ranks[&MIRBlockID(blk)], MIRBlockID(blk)))
+            .collect();
 
         loop {
             let next = match direction {
@@ -339,7 +344,8 @@ impl Mir {
 
     pub fn stmt_index_iter(&self) -> impl Iterator<Item = MIRStmtIndex> {
         self.blocks.keys().flat_map(|blk| {
-            (0..=self.blocks[blk].stmts.len()).map(move |i| MIRStmtIndex(blk, i))
+            (0..=self.blocks[blk].stmts.len())
+                .map(move |i| MIRStmtIndex(MIRBlockID(blk), i))
         })
     }
 
@@ -354,7 +360,7 @@ impl Mir {
             self.stmt_index_iter().map(|idx| (idx, HashSet::new())).collect();
         let actual = self.successors();
         for (blk, succs) in actual {
-            let stmts = &self.blocks[*blk].stmts;
+            let stmts = &self.blocks[blk.0].stmts;
             for (i, _) in stmts.iter().enumerate() {
                 if i < stmts.len() - 1 {
                     res.get_mut(&MIRStmtIndex(*blk, i))

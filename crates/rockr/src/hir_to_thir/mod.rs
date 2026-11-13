@@ -16,14 +16,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::timing::{Counts, Phase, timed},
     hir::{HirBody, hir_body},
     resolved::{FunctionId, InternedFunctionId},
     thir::Thir,
     typecheck::{TypeCheckResults, type_check_function},
 };
 pub use builder::ThirBuilder;
+use rockr_base::{
+    Db,
+    timing::{Counts, Phase, timed},
+};
 use translator::ThirTranslator;
 
 mod builder;

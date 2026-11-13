@@ -15,17 +15,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    mir::{
-        MIRBlockID, Mir,
-        analysis::{
-            MIRAnalysis,
-            init_tracking::{MIRInitAnalysis, MIRInitOut},
-            lattice::BlockMap,
-            liveness::{MIRLivenessAnalysis, MIRLivenessResult},
-            loans::{MIRLoanAnalysis, MIRLoanOut},
-        },
+use rockr_base::Db;
+
+use crate::mir::{
+    MIRBlockID, Mir,
+    analysis::{
+        MIRAnalysis,
+        init_tracking::{MIRInitAnalysis, MIRInitOut},
+        lattice::BlockMap,
+        liveness::{MIRLivenessAnalysis, MIRLivenessResult},
+        loans::{MIRLoanAnalysis, MIRLoanOut},
     },
 };
 use std::{collections::HashSet, sync::OnceLock};

@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::Lsp;
 use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse};
 use rockr::{
-    common::location::{Location, Span},
     hir::{function_ast, hir_body, impl_sources},
     lookup::{
         AstNode, ast_node_at, enclosing_fun, enclosing_scope_owner, sig::SigNode,
@@ -33,6 +32,7 @@ use rockr::{
     resolved::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
+use rockr_base::{Location, Span};
 
 impl Lsp<'_> {
     pub fn handle_goto_def(

@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::arch::{FloatWidth, IntWidth},
     layout::{
         aggregate::{finish_aggregate, struct_layout},
         fat_ptr::fat_ptr_layout_for,
@@ -27,9 +25,13 @@ use crate::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef,
         concrete_ty::ConcreteTy,
     },
-    unused,
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db,
+    lang::arch::{FloatWidth, IntWidth},
+    unused,
+};
 use std::range::RangeInclusive;
 
 pub mod aggregate;

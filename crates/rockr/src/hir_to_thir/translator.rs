@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{arena::Idx, diagnostic::Diag, location::Span, mutability::Mutability},
     hir::{
         self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
@@ -38,6 +36,7 @@ use crate::{
     typecheck::{self, PatternId, ReceiverAdjustment, TypeCheckResults},
 };
 use itertools::{Either, Itertools};
+use rockr_base::{Db, Span, arena::Idx, diagnostic::Diag, mutability::Mutability};
 
 pub struct ScopeSlot {
     id: ScopeId,

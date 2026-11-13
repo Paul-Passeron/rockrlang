@@ -15,12 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr::{
-    common::{
-        arena::{Arena, Idx},
-        symbols::Symbol,
-    },
-    layout::LIRTy,
+use rockr::layout::LIRTy;
+use rockr_base::{
+    arena::{Arena, Idx},
+    symbol::Symbol,
 };
 
 use crate::lir::{Finalized, LIRDef};

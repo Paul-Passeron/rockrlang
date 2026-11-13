@@ -18,13 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::Lsp;
 use itertools::Itertools;
 use rockr::{
-    common::{location::Location, mutability::Mutability},
     hir::signature::{FunctionSignature, get_sig_of_function},
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceRef, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef, type_printer::TypePrinter,
     },
 };
+use rockr_base::{Location, mutability::Mutability};
 use std::fmt::Write;
 
 impl Lsp<'_> {

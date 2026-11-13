@@ -15,16 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db, SourceFile,
-    common::location::{Location, Span},
-    lexer::{
-        Token,
-        rules::{get_skip_rules, get_token_rules},
-    },
+use crate::lexer::{
+    Token,
+    rules::{get_skip_rules, get_token_rules},
 };
 use core::fmt;
 use regex::Regex;
+use rockr_base::{Db, Location, SourceFile, Span};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LexError {

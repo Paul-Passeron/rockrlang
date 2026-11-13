@@ -26,15 +26,9 @@ use inkwell::{
 };
 use itertools::Itertools;
 use rockr::{
-    Db,
     check::{
         check, collect_module_functions, fundef::reachable_mir_instances,
         program_has_errors, reachable_frefs,
-    },
-    common::{
-        diagnostic::Diag,
-        location::LocationInfo,
-        timing::{PhaseStat, render_timings},
     },
     hir_to_thir::thir_body,
     mir::{MIRKey, passes::dead_code_elimination::dce},
@@ -44,11 +38,17 @@ use rockr::{
     thir::ExprKind,
     thir_to_mir::mir,
     workspace::{
+        error::CompilerError, load::load_workspace_from_disk, workspace_packages,
+    },
+};
+use rockr_base::{
+    Db,
+    diagnostic::Diag,
+    source::location::LocationInfo,
+    timing::{PhaseStat, render_timings},
+    workspace::{
         Workspace,
         config::{Config, OptLevel},
-        error::CompilerError,
-        load::load_workspace_from_disk,
-        workspace_packages,
     },
 };
 use rockrc_codegen::codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare};

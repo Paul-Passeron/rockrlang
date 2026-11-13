@@ -15,8 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::location::Span;
 pub use error::ParseError;
+use rockr_base::Span;
 use std::{fmt, hash::Hash};
 
 pub mod annotation;

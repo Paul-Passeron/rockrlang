@@ -30,11 +30,10 @@ use inkwell::{
 };
 use itertools::Itertools;
 use rockr::{
-    Db,
-    common::{arch::IntWidth, arena::Idx},
     layout::{Discriminant, LIRTy, LayoutData, LayoutID, Offset, ScalarKind},
     resolved::never_id,
 };
+use rockr_base::{Db, arena::Idx, lang::arch::IntWidth};
 use std::{collections::HashMap, num::NonZero};
 
 use crate::{

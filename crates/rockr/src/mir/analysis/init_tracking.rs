@@ -15,23 +15,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
+use rockr_base::{
     Db,
-    common::{
-        bitset::{BitSet, BitSetIdx},
-        symbols::Symbol,
+    bitset::{BitSet, BitSetIdx},
+    symbol::Symbol,
+};
+
+use crate::mir::{
+    BlockID, LocalID, MIRBlockID, MIRLocalID, Mir,
+    analysis::{
+        MIRAnalysis,
+        lattice::{BlockMap, Direction, FixedPointBlockRes, Lattice, LatticeChange},
     },
-    mir::{
-        BlockID, LocalID, Mir,
-        analysis::{
-            MIRAnalysis,
-            lattice::{BlockMap, Direction, FixedPointBlockRes, Lattice, LatticeChange},
-        },
-        basic_block::{MIRTerminator, Stmt},
-        operand::{
-            MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRProjectionKind,
-            MIRRValue, MIRRValueKind,
-        },
+    basic_block::{MIRTerminator, Stmt},
+    operand::{
+        MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection, MIRProjectionKind,
+        MIRRValue, MIRRValueKind,
     },
 };
 use std::{
@@ -142,7 +141,7 @@ impl MIRRValue {
 }
 
 fn record_place(db: &dyn Db, mir: &Mir, place: &MIRPlace, out: &mut HashSet<MoveKey>) {
-    if !mir.locals[place.local].ty.as_type_ref(db).is_copy(db) {
+    if !mir.locals[place.local.0].ty.as_type_ref(db).is_copy(db) {
         out.insert(place.as_move_key());
     }
     for proj in &place.projections {
@@ -163,7 +162,7 @@ fn compute_move_key_set(db: &dyn Db, mir: &Mir) -> HashSet<MoveKey> {
     let mut set = HashSet::new();
     for local in mir.locals.keys() {
         if !mir.locals[local].ty.as_type_ref(db).is_copy(db) {
-            set.insert(MoveKey { base: local, projections: Vec::new() });
+            set.insert(MoveKey { base: MIRLocalID(local), projections: Vec::new() });
         }
     }
 
@@ -343,7 +342,7 @@ fn compute_block_ops(
             ops.push(InitOp::Uninit(*id));
         }
     };
-    let data = &mir.blocks[blk];
+    let data = &mir.blocks[blk.0];
     for Stmt::Assign { dest, rvalue } in &data.stmts {
         dest.for_all_operands(|op| moved(&mut ops, op));
         rvalue.for_all_operands(|op| moved(&mut ops, op));
@@ -405,6 +404,7 @@ impl MIRAnalysis<'_, '_> for MIRInitAnalysis {
         let block_ops: BlockMap<Vec<InitOp>> = mir
             .blocks
             .keys()
+            .map(MIRBlockID)
             .map(|blk| (blk, compute_block_ops(&key_of, mir, blk)))
             .collect();
 

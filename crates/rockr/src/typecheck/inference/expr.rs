@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::{
         HirConstructorArgs, HirExpr, HirExprDesc, HirPlace, HirPlaceKind, HirStructField,
         LocalId,
@@ -39,6 +37,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use salsa::Accumulator;
 use std::{
     collections::{HashMap, HashSet},

@@ -15,15 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::Db;
-use crate::{
-    common::{
-        location::Span,
-        symbols::{StrLit, Symbol},
-    },
-    lexer::{LexError, Token, TokenKind, TokenPattern},
-};
+use crate::lexer::{LexError, Token, TokenKind, TokenPattern};
 use regex::Regex;
+use rockr_base::{Db, Span, strlit::StrLit, symbol::Symbol};
 
 fn anchored(re: &str) -> Regex {
     Regex::new(&format!(r"\A(?:{re})")).unwrap()

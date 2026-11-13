@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{common::symbols::Symbol, parse_tree::type_expr::AstTypeExpr};
+use rockr_base::symbol::Symbol;
+
+use crate::parse_tree::type_expr::AstTypeExpr;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AstAnnotation {

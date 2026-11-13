@@ -16,8 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{display::Display, location::Span, symbols::Symbol},
+    display::Display,
     parse_tree::{
         ParseError, Spanned,
         annotation::AstAnnotation,
@@ -29,6 +28,7 @@ use crate::{
 };
 use itertools::Itertools;
 use nonempty::NonEmpty;
+use rockr_base::{Db, Span, symbol::Symbol};
 use std::{fmt, sync::Arc};
 
 pub type AstTopLevelItem = Spanned<AstTopLevelItemDesc>;

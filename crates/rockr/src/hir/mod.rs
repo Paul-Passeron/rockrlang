@@ -15,16 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::mutability::Mutability;
-use crate::parse_tree::{Spanned, stmt::AstStmt, top_level::AstTemplateArg};
 use crate::{
-    Db,
-    common::{
-        arena,
-        location::Span,
-        symbols::{StrLit, Symbol},
-        timing::{Counts, Phase, timed},
-    },
     hir::lower_fundef::{lower_fundef_body, lower_method_body},
     name_resolve::{
         implems::module_impls,
@@ -33,10 +24,12 @@ use crate::{
         type_expr::{get_templates_of_fun, resolve_type_expr},
     },
     parse_tree::{
+        Spanned,
         expr::BinaryOperator,
+        stmt::AstStmt,
         top_level::{
             AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstInterfaceItem,
-            AstMethodDef, AstMethodsig, AstReceiver, AstTopLevelItemDesc,
+            AstMethodDef, AstMethodsig, AstReceiver, AstTemplateArg, AstTopLevelItemDesc,
         },
         type_expr::{AstAnyTypeExpr, AstTypeExpr},
     },
@@ -44,6 +37,13 @@ use crate::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
     },
+};
+use rockr_base::{
+    Db, Span, arena,
+    mutability::Mutability,
+    strlit::StrLit,
+    symbol::Symbol,
+    timing::{Counts, Phase, timed},
 };
 use std::sync::Arc;
 

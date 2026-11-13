@@ -24,11 +24,11 @@ use crate::{
 
 use itertools::Itertools;
 use rockr::{
-    Db,
     layout::{LIRTy, layout_of},
     mir::{FuncInst, Mir},
     resolved::concrete_ty::ConcreteTy,
 };
+use rockr_base::Db;
 
 pub struct MTLDCtx<'a> {
     pub mir_map: MIRMap<'a>,

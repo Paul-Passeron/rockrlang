@@ -15,12 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    layout::{
-        AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData, LayoutID,
-        Offset, ScalarKind, Size, VariantsLayout, target_width,
-    },
+use rockr_base::Db;
+
+use crate::layout::{
+    AggregateLayout, Align, FloatWidth, IntWidth, Layout, LayoutData, LayoutID, Offset,
+    ScalarKind, Size, VariantsLayout, target_width,
 };
 use std::{
     marker::PhantomData,

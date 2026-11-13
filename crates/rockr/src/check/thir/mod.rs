@@ -15,10 +15,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, diagnostic::Diag};
+
 use crate::{
-    Db,
     check::thir::{return_check::check_return, sanity_check::sanity_check},
-    common::diagnostic::Diag,
     hir_to_thir::thir_body,
     resolved::{FunctionId, InternedFunctionId},
     thir::Thir,

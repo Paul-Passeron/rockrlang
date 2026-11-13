@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{mutability::Mutability, symbols::Symbol},
     hir::{function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -35,6 +33,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 use std::sync::Arc;
 
 pub fn resolve_any_type_expr<'db>(

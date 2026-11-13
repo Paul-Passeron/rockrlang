@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
     hir::{FunctionLikeAst, impl_items},
     layout::{LIRTy, ScalarKind, layout_of},
     parse_tree::{
@@ -43,6 +41,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, symbol::Symbol};
 use rockr_constraint_solver::{ConstraintId, SolverHostExt};
 use std::collections::HashMap;
 use std::sync::Arc;

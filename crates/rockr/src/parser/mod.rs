@@ -16,18 +16,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db, SourceFile,
-    common::{
-        location::{Location, Span},
-        symbols::Symbol,
-        timing::{Counts, Phase, timed},
-    },
     lexer::{Token, TokenKind, lex_file},
     parse_tree::{
         ParseError, Spanned,
         error::ParseErrorKind,
         top_level::{Ast, AstAnyTopLevelItemDesc, AstTopLevelItemDesc},
     },
+};
+use rockr_base::{
+    Db, Location, SourceFile, Span,
+    symbol::Symbol,
+    timing::{Counts, Phase, timed},
 };
 use salsa::Accumulator;
 

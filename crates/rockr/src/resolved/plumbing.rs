@@ -23,7 +23,6 @@ use super::{
     StructId, Symbol, TypeDefId, TypeId, TypeRef,
 };
 use crate::{
-    common::mutability::Mutability,
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
@@ -31,6 +30,7 @@ use crate::{
     resolved::{IntWidthKind, concrete_ty::ConcreteTy},
 };
 use nonempty::nonempty;
+use rockr_base::mutability::Mutability;
 use std::marker::PhantomData;
 
 impl<'db> From<InternedModuleId<'db>> for ModuleId {

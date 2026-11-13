@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::mutability::Mutability;
+use rockr_base::{Db, mutability::Mutability};
+
 use crate::{
-    Db,
     resolved::{TypeDefId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, ProjectionKind, ScopeId,

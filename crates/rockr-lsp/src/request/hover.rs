@@ -21,10 +21,6 @@ use lsp_types::{
     Hover, HoverContents, HoverParams, MarkedString, MarkupContent, MarkupKind,
 };
 use rockr::{
-    common::{
-        location::{Location, Span},
-        symbols::Symbol,
-    },
     lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
     name_resolve::{
         definition::Definition,
@@ -37,6 +33,7 @@ use rockr::{
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
     },
 };
+use rockr_base::{Location, Span, symbol::Symbol};
 
 impl Lsp<'_> {
     pub(super) fn handle_hover(&self, params: HoverParams) -> Option<Hover> {

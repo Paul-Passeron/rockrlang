@@ -15,14 +15,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{
+    Db, Span,
+    arena::{Arena, Idx},
+    mutability::Mutability,
+    symbol::Symbol,
+    workspace::Workspace,
+};
+
 use crate::{
-    Db,
-    common::{
-        arena::{Arena, Idx},
-        location::Span,
-        mutability::Mutability,
-        symbols::Symbol,
-    },
     hir::{self, signature::get_sig_of_function},
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
@@ -40,7 +41,7 @@ use crate::{
         concrete_ty::{ConcreteTy, Substitution},
     },
     thir::{self, FunctionRef},
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -71,8 +72,11 @@ type RValueKind = MIRRValueKind;
 type Callee = MIRCallee;
 type ConstructorArgs = MIRConstructorArgs;
 
-pub type MIRBlockID = Idx<BasicBlock>;
-pub type MIRLocalID = Idx<Local>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MIRBlockID(pub Idx<BasicBlock>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct MIRLocalID(pub Idx<Local>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SyntacticSource {
@@ -135,7 +139,7 @@ impl Mir {
             return;
         }
 
-        match &self.blocks[blk].terminator {
+        match &self.blocks[blk.0].terminator {
             MIRTerminator::Return { .. } | MIRTerminator::Diverge => (),
             MIRTerminator::Goto { next } | MIRTerminator::Call { next, .. } => {
                 self.compute_reachable_aux(s, *next);
@@ -178,7 +182,7 @@ impl Mir {
                         branches.iter().map(|b| *b.1).chain([*default]).collect()
                     }
                 };
-                (blk, succs)
+                (MIRBlockID(blk), succs)
             })
             .collect()
     }
@@ -191,7 +195,7 @@ impl Mir {
             }
         });
         self.blocks.iter().for_each(|(blk, _)| {
-            res.entry(blk).or_default();
+            res.entry(MIRBlockID(blk)).or_default();
         });
         res
     }

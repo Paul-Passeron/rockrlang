@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
     mir::{
         MIRLocalID,
         operand::{MIRPlace, MIRProjection, MIRProjectionKind},
@@ -33,6 +31,7 @@ use crate::{
     thir_to_mir::ThirToMIR,
 };
 use itertools::Itertools;
+use rockr_base::{Db, symbol::Symbol};
 use std::collections::{BTreeSet, HashSet};
 
 // Compiling pattern matching to decision tree, inspired by

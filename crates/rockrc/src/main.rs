@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::compiler::build_from_disk;
 use clap::Parser as _;
 use clap_derive::Parser;
-use rockr::workspace::config::{Config, OptLevel};
+use rockr_base::workspace::config::{Config, OptLevel};
 use std::path::PathBuf;
 
 pub mod compiler;

@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
+
 use crate::{
-    Db,
-    common::{mutability::Mutability, symbols::Symbol},
     parse_tree::type_expr::AstTypeExprDesc,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,

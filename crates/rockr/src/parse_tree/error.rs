@@ -15,10 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    SourceFile,
-    lexer::{LexError, TokenKind},
-};
+use rockr_base::SourceFile;
+
+use crate::lexer::{LexError, TokenKind};
 
 #[salsa::accumulator]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

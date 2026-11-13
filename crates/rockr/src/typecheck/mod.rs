@@ -16,12 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{
-        diagnostic::Diag,
-        location::Span,
-        timing::{Counts, Phase, timed},
-    },
     hir::{
         HirBody, HirExpr, HirId, HirMatchBranch, HirPattern, HirPatternDesc, HirPlace,
         HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
@@ -33,6 +27,11 @@ use crate::{
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db, Span,
+    diagnostic::Diag,
+    timing::{Counts, Phase, timed},
+};
 use rockr_constraint_solver::SolverHostExt;
 use std::{collections::BTreeMap, panic, sync::Arc};
 

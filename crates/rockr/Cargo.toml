@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 rockr-constraint-solver.workspace = true
+rockr-base.workspace = true
 
 clap.workspace = true
 clap_derive.workspace = true

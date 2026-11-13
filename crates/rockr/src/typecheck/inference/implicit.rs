@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{mutability::Mutability, symbols::Symbol},
     hir::{impl_items, interface_items, owning_module},
     name_resolve::{
         definition::{Definition, resolve_in_module},
@@ -32,8 +30,8 @@ use crate::{
         array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
     },
     typecheck::inference::InferTy,
-    unused,
 };
+use rockr_base::{Db, mutability::Mutability, symbol::Symbol, unused};
 use std::sync::Arc;
 
 pub struct AstImplicitContext {

@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr::Db;
+use rockr_base::Db;
 
 use crate::{
     lir::{Building, Complete, Declaring, Module, ModulePhase},

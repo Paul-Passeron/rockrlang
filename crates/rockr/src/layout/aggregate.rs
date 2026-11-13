@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
     layout::{
         AggregateLayout, Align, FieldInput, FieldOrderingKind, LayoutID, Offset, Size,
         layout_of, ordering_strategy,
@@ -25,6 +24,7 @@ use crate::{
     resolved::{StructId, TypeRef, type_ref::StructRef},
 };
 use itertools::Itertools;
+use rockr_base::Db;
 
 impl FieldOrderingKind {
     pub fn order_fields(self, fields: &[FieldInput]) -> Vec<u32> {

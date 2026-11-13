@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{diagnostic::Diag, unord::Set},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         module_items, modules_in_package,
@@ -30,6 +28,7 @@ use crate::{
     resolved::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
 use itertools::Itertools;
+use rockr_base::{Db, diagnostic::Diag, unord::Set};
 
 pub fn resolve_type_expr_as_interface<'db>(
     db: &'db dyn Db,

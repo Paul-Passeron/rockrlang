@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
+
 use crate::{
-    Db,
-    common::{arch::IntWidth, symbols::Symbol},
     name_resolve::type_expr::{struct_item, templates_of_struct},
     resolved::{
         BuiltinTypeId, EnumId, FunctionId, InternedStructId, ScopeOwnerId, StructId,

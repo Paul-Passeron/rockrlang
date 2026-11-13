@@ -15,13 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{
+    Db, Span,
+    arena::{Arena, Idx},
+    mutability::Mutability,
+};
+
 use crate::{
-    Db,
-    common::{
-        arena::{Arena, Idx},
-        location::Span,
-        mutability::Mutability,
-    },
     hir::{self, LocalInfo},
     resolved::{FunctionId, TypeRef},
     thir::{

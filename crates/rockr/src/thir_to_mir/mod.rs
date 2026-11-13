@@ -16,14 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{
-        diagnostic::Diag,
-        location::Span,
-        mutability::Mutability,
-        symbols::Symbol,
-        timing::{Counts, Phase, timed},
-    },
     hir_to_thir::thir_body,
     mir::{
         MIRBlockID, MIRKey, MIRLocal, MIRLocalID, Mir, SyntacticSource,
@@ -55,6 +47,13 @@ use crate::{
     typecheck::conformance::type_implements,
 };
 use itertools::{Either, Itertools};
+use rockr_base::{
+    Db, Span,
+    diagnostic::Diag,
+    mutability::Mutability,
+    symbol::Symbol,
+    timing::{Counts, Phase, timed},
+};
 use std::collections::{BTreeMap, HashMap};
 
 pub mod decision_tree;
@@ -183,7 +182,7 @@ impl<'a> ThirToMIR<'a> {
     }
 
     fn place_of_local(&self, local: MIRLocalID, span: Span) -> MIRPlace {
-        let ty = self.builder.locals[local].ty;
+        let ty = self.builder.locals[local.0].ty;
         MIRPlace { local, projections: vec![], ty, span }
     }
 
@@ -216,7 +215,7 @@ impl<'a> ThirToMIR<'a> {
             StmtKind::Let { local, init } => {
                 let mir_local = self.local_map[local];
                 let dest =
-                    self.place_of_local(mir_local, self.builder.locals[mir_local].span);
+                    self.place_of_local(mir_local, self.builder.locals[mir_local.0].span);
                 let rvalue = self.build_rvalue(*init);
                 self.assign(dest, rvalue);
             }

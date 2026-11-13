@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::workspace::Workspace;
+
 use super::{Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 use crate::{
     name_resolve::implems::impls_in_package,
@@ -22,7 +24,7 @@ use crate::{
     typecheck::inference::{
         constraints::InferenceConstraintKind, implicit::ImplicitContext,
     },
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 
 #[derive(Debug)]

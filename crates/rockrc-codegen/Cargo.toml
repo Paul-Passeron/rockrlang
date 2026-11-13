@@ -11,6 +11,7 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
+rockr-base.workspace = true
 rockr.workspace = true
 
 clap.workspace = true

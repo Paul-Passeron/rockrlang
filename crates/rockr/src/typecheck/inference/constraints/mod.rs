@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{mutability::Mutability, symbols::Symbol},
     hir::interface_items,
     parse_tree::{
         expr::BinaryOperator,
@@ -36,6 +34,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 use rockr_constraint_solver::{ProbeOutcome, SolverHost, SolverHostExt};
 use std::{
     collections::{HashMap, HashSet},

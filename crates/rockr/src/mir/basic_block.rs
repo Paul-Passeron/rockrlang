@@ -15,12 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    common::{bitset::BitSet, location::Span},
-    mir::{
-        BlockID, Callee, LocalID, MIRLocalID, Mir, Operand, Place, RValue, Terminator,
-        operand::MIROperand,
-    },
+use rockr_base::{Span, bitset::BitSet};
+
+use crate::mir::{
+    BlockID, Callee, LocalID, MIRLocalID, Mir, Operand, Place, RValue, Terminator,
+    operand::MIROperand,
 };
 use std::collections::{BTreeMap, HashSet};
 

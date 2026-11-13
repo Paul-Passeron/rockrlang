@@ -15,15 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    common::{
-        location::Span,
-        symbols::{StrLit, Symbol},
-    },
-    parse_tree::{
-        Spanned,
-        type_expr::{AstAnyTypeExpr, AstTypeExpr},
-    },
+use rockr_base::{Span, strlit::StrLit, symbol::Symbol};
+
+use crate::parse_tree::{
+    Spanned,
+    type_expr::{AstAnyTypeExpr, AstTypeExpr},
 };
 
 pub type AstExpr = Spanned<AstExprDesc>;

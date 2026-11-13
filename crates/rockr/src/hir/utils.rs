@@ -15,8 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Span, symbol::Symbol};
+
 use crate::{
-    common::{location::Span, symbols::Symbol},
     hir::{
         HirExpr, HirExprDesc, HirMatchBranch, HirPattern, HirPatternConstructorArgs,
         HirPatternDesc, HirPlace, HirPlaceKind, HirStmt, HirStmtKind, LocalId,

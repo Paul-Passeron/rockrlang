@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, symbol::Symbol};
+
 use crate::{
-    Db,
-    common::symbols::Symbol,
     name_resolve::{
         core_module,
         definition::{Definition, resolve_in_module},

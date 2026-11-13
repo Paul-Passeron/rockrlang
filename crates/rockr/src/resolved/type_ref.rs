@@ -17,12 +17,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
 
+use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
+
 use super::{
     BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of, usize_id,
 };
 use crate::{
-    Db,
-    common::{mutability::Mutability, symbols::Symbol},
     parse_tree::top_level::AstEnumVariantKind,
     resolved::{
         AdtLike, EnumId, ScopeOwnerId, StructId, slice_of, type_printer::TypePrinter,

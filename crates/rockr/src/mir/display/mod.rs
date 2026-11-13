@@ -23,7 +23,7 @@ use crate::mir::{
         MIRProjectionKind, MIRRValue, MIRRValueKind,
     },
 };
-use crate::{Db, mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
+use crate::{mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
 use std::fmt;
 
 pub mod graphviz;
@@ -67,6 +67,7 @@ macro_rules! mwrite {
 }
 
 pub(crate) use mwrite;
+use rockr_base::Db;
 
 pub(crate) fn fmt_binop(op: BinaryOperator) -> &'static str {
     match op {
@@ -90,7 +91,7 @@ pub(crate) fn fmt_binop(op: BinaryOperator) -> &'static str {
 }
 
 pub fn fmt_local_id<W: MIRWrite>(w: &mut W, id: MIRLocalID) -> fmt::Result {
-    mwrite!(w, "_{}", id.into_raw())
+    mwrite!(w, "_{}", id.0.into_raw())
 }
 
 pub fn fmt_place<W: MIRWrite>(w: &mut W, db: &dyn Db, place: &MIRPlace) -> fmt::Result {
@@ -314,7 +315,7 @@ pub fn fmt_terminator<W: MIRWrite>(
     match terminator {
         MIRTerminator::Diverge => w.write_str("diverge"),
         MIRTerminator::Goto { next, .. } => {
-            mwrite!(w, "goto bb{}", next.into_raw())
+            mwrite!(w, "goto bb{}", next.0.into_raw())
         }
         MIRTerminator::Return { value, .. } => match value {
             Some(operand) => {
@@ -326,16 +327,16 @@ pub fn fmt_terminator<W: MIRWrite>(
         MIRTerminator::Branch { cond, then, else_, .. } => {
             w.write_str("branch ")?;
             fmt_operand(w, db, cond)?;
-            mwrite!(w, " ? bb{} : bb{}", then.into_raw(), else_.into_raw())
+            mwrite!(w, " ? bb{} : bb{}", then.0.into_raw(), else_.0.into_raw())
         }
         MIRTerminator::Switch { discriminant, branches, default, .. } => {
             w.write_str("switch ")?;
             fmt_operand(w, db, discriminant)?;
             w.write_str(" {")?;
             for (value, block) in branches {
-                mwrite!(w, " {value} => bb{},", block.into_raw())?;
+                mwrite!(w, " {value} => bb{},", block.0.into_raw())?;
             }
-            mwrite!(w, " _ => bb{} }}", default.into_raw())
+            mwrite!(w, " _ => bb{} }}", default.0.into_raw())
         }
         MIRTerminator::Call { callee, arguments, dest, next, .. } => {
             fmt_local_id(w, *dest)?;
@@ -348,7 +349,7 @@ pub fn fmt_terminator<W: MIRWrite>(
                 }
                 fmt_operand(w, db, arg)?;
             }
-            mwrite!(w, ") -> bb{}", next.into_raw())
+            mwrite!(w, ") -> bb{}", next.0.into_raw())
         }
     }
 }

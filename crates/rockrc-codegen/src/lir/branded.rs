@@ -22,13 +22,11 @@ use crate::lir::{
     inst::{BlockTarget, ValueInstKind, VoidInstKind},
 };
 use itertools::Itertools;
-use rockr::{
+use rockr::layout::LIRTy;
+use rockr_base::{
     Db,
-    common::{
-        arena::{Arena, Idx},
-        symbols::Symbol,
-    },
-    layout::LIRTy,
+    arena::{Arena, Idx},
+    symbol::Symbol,
     unused,
 };
 use std::marker::PhantomData;

@@ -16,11 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db, SourceFile,
-    common::{
-        location::{Location, Span},
-        symbols::Symbol,
-    },
     hir::FunctionLikeAst,
     lookup::enclosing_fun,
     name_resolve::type_expr::templates_of_owner,
@@ -33,6 +28,7 @@ use crate::{
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use itertools::Itertools;
+use rockr_base::{Db, Location, SourceFile, Span, symbol::Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionParam {

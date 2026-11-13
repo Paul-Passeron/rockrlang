@@ -11,6 +11,7 @@ license = "GNU-3"
 
 [workspace.dependencies]
 rockr = { path = "crates/rockr" }
+rockr-base = { path = "crates/rockr-base" }
 rockrc-codegen = { path = "crates/rockrc-codegen" }
 rockr-constraint-solver = { path = "crates/rockr-constraint-solver" }
 

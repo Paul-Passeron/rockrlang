@@ -16,17 +16,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
     check::{
         fundef::{check_fundef, reachable_mir_instances},
         implem::check_implem,
         interface::check_interface,
         thir::thir_is_valid,
         types::check_typedef,
-    },
-    common::{
-        diagnostic::{Diag, DiagLabel, Severity},
-        symbols::Symbol,
     },
     mir::{FuncInst, MIRKey},
     name_resolve::{
@@ -37,9 +32,15 @@ use crate::{
     },
     resolved::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
     thir_to_mir::mir,
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 use itertools::Itertools;
+use rockr_base::{
+    Db,
+    diagnostic::{Diag, DiagLabel, Severity},
+    symbol::Symbol,
+    workspace::Workspace,
+};
 use salsa::Accumulator;
 use std::collections::{HashMap, HashSet};
 

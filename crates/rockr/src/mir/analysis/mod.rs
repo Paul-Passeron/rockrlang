@@ -15,7 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, mir::Mir};
+use rockr_base::Db;
+
+use crate::mir::Mir;
 
 pub mod init_tracking;
 pub mod lattice;

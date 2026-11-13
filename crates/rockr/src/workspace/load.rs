@@ -15,17 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use walkdir::WalkDir;
-
-use crate::{
-    Db, RockrDb,
+use rockr_base::{
+    Db,
+    db::RockrDb,
     workspace::{
-        PackageRoot, Workspace,
         config::Config,
         discover::{ANCHOR_FILE_NAME, read_source_file},
-        error::CompilerError,
     },
 };
+use walkdir::WalkDir;
+
+use crate::workspace::{PackageRoot, Workspace, error::CompilerError};
 use std::path::PathBuf;
 
 fn add_package_root_from_disk(

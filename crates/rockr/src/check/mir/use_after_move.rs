@@ -15,23 +15,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::diagnostic::Diag,
-    mir::{
-        Mir,
-        analysis::init_tracking::{
-            IdInitMap, InitState, IterOperand, MIRInitOut, MoveKey,
-        },
-        basic_block::{MIRTerminator, Stmt},
-        operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
-    },
+use rockr_base::{Db, diagnostic::Diag};
+
+use crate::mir::{
+    Mir,
+    analysis::init_tracking::{IdInitMap, InitState, IterOperand, MIRInitOut, MoveKey},
+    basic_block::{MIRTerminator, Stmt},
+    operand::{MIROperand, MIRPlace, MIRRValue, MIRRValueKind},
 };
 
 pub fn check_use_after_move(db: &dyn Db, mir: &Mir) {
     let init = mir.init_tracking(db);
     for (blk, infos) in &mir.blocks {
-        let mut state = init.entry_state(blk);
+        let mut state = init.entry_state(crate::mir::MIRBlockID(blk));
         for stmt in &infos.stmts {
             match stmt {
                 Stmt::Assign { dest, rvalue } => {

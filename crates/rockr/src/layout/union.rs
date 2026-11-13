@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use super::LayoutData;
 use crate::{
-    Db,
     layout::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, discriminant_strategy, finish_aggregate, layout_of,
@@ -28,6 +27,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::Db;
 
 fn layout_of_cons(db: &dyn Db, cons: &ConstructorType) -> LayoutID {
     let source_ordered = match cons {

@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::signature::get_sig_of_function,
     parse_tree::expr::BinaryOperator,
     resolved::{
@@ -36,6 +34,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use salsa::Accumulator;
 use std::collections::HashSet;
 

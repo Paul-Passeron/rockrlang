@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
     mir::{
         FuncInst, MIRBlockID, MIRKey, MIRLocalID, Mir,
         basic_block::{MIRTerminator, Stmt},
@@ -30,6 +29,7 @@ use crate::{
     thir_to_mir::_mir,
 };
 use itertools::Itertools;
+use rockr_base::Db;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub struct DeadCodeElimination;
@@ -55,7 +55,7 @@ pub struct DCECtx<'a> {
 
 impl<'a> DCECtx<'a> {
     pub fn new(db: &'a dyn Db, mir: &'a Mir) -> Self {
-        let entry_name = mir.blocks[mir.entry].name.clone();
+        let entry_name = mir.blocks[mir.entry.0].name.clone();
         let b = MIRBuilder::new(db, entry_name);
         Self {
             mir,
@@ -76,7 +76,7 @@ impl<'a> DCECtx<'a> {
         if let Some(res) = self.local_map.get(&original) {
             return *res;
         }
-        let description = self.mir.locals[original].clone();
+        let description = self.mir.locals[original.0].clone();
         let new_id = self.b.new_local(description);
         self.local_map.insert(original, new_id);
         new_id
@@ -97,7 +97,7 @@ impl<'a> DCECtx<'a> {
         let mut merge_next: HashMap<OldBlockID, OldBlockID> = HashMap::new();
         let mut has_prev: HashSet<OldBlockID> = HashSet::new();
         for &a in &self.reachable {
-            if let MIRTerminator::Goto { next } = &self.mir.blocks[a].terminator {
+            if let MIRTerminator::Goto { next } = &self.mir.blocks[a.0].terminator {
                 let b = *next;
                 if self.successors[&a].len() == 1 && self.predecessors[&b].len() == 1 {
                     merge_next.insert(a, b);
@@ -330,7 +330,7 @@ impl<'a> DCECtx<'a> {
                 assert_ne!(p, &[]);
                 let name = self.salvage_path_name(p);
                 if *p.first().unwrap() == self.mir.entry {
-                    self.b.blocks[self.b.entry].name = name;
+                    self.b.blocks[self.b.entry.0].name = name;
                     self.b.entry
                 } else {
                     self.b.new_block(name)
@@ -340,11 +340,11 @@ impl<'a> DCECtx<'a> {
 
         for (p, bb) in paths.iter().zip_eq(&bbs) {
             self.b.switch_to_block(*bb).unwrap();
-            for stmt in p.iter().flat_map(|blk| &self.mir.blocks[*blk].stmts) {
+            for stmt in p.iter().flat_map(|blk| &self.mir.blocks[blk.0].stmts) {
                 let new_stmt = self.copy_stmt(stmt);
                 self.b.emit(new_stmt);
             }
-            let terminator = &self.mir.blocks[*p.last().unwrap()].terminator;
+            let terminator = &self.mir.blocks[p.last().unwrap().0].terminator;
             let new_terminator = self.copy_terminator(terminator, &bbs, &path_heads);
             self.b.terminate(new_terminator).unwrap();
         }
@@ -353,7 +353,7 @@ impl<'a> DCECtx<'a> {
     fn salvage_path_name(&self, path: &[OldBlockID]) -> Option<String> {
         let names = path
             .iter()
-            .filter_map(|blk| self.mir.blocks[*blk].name.as_ref())
+            .filter_map(|blk| self.mir.blocks[blk.0].name.as_ref())
             .collect_vec();
         if names.is_empty() {
             return None;

@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, Location, SourceFile, Span};
+
 use crate::{
-    Db, SourceFile,
-    common::location::{Location, Span},
     hir_to_thir::thir_body,
     lookup::{enclosing_fun, enclosing_scope_owner},
     name_resolve::{interfaces::interface_item, module_items},

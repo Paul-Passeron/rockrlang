@@ -15,8 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::Db;
+
 use crate::{
-    Db,
     check::mir::{loans::check_loans, use_after_move::check_use_after_move},
     mir::Mir,
 };

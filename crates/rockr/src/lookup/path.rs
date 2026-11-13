@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{Db, Location, Span};
+
 use crate::{
-    Db,
-    common::location::{Location, Span},
     lookup::enclosing_scope_owner,
     name_resolve::{
         definition::{Definition, resolve_in_module},

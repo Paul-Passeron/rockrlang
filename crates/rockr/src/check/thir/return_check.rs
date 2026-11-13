@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::{diagnostic::Diag, location::Span},
     hir::signature::get_sig_of_function,
     resolved::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
@@ -25,6 +23,7 @@ use crate::{
         stmt::{StmtKind, ThirStmt},
     },
 };
+use rockr_base::{Db, Span, diagnostic::Diag};
 use salsa::Accumulator;
 
 pub fn check_return(db: &dyn Db, thir: &Thir) {

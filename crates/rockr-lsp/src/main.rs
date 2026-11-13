@@ -23,13 +23,12 @@ use lsp_types::{
     TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
     notification::{Notification as INotification, PublishDiagnostics},
 };
-use rockr::{
-    RockrDb, SourceFile,
-    check::program_has_errors,
-    common::{
-        diagnostic::{Diag, Severity},
-        location::{Location, Span, offset_at},
-    },
+use rockr::check::program_has_errors;
+use rockr_base::{
+    Location, SourceFile, Span,
+    db::RockrDb,
+    diagnostic::{Diag, Severity},
+    source::location::offset_at,
     workspace::{Workspace, config::Config},
 };
 use std::{

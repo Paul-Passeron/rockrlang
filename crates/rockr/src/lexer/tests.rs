@@ -15,11 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db, RockrDb, SourceFile,
-    common::symbols::Symbol,
-    lexer::{Lexer, TokenKind},
-};
+use rockr_base::{Db, SourceFile, db::RockrDb, symbol::Symbol};
+
+use crate::lexer::{Lexer, TokenKind};
 use std::{path::PathBuf, sync::Arc};
 
 type Lexed = Result<(TokenKind, usize, usize), String>;

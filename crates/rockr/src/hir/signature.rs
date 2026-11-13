@@ -16,8 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    Db,
-    common::symbols::Symbol,
     hir::{Mutability, function_ast},
     name_resolve::type_expr::{get_templates_of_fun_only, templates_of_owner},
     parse_tree::top_level::{AstReceiver, AstTemplateArg},
@@ -31,6 +29,7 @@ use crate::{
     },
 };
 use itertools::Itertools;
+use rockr_base::{Db, symbol::Symbol};
 use std::{fmt, sync::Arc};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

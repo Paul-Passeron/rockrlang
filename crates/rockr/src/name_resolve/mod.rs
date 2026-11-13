@@ -15,16 +15,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use rockr_base::{
+    Db, SourceFile, Span, diagnostic::Diag, symbol::Symbol, unord::Set,
+    workspace::Workspace,
+};
+
 use crate::{
-    Db, SourceFile,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol, unord::Set},
     parse_tree::{
         ParseError,
         top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     },
     parser::parse_file,
     resolved::{FileModule, InternedModuleId, ModuleId, Package},
-    workspace::{Workspace, workspace_packages},
+    workspace::workspace_packages,
 };
 
 pub mod definition;

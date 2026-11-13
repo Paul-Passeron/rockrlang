@@ -21,13 +21,14 @@ use super::{
 };
 use crate::typecheck::inference::expr::report_field_mismatches;
 use crate::{
-    common::{diagnostic::Diag, location::Span},
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::templates_of_struct,
     parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId},
 };
 use itertools::EitherOrBoth;
+use rockr_base::Span;
+use rockr_base::diagnostic::Diag;
 use salsa::Accumulator;
 
 impl InferenceCtx<'_> {

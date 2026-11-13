@@ -15,14 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db,
-    common::{
-        location::Span,
-        symbols::{StrLit, Symbol},
-    },
-};
 use std::fmt;
+
+use rockr_base::{Db, Span, strlit::StrLit, symbol::Symbol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {

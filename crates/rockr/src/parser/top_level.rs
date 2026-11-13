@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    common::symbols::Symbol,
     lexer::TokenKind,
     parse_tree::{
         Spanned,
@@ -33,6 +32,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 use nonempty::nonempty;
+use rockr_base::symbol::Symbol;
 use salsa::Accumulator;
 use std::sync::Arc;
 

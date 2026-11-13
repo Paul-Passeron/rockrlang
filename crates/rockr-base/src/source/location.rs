@@ -15,9 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::{fmt::Display, path::PathBuf};
-
 use crate::{Db, SourceFile};
+use std::{fmt::Display, path::PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Location {
@@ -30,6 +29,41 @@ pub struct Span {
     pub file: SourceFile,
     pub start_offset: usize,
     pub end_offset: usize,
+}
+
+impl Span {
+    pub fn new(file: SourceFile, start: usize, end: usize) -> Self {
+        Self { file, start_offset: start.min(end), end_offset: start.max(end) }
+    }
+
+    pub fn start(self) -> Location {
+        Location { file: self.file, offset: self.start_offset }
+    }
+
+    pub fn end(self) -> Location {
+        Location { file: self.file, offset: self.end_offset }
+    }
+
+    pub fn encloses(&self, loc: Location) -> bool {
+        if self.file != loc.file {
+            return false;
+        }
+        if self.start_offset > loc.offset {
+            return false;
+        }
+        if self.end_offset < loc.offset {
+            return false;
+        }
+        true
+    }
+
+    pub fn len(&self) -> usize {
+        self.end_offset - self.start_offset
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl Location {
