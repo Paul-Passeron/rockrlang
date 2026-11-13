@@ -15,10 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    Db, SourceFile,
-    workspace::{config::Config, discover::ANCHOR_FILE_NAME},
-};
+use crate::{Db, SourceFile, workspace::config::Config};
 use dashmap::DashSet;
 use itertools::Itertools;
 use salsa::Setter;
@@ -39,36 +36,6 @@ pub struct Workspace {
 pub struct PackageRoot {
     pub name: String,
     pub file: SourceFile,
-}
-
-#[salsa::tracked(returns(copy))]
-pub fn is_file_direct_submodule_of_file(
-    db: &dyn Db,
-    parent: SourceFile,
-    child: SourceFile,
-) -> bool {
-    if parent == child {
-        return false;
-    }
-    let p_path = parent.path(db);
-    if p_path.file_name().unwrap() != ANCHOR_FILE_NAME {
-        return false;
-    }
-    let c_path = child.path(db);
-    let parent_dir = p_path.parent().unwrap();
-    let child_dir = c_path.parent().unwrap();
-
-    if parent_dir == child_dir {
-        return true;
-    }
-
-    if c_path.file_name().unwrap() == ANCHOR_FILE_NAME
-        && child_dir.parent() == Some(parent_dir)
-    {
-        return true;
-    }
-
-    false
 }
 
 impl Workspace {
