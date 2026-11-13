@@ -28,6 +28,7 @@ pub mod arch;
 pub mod collections;
 pub mod db;
 pub mod diagnostic;
+pub mod display;
 pub mod mutability;
 pub mod source;
 pub mod unused;
