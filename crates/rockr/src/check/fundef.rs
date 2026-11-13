@@ -25,11 +25,11 @@ use crate::{
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::type_expr::get_templates_of_fun,
     resolved::{
-        FunctionId, ScopeOwnerId, TypeRef,
-        concrete_ty::{ConcreteTy, Substitution},
+        FunctionId,
+        concrete_ty::{Substitution, concretize_fid},
     },
     thir_to_mir::mir,
-    typecheck::{conformance::method_impl_for, type_check_function},
+    typecheck::type_check_function,
 };
 use std::collections::HashSet;
 
@@ -122,28 +122,4 @@ pub fn reachable_mir_instances(
     }
 
     res
-}
-
-pub fn concretize_fid(
-    db: &dyn Db,
-    f_id: FunctionId,
-    callee_subs: &Substitution,
-    zelf: Option<ConcreteTy>,
-) -> Option<(FunctionId, Substitution)> {
-    let ScopeOwnerId::Interface(i_ref) = f_id.parent(db) else {
-        return Some((f_id, callee_subs.clone()));
-    };
-    let zelf = zelf?.as_type_id(db);
-    let is_static = f_id.receiver(db).is_static();
-    let arity = f_id.args(db).1.len();
-    let hint = Some(i_ref.def(db));
-    let method = method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint)?;
-    let empty = Substitution::empty();
-    let mut new_subs: Vec<ConcreteTy> = method
-        .subs
-        .iter()
-        .map(|ty| TypeRef::Concrete(*ty).to_concrete(db, &empty).unwrap())
-        .collect();
-    new_subs.extend(callee_subs.iter());
-    Some((method.method_id, Substitution::new(new_subs)))
 }

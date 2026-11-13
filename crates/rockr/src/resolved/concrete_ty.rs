@@ -20,12 +20,15 @@ use crate::{
     common::{arch::IntWidth, symbols::Symbol},
     name_resolve::type_expr::{struct_item, templates_of_struct},
     resolved::{
-        BuiltinTypeId, EnumId, InternedStructId, ScopeOwnerId, StructId, TypeDefId,
-        TypeId, TypeRef, char_id, int_id,
+        BuiltinTypeId, EnumId, FunctionId, InternedStructId, ScopeOwnerId, StructId,
+        TypeDefId, TypeId, TypeRef, char_id, int_id,
         type_ref::{ConstructorType, EnumRef, TyLike},
         usize_id,
     },
-    typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
+    typecheck::{
+        conformance::method_impl_for,
+        inference::implicit::{AsAstImplCtx, AstImplicitContext},
+    },
 };
 use std::marker::PhantomData;
 
@@ -367,4 +370,28 @@ pub fn int_ty_with_width(db: &dyn Db, width: IntWidth) -> ConcreteTy {
         IntWidth::I64 => usize_id(db),
         IntWidth::I128 => todo!(),
     }
+}
+
+pub fn concretize_fid(
+    db: &dyn Db,
+    f_id: FunctionId,
+    callee_subs: &Substitution,
+    zelf: Option<ConcreteTy>,
+) -> Option<(FunctionId, Substitution)> {
+    let ScopeOwnerId::Interface(i_ref) = f_id.parent(db) else {
+        return Some((f_id, callee_subs.clone()));
+    };
+    let zelf = zelf?.as_type_id(db);
+    let is_static = f_id.receiver(db).is_static();
+    let arity = f_id.args(db).1.len();
+    let hint = Some(i_ref.def(db));
+    let method = method_impl_for(db, zelf, f_id.name(db), arity, is_static, hint)?;
+    let empty = Substitution::empty();
+    let mut new_subs: Vec<ConcreteTy> = method
+        .subs
+        .iter()
+        .map(|ty| TypeRef::Concrete(*ty).to_concrete(db, &empty).unwrap())
+        .collect();
+    new_subs.extend(callee_subs.iter());
+    Some((method.method_id, Substitution::new(new_subs)))
 }

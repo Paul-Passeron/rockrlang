@@ -31,7 +31,6 @@ use crate::{
 };
 
 pub mod display;
-pub mod expr;
 pub mod stmt;
 
 pub type ExprId = Idx<ThirExpr>;

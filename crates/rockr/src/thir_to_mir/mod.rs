@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    check::fundef::concretize_fid,
     common::{
         diagnostic::Diag,
         location::Span,
@@ -39,7 +38,9 @@ use crate::{
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
         TypeRef, char_id,
-        concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
+        concrete_ty::{
+            ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution, concretize_fid,
+        },
         never_id, str_id,
         type_ref::{CastClass, EnumRef, StructRef, TyLike},
         void_id,

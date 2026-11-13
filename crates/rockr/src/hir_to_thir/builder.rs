@@ -25,8 +25,8 @@ use crate::{
     hir::{self, LocalInfo},
     resolved::{FunctionId, TypeRef},
     thir::{
-        ExprId, LocalId, PlaceId, Projection, ProjectionKind, ScopeId, Thir, ThirExpr,
-        ThirLocal, ThirPlace, ThirScope, stmt::ThirStmt,
+        ExprId, ExprKind, LocalId, PlaceId, Projection, ProjectionKind, ScopeId, Thir,
+        ThirExpr, ThirLocal, ThirPlace, ThirScope, stmt::ThirStmt,
     },
     typecheck::TypeCheckResults,
 };
@@ -159,5 +159,15 @@ impl<'db> ThirBuilder<'db> {
             source: None,
             is_synthetic: true,
         })
+    }
+
+    pub fn use_place(&self, place: PlaceId, span: Span) -> ThirExpr {
+        let thir_place = self.get_place(place);
+        ThirExpr {
+            kind: ExprKind::Use(place),
+            ty: thir_place.ty,
+            span,
+            is_synthetic: thir_place.is_synthetic,
+        }
     }
 }

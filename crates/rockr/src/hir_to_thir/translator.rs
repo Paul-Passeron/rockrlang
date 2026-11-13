@@ -636,7 +636,7 @@ impl<'db> ThirTranslator<'db> {
                             );
 
                             let field_value = if wrapped.depth() == 0 {
-                                b.new_expr(ThirExpr::use_place(field_place, b, span))
+                                b.new_expr(b.use_place(field_place, span))
                             } else {
                                 let mutability = if let Some(WrapKind::Ref(mutability)) =
                                     wrapped.refs.first()
@@ -995,7 +995,7 @@ impl<'db> ThirTranslator<'db> {
                                 Mutability::Const,
                             )
                         });
-                    b.new_expr(ThirExpr::use_place(place, b, span))
+                    b.new_expr(b.use_place(place, span))
                 }
                 ReceiverAdjustment::Ref => {
                     let place =
@@ -1051,7 +1051,7 @@ impl<'db> ThirTranslator<'db> {
                             cur_ty,
                         );
                     }
-                    b.new_expr(ThirExpr::use_place(place, b, span))
+                    b.new_expr(b.use_place(place, span))
                 }
                 ReceiverAdjustment::DerefThenRef(depth) => {
                     let mut place =
@@ -1110,7 +1110,7 @@ impl<'db> ThirTranslator<'db> {
             }
         } else {
             let place = Self::spill_to_temp(b, stmts, thir_receiver, Mutability::Const);
-            b.new_expr(ThirExpr::use_place(place, b, span))
+            b.new_expr(b.use_place(place, span))
         }
     }
 
