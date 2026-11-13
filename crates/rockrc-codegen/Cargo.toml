@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 rockr-base.workspace = true
+rockr-syntax.workspace = true
 rockr.workspace = true
 
 generativity.workspace = true

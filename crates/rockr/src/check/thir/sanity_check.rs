@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::signature::get_sig_of_function,
-    parse_tree::expr::BinaryOperator,
     resolved::{
         ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
@@ -35,6 +34,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 use salsa::Accumulator;
 use std::collections::HashSet;
 

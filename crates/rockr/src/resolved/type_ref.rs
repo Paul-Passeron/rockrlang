@@ -19,16 +19,15 @@ use std::collections::HashMap;
 
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 
-use super::{
-    BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of, usize_id,
-};
 use crate::{
-    parse_tree::top_level::AstEnumVariantKind,
     resolved::{
-        AdtLike, EnumId, ScopeOwnerId, StructId, slice_of, type_printer::TypePrinter,
+        AdtLike, BuiltinTypeId, BuiltinTypeKind, EnumId, PtrKind, ScopeOwnerId, StructId,
+        TypeDefId, TypeId, TypeRef, ref_of, slice_of, type_printer::TypePrinter,
+        usize_id,
     },
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
+use rockr_syntax::parse_tree::top_level::AstEnumVariantKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CastClass {

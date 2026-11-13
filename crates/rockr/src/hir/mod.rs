@@ -23,16 +23,6 @@ use crate::{
         module_items,
         type_expr::{get_templates_of_fun, resolve_type_expr},
     },
-    parse_tree::{
-        Spanned,
-        expr::BinaryOperator,
-        stmt::AstStmt,
-        top_level::{
-            AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstInterfaceItem,
-            AstMethodDef, AstMethodsig, AstReceiver, AstTemplateArg, AstTopLevelItemDesc,
-        },
-        type_expr::{AstAnyTypeExpr, AstTypeExpr},
-    },
     resolved::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
@@ -44,6 +34,16 @@ use rockr_base::{
     strlit::StrLit,
     symbol::Symbol,
     timing::{Counts, Phase, timed},
+};
+use rockr_syntax::parse_tree::{
+    Spanned,
+    expr::BinaryOperator,
+    stmt::AstStmt,
+    top_level::{
+        AstFundef, AstFundefArg, AstFunsig, AstImplItem, AstInterfaceItem, AstMethodDef,
+        AstMethodsig, AstReceiver, AstTemplateArg, AstTopLevelItemDesc,
+    },
+    type_expr::{AstAnyTypeExpr, AstTypeExpr},
 };
 use std::sync::Arc;
 

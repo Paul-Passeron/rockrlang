@@ -20,15 +20,15 @@ use rockr_base::{
     workspace::Workspace,
 };
 
-use crate::{
+use crate::resolved::{
+    FileModule, InternedModuleId, ModuleId, Package, packages::workspace_packages,
+};
+use rockr_syntax::{
     parse_tree::{
         ParseError,
         top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     },
     parser::parse_file,
-    resolved::{
-        FileModule, InternedModuleId, ModuleId, Package, packages::workspace_packages,
-    },
 };
 
 pub mod definition;

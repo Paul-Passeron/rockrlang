@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    display::Display,
+    Display,
     parse_tree::{
         ParseError, Spanned,
         annotation::AstAnnotation,
@@ -385,5 +385,48 @@ impl From<NonEmpty<Spanned<Symbol>>> for AstIncludePath {
                 )
             },
         )
+    }
+}
+
+impl AstIncludePathDesc {
+    pub fn to_segments(&self) -> Option<NonEmpty<Symbol>> {
+        fn to_segments_aux(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
+            match this {
+                AstIncludePathDesc::Symbol(symbol) => {
+                    v.push(*symbol);
+                }
+                AstIncludePathDesc::NameResolved { from, to } => {
+                    v.push(*from);
+                    to_segments_aux(&to.data, v);
+                }
+                AstIncludePathDesc::Error => unreachable!(),
+            }
+        }
+        let (hd, tl) = match self {
+            Self::Symbol(symbol) => Some((*symbol, None)),
+            Self::NameResolved { from, to } => Some((*from, Some(to))),
+            Self::Error => None,
+        }?;
+        let mut res = NonEmpty::singleton(hd);
+        if let Some(rest) = tl {
+            to_segments_aux(&rest.data, &mut res);
+        }
+        Some(res)
+    }
+}
+
+impl AstImplItem {
+    pub fn name(&self) -> Symbol {
+        match self {
+            Self::Type { name, .. } => *name,
+            Self::Fundef(fdef) => fdef.data.name.data,
+        }
+    }
+
+    pub fn name_span(&self) -> Span {
+        match self {
+            Self::Type { name_span, .. } => *name_span,
+            Self::Fundef(fdef) => fdef.data.name.span,
+        }
     }
 }

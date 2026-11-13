@@ -14,17 +14,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 use crate::{
     hir::{function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         interfaces::interface_item,
         module_items,
-    },
-    parse_tree::{
-        top_level::{AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
-        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
     },
     resolved::{
         EnumId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
@@ -34,6 +29,10 @@ use crate::{
 };
 use itertools::Itertools;
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
+use rockr_syntax::parse_tree::{
+    top_level::{AstEnumDef, AstStructDef, AstTemplateArg, AstTopLevelItemDesc},
+    type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
+};
 use std::sync::Arc;
 
 pub fn resolve_any_type_expr<'db>(

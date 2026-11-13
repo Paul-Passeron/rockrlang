@@ -17,9 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 
-use crate::{
-    hir::interface_items, parse_tree::top_level::AstInterfaceItem, resolved::InterfaceId,
-};
+use crate::{hir::interface_items, resolved::InterfaceId};
 use std::collections::{HashMap, hash_map::Entry};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {
@@ -41,22 +39,6 @@ fn check_ambiguous_interface_items(db: &dyn Db, interface: InterfaceId) {
                 ),
                 item.name_span(),
             );
-        }
-    }
-}
-
-impl AstInterfaceItem {
-    pub fn name(&self) -> Symbol {
-        match self {
-            Self::Type(arg) => arg.name,
-            Self::Sig(sig) => sig.data.name.data,
-        }
-    }
-
-    pub fn name_span(&self) -> Span {
-        match self {
-            Self::Type(arg) => arg.name_span,
-            Self::Sig(sig) => sig.data.name.span,
         }
     }
 }

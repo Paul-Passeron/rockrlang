@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     hir::{Mutability, function_ast},
     name_resolve::type_expr::{get_templates_of_fun_only, templates_of_owner},
-    parse_tree::top_level::{AstReceiver, AstTemplateArg},
     resolved::{
         BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeId, TypeRef,
         ptr_of, ref_of,
@@ -30,6 +29,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rockr_base::{Db, symbol::Symbol};
+use rockr_syntax::parse_tree::top_level::{AstReceiver, AstTemplateArg};
 use std::{fmt, sync::Arc};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -85,27 +85,25 @@ pub struct FunctionSignature {
     pub ret: TypeRef,
 }
 
-impl AstReceiver {
-    pub fn as_zelf_arg(&self) -> Option<ZelfArg> {
-        let mutability = match self {
-            Self::None => {
-                return None;
-            }
-            Self::MutZelf(_) | Self::MutRefZelf(_) | Self::MutPtrZelf(_) => {
-                Mutability::Mutable
-            }
-            _ => Mutability::Const,
-        };
-        let kind = match self {
-            Self::None => {
-                return None;
-            }
-            Self::Zelf(_) | Self::MutZelf(_) => ZelfKind::Zelf,
-            Self::RefZelf(_) | Self::MutRefZelf(_) => ZelfKind::RefZelf,
-            Self::PtrZelf(_) | Self::MutPtrZelf(_) => ZelfKind::PtrZelf,
-        };
-        Some(ZelfArg { mutability, kind })
-    }
+pub fn receiver_as_zelf_arg(receiver: AstReceiver) -> Option<ZelfArg> {
+    let mutability = match receiver {
+        AstReceiver::None => {
+            return None;
+        }
+        AstReceiver::MutZelf(_)
+        | AstReceiver::MutRefZelf(_)
+        | AstReceiver::MutPtrZelf(_) => Mutability::Mutable,
+        _ => Mutability::Const,
+    };
+    let kind = match receiver {
+        AstReceiver::None => {
+            return None;
+        }
+        AstReceiver::Zelf(_) | AstReceiver::MutZelf(_) => ZelfKind::Zelf,
+        AstReceiver::RefZelf(_) | AstReceiver::MutRefZelf(_) => ZelfKind::RefZelf,
+        AstReceiver::PtrZelf(_) | AstReceiver::MutPtrZelf(_) => ZelfKind::PtrZelf,
+    };
+    Some(ZelfArg { mutability, kind })
 }
 
 impl fmt::Display for ZelfArg {
@@ -151,7 +149,7 @@ pub fn get_sig_of_function(
             })
             .collect_vec();
     let ast = function_ast(db, function_id);
-    let zelf = ast.inner(db).receiver().and_then(|r| r.as_zelf_arg());
+    let zelf = ast.inner(db).receiver().and_then(receiver_as_zelf_arg);
     let args: Vec<_> = ast
         .inner(db)
         .get_args()

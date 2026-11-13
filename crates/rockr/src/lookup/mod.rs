@@ -15,8 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr_base::{Db, Location, SourceFile, Span, workspace::Workspace};
-
 use crate::{
     hir::{impl_items, interface_items},
     hir_to_thir::thir_body,
@@ -29,12 +27,15 @@ use crate::{
     name_resolve::{
         definition::Definition, file_module_id, implems::module_impls, module_items,
     },
-    parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTopLevelItemDesc},
     resolved::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef, packages::workspace_packages,
     },
     thir::Thir,
+};
+use rockr_base::{Db, Location, SourceFile, Span, workspace::Workspace};
+use rockr_syntax::parse_tree::top_level::{
+    AstImplItem, AstInterfaceItem, AstTopLevelItemDesc,
 };
 
 pub mod path;

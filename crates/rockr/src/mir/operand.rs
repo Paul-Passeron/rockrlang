@@ -21,14 +21,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 // Some ideas:
 // - Differentiate between shared / mutable borrow deref ?
 
-use rockr_base::{Db, Span, bitset::BitSet, mutability::Mutability, symbol::Symbol};
-
 use crate::{
     mir::{
         Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
         RValueKind,
     },
-    parse_tree::expr::BinaryOperator,
     resolved::{
         bool_id, char_id,
         concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
@@ -36,6 +33,8 @@ use crate::{
     },
     thir::FunctionRef,
 };
+use rockr_base::{Db, Span, bitset::BitSet, mutability::Mutability, symbol::Symbol};
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::once,

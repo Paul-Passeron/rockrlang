@@ -20,10 +20,10 @@ use crate::mir::{
     basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
     operand::{
         MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace, MIRProjection,
-        MIRProjectionKind, MIRRValue, MIRRValueKind,
+        MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
     },
 };
-use crate::{mir::operand::UnaryOperator, parse_tree::expr::BinaryOperator};
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 use std::fmt;
 
 pub mod graphviz;

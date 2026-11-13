@@ -18,7 +18,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 
 use crate::{
-    parse_tree::type_expr::AstTypeExprDesc,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
         rehole, str_def,
@@ -29,6 +28,7 @@ use crate::{
         implicit::{AsAstImplCtx, ImplicitContext},
     },
 };
+use rockr_syntax::parse_tree::type_expr::AstTypeExprDesc;
 use std::{collections::HashMap, sync::Arc};
 
 impl InferenceCtx<'_> {

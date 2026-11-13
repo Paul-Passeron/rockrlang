@@ -23,16 +23,13 @@ use crate::lir::{
     inst::{CastKind, Terminator},
 };
 use itertools::Itertools;
-use rockr::layout::target_width;
-use rockr::mir::FuncInst;
-use rockr::resolved::type_ref::ConstructorType;
 use rockr::{
     layout::{
         AggregateLayout, LIRTy, LayoutData, LayoutID, Offset, ScalarKind,
-        fat_ptr::FAT_PTR_DATA_FIELD, layout_of,
+        fat_ptr::FAT_PTR_DATA_FIELD, layout_of, target_width,
     },
     mir::{
-        MIRBlockID, MIRLocalID, Mir,
+        FuncInst, MIRBlockID, MIRLocalID, Mir,
         basic_block::{MIRBasicBlock, MIRTerminator, Stmt},
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
@@ -40,16 +37,14 @@ use rockr::{
         },
     },
     name_resolve::type_expr::struct_item,
-    parse_tree::expr::BinaryOperator,
     resolved::{
         TypeDefId, array_of, bool_id,
         concrete_ty::ConcreteTy,
-        type_ref::{CastClass, TyLike},
+        type_ref::{CastClass, ConstructorType, TyLike},
     },
 };
-use rockr_base::Db;
-use rockr_base::lang::arch::IntWidth;
-use rockr_base::symbol::Symbol;
+use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 use std::{cmp::Ordering, collections::HashMap, ops::Index};
 
 pub struct MIRMap<'a> {

@@ -22,7 +22,6 @@ use crate::{
         signature::{ZelfArg, get_sig_of_function},
     },
     name_resolve::implems::impls_in_package,
-    parse_tree::top_level::{AstImplItem, AstInterfaceItem},
     resolved::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
         InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
@@ -30,9 +29,12 @@ use crate::{
     },
 };
 use itertools::Itertools;
-use rockr_base::symbol::{InternedSymbol, Symbol};
-use rockr_base::workspace::Workspace;
-use rockr_base::{Db, Span};
+use rockr_base::{
+    Db, Span,
+    symbol::{InternedSymbol, Symbol},
+    workspace::Workspace,
+};
+use rockr_syntax::parse_tree::top_level::{AstImplItem, AstInterfaceItem};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, PartialEq, Eq, Hash)]

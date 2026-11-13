@@ -24,7 +24,6 @@ use crate::{
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
         HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern,
     },
-    parse_tree::expr::BinaryOperator,
     resolved::TypeDefId,
 };
 use std::fmt::{self, Formatter};
@@ -32,29 +31,6 @@ use std::fmt::{self, Formatter};
 impl<'db> HirBody<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> Display<'db, &'db Self> {
         Display { value: self, db }
-    }
-}
-
-impl fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Plus => write!(f, "+"),
-            Self::Minus => write!(f, "-"),
-            Self::Times => write!(f, "*"),
-            Self::Div => write!(f, "/"),
-            Self::Modulo => write!(f, "%"),
-            Self::Eq => write!(f, "=="),
-            Self::Diff => write!(f, "!="),
-            Self::Lt => write!(f, "<"),
-            Self::Leq => write!(f, "<="),
-            Self::Gt => write!(f, ">"),
-            Self::Geq => write!(f, ">="),
-            Self::And => write!(f, "&&"),
-            Self::Or => write!(f, "||"),
-            Self::BitAnd => write!(f, "&"),
-            Self::BitOr => write!(f, "|"),
-            Self::BitXor => write!(f, "^"),
-        }
     }
 }
 

@@ -23,10 +23,6 @@ use crate::{
     name_resolve::type_expr::{
         get_templates_of_fun, struct_item, templates_of_enum, templates_of_struct,
     },
-    parse_tree::{
-        expr::BinaryOperator,
-        top_level::{AstEnumVariantKind, AstStructDefField},
-    },
     resolved::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
@@ -38,6 +34,10 @@ use crate::{
 };
 use itertools::Itertools;
 use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
+use rockr_syntax::parse_tree::{
+    expr::BinaryOperator,
+    top_level::{AstEnumVariantKind, AstStructDefField},
+};
 use salsa::Accumulator;
 use std::{
     collections::{HashMap, HashSet},

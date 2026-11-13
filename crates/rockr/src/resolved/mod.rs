@@ -15,15 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    name_resolve::type_expr::{templates_of_enum, templates_of_struct},
-    parse_tree::top_level::{AstImplItem, AstTemplateArg},
-};
+use crate::name_resolve::type_expr::{templates_of_enum, templates_of_struct};
 pub use plumbing::*;
 use rockr_base::{
     Db, SourceFile, Span, lang::arch::IntWidth, mutability::Mutability, symbol::Symbol,
     unord::Set,
 };
+use rockr_syntax::parse_tree::top_level::{AstImplItem, AstTemplateArg};
 use type_printer::TypePrinter;
 
 pub mod concrete_ty;

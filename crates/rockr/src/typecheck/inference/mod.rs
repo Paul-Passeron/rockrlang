@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     display::Display,
-    hir::LocalId,
+    hir::{LocalId, signature::receiver_as_zelf_arg},
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -27,7 +27,6 @@ use crate::{
             templates_of_struct,
         },
     },
-    parse_tree::top_level::AstTemplateArg,
     resolved::{
         BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
         TypeParamId, TypeRef, type_printer::TypePrinter, type_ref::TyLike,
@@ -45,6 +44,7 @@ use ena::unify::{InPlace, UnificationTable, UnifyValue};
 use itertools::Itertools;
 use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use rockr_constraint_solver::ConstraintSolver;
+use rockr_syntax::parse_tree::top_level::AstTemplateArg;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt, mem,
@@ -211,7 +211,7 @@ impl<'db> InferenceCtx<'db> {
                 .expect("First local type unification should not fail");
         }
 
-        match (func.receiver(db).as_zelf_arg(), zelf_ty) {
+        match (receiver_as_zelf_arg(func.receiver(db)), zelf_ty) {
             (Some(arg), Some(zelf_ty)) => {
                 let ty = arg.get_zelf_type_for(db, zelf_ty);
                 let local_ty = this.local_var(

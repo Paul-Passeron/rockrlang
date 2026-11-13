@@ -15,13 +15,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr_base::{Db, diagnostic::Diag, symbol::Symbol};
-
 use crate::{
-    parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
+use rockr_base::{Db, diagnostic::Diag, symbol::Symbol};
+use rockr_syntax::parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind};
 use std::collections::HashSet;
 
 pub fn check_typedef(db: &dyn Db, typedef: TypeDefId) {

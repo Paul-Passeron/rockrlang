@@ -21,8 +21,6 @@ use crate::{
         builtin_module, core_module, core_package, file_module_id,
         interfaces::interface_item, module_items, std_module,
     },
-    parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
-    parser::parse_file,
     resolved::{
         EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
         StructId, TypeDefId, bool_id, char_id, i8_id, i16_id, i32_id, i64_id, i128_id,
@@ -34,6 +32,10 @@ use nonempty::NonEmpty;
 use rockr_base::{
     Db, Span,
     symbol::{InternedSymbol, Symbol},
+};
+use rockr_syntax::{
+    parse_tree::top_level::{AstTopLevelItem, AstTopLevelItemDesc},
+    parser::parse_file,
 };
 use std::collections::BTreeMap;
 
@@ -264,33 +266,6 @@ pub fn builtin_definitions(db: &dyn Db) -> BTreeMap<Symbol, Definition> {
     });
 
     res
-}
-
-impl AstIncludePathDesc {
-    pub fn to_segments(&self) -> Option<NonEmpty<Symbol>> {
-        fn to_segments_aux(this: &AstIncludePathDesc, v: &mut NonEmpty<Symbol>) {
-            match this {
-                AstIncludePathDesc::Symbol(symbol) => {
-                    v.push(*symbol);
-                }
-                AstIncludePathDesc::NameResolved { from, to } => {
-                    v.push(*from);
-                    to_segments_aux(&to.data, v);
-                }
-                AstIncludePathDesc::Error => unreachable!(),
-            }
-        }
-        let (hd, tl) = match self {
-            Self::Symbol(symbol) => Some((*symbol, None)),
-            Self::NameResolved { from, to } => Some((*from, Some(to))),
-            Self::Error => None,
-        }?;
-        let mut res = NonEmpty::singleton(hd);
-        if let Some(rest) = tl {
-            to_segments_aux(&rest.data, &mut res);
-        }
-        Some(res)
-    }
 }
 
 #[salsa::tracked(returns(deref))]

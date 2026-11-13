@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use rockr_base::{Db, symbol::Symbol};
+use rockr_syntax::parse_tree::top_level::{AstInterface, AstTopLevelItemDesc};
 
 use crate::{
     name_resolve::{
@@ -23,7 +24,6 @@ use crate::{
         definition::{Definition, resolve_in_module},
         module_items,
     },
-    parse_tree::top_level::{AstInterface, AstTopLevelItemDesc},
     resolved::{
         EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId, StructId,
         TypeDefId,

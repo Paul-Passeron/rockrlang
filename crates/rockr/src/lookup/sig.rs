@@ -19,16 +19,16 @@ use crate::{
     hir::FunctionLikeAst,
     lookup::enclosing_fun,
     name_resolve::type_expr::templates_of_owner,
-    parse_tree::{
-        Spanned,
-        top_level::{AstFundefArg, AstTemplateArg},
-        type_expr::AstTypeExpr,
-    },
     resolved::{FunctionId, InterfaceRef, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use itertools::Itertools;
 use rockr_base::{Db, Location, SourceFile, Span, symbol::Symbol};
+use rockr_syntax::parse_tree::{
+    Spanned,
+    top_level::{AstFundefArg, AstTemplateArg},
+    type_expr::AstTypeExpr,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FunctionParam {

@@ -14,13 +14,8 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-
 use crate::{
     hir::interface_items,
-    parse_tree::{
-        expr::BinaryOperator,
-        top_level::{AstInterfaceItem, AstMethodsig},
-    },
     resolved::{
         FunctionId, ImplSource, InterfaceId, InterfaceRef, PtrKind, ScopeOwnerId, TypeId,
         TypeRef,
@@ -36,6 +31,10 @@ use crate::{
 use itertools::Itertools;
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 use rockr_constraint_solver::{ProbeOutcome, SolverHost, SolverHostExt};
+use rockr_syntax::parse_tree::{
+    expr::BinaryOperator,
+    top_level::{AstInterfaceItem, AstMethodsig},
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt,

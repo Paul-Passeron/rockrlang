@@ -20,10 +20,10 @@ use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use crate::{
     check::fundef::check_fundef,
     hir::{impl_items, signature::ZelfArg},
-    parse_tree::top_level::AstImplItem,
     resolved::{FunctionId, ImplSource, ScopeOwnerId},
     typecheck::conformance::{ConformanceError, interface_conformance_errors},
 };
+use rockr_syntax::parse_tree::top_level::AstImplItem;
 use std::collections::HashMap;
 
 pub fn check_implem<'db>(db: &'db dyn Db, implem: ImplSource<'db>) {
@@ -176,21 +176,5 @@ fn describe_receiver(zelf: Option<ZelfArg>) -> String {
     match zelf {
         Some(z) => z.to_string(),
         None => "no receiver".to_owned(),
-    }
-}
-
-impl AstImplItem {
-    pub fn name(&self) -> Symbol {
-        match self {
-            Self::Type { name, .. } => *name,
-            Self::Fundef(fdef) => fdef.data.name.data,
-        }
-    }
-
-    pub fn name_span(&self) -> Span {
-        match self {
-            Self::Type { name_span, .. } => *name_span,
-            Self::Fundef(fdef) => fdef.data.name.span,
-        }
     }
 }

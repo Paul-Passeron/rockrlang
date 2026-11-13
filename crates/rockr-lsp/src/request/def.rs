@@ -28,11 +28,11 @@ use rockr::{
         module_items,
         type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_owner},
     },
-    parse_tree::top_level::{AstTemplateArg, AstTopLevelItemDesc},
     resolved::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 use rockr_base::{Location, Span};
+use rockr_syntax::parse_tree::top_level::{AstTemplateArg, AstTopLevelItemDesc};
 
 impl Lsp<'_> {
     pub fn handle_goto_def(

@@ -15,20 +15,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::{
-    Definition, HashMap, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId,
-    PatternId, StructId, Symbol, TypeDefId, TypeInferenceError,
-};
+use std::collections::HashMap;
+
 use crate::typecheck::inference::expr::report_field_mismatches;
+use crate::typecheck::inference::{
+    Definition, ImplicitContext, InferTy, InferenceCtx, Itertools, LocalId, PatternId,
+    StructId, Symbol, TypeDefId, TypeInferenceError,
+};
 use crate::{
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::templates_of_struct,
-    parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind},
     resolved::{EnumId, ScopeOwnerId},
 };
 use itertools::EitherOrBoth;
-use rockr_base::Span;
-use rockr_base::diagnostic::Diag;
+use rockr_base::{Span, diagnostic::Diag};
+use rockr_syntax::parse_tree::top_level::{AstEnumVariant, AstEnumVariantKind};
 use salsa::Accumulator;
 
 impl InferenceCtx<'_> {

@@ -21,7 +21,6 @@ use crate::{
         operand::{MIRPlace, MIRProjection, MIRProjectionKind},
     },
     name_resolve::type_expr::enum_item,
-    parse_tree::top_level::AstEnumVariantKind,
     resolved::{
         bool_id,
         concrete_ty::{ConcreteTy, Substitution},
@@ -32,6 +31,7 @@ use crate::{
 };
 use itertools::Itertools;
 use rockr_base::{Db, symbol::Symbol};
+use rockr_syntax::parse_tree::top_level::AstEnumVariantKind;
 use std::collections::{BTreeSet, HashSet};
 
 // Compiling pattern matching to decision tree, inspired by

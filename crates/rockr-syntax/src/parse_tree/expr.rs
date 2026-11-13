@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::fmt::{self, Formatter};
+
 use rockr_base::{Span, strlit::StrLit, symbol::Symbol};
 
 use crate::parse_tree::{
@@ -149,4 +151,27 @@ pub enum BinaryOperator {
     BitAnd,
     BitOr,
     BitXor,
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Plus => write!(f, "+"),
+            Self::Minus => write!(f, "-"),
+            Self::Times => write!(f, "*"),
+            Self::Div => write!(f, "/"),
+            Self::Modulo => write!(f, "%"),
+            Self::Eq => write!(f, "=="),
+            Self::Diff => write!(f, "!="),
+            Self::Lt => write!(f, "<"),
+            Self::Leq => write!(f, "<="),
+            Self::Gt => write!(f, ">"),
+            Self::Geq => write!(f, ">="),
+            Self::And => write!(f, "&&"),
+            Self::Or => write!(f, "||"),
+            Self::BitAnd => write!(f, "&"),
+            Self::BitOr => write!(f, "|"),
+            Self::BitXor => write!(f, "^"),
+        }
+    }
 }

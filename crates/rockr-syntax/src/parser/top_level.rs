@@ -32,7 +32,7 @@ use crate::{
     parser::{ParseError, ParseErrorKind, Parser},
 };
 use nonempty::nonempty;
-use rockr_base::symbol::Symbol;
+use rockr_base::{Span, symbol::Symbol};
 use salsa::Accumulator;
 use std::sync::Arc;
 
@@ -760,6 +760,22 @@ impl Parser<'_> {
                 ))
             }
             _ => Err(self.parse_error(ParseErrorKind::NotATopLevelItem)),
+        }
+    }
+}
+
+impl AstInterfaceItem {
+    pub fn name(&self) -> Symbol {
+        match self {
+            Self::Type(arg) => arg.name,
+            Self::Sig(sig) => sig.data.name.data,
+        }
+    }
+
+    pub fn name_span(&self) -> Span {
+        match self {
+            Self::Type(arg) => arg.name_span,
+            Self::Sig(sig) => sig.data.name.span,
         }
     }
 }

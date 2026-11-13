@@ -15,10 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr_base::symbol::Symbol;
-
 use crate::{
-    parse_tree::expr::BinaryOperator,
     resolved::InterfaceId,
     typecheck::{
         ExprId,
@@ -29,6 +26,8 @@ use crate::{
         },
     },
 };
+use rockr_base::symbol::Symbol;
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 
 impl InferenceCtx<'_> {
     pub fn emit_constraint(&mut self, constraint: InferenceConstraintKind) {

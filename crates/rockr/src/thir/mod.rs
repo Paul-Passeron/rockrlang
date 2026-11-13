@@ -15,19 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use rockr_base::arena::{Arena, Idx};
-use rockr_base::mutability::Mutability;
-use rockr_base::strlit::StrLit;
-use rockr_base::symbol::Symbol;
-use rockr_base::{Db, Span};
-
-use crate::resolved::type_ref::{EnumRef, StructRef};
 use crate::{
     hir::{self, function_ast},
-    parse_tree::expr::BinaryOperator,
+    resolved::type_ref::{EnumRef, StructRef},
     resolved::{FunctionId, InterfaceRef, TypeRef},
     thir::stmt::ThirStmt,
 };
+use rockr_base::{
+    Db, Span,
+    arena::{Arena, Idx},
+    mutability::Mutability,
+    strlit::StrLit,
+    symbol::Symbol,
+};
+use rockr_syntax::parse_tree::expr::BinaryOperator;
 
 pub mod display;
 pub mod stmt;

@@ -21,17 +21,17 @@ use crate::{
     hir_to_thir::thir_body,
     lookup::{enclosing_fun, enclosing_scope_owner},
     name_resolve::{interfaces::interface_item, module_items},
-    parse_tree::{
-        expr::{AstExpr, AstExprDesc},
-        stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
-        top_level::{
-            AstEnumDef, AstEnumVariantKind, AstFunsig, AstImplItem, AstInterfaceItem,
-            AstStructDef, AstTopLevelItemDesc,
-        },
-        type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
-    },
     resolved::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
+};
+use rockr_syntax::parse_tree::{
+    expr::{AstExpr, AstExprDesc},
+    stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
+    top_level::{
+        AstEnumDef, AstEnumVariantKind, AstFunsig, AstImplItem, AstInterfaceItem,
+        AstStructDef, AstTopLevelItemDesc,
+    },
+    type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

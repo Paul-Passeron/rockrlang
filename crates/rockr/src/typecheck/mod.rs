@@ -21,7 +21,6 @@ use crate::{
         HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
     },
     name_resolve::type_expr::get_templates_of_fun,
-    parse_tree::{top_level::AstTemplateArg, type_expr::AstAnyTypeExpr},
     resolved::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
@@ -33,6 +32,7 @@ use rockr_base::{
     timing::{Counts, Phase, timed},
 };
 use rockr_constraint_solver::SolverHostExt;
+use rockr_syntax::parse_tree::{top_level::AstTemplateArg, type_expr::AstAnyTypeExpr};
 use std::{collections::BTreeMap, panic, sync::Arc};
 
 pub mod conformance;

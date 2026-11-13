@@ -21,14 +21,14 @@ use crate::{
         module_items, modules_in_package,
         type_expr::{resolve_any_type_expr, resolve_type_expr},
     },
-    parse_tree::{
-        top_level::{AstTemplateArg, AstTopLevelItemDesc},
-        type_expr::{AstTypeExpr, AstTypeExprDesc},
-    },
     resolved::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
 use itertools::Itertools;
 use rockr_base::{Db, diagnostic::Diag, unord::Set};
+use rockr_syntax::parse_tree::{
+    top_level::{AstTemplateArg, AstTopLevelItemDesc},
+    type_expr::{AstTypeExpr, AstTypeExprDesc},
+};
 
 pub fn resolve_type_expr_as_interface<'db>(
     db: &'db dyn Db,

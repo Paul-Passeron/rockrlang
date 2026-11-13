@@ -26,7 +26,6 @@ use rockr::{
         definition::Definition,
         type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     },
-    parse_tree::top_level::AstTemplateArg,
     resolved::{FunctionId, TypeDefId, TypeParamId, TypeRef, type_ref::StructRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
@@ -34,6 +33,7 @@ use rockr::{
     },
 };
 use rockr_base::{Location, Span, symbol::Symbol};
+use rockr_syntax::parse_tree::top_level::AstTemplateArg;
 
 impl Lsp<'_> {
     pub(super) fn handle_hover(&self, params: HoverParams) -> Option<Hover> {

@@ -21,10 +21,6 @@ use crate::{
         definition::{Definition, resolve_in_module},
         type_expr::{get_templates_of_fun, templates_of_owner},
     },
-    parse_tree::{
-        top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
-        type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
-    },
     resolved::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
         array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
@@ -32,6 +28,10 @@ use crate::{
     typecheck::inference::InferTy,
 };
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol, unused};
+use rockr_syntax::parse_tree::{
+    top_level::{AstImplItem, AstInterfaceItem, AstTemplateArg},
+    type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
+};
 use std::sync::Arc;
 
 pub struct AstImplicitContext {

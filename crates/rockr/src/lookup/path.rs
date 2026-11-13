@@ -24,21 +24,21 @@ use crate::{
         interfaces::interface_item,
         module_items,
     },
-    parse_tree::{
-        expr::{AstExpr, AstExprDesc},
-        pattern::{
-            AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc,
-            StructFieldPattern,
-        },
-        stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
-        top_level::{
-            AstEnumDef, AstEnumVariant, AstEnumVariantKind, AstFundef, AstFundefArg,
-            AstFunsig, AstImplItem, AstInterfaceItem, AstMethodDef, AstMethodsig,
-            AstStructDef, AstTemplateArg, AstTopLevelItemDesc,
-        },
-        type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
-    },
     resolved::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
+};
+use rockr_syntax::parse_tree::{
+    expr::{AstExpr, AstExprDesc},
+    pattern::{
+        AstConstructFields, AstNamedPattern, AstPattern, AstPatternDesc,
+        StructFieldPattern,
+    },
+    stmt::{AstMatchBranch, AstStmt, AstStmtDesc},
+    top_level::{
+        AstEnumDef, AstEnumVariant, AstEnumVariantKind, AstFundef, AstFundefArg,
+        AstFunsig, AstImplItem, AstInterfaceItem, AstMethodDef, AstMethodsig,
+        AstStructDef, AstTemplateArg, AstTopLevelItemDesc,
+    },
+    type_expr::{AstAnyTypeExpr, AstAnyTypeExprDesc, AstTypeExpr, AstTypeExprDesc},
 };
 
 pub fn path_node_at(db: &dyn Db, loc: Location) -> Option<(Definition, Span)> {
