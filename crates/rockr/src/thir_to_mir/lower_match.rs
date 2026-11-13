@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::arch::IntWidth;
+use crate::resolved::concrete_ty::int_ty_with_witdh;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -26,10 +26,7 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
-    resolved::{
-        TypeDefId, TypeId, TypeRef, char_id, concrete_ty::ConcreteTy, int_id, ref_of,
-        usize_id,
-    },
+    resolved::{TypeDefId, TypeId, TypeRef, concrete_ty::ConcreteTy, ref_of},
     thir::{EnumRef, StructRef, ThirMatchBranch},
     thir_to_mir::{
         ThirToMIR,
@@ -283,15 +280,5 @@ impl ThirToMIR<'_> {
             };
         }
         res
-    }
-}
-
-pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> ConcreteTy {
-    match width {
-        IntWidth::I8 => char_id(db),
-        IntWidth::I16 => todo!(),
-        IntWidth::I32 => int_id(db),
-        IntWidth::I64 => usize_id(db),
-        IntWidth::I128 => todo!(),
     }
 }

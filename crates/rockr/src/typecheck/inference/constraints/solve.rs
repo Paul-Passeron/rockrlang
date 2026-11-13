@@ -15,7 +15,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
     common::symbols::Symbol,
@@ -27,9 +26,10 @@ use crate::{
     },
     resolved::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef, type_ref::CastClass,
+        TypeDefId, TypeId, TypeRef,
+        concrete_ty::int_ty_with_witdh,
+        type_ref::{CastClass, TyLike},
     },
-    thir_to_mir::lower_match::int_ty_with_witdh,
     typecheck::{
         CallKind, ExprId, InferCallInfos, ReceiverAdjustment,
         conformance::{MethodImpl, method_impl_for},

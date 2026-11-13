@@ -18,11 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     check::thir::sanity_check::ConstructorType,
-    common::symbols::Symbol,
+    common::{arch::IntWidth, symbols::Symbol},
     name_resolve::type_expr::{struct_item, templates_of_struct},
     resolved::{
         BuiltinTypeId, EnumId, InternedStructId, ScopeOwnerId, StructId, TypeDefId,
-        TypeId, TypeRef, type_ref::TyLike,
+        TypeId, TypeRef, char_id, int_id, type_ref::TyLike, usize_id,
     },
     thir,
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
@@ -356,5 +356,15 @@ impl<'db> InternedConcreteStructRef<'db> {
         self.def(db)
             .declared_typeof_field(db, field)?
             .to_concrete(db, &Substitution::new(self.args(db).iter().copied()))
+    }
+}
+
+pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> ConcreteTy {
+    match width {
+        IntWidth::I8 => char_id(db),
+        IntWidth::I16 => todo!(),
+        IntWidth::I32 => int_id(db),
+        IntWidth::I64 => usize_id(db),
+        IntWidth::I128 => todo!(),
     }
 }
