@@ -68,8 +68,8 @@ fn module_path_node_at(
     module_items(db, module.into()).as_ref()?.iter().find_map(|item| {
         item.span.encloses(loc).then_some(())?;
         match &item.data {
-            // We should not be here, the enclosing scope owner was `module`, not another
-            // nested scope owner
+            // We should not be here, the enclosing scope owner was `module`,
+            // not another nested scope owner
             AstTopLevelItemDesc::Module(_)
             | AstTopLevelItemDesc::Interface(_)
             | AstTopLevelItemDesc::Impl(_)

@@ -232,8 +232,8 @@ impl Thir {
                 _ => None,
             },
             Some(_) => None,
-            // `node_at` skips synthetic nodes, and a plain `let` lowers to a synthetic
-            // `Let`, so its annotation region lands here.
+            // `node_at` skips synthetic nodes, and a plain `let` lowers to a
+            // synthetic `Let`, so its annotation region lands here.
             None => self.enclosing_let_ty(loc),
         }
     }

@@ -30,11 +30,9 @@ fn lex_in(db: &RockrDb, src: &str) -> Vec<Lexed> {
     let mut out = vec![];
     loop {
         match lexer.next_token() {
-            Ok(tok) => out.push(Ok((
-                tok.kind,
-                tok.span.start_offset,
-                tok.span.end_offset,
-            ))),
+            Ok(tok) => {
+                out.push(Ok((tok.kind, tok.span.start_offset, tok.span.end_offset)))
+            }
             Err(e) if e.message == "EOF" => return out,
             Err(e) => {
                 out.push(Err(e.message));
