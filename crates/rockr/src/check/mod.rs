@@ -24,7 +24,10 @@ use crate::{
         thir::thir_is_valid,
         types::check_typedef,
     },
-    common::{diagnostic::Diag, symbols::Symbol},
+    common::{
+        diagnostic::{Diag, DiagLabel, Severity},
+        symbols::Symbol,
+    },
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},
@@ -74,7 +77,7 @@ pub fn check_duplicate_defs(
 
     for (_, defs) in map {
         if defs.len() > 1 {
-            Diag::redefinition(
+            redefinition(
                 db,
                 defs.into_iter().sorted_by_key(|k| k.name_span(db).unwrap()).collect(),
             )
@@ -159,4 +162,34 @@ pub fn reachable_frefs<'db>(db: &'db dyn Db, pkg: Package<'db>) -> Vec<FuncInst>
 #[salsa::tracked(returns(copy))]
 pub fn check_package<'db>(db: &'db dyn Db, pkg: Package<'db>) {
     check_file_module(db, *pkg.root(db), pkg, None);
+}
+
+pub fn redefinition(db: &dyn Db, defs: Vec<Definition>) -> Diag {
+    assert_ne!(defs, []);
+    let (first, others) = {
+        let mut defs = defs;
+        let head = defs.remove(0);
+        (head, defs)
+    };
+
+    let primary =
+        DiagLabel::new(first.name_span(db).unwrap(), Some("Defined here".to_owned()));
+    let secondary = others
+        .into_iter()
+        .map(|def| {
+            DiagLabel::new(def.name_span(db).unwrap(), Some("Defined here".to_owned()))
+        })
+        .collect();
+
+    Diag::new(
+        Severity::Error,
+        format!(
+            "name `{}` is defined multiple times at top-level.",
+            first.name(db).to_string(db)
+        ),
+        primary,
+        secondary,
+        vec![],
+        vec![],
+    )
 }

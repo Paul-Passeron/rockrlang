@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{Db, common::location::Span, name_resolve::definition::Definition};
+use crate::{Db, common::location::Span};
 use salsa::Accumulator;
 
 #[allow(dead_code)]
@@ -62,39 +62,6 @@ pub struct DiagLabel {
 impl Diag {
     pub fn is_error(&self) -> bool {
         self.severity == Severity::Error
-    }
-
-    pub fn redefinition(db: &dyn Db, defs: Vec<Definition>) -> Self {
-        assert_ne!(defs, []);
-        let (first, others) = {
-            let mut defs = defs;
-            let head = defs.remove(0);
-            (head, defs)
-        };
-
-        let primary =
-            DiagLabel::new(first.name_span(db).unwrap(), Some("Defined here".to_owned()));
-        let secondary = others
-            .into_iter()
-            .map(|def| {
-                DiagLabel::new(
-                    def.name_span(db).unwrap(),
-                    Some("Defined here".to_owned()),
-                )
-            })
-            .collect();
-
-        Self::new(
-            Severity::Error,
-            format!(
-                "name `{}` is defined multiple times at top-level.",
-                first.name(db).to_string(db)
-            ),
-            primary,
-            secondary,
-            vec![],
-            vec![],
-        )
     }
 
     pub fn todo(message: String, span: Span) -> Self {
