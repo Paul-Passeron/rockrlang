@@ -35,5 +35,5 @@ pub mod lang;
 pub mod printer;
 pub mod source;
 pub mod timing;
-pub mod unused;
+mod unused;
 pub mod workspace;
