@@ -22,8 +22,10 @@ use crate::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, discriminant_strategy, finish_aggregate, layout_of,
     },
-    resolved::{EnumId, TypeRef, type_ref::ConstructorType},
-    thir::EnumRef,
+    resolved::{
+        EnumId, TypeRef,
+        type_ref::{ConstructorType, EnumRef},
+    },
 };
 use itertools::Itertools;
 

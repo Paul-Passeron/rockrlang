@@ -21,11 +21,13 @@ use crate::{
         location::{Location, Span},
         symbols::Symbol,
     },
-    resolved::TypeRef,
+    resolved::{
+        TypeRef,
+        type_ref::{EnumRef, StructRef},
+    },
     thir::{
-        EnumRef, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, StructRef, Thir,
-        ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
-        ThirPatternKind,
+        ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Thir, ThirConstructorArgs,
+        ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
 };

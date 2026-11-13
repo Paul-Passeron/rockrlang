@@ -25,10 +25,9 @@ use crate::{
         symbols::Symbol,
         timing::{Counts, Phase, timed},
     },
-    hir::signature::get_sig_of_function,
     hir_to_thir::thir_body,
     mir::{
-        MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
+        MIRBlockID, MIRKey, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
@@ -36,36 +35,26 @@ use crate::{
             MIRProjection, MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
         },
     },
-    name_resolve::{
-        core_package, file_module_id,
-        interfaces::{core_copy_interface, core_drop_interface},
-        std_package,
-        type_expr::get_templates_of_fun,
-    },
+    name_resolve::interfaces::{core_copy_interface, core_drop_interface},
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
         TypeRef, char_id,
         concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
         never_id, str_id,
-        type_ref::{CastClass, TyLike},
+        type_ref::{CastClass, EnumRef, StructRef, TyLike},
         void_id,
     },
     thir::{
-        self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        ProjectionKind, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        self, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
+        ProjectionKind, ScopeId, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch, ThirStructField,
         stmt::{StmtKind, ThirStmt},
     },
     thir_to_mir::lower_match::MatchLowerer,
     typecheck::conformance::type_implements,
-    workspace::{Workspace, workspace_packages},
 };
 use itertools::{Either, Itertools};
-use std::{
-    collections::{BTreeMap, HashMap},
-    iter::empty,
-    marker::PhantomData,
-};
+use std::collections::{BTreeMap, HashMap};
 
 pub mod decision_tree;
 pub mod lower_match;
@@ -80,114 +69,6 @@ pub struct ThirToMIR<'a> {
     params: Vec<MIRLocalID>,
     loop_begins: HashMap<ScopeId, MIRBlockID>,
     loop_ends: HashMap<ScopeId, MIRBlockID>,
-}
-
-#[salsa::interned]
-pub struct MIRKey {
-    pub fdef: FunctionId,
-    pub subs: Substitution,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FuncInst(pub salsa::Id);
-
-impl<'db> From<MIRKey<'db>> for FuncInst {
-    fn from(value: MIRKey<'db>) -> Self {
-        Self(value.0)
-    }
-}
-
-impl FuncInst {
-    pub fn interned<'db>(self) -> MIRKey<'db> {
-        MIRKey(self.0, PhantomData)
-    }
-
-    pub fn fdef(self, db: &dyn Db) -> FunctionId {
-        *self.interned().fdef(db)
-    }
-
-    pub fn subs(self, db: &dyn Db) -> &Substitution {
-        self.interned().subs(db)
-    }
-
-    pub fn from_funcref(db: &dyn Db, fref: &FunctionRef) -> Self {
-        assert_eq!(get_templates_of_fun(db, fref.id.interned()).len(), fref.args.len());
-        let empty_sub = Substitution::new(empty());
-        let concrete_tys = fref.args.iter().map(|ty| {
-            ty.to_concrete(db, &empty_sub)
-                .expect("If the fref isn't known to be concrete, this is a bug")
-        });
-        MIRKey::new(db, fref.id, Substitution::new(concrete_tys)).into()
-    }
-
-    pub fn ret_ty(self, db: &dyn Db) -> ConcreteTy {
-        let sig = get_sig_of_function(db, self.fdef(db).interned());
-        let ret_ty = match sig.ret {
-            TypeRef::Zelf => self.fdef(db).parent(db).get_canonical_zelf(db).unwrap(),
-            ret => ret,
-        };
-        ret_ty.to_concrete(db, self.subs(db)).unwrap()
-    }
-
-    pub fn params(self, db: &dyn Db) -> Vec<(Symbol, ConcreteTy)> {
-        let sig = get_sig_of_function(db, self.fdef(db).interned());
-        let fdef = self.fdef(db);
-        let zelf = fdef.parent(db).get_canonical_zelf(db);
-        let receiver = sig.zelf.map(|arg| {
-            (
-                Symbol::new(db, "self"),
-                arg.as_type_ref_for(db, zelf.unwrap())
-                    .to_concrete(db, self.subs(db))
-                    .unwrap(),
-            )
-        });
-        receiver
-            .into_iter()
-            .chain(
-                sig.args.iter().map(|(symb, ty)| {
-                    (*symb, ty.to_concrete(db, self.subs(db)).unwrap())
-                }),
-            )
-            .collect()
-    }
-}
-
-#[salsa::tracked]
-impl FuncInst {
-    pub fn is_variadic(self, db: &dyn Db) -> bool {
-        self.fdef(db).is_var_args(db)
-    }
-
-    pub fn is_main(self, db: &dyn Db) -> bool {
-        let packages = workspace_packages(db, Workspace::get(db));
-        let mut main_pkg = None;
-        for pkg in packages {
-            if Some(*pkg) == std_package(db) {
-                continue;
-            }
-            if *pkg == core_package(db) {
-                continue;
-            }
-            assert!(main_pkg.is_none(), "TODO: handle multiple packages for main");
-
-            main_pkg = Some(*pkg);
-        }
-        let Some(main_pkg) = main_pkg else {
-            return false;
-        };
-        let file_module = file_module_id(db, *main_pkg.root(db), None, main_pkg);
-        let f_id = FunctionId::new(
-            db,
-            Symbol::new(db, "main"),
-            ScopeOwnerId::Module(file_module),
-        );
-        if self.fdef(db) != f_id {
-            return false;
-        }
-        assert!(self.subs(db).is_empty(), "Generic main function !");
-
-        true
-    }
 }
 
 #[salsa::tracked]

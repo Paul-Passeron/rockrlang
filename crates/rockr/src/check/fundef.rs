@@ -22,13 +22,13 @@ use crate::{
         thir::{checked_thir_body, thir_is_valid},
     },
     common::timing::{Counts, Phase, timed},
-    mir::passes::dead_code_elimination::dce,
+    mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::type_expr::get_templates_of_fun,
     resolved::{
         FunctionId, ScopeOwnerId, TypeRef,
         concrete_ty::{ConcreteTy, Substitution},
     },
-    thir_to_mir::{MIRKey, mir},
+    thir_to_mir::mir,
     typecheck::{conformance::method_impl_for, type_check_function},
 };
 use std::collections::HashSet;

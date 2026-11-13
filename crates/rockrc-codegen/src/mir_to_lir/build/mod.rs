@@ -25,6 +25,7 @@ use crate::lir::{
 use itertools::Itertools;
 use rockr::common::arch::IntWidth;
 use rockr::layout::target_width;
+use rockr::mir::FuncInst;
 use rockr::resolved::type_ref::ConstructorType;
 use rockr::{
     Db,
@@ -48,7 +49,6 @@ use rockr::{
         concrete_ty::ConcreteTy,
         type_ref::{CastClass, TyLike},
     },
-    thir_to_mir::FuncInst,
 };
 use std::{cmp::Ordering, collections::HashMap, ops::Index};
 

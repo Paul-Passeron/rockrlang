@@ -19,7 +19,7 @@ use crate::{
     Db,
     common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::signature::get_sig_of_function,
-    parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
+    parse_tree::expr::BinaryOperator,
     resolved::{
         ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
@@ -29,16 +29,15 @@ use crate::{
         void_id,
     },
     thir::{
-        EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        ProjectionKind, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
-        ThirMatchBranch, ThirPattern, ThirPatternKind,
+        ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection, ProjectionKind,
+        Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+        ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
-    typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use itertools::Itertools;
 use salsa::Accumulator;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 pub struct SanityError {
     pub expected: TypeRef,
@@ -657,45 +656,6 @@ impl<'db> SanityChecker<'db> {
     }
 }
 
-impl EnumRef {
-    pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
-        let item = self.def.item(db);
-        let variant = item.variants.get(idx)?;
-        let raw = match &variant.kind {
-            AstEnumVariantKind::Unit => Some(ConstructorType::None),
-            AstEnumVariantKind::StructLike(fields) => {
-                let ctx = AstImplicitContext::new(
-                    db,
-                    ScopeOwnerId::Module(self.def.parent(db)),
-                    &item.template_args,
-                );
-                Some(ConstructorType::Struct(
-                    fields
-                        .iter()
-                        .map(|field| (field.name, ctx.resolve_err(db, &field.ty.data)))
-                        .collect(),
-                ))
-            }
-            AstEnumVariantKind::TupleLike(spanneds) => {
-                let ctx = AstImplicitContext::new(
-                    db,
-                    ScopeOwnerId::Module(self.def.parent(db)),
-                    &item.template_args,
-                );
-                Some(ConstructorType::Tuple(
-                    spanneds.iter().map(|ast| ctx.resolve_err(db, &ast.data)).collect(),
-                ))
-            }
-        }?;
-        Some(raw.with_substitution(db, &self.args))
-    }
-
-    pub fn variants(&self, db: &dyn Db) -> Vec<ConstructorType> {
-        let n = self.def.item(db).variants.len();
-        (0..n).into_iter().map(|i| self.get_cons(db, i).unwrap()).collect()
-    }
-}
-
 pub fn sanity_check(db: &dyn Db, thir: &Thir) {
     let mismatches = SanityChecker::new(db, thir).check();
     for mismatch in &mismatches {
@@ -708,31 +668,6 @@ pub fn sanity_check(db: &dyn Db, thir: &Thir) {
             ),
             mismatch.span,
         );
-    }
-}
-
-impl StructRef {
-    /// Field types as declared on the struct definition, still referencing the
-    /// struct's own template parameters rather than the concrete `self.args`.
-    pub fn declared_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
-        let item = self.def.item(db);
-        let mut res = HashMap::new();
-        for field in &item.fields {
-            let ctx = AstImplicitContext::new(
-                db,
-                ScopeOwnerId::Module(self.def.parent(db)),
-                &item.template_args,
-            );
-            res.insert(field.name, ctx.resolve_err(db, &field.ty.data));
-        }
-        res
-    }
-
-    pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
-        self.declared_fields_ty(db)
-            .into_iter()
-            .map(|(name, ty)| (name, ty.subst(db, &Subst::params(&self.args))))
-            .collect()
     }
 }
 

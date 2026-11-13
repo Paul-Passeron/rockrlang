@@ -15,14 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use std::collections::HashMap;
+
 use super::{
     BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of, usize_id,
 };
 use crate::{
     Db,
     common::{mutability::Mutability, symbols::Symbol},
+    parse_tree::top_level::AstEnumVariantKind,
     printer::type_printer::TypePrinter,
-    resolved::{AdtLike, slice_of},
+    resolved::{AdtLike, EnumId, ScopeOwnerId, StructId, slice_of},
+    typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -342,4 +346,92 @@ pub fn peel_type_ref_until(
         return None;
     }
     Some(PeeledTy { inner: ty, refs })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct StructRef {
+    pub def: StructId,
+    pub args: Vec<TypeRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EnumRef {
+    pub def: EnumId,
+    pub args: Vec<TypeRef>,
+}
+
+impl EnumRef {
+    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
+        TypeId::new(db, TypeDefId::Enum(self.def), self.args).into()
+    }
+}
+
+impl StructRef {
+    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
+        TypeId::new(db, TypeDefId::Struct(self.def), self.args).into()
+    }
+}
+
+impl EnumRef {
+    pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
+        let item = self.def.item(db);
+        let variant = item.variants.get(idx)?;
+        let raw = match &variant.kind {
+            AstEnumVariantKind::Unit => Some(ConstructorType::None),
+            AstEnumVariantKind::StructLike(fields) => {
+                let ctx = AstImplicitContext::new(
+                    db,
+                    ScopeOwnerId::Module(self.def.parent(db)),
+                    &item.template_args,
+                );
+                Some(ConstructorType::Struct(
+                    fields
+                        .iter()
+                        .map(|field| (field.name, ctx.resolve_err(db, &field.ty.data)))
+                        .collect(),
+                ))
+            }
+            AstEnumVariantKind::TupleLike(spanneds) => {
+                let ctx = AstImplicitContext::new(
+                    db,
+                    ScopeOwnerId::Module(self.def.parent(db)),
+                    &item.template_args,
+                );
+                Some(ConstructorType::Tuple(
+                    spanneds.iter().map(|ast| ctx.resolve_err(db, &ast.data)).collect(),
+                ))
+            }
+        }?;
+        Some(raw.with_substitution(db, &self.args))
+    }
+
+    pub fn variants(&self, db: &dyn Db) -> Vec<ConstructorType> {
+        let n = self.def.item(db).variants.len();
+        (0..n).into_iter().map(|i| self.get_cons(db, i).unwrap()).collect()
+    }
+}
+
+impl StructRef {
+    /// Field types as declared on the struct definition, still referencing the
+    /// struct's own template parameters rather than the concrete `self.args`.
+    pub fn declared_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
+        let item = self.def.item(db);
+        let mut res = HashMap::new();
+        for field in &item.fields {
+            let ctx = AstImplicitContext::new(
+                db,
+                ScopeOwnerId::Module(self.def.parent(db)),
+                &item.template_args,
+            );
+            res.insert(field.name, ctx.resolve_err(db, &field.ty.data));
+        }
+        res
+    }
+
+    pub fn get_fields_ty(&self, db: &dyn Db) -> HashMap<Symbol, TypeRef> {
+        self.declared_fields_ty(db)
+            .into_iter()
+            .map(|(name, ty)| (name, ty.subst(db, &Subst::params(&self.args))))
+            .collect()
+    }
 }

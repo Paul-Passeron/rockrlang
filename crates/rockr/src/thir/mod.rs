@@ -16,6 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::common::mutability::Mutability;
+use crate::resolved::type_ref::{EnumRef, StructRef};
 use crate::{
     Db,
     common::{
@@ -25,7 +26,7 @@ use crate::{
     },
     hir::{self, function_ast},
     parse_tree::expr::BinaryOperator,
-    resolved::{EnumId, FunctionId, InterfaceRef, StructId, TypeRef},
+    resolved::{FunctionId, InterfaceRef, TypeRef},
     thir::stmt::ThirStmt,
 };
 
@@ -106,18 +107,6 @@ pub struct FunctionRef {
 pub enum Dispatch {
     Direct,
     Interface(InterfaceRef),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StructRef {
-    pub def: StructId,
-    pub args: Vec<TypeRef>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EnumRef {
-    pub def: EnumId,
-    pub args: Vec<TypeRef>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

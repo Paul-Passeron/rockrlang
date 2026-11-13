@@ -25,8 +25,8 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
-    resolved::{TypeDefId, TypeId, TypeRef, concrete_ty::ConcreteTy, ref_of},
-    thir::{EnumRef, StructRef, ThirMatchBranch},
+    resolved::{concrete_ty::ConcreteTy, ref_of},
+    thir::ThirMatchBranch,
     thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
@@ -224,18 +224,6 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
         let matrix = self.build_match_matrix(branches);
         let decision_tree = matrix.compile(self.ctx);
         self.lower_decision_tree(&decision_tree, branches);
-    }
-}
-
-impl EnumRef {
-    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
-        TypeId::new(db, TypeDefId::Enum(self.def), self.args).into()
-    }
-}
-
-impl StructRef {
-    pub fn into_type_ref(self, db: &dyn Db) -> TypeRef {
-        TypeId::new(db, TypeDefId::Struct(self.def), self.args).into()
     }
 }
 

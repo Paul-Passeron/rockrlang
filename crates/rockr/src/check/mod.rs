@@ -28,6 +28,7 @@ use crate::{
         diagnostic::{Diag, DiagLabel, Severity},
         symbols::Symbol,
     },
+    mir::{FuncInst, MIRKey},
     name_resolve::{
         core_module,
         definition::{Definition, module_definitions},
@@ -35,7 +36,7 @@ use crate::{
         implems::module_impls,
     },
     resolved::{FileModule, FunctionId, InternedModuleId, ModuleId, Package},
-    thir_to_mir::{FuncInst, MIRKey, mir},
+    thir_to_mir::mir,
     workspace::{Workspace, workspace_packages},
 };
 use itertools::Itertools;

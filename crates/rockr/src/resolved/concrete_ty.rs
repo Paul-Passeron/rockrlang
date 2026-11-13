@@ -22,10 +22,9 @@ use crate::{
     resolved::{
         BuiltinTypeId, EnumId, InternedStructId, ScopeOwnerId, StructId, TypeDefId,
         TypeId, TypeRef, char_id, int_id,
-        type_ref::{ConstructorType, TyLike},
+        type_ref::{ConstructorType, EnumRef, TyLike},
         usize_id,
     },
-    thir,
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use std::marker::PhantomData;
@@ -283,7 +282,7 @@ impl ConcreteEnumRef {
     }
 
     pub fn get_cons(self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
-        let as_thir_ref = thir::EnumRef {
+        let as_thir_ref = EnumRef {
             def: self.def(db),
             args: self.args(db).iter().map(|a| a.as_type_ref(db)).collect(),
         };

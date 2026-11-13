@@ -15,14 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::type_ref::Subst;
+use crate::resolved::type_ref::{EnumRef, StructRef, Subst};
 use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     hir_to_thir::builder::ThirBuilder,
     name_resolve::type_expr::templates_of_struct,
     resolved::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},
-    thir::{EnumRef, LocalId, PlaceBase, StructRef, ThirPlace},
+    thir::{LocalId, PlaceBase, ThirPlace},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 

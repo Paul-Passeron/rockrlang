@@ -19,10 +19,9 @@ use crate::{
     Db,
     common::arena::Arena,
     mir::{
-        BasicBlock, BlockID, Local, LocalID, Mir, Terminator, basic_block::Stmt,
-        cache::MIRCache,
+        BasicBlock, BlockID, FuncInst, Local, LocalID, Mir, Terminator,
+        basic_block::Stmt, cache::MIRCache,
     },
-    thir_to_mir::FuncInst,
 };
 use std::collections::HashSet;
 

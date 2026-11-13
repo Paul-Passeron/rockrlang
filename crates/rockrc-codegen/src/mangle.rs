@@ -20,12 +20,12 @@ use rockr::{
     Db,
     hir::{FunctionLikeAst, owning_module},
     layout::{Size, target_width},
+    mir::{FuncInst, MIRKey},
     name_resolve::builtin_module,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, ModuleId, TypeDefId, TypeRef,
         concrete_ty::{ConcreteTy, InternedConcreteTy},
     },
-    thir_to_mir::{FuncInst, MIRKey},
 };
 use std::sync::Arc;
 

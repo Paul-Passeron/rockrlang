@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     mir::{
-        MIRBlockID, MIRLocalID, Mir,
+        FuncInst, MIRBlockID, MIRKey, MIRLocalID, Mir,
         basic_block::{MIRTerminator, Stmt},
         builder::MIRBuilder,
         operand::{
@@ -27,7 +27,7 @@ use crate::{
         },
         passes::MIRPass,
     },
-    thir_to_mir::{_mir, FuncInst, MIRKey},
+    thir_to_mir::_mir,
 };
 use itertools::Itertools;
 use std::collections::{BTreeSet, HashMap, HashSet};
