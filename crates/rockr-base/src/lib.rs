@@ -29,6 +29,7 @@ pub mod collections;
 pub mod db;
 pub mod diagnostic;
 pub mod display;
+pub mod ids;
 pub mod mutability;
 pub mod source;
 pub mod unused;
