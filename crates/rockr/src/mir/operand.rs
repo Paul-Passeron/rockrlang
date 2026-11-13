@@ -23,8 +23,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{bitset::BitSet, location::Span, symbols::Symbol},
-    hir::Mutability,
+    common::{bitset::BitSet, location::Span, mutability::Mutability, symbols::Symbol},
     mir::{
         Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
         RValueKind,

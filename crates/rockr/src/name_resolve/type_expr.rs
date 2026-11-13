@@ -17,8 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::symbols::Symbol,
-    hir::{Mutability, function_ast, impl_sources},
+    common::{mutability::Mutability, symbols::Symbol},
+    hir::{function_ast, impl_sources},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         interfaces::interface_item,
@@ -125,12 +125,11 @@ pub fn resolve_type_expr_desc<'db>(
             let elem = ty.as_known().map_or(TypeRef::Unknown, |ty| {
                 resolve_type_expr(db, &ty, module, template_args, has_zelf)
             });
-            slice_of::<TypeId>(
+            TypeRef::from(slice_of::<TypeId>(
                 db,
                 elem,
                 if *mutable { Mutability::Mutable } else { Mutability::Const },
-            )
-            .into()
+            ))
         }
 
         AstTypeExprDesc::Tuple(tys) => {

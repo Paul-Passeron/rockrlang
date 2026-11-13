@@ -17,8 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::symbols::Symbol,
-    hir::{Mutability, interface_items},
+    common::{mutability::Mutability, symbols::Symbol},
+    hir::interface_items,
     parse_tree::{
         expr::BinaryOperator,
         top_level::{AstInterfaceItem, AstMethodsig},

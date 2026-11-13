@@ -19,9 +19,10 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         location::Span,
+        mutability::Mutability,
         symbols::Symbol,
     },
-    hir::{self, Mutability},
+    hir,
     mir::{
         basic_block::{MIRBasicBlock, MIRTerminator},
         cache::MIRCache,

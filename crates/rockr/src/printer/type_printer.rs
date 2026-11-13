@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    hir::Mutability,
+    common::mutability::Mutability,
     hir::signature::{FunctionSignature, get_sig_of_function},
     name_resolve::{
         builtin_module, core_package, definition::Definition, main_package, std_package,

@@ -18,8 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::Lsp;
 use itertools::Itertools;
 use rockr::{
-    common::location::Location,
-    hir::Mutability,
+    common::{location::Location, mutability::Mutability},
     hir::signature::{FunctionSignature, get_sig_of_function},
     printer::type_printer::TypePrinter,
     resolved::{

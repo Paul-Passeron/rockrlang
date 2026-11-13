@@ -15,15 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
-    common::symbols::Symbol,
-    hir::Mutability,
+    common::{mutability::Mutability, symbols::Symbol},
     parse_tree::type_expr::AstTypeExprDesc,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
-        rehole, str_def, type_ref::CastClass,
+        rehole, str_def,
+        type_ref::{CastClass, TyLike},
     },
     typecheck::inference::{
         InferTy, InferenceCtx,

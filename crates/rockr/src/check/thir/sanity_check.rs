@@ -15,22 +15,21 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::type_ref::Subst;
-use crate::resolved::type_ref::TyLike;
-use crate::thir::ProjectionKind;
 use crate::{
     Db,
-    common::{diagnostic::Diag, location::Span, symbols::Symbol},
-    hir::{Mutability, signature::get_sig_of_function},
+    common::{diagnostic::Diag, location::Span, mutability::Mutability, symbols::Symbol},
+    hir::signature::get_sig_of_function,
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{
         AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of, void_id,
+        const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
+        type_ref::{Subst, TyLike},
+        void_id,
     },
     thir::{
         EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
-        ThirPattern, ThirPatternKind,
+        ProjectionKind, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        ThirMatchBranch, ThirPattern, ThirPatternKind,
         stmt::{StmtKind, ThirStmt},
     },
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},

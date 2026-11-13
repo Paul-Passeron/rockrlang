@@ -22,13 +22,14 @@ use crate::{
         diagnostic::Diag,
         ids::{IdGen, IdWrapper},
         location::Span,
+        mutability::Mutability,
         symbols::Symbol,
     },
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc, HirId,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
         HirPlaceKind, HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern,
-        LocalId, LocalInfo, Mutability,
+        LocalId, LocalInfo,
     },
     name_resolve::{
         definition::{Definition, get_module_pretty_name, resolve_in_module},

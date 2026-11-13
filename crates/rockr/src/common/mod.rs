@@ -22,6 +22,7 @@ pub mod display;
 pub mod frozen;
 pub mod ids;
 pub mod location;
+pub mod mutability;
 pub mod symbols;
 pub mod timing;
 pub mod unord;

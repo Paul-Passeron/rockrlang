@@ -20,8 +20,9 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         location::Span,
+        mutability::Mutability,
     },
-    hir::{self, LocalInfo, Mutability},
+    hir::{self, LocalInfo},
     resolved::{FunctionId, TypeRef},
     thir::{
         ExprId, LocalId, PlaceId, Projection, ProjectionKind, ScopeId, Thir, ThirExpr,

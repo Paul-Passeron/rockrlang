@@ -19,7 +19,8 @@ use super::{
     BuiltinTypeId, BuiltinTypeKind, PtrKind, TypeDefId, TypeId, TypeRef, ref_of, usize_id,
 };
 use crate::{
-    Db, hir::Mutability, printer::type_printer::TypePrinter, resolved::slice_of,
+    Db, common::mutability::Mutability, printer::type_printer::TypePrinter,
+    resolved::slice_of,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

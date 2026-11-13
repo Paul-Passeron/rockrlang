@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::common::mutability::Mutability;
 use crate::{
     Db,
     common::{
@@ -23,7 +24,7 @@ use crate::{
         symbols::{StrLit, Symbol},
         timing::{Counts, Phase, timed},
     },
-    hir::{self, Mutability, function_ast, hir_body},
+    hir::{self, function_ast, hir_body},
     hir_to_thir::thir_body_from_hir,
     parse_tree::expr::BinaryOperator,
     resolved::{EnumId, FunctionId, InterfaceRef, InternedFunctionId, StructId, TypeRef},

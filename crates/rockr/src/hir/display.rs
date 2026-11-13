@@ -17,11 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::display::Display,
+    common::{display::Display, mutability::Mutability},
     hir::{
         HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
-        HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern, Mutability,
+        HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern,
     },
     parse_tree::expr::BinaryOperator,
     resolved::TypeDefId,

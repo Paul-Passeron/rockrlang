@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::common::mutability::Mutability;
 use crate::parse_tree::{Spanned, stmt::AstStmt, top_level::AstTemplateArg};
 use crate::{
     Db,
@@ -44,7 +45,7 @@ use crate::{
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
     },
 };
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 
 pub mod display;
 pub mod lower_fundef;
@@ -105,26 +106,6 @@ pub struct HirExpr {
     pub data: HirExprDesc,
     pub span: Span,
     pub is_synthetic: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Mutability {
-    Const,
-    Mutable,
-}
-impl Mutability {
-    pub fn is_mut(self) -> bool {
-        matches!(self, Self::Mutable)
-    }
-}
-
-impl fmt::Display for Mutability {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Const => Ok(()),
-            Self::Mutable => write!(f, "mut "),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -568,7 +549,8 @@ fn _hir_body<'db>(
         |res| Counts {
             functions: usize::from(res.is_some()),
             stmts: res.map(|b| b.stmts(db).len()),
-            // HIR keeps expressions as boxed trees (no arena/map to size cheaply).
+            // HIR keeps expressions as boxed trees (no arena/map to size
+            // cheaply).
             exprs: None,
         },
     )

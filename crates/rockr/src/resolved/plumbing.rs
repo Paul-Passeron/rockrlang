@@ -23,7 +23,7 @@ use super::{
     StructId, Symbol, TypeDefId, TypeId, TypeRef,
 };
 use crate::{
-    hir::Mutability,
+    common::mutability::Mutability,
     mir::concrete_ty::ConcreteTy,
     name_resolve::{
         core_module,

@@ -15,19 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::mir::operand::MIRProjectionKind;
-use crate::resolved::type_ref::TyLike;
-use crate::thir::ProjectionKind;
 use crate::{
     Db,
     check::fundef::concretize_fid,
     common::{
         diagnostic::Diag,
         location::Span,
+        mutability::Mutability,
         symbols::Symbol,
         timing::{Counts, Phase, timed},
     },
-    hir::{Mutability, signature::get_sig_of_function},
+    hir::signature::get_sig_of_function,
     mir::{
         MIRBlockID, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
@@ -35,7 +33,7 @@ use crate::{
         concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy, Substitution},
         operand::{
             MIRCallee, MIRConstant, MIRConstructorArgs, MIROperand, MIRPlace,
-            MIRProjection, MIRRValue, MIRRValueKind, UnaryOperator,
+            MIRProjection, MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
         },
     },
     name_resolve::{
@@ -46,11 +44,13 @@ use crate::{
     },
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
-        TypeRef, char_id, never_id, str_id, type_ref::CastClass, void_id,
+        TypeRef, char_id, never_id, str_id,
+        type_ref::{CastClass, TyLike},
+        void_id,
     },
     thir::{
         self, EnumRef, ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection,
-        ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
+        ProjectionKind, ScopeId, StructRef, Thir, ThirConstructorArgs, ThirExprWithSetup,
         ThirMatchBranch, ThirStructField,
         stmt::{StmtKind, ThirStmt},
         thir_body,

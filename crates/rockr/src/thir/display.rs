@@ -15,16 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use super::stmt::{StmtKind, ThirStmt};
-use super::{
-    Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, ScopeId, Thir,
-    ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
-    ThirPatternKind,
+use crate::common::mutability::Mutability;
+use crate::{
+    Db,
+    resolved::{TypeDefId, TypeRef},
+    thir::{
+        Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, ProjectionKind, ScopeId,
+        Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,
+        ThirPatternKind, ThirStructField,
+        stmt::{BlockSemanticInfo, StmtKind, ThirStmt},
+    },
 };
-use crate::resolved::TypeDefId;
-use crate::thir::stmt::BlockSemanticInfo;
-use crate::thir::{ProjectionKind, ThirStructField};
-use crate::{Db, hir::Mutability, resolved::TypeRef};
 
 const INDENT: &str = "    ";
 

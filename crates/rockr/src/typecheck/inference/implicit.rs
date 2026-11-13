@@ -17,8 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::symbols::Symbol,
-    hir::{Mutability, impl_items, interface_items, owning_module},
+    common::{mutability::Mutability, symbols::Symbol},
+    hir::{impl_items, interface_items, owning_module},
     name_resolve::{
         definition::{Definition, resolve_in_module},
         type_expr::{get_templates_of_fun, templates_of_owner},

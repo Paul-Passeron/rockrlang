@@ -20,8 +20,8 @@ use crate::{
     common::{
         arena::{Arena, Idx},
         bitset::{BitSet, BitSetIdx},
+        mutability::Mutability,
     },
-    hir::Mutability,
     mir::{
         MIRBlockID, MIRLocalID, Mir,
         analysis::{

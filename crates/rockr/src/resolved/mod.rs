@@ -19,8 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db, SourceFile,
-    common::{location::Span, symbols::Symbol, unord::Set},
-    hir::Mutability,
+    common::{location::Span, mutability::Mutability, symbols::Symbol, unord::Set},
     layout::IntWidth,
     name_resolve::type_expr::{templates_of_enum, templates_of_struct},
     parse_tree::top_level::{AstImplItem, AstTemplateArg},

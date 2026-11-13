@@ -15,6 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::common::mutability::Mutability;
 use crate::resolved::type_ref::Subst;
 use crate::resolved::type_ref::TyLike;
 use crate::thir::ProjectionKind;
@@ -25,7 +26,7 @@ use crate::{
     hir::{
         self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
-        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern, Mutability,
+        HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
     },
     hir_to_thir::builder::ThirBuilder,
     resolved::{ScopeOwnerId, TypeId, TypeRef, rehole},
