@@ -486,6 +486,7 @@ impl Parser<'_> {
                 Ok(Spanned::new(AstExprDesc::BoolLit(false), tok.span))
             }
             TokenKind::OpenBra => {
+                let start = self.get_start();
                 self.consume();
                 let exprs = self.parse_list(
                     Self::parse_expr_unrestricted,
@@ -493,7 +494,7 @@ impl Parser<'_> {
                     |p| p.peek_n(0).is_none_or(|t| t.kind == TokenKind::CloseBra),
                 )?;
                 self.eat(TokenKind::CloseBra)?;
-                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), tok.span))
+                Ok(Spanned::new(AstExprDesc::SliceLit(exprs), start.span(self.get_end())))
             }
             TokenKind::OpenPar => {
                 self.consume();
