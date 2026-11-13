@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     hir::{FunctionLikeAst, impl_items},
     layout::{LIRTy, ScalarKind, layout_of},
-    resolved::{
+    model::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
         concrete_ty::int_ty_with_width,

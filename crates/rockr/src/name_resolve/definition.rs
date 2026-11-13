@@ -21,7 +21,7 @@ use crate::{
         builtin_module, core_module, core_package, file_module_id,
         interfaces::interface_item, module_items, std_module,
     },
-    resolved::{
+    model::{
         EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
         StructId, TypeDefId, bool_id, char_id, i8_id, i16_id, i32_id, i64_id, i128_id,
         int_id, isize_id, never_id, type_printer::TypePrinter, u8_id, u16_id, u32_id,

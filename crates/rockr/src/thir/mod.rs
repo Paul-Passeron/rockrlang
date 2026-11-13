@@ -17,8 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::{self, function_ast},
-    resolved::type_ref::{EnumRef, StructRef},
-    resolved::{FunctionId, InterfaceRef, TypeRef},
+    model::type_ref::{EnumRef, StructRef},
+    model::{FunctionId, InterfaceRef, TypeRef},
     thir::stmt::ThirStmt,
 };
 use rockr_base::{

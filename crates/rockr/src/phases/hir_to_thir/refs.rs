@@ -18,11 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::symbol::Symbol;
 use rockr_base::{Db, Span};
 
-use crate::resolved::type_ref::{EnumRef, StructRef, Subst};
+use crate::model::type_ref::{EnumRef, StructRef, Subst};
 use crate::{
     name_resolve::type_expr::templates_of_struct,
     phases::hir_to_thir::builder::ThirBuilder,
-    resolved::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},
+    model::{ScopeOwnerId, TypeDefId, TypeId, TypeRef},
     thir::{LocalId, PlaceBase, ThirPlace},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };

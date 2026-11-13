@@ -21,7 +21,7 @@ use crate::{
         module_items, modules_in_package,
         type_expr::{resolve_any_type_expr, resolve_type_expr},
     },
-    resolved::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
+    model::{ImplId, ImplSource, InterfaceRef, InternedModuleId, ModuleId, Package},
 };
 use itertools::Itertools;
 use rockr_base::{Db, diagnostic::Diag, unord::Set};

@@ -20,7 +20,7 @@ use rockr_base::{
     workspace::Workspace,
 };
 
-use crate::resolved::{
+use crate::model::{
     FileModule, InternedModuleId, ModuleId, Package, packages::workspace_packages,
 };
 use rockr_syntax::{

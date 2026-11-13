@@ -31,7 +31,7 @@ use inkwell::{
 use itertools::Itertools;
 use rockr::{
     layout::{Discriminant, LIRTy, LayoutData, LayoutID, Offset, ScalarKind},
-    resolved::never_id,
+    model::never_id,
 };
 use rockr_base::{Db, arena::Idx, lang::arch::IntWidth};
 use std::{collections::HashMap, num::NonZero};

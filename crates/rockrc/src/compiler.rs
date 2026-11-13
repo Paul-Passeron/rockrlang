@@ -31,9 +31,9 @@ use rockr::{
         program_has_errors, reachable_frefs,
     },
     mir::{MIRKey, passes::dead_code_elimination::dce},
+    model::{FunctionId, concrete_ty::Substitution, packages::workspace_packages},
     name_resolve::file_module_id,
     phases::{hir_to_thir::thir_body, thir_to_mir::mir},
-    resolved::{FunctionId, concrete_ty::Substitution, packages::workspace_packages},
     thir::ExprKind,
 };
 use rockr_base::{

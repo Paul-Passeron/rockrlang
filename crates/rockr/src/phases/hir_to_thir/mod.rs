@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::{HirBody, hir_body},
-    resolved::{FunctionId, InternedFunctionId},
+    model::{FunctionId, InternedFunctionId},
     thir::Thir,
     typecheck::{TypeCheckResults, type_check_function},
 };

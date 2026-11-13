@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::{Db, mutability::Mutability};
 
 use crate::{
-    resolved::{TypeDefId, TypeRef},
+    model::{TypeDefId, TypeRef},
     thir::{
         Dispatch, ExprId, ExprKind, LocalId, PlaceBase, PlaceId, ProjectionKind, ScopeId,
         Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch, ThirPattern,

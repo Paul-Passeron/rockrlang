@@ -20,13 +20,13 @@ use crate::{
         MIRLocalID,
         operand::{MIRPlace, MIRProjection, MIRProjectionKind},
     },
-    name_resolve::type_expr::enum_item,
-    phases::thir_to_mir::ThirToMIR,
-    resolved::{
+    model::{
         bool_id,
         concrete_ty::{ConcreteTy, Substitution},
         type_ref::{ConstructorType, RefWrappedTy, TyLike},
     },
+    name_resolve::type_expr::enum_item,
+    phases::thir_to_mir::ThirToMIR,
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
 };
 use itertools::Itertools;

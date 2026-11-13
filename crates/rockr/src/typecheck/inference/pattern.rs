@@ -25,7 +25,7 @@ use crate::typecheck::inference::{
 use crate::{
     hir::{HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirStructFieldPattern},
     name_resolve::type_expr::templates_of_struct,
-    resolved::{EnumId, ScopeOwnerId},
+    model::{EnumId, ScopeOwnerId},
 };
 use itertools::EitherOrBoth;
 use rockr_base::{Span, diagnostic::Diag};

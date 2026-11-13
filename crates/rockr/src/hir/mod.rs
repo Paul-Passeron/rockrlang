@@ -23,7 +23,7 @@ use crate::{
         module_items,
         type_expr::{get_templates_of_fun, resolve_type_expr},
     },
-    resolved::{
+    model::{
         EnumId, FunctionId, ImplSource, InterfaceId, InternedFunctionId, InternedImplId,
         InternedInterfaceId, ModuleId, ScopeOwnerId, StructId, TypeRef,
     },

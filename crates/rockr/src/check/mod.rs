@@ -31,7 +31,7 @@ use crate::{
         implems::module_impls,
     },
     phases::thir_to_mir::mir,
-    resolved::{
+    model::{
         FileModule, FunctionId, InternedModuleId, ModuleId, Package,
         packages::workspace_packages,
     },

@@ -23,11 +23,11 @@ use super::{
     StructId, Symbol, TypeDefId, TypeId, TypeRef,
 };
 use crate::{
+    model::{IntWidthKind, concrete_ty::ConcreteTy},
     name_resolve::{
         core_module,
         definition::{Definition, Segments, resolve_path},
     },
-    resolved::{IntWidthKind, concrete_ty::ConcreteTy},
 };
 use nonempty::nonempty;
 use rockr_base::mutability::Mutability;

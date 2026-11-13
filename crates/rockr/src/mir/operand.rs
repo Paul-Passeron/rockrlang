@@ -26,7 +26,7 @@ use crate::{
         Constant, ConstructorArgs, LocalID, MIRLocalID, Mir, Operand, Place, Projection,
         RValueKind,
     },
-    resolved::{
+    model::{
         bool_id, char_id,
         concrete_ty::{ConcreteEnumRef, ConcreteStructRef, ConcreteTy},
         ptr_of,

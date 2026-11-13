@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     hir::{Mutability, function_ast},
     name_resolve::type_expr::{get_templates_of_fun_only, templates_of_owner},
-    resolved::{
+    model::{
         BuiltinTypeId, InterfaceRef, InternedFunctionId, TypeDefId, TypeId, TypeRef,
         ptr_of, ref_of,
     },

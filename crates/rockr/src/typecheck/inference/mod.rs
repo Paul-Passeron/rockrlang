@@ -27,7 +27,7 @@ use crate::{
             templates_of_struct,
         },
     },
-    resolved::{
+    model::{
         BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
         TypeParamId, TypeRef, type_printer::TypePrinter, type_ref::TyLike,
     },

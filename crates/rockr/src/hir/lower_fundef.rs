@@ -29,7 +29,7 @@ use crate::{
         },
         type_expr::{get_template_param_count, get_templates_of_fun, templates_of_enum},
     },
-    resolved::{
+    model::{
         BuiltinTypeId, FunctionId, ModuleId, ScopeOwnerId, TypeDefId, TypeId,
         TypeParamId, TypeRef, compute_template_hints, rehole, tuple_of,
         type_ref::EnumRef,

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::signature::get_sig_of_function,
-    resolved::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
+    model::{BuiltinTypeId, TypeDefId, TypeId, TypeRef},
     thir::{
         ExprId, ExprKind, Thir, ThirConstructorArgs, ThirExprWithSetup, ThirMatchBranch,
         stmt::{StmtKind, ThirStmt},

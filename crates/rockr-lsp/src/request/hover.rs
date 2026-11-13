@@ -26,7 +26,7 @@ use rockr::{
         definition::Definition,
         type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     },
-    resolved::{FunctionId, TypeDefId, TypeParamId, TypeRef, type_ref::StructRef},
+    model::{FunctionId, TypeDefId, TypeParamId, TypeRef, type_ref::StructRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},

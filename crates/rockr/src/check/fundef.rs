@@ -26,12 +26,12 @@ use crate::{
         thir::{checked_thir_body, thir_is_valid},
     },
     mir::{MIRKey, passes::dead_code_elimination::dce},
-    name_resolve::type_expr::get_templates_of_fun,
-    phases::thir_to_mir::mir,
-    resolved::{
+    model::{
         FunctionId,
         concrete_ty::{Substitution, concretize_fid},
     },
+    name_resolve::type_expr::get_templates_of_fun,
+    phases::thir_to_mir::mir,
     typecheck::type_check_function,
 };
 use std::collections::HashSet;

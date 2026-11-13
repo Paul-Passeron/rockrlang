@@ -21,7 +21,7 @@ use crate::{
         definition::{Definition, resolve_in_module},
         type_expr::{get_templates_of_fun, templates_of_owner},
     },
-    resolved::{
+    model::{
         FunctionId, InterfaceRef, ModuleId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
         array_of, const_ptr_of, const_ref_of, mut_ptr_of, mut_ref_of, slice_of, tuple_of,
     },

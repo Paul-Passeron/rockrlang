@@ -18,10 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::Db;
 
 use crate::layout::target_width;
-use crate::resolved::type_ref::TyLike;
+use crate::model::type_ref::TyLike;
 use crate::{
     layout::{AggregateLayout, LayoutData, LayoutID, Offset, Size},
-    resolved::TypeRef,
+    model::TypeRef,
 };
 
 pub const FAT_PTR_DATA_FIELD: u32 = 0;

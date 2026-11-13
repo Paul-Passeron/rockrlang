@@ -23,7 +23,7 @@ use rockr_base::{
 
 use crate::{
     hir::{self, LocalInfo},
-    resolved::{FunctionId, TypeRef},
+    model::{FunctionId, TypeRef},
     thir::{
         ExprId, ExprKind, LocalId, PlaceId, Projection, ProjectionKind, ScopeId, Thir,
         ThirExpr, ThirLocal, ThirPlace, ThirScope, stmt::ThirStmt,

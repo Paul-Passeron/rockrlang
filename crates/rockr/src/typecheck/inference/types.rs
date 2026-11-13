@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 
 use crate::{
-    resolved::{
+    model::{
         BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
         rehole, str_def,
         type_ref::{CastClass, TyLike},

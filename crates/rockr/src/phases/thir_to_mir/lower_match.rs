@@ -15,8 +15,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::concrete_ty::int_ty_with_width;
-use crate::resolved::type_ref::{RefWrappedTy, TyLike, WrapKind};
+use crate::model::concrete_ty::int_ty_with_width;
+use crate::model::type_ref::{RefWrappedTy, TyLike, WrapKind};
 use crate::{
     layout::{Discriminant, LIRTy, layout_of},
     mir::{
@@ -24,11 +24,11 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
+    model::{concrete_ty::ConcreteTy, ref_of},
     phases::thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },
-    resolved::{concrete_ty::ConcreteTy, ref_of},
     thir::ThirMatchBranch,
 };
 use itertools::Itertools;

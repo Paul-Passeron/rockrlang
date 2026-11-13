@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    resolved::InterfaceId,
+    model::InterfaceId,
     typecheck::{
         ExprId,
         inference::{

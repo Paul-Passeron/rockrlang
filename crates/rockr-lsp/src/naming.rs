@@ -19,7 +19,7 @@ use crate::Lsp;
 use itertools::Itertools;
 use rockr::{
     hir::signature::{FunctionSignature, get_sig_of_function},
-    resolved::{
+    model::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceRef, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef, type_printer::TypePrinter,
     },

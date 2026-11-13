@@ -27,7 +27,7 @@ use rockr::{
         Aggregate, AggregateLayout, Discriminant, LIRTy, LayoutData, LayoutID,
         ScalarKind, Union, ValueClass, VariantsLayout,
     },
-    resolved::ptr_of,
+    model::ptr_of,
 };
 use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
 use std::marker::PhantomData;

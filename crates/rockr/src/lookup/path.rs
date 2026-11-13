@@ -24,7 +24,7 @@ use crate::{
         interfaces::interface_item,
         module_items,
     },
-    resolved::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
+    model::{ImplId, InterfaceId, ModuleId, ScopeOwnerId},
 };
 use rockr_syntax::parse_tree::{
     expr::{AstExpr, AstExprDesc},

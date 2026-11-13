@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 
-use crate::{hir::interface_items, resolved::InterfaceId};
+use crate::{hir::interface_items, model::InterfaceId};
 use std::collections::{HashMap, hash_map::Entry};
 
 pub fn check_interface(db: &dyn Db, interface: InterfaceId) {

@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    resolved::type_printer::{TypePrinter, TypePrinterOption},
+    model::type_printer::{TypePrinter, TypePrinterOption},
     typecheck::inference::{InferTy, InferenceCtx},
 };
 use itertools::Itertools;

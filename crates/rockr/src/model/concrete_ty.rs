@@ -19,7 +19,7 @@ use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
 
 use crate::{
     name_resolve::type_expr::{struct_item, templates_of_struct},
-    resolved::{
+    model::{
         BuiltinTypeId, EnumId, FunctionId, InternedStructId, ScopeOwnerId, StructId,
         TypeDefId, TypeId, TypeRef, char_id, int_id,
         type_ref::{ConstructorType, EnumRef, TyLike},

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     name_resolve::{builtin_module, core_package, main_package, std_package},
-    resolved::{
+    model::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
         ModuleId, Package, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },

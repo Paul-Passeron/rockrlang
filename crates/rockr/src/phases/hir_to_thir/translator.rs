@@ -22,7 +22,7 @@ use crate::{
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
     },
     phases::hir_to_thir::builder::ThirBuilder,
-    resolved::{
+    model::{
         ScopeOwnerId, TypeId, TypeRef, rehole,
         type_ref::{RefWrappedTy, Subst, TyLike, WrapKind},
     },

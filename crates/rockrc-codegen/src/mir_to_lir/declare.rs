@@ -26,7 +26,7 @@ use itertools::Itertools;
 use rockr::{
     layout::{LIRTy, layout_of},
     mir::{FuncInst, Mir},
-    resolved::concrete_ty::ConcreteTy,
+    model::concrete_ty::ConcreteTy,
 };
 use rockr_base::Db;
 

@@ -28,7 +28,7 @@ use crate::{
     name_resolve::interfaces::{core_copy_interface, core_drop_interface},
     phases::hir_to_thir::thir_body,
     phases::thir_to_mir::lower_match::MatchLowerer,
-    resolved::{
+    model::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
         TypeRef, char_id,
         concrete_ty::{

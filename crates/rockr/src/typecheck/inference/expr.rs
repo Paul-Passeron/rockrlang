@@ -23,7 +23,7 @@ use crate::{
     name_resolve::type_expr::{
         get_templates_of_fun, struct_item, templates_of_enum, templates_of_struct,
     },
-    resolved::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
+    model::{EnumId, FunctionId, ScopeOwnerId, StructId, TypeDefId, TypeRef},
     typecheck::{
         CallKind, ExprId, InferCallInfos, PlaceId,
         inference::{

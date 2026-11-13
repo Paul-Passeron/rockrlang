@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::signature::{FunctionSignature, get_sig_of_function},
-    resolved::{FunctionId, type_printer::TypePrinter},
+    model::{FunctionId, type_printer::TypePrinter},
 };
 use itertools::Itertools;
 use rockr_base::Db;

@@ -21,7 +21,7 @@ use crate::{
         fat_ptr::fat_ptr_layout_for,
         union::enum_layout,
     },
-    resolved::{
+    model::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, TypeDefId, TypeRef,
         concrete_ty::ConcreteTy,
     },

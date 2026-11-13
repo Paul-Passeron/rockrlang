@@ -36,7 +36,7 @@ use crate::{
     name_resolve::{
         core_package, file_module_id, std_package, type_expr::get_templates_of_fun,
     },
-    resolved::{
+    model::{
         FunctionId, ScopeOwnerId, TypeRef,
         concrete_ty::{ConcreteTy, Substitution},
         packages::workspace_packages,

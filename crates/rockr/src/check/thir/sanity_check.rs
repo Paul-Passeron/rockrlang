@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::signature::get_sig_of_function,
-    resolved::{
+    model::{
         ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
         type_ref::{

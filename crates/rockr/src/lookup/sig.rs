@@ -19,7 +19,7 @@ use crate::{
     hir::FunctionLikeAst,
     lookup::enclosing_fun,
     name_resolve::type_expr::templates_of_owner,
-    resolved::{FunctionId, InterfaceRef, TypeRef},
+    model::{FunctionId, InterfaceRef, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use itertools::Itertools;

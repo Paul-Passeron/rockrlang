@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 
 use crate::{
-    resolved::{
+    model::{
         AdtLike, BuiltinTypeId, BuiltinTypeKind, EnumId, PtrKind, ScopeOwnerId, StructId,
         TypeDefId, TypeId, TypeRef, ref_of, slice_of, type_printer::TypePrinter,
         usize_id,

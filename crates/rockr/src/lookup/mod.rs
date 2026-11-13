@@ -27,7 +27,7 @@ use crate::{
         definition::Definition, file_module_id, implems::module_impls, module_items,
     },
     phases::hir_to_thir::thir_body,
-    resolved::{
+    model::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef, packages::workspace_packages,
     },

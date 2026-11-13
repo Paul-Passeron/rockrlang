@@ -17,9 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     lookup::{enclosing_fun, enclosing_scope_owner},
+    model::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
     name_resolve::{interfaces::interface_item, module_items},
     phases::hir_to_thir::thir_body,
-    resolved::{FunctionId, ImplId, InterfaceRef, ModuleId, ScopeOwnerId, TypeRef},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use rockr_base::{Db, Location, SourceFile, Span};

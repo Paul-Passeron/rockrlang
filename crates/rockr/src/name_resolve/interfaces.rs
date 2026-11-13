@@ -24,7 +24,7 @@ use crate::{
         definition::{Definition, resolve_in_module},
         module_items,
     },
-    resolved::{
+    model::{
         EnumId, InterfaceId, InternedInterfaceId, InternedModuleId, ModuleId, StructId,
         TypeDefId,
     },

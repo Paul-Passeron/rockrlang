@@ -28,7 +28,7 @@ use rockr::{
         module_items,
         type_expr::{enum_item, get_templates_of_fun, struct_item, templates_of_owner},
     },
-    resolved::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
+    model::{InterfaceId, ModuleId, ScopeOwnerId, TypeDefId, TypeRef},
     thir::{ExprId, ExprKind, LocalId, PlaceId, Thir},
 };
 use rockr_base::{Location, Span};

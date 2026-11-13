@@ -20,7 +20,7 @@ use rockr_base::{Db, Span, diagnostic::Diag, symbol::Symbol};
 use crate::{
     check::fundef::check_fundef,
     hir::{impl_items, signature::ZelfArg},
-    resolved::{FunctionId, ImplSource, ScopeOwnerId},
+    model::{FunctionId, ImplSource, ScopeOwnerId},
     typecheck::conformance::{ConformanceError, interface_conformance_errors},
 };
 use rockr_syntax::parse_tree::top_level::AstImplItem;

@@ -24,7 +24,7 @@ use crate::{
         HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace, HirPlaceKind,
         HirStmt, HirStmtKind, HirStructField, HirStructFieldPattern,
     },
-    resolved::TypeDefId,
+    model::TypeDefId,
 };
 use std::fmt::{self, Formatter};
 

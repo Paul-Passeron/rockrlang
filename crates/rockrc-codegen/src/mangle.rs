@@ -21,7 +21,7 @@ use rockr::{
     layout::{Size, target_width},
     mir::{FuncInst, MIRKey},
     name_resolve::builtin_module,
-    resolved::{
+    model::{
         BuiltinTypeId, BuiltinTypeKind, IntWidthKind, ModuleId, TypeDefId, TypeRef,
         concrete_ty::{ConcreteTy, InternedConcreteTy},
     },

@@ -20,7 +20,7 @@ use rockr_base::workspace::Workspace;
 use super::{Db, HashMap, InferTy, InferVar, InferenceCtx, Package, TypeRef};
 use crate::{
     name_resolve::implems::impls_in_package,
-    resolved::{ImplSource, ScopeOwnerId, packages::workspace_packages},
+    model::{ImplSource, ScopeOwnerId, packages::workspace_packages},
     typecheck::inference::{
         constraints::InferenceConstraintKind, implicit::ImplicitContext,
     },

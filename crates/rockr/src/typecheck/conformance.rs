@@ -15,14 +15,14 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::type_ref::Subst;
+use crate::model::type_ref::Subst;
 use crate::{
     hir::{
         impl_items, interface_items,
         signature::{ZelfArg, get_sig_of_function},
     },
     name_resolve::implems::impls_in_package,
-    resolved::{
+    model::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
         InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
         packages::workspace_packages,

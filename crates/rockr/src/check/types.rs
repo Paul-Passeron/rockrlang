@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    resolved::{EnumId, ScopeOwnerId, StructId, TypeDefId},
+    model::{EnumId, ScopeOwnerId, StructId, TypeDefId},
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 use rockr_base::{Db, diagnostic::Diag, symbol::Symbol};

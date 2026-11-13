@@ -21,7 +21,7 @@ use crate::{
         layout_of, ordering_strategy,
     },
     name_resolve::type_expr::struct_item,
-    resolved::{StructId, TypeRef, type_ref::StructRef},
+    model::{StructId, TypeRef, type_ref::StructRef},
 };
 use itertools::Itertools;
 use rockr_base::Db;

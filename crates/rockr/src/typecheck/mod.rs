@@ -21,7 +21,7 @@ use crate::{
         HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
     },
     name_resolve::type_expr::get_templates_of_fun,
-    resolved::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
+    model::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 use itertools::Itertools;

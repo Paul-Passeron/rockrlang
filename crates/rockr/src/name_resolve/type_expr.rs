@@ -21,7 +21,7 @@ use crate::{
         interfaces::interface_item,
         module_items,
     },
-    resolved::{
+    model::{
         EnumId, InternedEnumId, InternedFunctionId, InternedModuleId, InternedStructId,
         ScopeOwnerId, StructId, TypeDefId, TypeId, TypeParamId, TypeRef, array_of,
         ptr_of, ref_of, slice_of, tuple_of,

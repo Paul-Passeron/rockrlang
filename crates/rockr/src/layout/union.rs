@@ -21,7 +21,7 @@ use crate::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, discriminant_strategy, finish_aggregate, layout_of,
     },
-    resolved::{
+    model::{
         EnumId, TypeRef,
         type_ref::{ConstructorType, EnumRef},
     },
