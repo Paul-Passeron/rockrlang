@@ -24,7 +24,7 @@ use lsp_types::{
         Notification as INotification,
     },
 };
-use rockr::common::load::{compute_all_files_from_roots, compute_package_roots};
+use rockr::workspace::load::{compute_all_files_from_roots, compute_package_roots};
 use salsa::Setter;
 
 impl Lsp<'_> {

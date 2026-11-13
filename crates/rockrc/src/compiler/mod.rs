@@ -32,7 +32,6 @@ use rockr::{
     },
     common::{
         diagnostic::Diag,
-        load::load_workspace_from_disk,
         location::LocationInfo,
         timing::{PhaseStat, render_timings},
     },
@@ -46,6 +45,7 @@ use rockr::{
         Workspace,
         config::{Config, OptLevel},
         error::CompilerError,
+        load::load_workspace_from_disk,
         workspace_packages,
     },
 };

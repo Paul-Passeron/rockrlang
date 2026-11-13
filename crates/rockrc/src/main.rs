@@ -15,12 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use crate::compiler::build_from_disk;
 use clap::Parser as _;
 use clap_derive::Parser;
 use rockr::workspace::config::{Config, OptLevel};
 use std::path::PathBuf;
-
-use crate::compiler::build_from_disk;
 
 pub mod compiler;
 pub mod driver;

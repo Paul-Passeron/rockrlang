@@ -15,21 +15,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+use common::workspace_root;
+use rockr::{
+    check::check,
+    common::{diagnostic::Severity, location::LocationInfo},
+    workspace::{
+        Workspace,
+        config::{Config, OptLevel},
+        load::{load_workspace_from_disk, program_has_errors},
+    },
+};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 
-use rockr::check::check;
-use rockr::common::diagnostic::Severity;
-use rockr::common::load::load_workspace_from_disk;
-use rockr::common::location::LocationInfo;
-use rockr::workspace::Workspace;
-use rockr::workspace::config::{Config, OptLevel};
-use rockr::workspace::load::program_has_errors;
-
 mod common;
-use common::workspace_root;
 
 const FAIL_DIR: &str = "examples/fail";
 

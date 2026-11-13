@@ -20,7 +20,6 @@ pub mod bitset;
 pub mod diagnostic;
 pub mod frozen;
 pub mod ids;
-pub mod load;
 pub mod location;
 pub mod symbols;
 pub mod timing;
