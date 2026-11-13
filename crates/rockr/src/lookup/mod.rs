@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     hir::{impl_items, interface_items},
-    hir_to_thir::thir_body,
     lookup::{
         path::path_node_at,
         sig::{SigNode, sig_node_at},
@@ -27,6 +26,7 @@ use crate::{
     name_resolve::{
         definition::Definition, file_module_id, implems::module_impls, module_items,
     },
+    phases::hir_to_thir::thir_body,
     resolved::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
         ScopeOwnerId, TypeParamId, TypeRef, packages::workspace_packages,

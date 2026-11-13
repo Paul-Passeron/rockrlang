@@ -30,12 +30,11 @@ use rockr::{
         check, collect_module_functions, fundef::reachable_mir_instances,
         program_has_errors, reachable_frefs,
     },
-    hir_to_thir::thir_body,
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::file_module_id,
+    phases::{hir_to_thir::thir_body, thir_to_mir::mir},
     resolved::{FunctionId, concrete_ty::Substitution, packages::workspace_packages},
     thir::ExprKind,
-    thir_to_mir::mir,
 };
 use rockr_base::{
     Db,

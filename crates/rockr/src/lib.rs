@@ -18,12 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 pub mod check;
 pub mod display;
 pub mod hir;
-pub mod hir_to_thir;
 pub mod layout;
 pub mod lookup;
 pub mod mir;
 pub mod name_resolve;
+pub mod phases;
 pub mod resolved;
 pub mod thir;
-pub mod thir_to_mir;
 pub mod typecheck;

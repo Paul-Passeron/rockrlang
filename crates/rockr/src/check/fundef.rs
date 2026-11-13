@@ -27,11 +27,11 @@ use crate::{
     },
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::type_expr::get_templates_of_fun,
+    phases::thir_to_mir::mir,
     resolved::{
         FunctionId,
         concrete_ty::{Substitution, concretize_fid},
     },
-    thir_to_mir::mir,
     typecheck::type_check_function,
 };
 use std::collections::HashSet;

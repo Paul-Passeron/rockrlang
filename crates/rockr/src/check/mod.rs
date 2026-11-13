@@ -30,11 +30,11 @@ use crate::{
         file_module_id,
         implems::module_impls,
     },
+    phases::thir_to_mir::mir,
     resolved::{
         FileModule, FunctionId, InternedModuleId, ModuleId, Package,
         packages::workspace_packages,
     },
-    thir_to_mir::mir,
 };
 use itertools::Itertools;
 use rockr_base::{

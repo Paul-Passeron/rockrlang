@@ -24,12 +24,12 @@ use crate::{
         basic_block::{MIRTerminator, Stmt},
         operand::{MIRPlace, MIRRValue, MIRRValueKind},
     },
-    resolved::{concrete_ty::ConcreteTy, ref_of},
-    thir::ThirMatchBranch,
-    thir_to_mir::{
+    phases::thir_to_mir::{
         ThirToMIR,
         decision_tree::{Constructor, DecisionTree, Matrix, Row},
     },
+    resolved::{concrete_ty::ConcreteTy, ref_of},
+    thir::ThirMatchBranch,
 };
 use itertools::Itertools;
 use rockr_base::Db;

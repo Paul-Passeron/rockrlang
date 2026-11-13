@@ -16,7 +16,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::{
-    hir_to_thir::thir_body,
     mir::{
         MIRBlockID, MIRKey, MIRLocal, MIRLocalID, Mir, SyntacticSource,
         basic_block::{MIRTerminator, Stmt},
@@ -27,6 +26,8 @@ use crate::{
         },
     },
     name_resolve::interfaces::{core_copy_interface, core_drop_interface},
+    phases::hir_to_thir::thir_body,
+    phases::thir_to_mir::lower_match::MatchLowerer,
     resolved::{
         BuiltinTypeKind, FunctionId, InterfaceRef, ScopeOwnerId, TypeDefId, TypeId,
         TypeRef, char_id,
@@ -43,7 +44,6 @@ use crate::{
         ThirMatchBranch, ThirStructField,
         stmt::{StmtKind, ThirStmt},
     },
-    thir_to_mir::lower_match::MatchLowerer,
     typecheck::conformance::type_implements,
 };
 use itertools::{Either, Itertools};

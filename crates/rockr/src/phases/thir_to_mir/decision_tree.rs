@@ -21,13 +21,13 @@ use crate::{
         operand::{MIRPlace, MIRProjection, MIRProjectionKind},
     },
     name_resolve::type_expr::enum_item,
+    phases::thir_to_mir::ThirToMIR,
     resolved::{
         bool_id,
         concrete_ty::{ConcreteTy, Substitution},
         type_ref::{ConstructorType, RefWrappedTy, TyLike},
     },
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
-    thir_to_mir::ThirToMIR,
 };
 use itertools::Itertools;
 use rockr_base::{Db, symbol::Symbol};

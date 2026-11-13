@@ -21,7 +21,7 @@ use crate::{
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
     },
-    hir_to_thir::builder::ThirBuilder,
+    phases::hir_to_thir::builder::ThirBuilder,
     resolved::{
         ScopeOwnerId, TypeId, TypeRef, rehole,
         type_ref::{RefWrappedTy, Subst, TyLike, WrapKind},

@@ -26,7 +26,7 @@ use crate::{
         },
         passes::MIRPass,
     },
-    thir_to_mir::_mir,
+    phases::thir_to_mir::_mir,
 };
 use itertools::Itertools;
 use rockr_base::Db;

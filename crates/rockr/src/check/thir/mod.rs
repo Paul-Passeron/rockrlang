@@ -19,7 +19,7 @@ use rockr_base::{Db, diagnostic::Diag};
 
 use crate::{
     check::thir::{return_check::check_return, sanity_check::sanity_check},
-    hir_to_thir::thir_body,
+    phases::hir_to_thir::thir_body,
     resolved::{FunctionId, InternedFunctionId},
     thir::Thir,
 };
