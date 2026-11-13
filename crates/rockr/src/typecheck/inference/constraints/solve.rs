@@ -19,10 +19,8 @@ use crate::{
     hir::{FunctionLikeAst, impl_items},
     layout::{LIRTy, ScalarKind, layout_of},
     model::{
-        BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
-        concrete_ty::int_ty_with_width,
-        type_ref::{CastClass, TyLike},
+        BuiltinTypeId, CastClass, FunctionId, ImplSource, InterfaceId, PtrKind,
+        ScopeOwnerId, TyLike, TypeDefId, TypeId, TypeRef, concrete_ty::int_ty_with_width,
     },
     typecheck::{
         CallKind, ExprId, InferCallInfos, ReceiverAdjustment,

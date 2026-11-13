@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::model::concrete_ty::int_ty_with_width;
-use crate::model::type_ref::{RefWrappedTy, TyLike, WrapKind};
+use crate::model::{RefWrappedTy, TyLike, WrapKind};
 use crate::{
     layout::{Discriminant, LIRTy, layout_of},
     mir::{

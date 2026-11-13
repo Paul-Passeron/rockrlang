@@ -22,11 +22,11 @@ use lsp_types::{
 };
 use rockr::{
     lookup::{AstNode, ast_node_at, enclosing_fun, sig::SigNode, thir::ThirNode},
+    model::{FunctionId, StructRef, TypeDefId, TypeParamId, TypeRef},
     name_resolve::{
         definition::Definition,
         type_expr::{get_templates_of_fun, struct_item, templates_of_struct},
     },
-    model::{FunctionId, TypeDefId, TypeParamId, TypeRef, type_ref::StructRef},
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Thir,
         stmt::{BlockSemanticInfo, StmtKind, ThirStmt},

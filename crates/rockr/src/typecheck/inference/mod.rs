@@ -18,6 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     display::Display,
     hir::{LocalId, signature::receiver_as_zelf_arg},
+    model::{
+        BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TyLike, TypeDefId,
+        TypeId, TypeParamId, TypeRef, type_printer::TypePrinter,
+    },
     name_resolve::{
         definition::Definition,
         implems::resolve_type_expr_as_interface,
@@ -26,10 +30,6 @@ use crate::{
             get_templates_of_fun, get_templates_of_fun_only, templates_of_enum,
             templates_of_struct,
         },
-    },
-    model::{
-        BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, type_printer::TypePrinter, type_ref::TyLike,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,

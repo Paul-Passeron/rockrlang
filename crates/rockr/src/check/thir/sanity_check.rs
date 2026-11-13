@@ -18,12 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     hir::signature::get_sig_of_function,
     model::{
-        ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
-        const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
-        type_ref::{
-            ConstructorType, PeeledTy, Subst, TyLike, peel_type_ref_until, wrap_type_ref,
-        },
-        void_id,
+        ConstructorType, PeeledTy, ScopeOwnerId, Subst, TyLike, TypeDefId, TypeId,
+        TypeRef, array_of, bool_id, char_id, const_ptr_of, int_id, peel_type_ref_until,
+        ptr_of, ref_of, str_id, tuple_of, void_id, wrap_type_ref,
     },
     thir::{
         ExprId, ExprKind, FunctionRef, PlaceBase, PlaceId, Projection, ProjectionKind,

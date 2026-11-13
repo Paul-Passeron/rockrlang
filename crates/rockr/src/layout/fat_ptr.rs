@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::Db;
 
 use crate::layout::target_width;
-use crate::model::type_ref::TyLike;
+use crate::model::TyLike;
 use crate::{
     layout::{AggregateLayout, LayoutData, LayoutID, Offset, Size},
     model::TypeRef,

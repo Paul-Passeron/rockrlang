@@ -21,11 +21,10 @@ use crate::{
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
     },
-    phases::hir_to_thir::builder::ThirBuilder,
     model::{
-        ScopeOwnerId, TypeId, TypeRef, rehole,
-        type_ref::{RefWrappedTy, Subst, TyLike, WrapKind},
+        RefWrappedTy, ScopeOwnerId, Subst, TyLike, TypeId, TypeRef, WrapKind, rehole,
     },
+    phases::hir_to_thir::builder::ThirBuilder,
     thir::{
         Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Projection,
         ProjectionKind, ScopeId, ScopeKind, Thir, ThirConstructorArgs, ThirExpr,

@@ -19,9 +19,8 @@ use rockr_base::{Db, mutability::Mutability, symbol::Symbol};
 
 use crate::{
     model::{
-        BuiltinTypeId, BuiltinTypeKind, ScopeOwnerId, StructId, TypeDefId, TypeRef,
-        rehole, str_def,
-        type_ref::{CastClass, TyLike},
+        BuiltinTypeId, BuiltinTypeKind, CastClass, ScopeOwnerId, StructId, TyLike,
+        TypeDefId, TypeRef, rehole, str_def,
     },
     typecheck::inference::{
         InferTy, InferenceCtx,

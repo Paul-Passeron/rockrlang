@@ -18,10 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use rockr_base::{Db, Location, Span, symbol::Symbol};
 
 use crate::{
-    model::{
-        TypeRef,
-        type_ref::{EnumRef, StructRef},
-    },
+    model::{EnumRef, StructRef, TypeRef},
     thir::{
         ExprId, ExprKind, LocalId, PlaceBase, PlaceId, Thir, ThirConstructorArgs,
         ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind,

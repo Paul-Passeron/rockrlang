@@ -20,8 +20,8 @@ use crate::{
         HirBody, HirExpr, HirId, HirMatchBranch, HirPattern, HirPatternDesc, HirPlace,
         HirStmt, HirStmtKind, LocalId, LocalInfo, hir_body,
     },
+    model::{FunctionId, InternedFunctionId, Subst, TypeRef},
     name_resolve::type_expr::get_templates_of_fun,
-    model::{FunctionId, InternedFunctionId, TypeRef, type_ref::Subst},
     typecheck::inference::{InferTy, InferenceCtx, TypeInferenceError},
 };
 use itertools::Itertools;

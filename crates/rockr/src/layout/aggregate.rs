@@ -20,8 +20,8 @@ use crate::{
         AggregateLayout, Align, FieldInput, FieldOrderingKind, LayoutID, Offset, Size,
         layout_of, ordering_strategy,
     },
+    model::{StructId, StructRef, TypeRef},
     name_resolve::type_expr::struct_item,
-    model::{StructId, TypeRef, type_ref::StructRef},
 };
 use itertools::Itertools;
 use rockr_base::Db;

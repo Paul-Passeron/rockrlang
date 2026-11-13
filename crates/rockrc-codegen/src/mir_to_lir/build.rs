@@ -36,12 +36,11 @@ use rockr::{
             MIRProjectionKind, MIRRValue, MIRRValueKind, UnaryOperator,
         },
     },
-    name_resolve::type_expr::struct_item,
     model::{
-        TypeDefId, array_of, bool_id,
+        CastClass, ConstructorType, TyLike, TypeDefId, array_of, bool_id,
         concrete_ty::ConcreteTy,
-        type_ref::{CastClass, ConstructorType, TyLike},
     },
+    name_resolve::type_expr::struct_item,
 };
 use rockr_base::{Db, lang::arch::IntWidth, symbol::Symbol};
 use rockr_syntax::parse_tree::expr::BinaryOperator;

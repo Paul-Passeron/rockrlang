@@ -21,10 +21,7 @@ use crate::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, discriminant_strategy, finish_aggregate, layout_of,
     },
-    model::{
-        EnumId, TypeRef,
-        type_ref::{ConstructorType, EnumRef},
-    },
+    model::{ConstructorType, EnumId, EnumRef, TypeRef},
 };
 use itertools::Itertools;
 use rockr_base::Db;

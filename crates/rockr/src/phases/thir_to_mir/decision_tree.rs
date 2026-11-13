@@ -21,9 +21,8 @@ use crate::{
         operand::{MIRPlace, MIRProjection, MIRProjectionKind},
     },
     model::{
-        bool_id,
+        ConstructorType, RefWrappedTy, TyLike, bool_id,
         concrete_ty::{ConcreteTy, Substitution},
-        type_ref::{ConstructorType, RefWrappedTy, TyLike},
     },
     name_resolve::type_expr::enum_item,
     phases::thir_to_mir::ThirToMIR,
