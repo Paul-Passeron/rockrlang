@@ -57,6 +57,13 @@ pub fn check(db: &dyn Db, ws: Workspace) {
     }
 }
 
+pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
+    let ws = Workspace::get(db);
+    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
+    let has_errors = raw_diags.iter().any(|d| d.is_error());
+    (has_errors, raw_diags)
+}
+
 pub fn check_definition(db: &dyn Db, def: Definition) {
     match def {
         Definition::Function(function_id) => check_fundef(db, function_id),

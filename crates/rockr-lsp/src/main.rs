@@ -25,11 +25,12 @@ use lsp_types::{
 };
 use rockr::{
     RockrDb, SourceFile,
+    check::program_has_errors,
     common::{
         diagnostic::{Diag, Severity},
         location::{Location, Span, offset_at},
     },
-    workspace::{Workspace, config::Config, load::program_has_errors},
+    workspace::{Workspace, config::Config},
 };
 use std::{
     collections::HashMap,

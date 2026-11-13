@@ -28,7 +28,8 @@ use itertools::Itertools;
 use rockr::{
     Db,
     check::{
-        check, collect_module_functions, fundef::reachable_mir_instances, reachable_frefs,
+        check, collect_module_functions, fundef::reachable_mir_instances,
+        program_has_errors, reachable_frefs,
     },
     common::{
         diagnostic::Diag,
@@ -55,13 +56,6 @@ use std::{
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
-
-pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
-    let ws = Workspace::get(db);
-    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
-    let has_errors = raw_diags.iter().any(|d| d.is_error());
-    (has_errors, raw_diags)
-}
 
 pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
     let db = load_workspace_from_disk(root, config)?;

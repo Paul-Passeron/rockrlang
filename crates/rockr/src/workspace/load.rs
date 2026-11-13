@@ -19,9 +19,6 @@ use walkdir::WalkDir;
 
 use crate::{
     Db, RockrDb,
-    check::check,
-    common::{diagnostic::Diag, location::LocationInfo},
-    printer::render_diagnostics,
     workspace::{
         PackageRoot, Workspace,
         config::Config,
@@ -126,32 +123,4 @@ pub fn load_workspace_from_disk(
     compute_package_roots(&mut db, root)?;
     compute_all_files_from_roots(&mut db)?;
     Ok(db)
-}
-
-pub fn program_has_errors(db: &dyn Db) -> (bool, Vec<&Diag>) {
-    let ws = Workspace::get(db);
-    let raw_diags: Vec<&Diag> = check::accumulated::<Diag>(db, ws);
-    let has_errors = raw_diags.iter().any(|d| d.is_error());
-    (has_errors, raw_diags)
-}
-
-pub fn check_from_disk(root: PathBuf, config: Config) -> Result<(), CompilerError> {
-    let db = load_workspace_from_disk(root, config)?;
-    let ws = Workspace::get(&db);
-    check(&db, ws);
-    let (has_errors, raw_diags) = program_has_errors(&db);
-
-    let mut diags: Vec<(&LocationInfo, &Diag)> = raw_diags
-        .into_iter()
-        .map(|d| (d.primary.span.start().loc_info(&db), d))
-        .collect();
-
-    diags.sort_by(|(loc_a, diag_a), (loc_b, diag_b)| {
-        diag_a.severity.cmp(&diag_b.severity).then_with(|| {
-            loc_a.cmp(loc_b).then_with(|| diag_a.message.cmp(&diag_b.message))
-        })
-    });
-
-    render_diagnostics(&db, diags.into_iter().map(|(_, diag)| diag));
-    if has_errors { Err(CompilerError::CompiledWithErrors) } else { Ok(()) }
 }
