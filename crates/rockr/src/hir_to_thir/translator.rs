@@ -15,26 +15,24 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::common::mutability::Mutability;
-use crate::resolved::type_ref::Subst;
-use crate::resolved::type_ref::TyLike;
-use crate::thir::ProjectionKind;
 use crate::{
     Db,
-    check::thir::sanity_check::{RefWrappedTy, WrapKind},
-    common::{arena::Idx, diagnostic::Diag, location::Span},
+    common::{arena::Idx, diagnostic::Diag, location::Span, mutability::Mutability},
     hir::{
         self, HIRBlockSemanticInfo, HirBody, HirConstructorArgs, HirExpr, HirExprDesc,
         HirMatchBranch, HirPattern, HirPatternConstructorArgs, HirPatternDesc, HirPlace,
         HirPlaceKind, HirStmt, HirStmtKind, HirStructFieldPattern,
     },
     hir_to_thir::builder::ThirBuilder,
-    resolved::{ScopeOwnerId, TypeId, TypeRef, rehole},
+    resolved::{
+        ScopeOwnerId, TypeId, TypeRef, rehole,
+        type_ref::{RefWrappedTy, Subst, TyLike, WrapKind},
+    },
     thir::{
-        Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Projection, ScopeId,
-        ScopeKind, Thir, ThirConstructorArgs, ThirExpr, ThirExprWithSetup,
-        ThirMatchBranch, ThirPattern, ThirPatternKind, ThirPlace, ThirScope,
-        ThirStructField,
+        Dispatch, ExprId, ExprKind, FunctionRef, LocalId, PlaceId, Projection,
+        ProjectionKind, ScopeId, ScopeKind, Thir, ThirConstructorArgs, ThirExpr,
+        ThirExprWithSetup, ThirMatchBranch, ThirPattern, ThirPatternKind, ThirPlace,
+        ThirScope, ThirStructField,
         stmt::{BlockSemanticInfo, ThirStmt},
     },
     typecheck::{self, PatternId, ReceiverAdjustment, TypeCheckResults},

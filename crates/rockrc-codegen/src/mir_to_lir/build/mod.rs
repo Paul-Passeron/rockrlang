@@ -25,9 +25,9 @@ use crate::lir::{
 use itertools::Itertools;
 use rockr::common::arch::IntWidth;
 use rockr::layout::target_width;
+use rockr::resolved::type_ref::ConstructorType;
 use rockr::{
     Db,
-    check::thir::sanity_check::ConstructorType,
     common::symbols::Symbol,
     layout::{
         AggregateLayout, LIRTy, LayoutData, LayoutID, Offset, ScalarKind,

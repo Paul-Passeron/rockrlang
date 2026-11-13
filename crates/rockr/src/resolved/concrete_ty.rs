@@ -17,12 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    check::thir::sanity_check::ConstructorType,
     common::{arch::IntWidth, symbols::Symbol},
     name_resolve::type_expr::{struct_item, templates_of_struct},
     resolved::{
         BuiltinTypeId, EnumId, InternedStructId, ScopeOwnerId, StructId, TypeDefId,
-        TypeId, TypeRef, char_id, int_id, type_ref::TyLike, usize_id,
+        TypeId, TypeRef, char_id, int_id,
+        type_ref::{ConstructorType, TyLike},
+        usize_id,
     },
     thir,
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},

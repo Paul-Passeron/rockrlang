@@ -17,13 +17,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    common::{diagnostic::Diag, location::Span, mutability::Mutability, symbols::Symbol},
+    common::{diagnostic::Diag, location::Span, symbols::Symbol},
     hir::signature::get_sig_of_function,
     parse_tree::{expr::BinaryOperator, top_level::AstEnumVariantKind},
     resolved::{
-        AdtLike, ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
+        ScopeOwnerId, TypeDefId, TypeId, TypeRef, array_of, bool_id, char_id,
         const_ptr_of, int_id, ptr_of, ref_of, str_id, tuple_of,
-        type_ref::{Subst, TyLike},
+        type_ref::{
+            ConstructorType, PeeledTy, Subst, TyLike, peel_type_ref_until, wrap_type_ref,
+        },
         void_id,
     },
     thir::{
@@ -452,7 +454,7 @@ impl<'db> SanityChecker<'db> {
     fn check_types(&mut self, expected: TypeRef, got: TypeRef, span: Span) {
         let expected = self.normalize_type(expected);
         let got = self.normalize_type(got);
-        if contains_error(self.db, expected) || contains_error(self.db, got) {
+        if expected.contains_error(self.db) || got.contains_error(self.db) {
             return;
         }
         if expected != got {
@@ -655,30 +657,6 @@ impl<'db> SanityChecker<'db> {
     }
 }
 
-pub enum ConstructorType {
-    Tuple(Vec<TypeRef>),
-    Struct(Vec<(Symbol, TypeRef)>),
-    None,
-}
-
-impl ConstructorType {
-    #[must_use]
-    pub fn with_substitution(&self, db: &dyn Db, sub: &[TypeRef]) -> Self {
-        match self {
-            Self::Tuple(type_refs) => Self::Tuple(
-                type_refs.iter().map(|ty| ty.subst(db, &Subst::params(sub))).collect(),
-            ),
-            Self::Struct(items) => Self::Struct(
-                items
-                    .iter()
-                    .map(|(name, ty)| (*name, ty.subst(db, &Subst::params(sub))))
-                    .collect(),
-            ),
-            Self::None => Self::None,
-        }
-    }
-}
-
 impl EnumRef {
     pub fn get_cons(&self, db: &dyn Db, idx: usize) -> Option<ConstructorType> {
         let item = self.def.item(db);
@@ -790,120 +768,4 @@ impl FunctionRef {
             _ => None,
         })
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WrapKind {
-    Ref(Mutability),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RefWrappedTy<T: AdtLike> {
-    pub inner: T,
-    pub refs: Vec<WrapKind>, // [&A, &B, &C] means &C &B &A T
-}
-
-impl<T: AdtLike> RefWrappedTy<T> {
-    pub fn wrap_like(&self, db: &dyn Db, to_wrap: T) -> T {
-        self.refs.iter().fold(to_wrap, |ty, ref_kind| ref_kind.wrap(db, ty.into()))
-    }
-
-    pub fn as_type_ref(&self, db: &dyn Db) -> T {
-        self.wrap_like(db, self.inner)
-    }
-
-    pub fn peel_until(db: &dyn Db, to_peel: T, target: T) -> Option<Self> {
-        let mut refs = vec![];
-        let mut inner = to_peel;
-        while inner != target
-            && let Some((mutability, ty)) = inner.peel_ref(db)
-        {
-            inner = ty.try_into().ok()?;
-            refs.push(WrapKind::Ref(mutability));
-        }
-        if inner != target {
-            return None;
-        }
-        Some(Self { inner, refs })
-    }
-
-    pub fn from_type(db: &dyn Db, ty: T) -> Self {
-        let mut refs = vec![];
-        let mut inner = ty;
-        while let Some((mutability, ty)) = inner.peel_ref(db) {
-            inner = ty.try_into().ok().unwrap();
-            refs.push(WrapKind::Ref(mutability));
-        }
-        refs.reverse();
-        Self { inner, refs }
-    }
-
-    pub fn depth(&self) -> usize {
-        self.refs.len()
-    }
-}
-
-impl WrapKind {
-    pub fn wrap<T: AdtLike>(self, db: &dyn Db, ty: T::Args) -> T {
-        let Self::Ref(mutability) = self;
-        ref_of(db, ty, mutability.is_mut())
-    }
-}
-
-fn contains_error(db: &dyn Db, ty: TypeRef) -> bool {
-    match ty {
-        TypeRef::Error => true,
-        TypeRef::Concrete(id) => id.args(db).iter().any(|arg| contains_error(db, *arg)),
-        TypeRef::Param(_) | TypeRef::Associated(_) | TypeRef::Zelf | TypeRef::Unknown => {
-            false
-        }
-    }
-}
-
-/// Applies `refs` (as collected by [`peel_type_ref_until`]) on top of `ty`.
-///
-/// Unlike [`RefWrappedTy::wrap_like`], this works directly on `TypeRef` and so
-/// tolerates non-concrete leaves (e.g. a bare `Param` inside a generic
-/// function's own body), which `RefWrappedTy<TypeId>` cannot represent.
-fn wrap_type_ref(db: &dyn Db, refs: &[WrapKind], ty: TypeRef) -> TypeRef {
-    refs.iter()
-        .fold(ty, |ty, WrapKind::Ref(mutability)| ty.wrap_ref(db, mutability.is_mut()))
-}
-
-/// Like [`RefWrappedTy`], but over `TypeRef` directly — `AdtLike` cannot be
-/// implemented for `TypeRef` since a bare `Param`/`Zelf`/`Error`/`Unknown` has
-/// no `def()`, and those legitimately appear here in unmonomorphized THIR.
-pub struct PeeledTy {
-    pub inner: TypeRef,
-    pub refs: Vec<WrapKind>,
-}
-
-impl PeeledTy {
-    fn from_type_ref(db: &dyn Db, mut ty: TypeRef) -> Self {
-        let mut refs = vec![];
-        while let Some((mutability, inner)) = ty.as_ref(db) {
-            ty = inner;
-            refs.push(WrapKind::Ref(mutability));
-        }
-        refs.reverse();
-        Self { inner: ty, refs }
-    }
-}
-
-fn peel_type_ref_until(
-    db: &dyn Db,
-    mut ty: TypeRef,
-    target: TypeRef,
-) -> Option<PeeledTy> {
-    let mut refs = vec![];
-    while ty != target
-        && let Some((mutability, inner)) = ty.as_ref(db)
-    {
-        ty = inner;
-        refs.push(WrapKind::Ref(mutability));
-    }
-    if ty != target {
-        return None;
-    }
-    Some(PeeledTy { inner: ty, refs })
 }

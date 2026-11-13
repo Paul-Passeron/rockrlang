@@ -18,12 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use super::LayoutData;
 use crate::{
     Db,
-    check::thir::sanity_check::ConstructorType,
     layout::{
         Align, Discriminant, DiscriminantStrategyKind, IntWidth, LayoutID, Offset, Size,
         VariantsLayout, discriminant_strategy, finish_aggregate, layout_of,
     },
-    resolved::{EnumId, TypeRef},
+    resolved::{EnumId, TypeRef, type_ref::ConstructorType},
     thir::EnumRef,
 };
 use itertools::Itertools;

@@ -16,10 +16,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::resolved::concrete_ty::int_ty_with_width;
-use crate::resolved::type_ref::TyLike;
+use crate::resolved::type_ref::{RefWrappedTy, TyLike, WrapKind};
 use crate::{
     Db,
-    check::thir::sanity_check::{RefWrappedTy, WrapKind},
     layout::{Discriminant, LIRTy, layout_of},
     mir::{
         MIRBlockID,

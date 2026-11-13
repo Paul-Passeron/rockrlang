@@ -17,7 +17,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     Db,
-    check::thir::sanity_check::{ConstructorType, RefWrappedTy},
     common::symbols::Symbol,
     mir::{
         MIRLocalID,
@@ -28,7 +27,7 @@ use crate::{
     resolved::{
         bool_id,
         concrete_ty::{ConcreteTy, Substitution},
-        type_ref::TyLike,
+        type_ref::{ConstructorType, RefWrappedTy, TyLike},
     },
     thir::{ThirConstructorArgs, ThirPattern, ThirPatternKind},
     thir_to_mir::ThirToMIR,
