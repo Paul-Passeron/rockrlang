@@ -20,4 +20,3 @@ clap_derive.workspace = true
 inkwell.workspace = true
 itertools.workspace = true
 llvm-sys.workspace = true
-salsa-macros.workspace = true

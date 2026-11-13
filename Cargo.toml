@@ -29,7 +29,6 @@ pathdiff = "0.2.3"
 regex = "1.12.3"
 rustc-literal-escaper = "0.0.7"
 salsa = { version = "0.28.4", features = [] }
-salsa-macros = "0.28.4"
 unescaper = "0.1.8"
 walkdir = "2.5.0"
 lsp-server = "0.10.0"

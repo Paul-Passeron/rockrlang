@@ -19,5 +19,4 @@ inkwell.workspace = true
 itertools.workspace = true
 llvm-sys.workspace = true
 salsa.workspace = true
-salsa-macros.workspace = true
 unescaper.workspace = true
