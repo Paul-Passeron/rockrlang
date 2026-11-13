@@ -14,14 +14,9 @@ workspace = true
 rockr-constraint-solver.workspace = true
 rockr-base.workspace = true
 
-clap.workspace = true
-clap_derive.workspace = true
-dashmap.workspace = true
 ena.workspace = true
 itertools.workspace = true
 nonempty.workspace = true
-parking_lot.workspace = true
-pathdiff.workspace = true
 regex.workspace = true
 rustc-literal-escaper.workspace = true
 salsa.workspace = true

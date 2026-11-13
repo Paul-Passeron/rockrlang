@@ -16,7 +16,6 @@ clap_derive.workspace = true
 codespan-reporting.workspace = true
 dashmap.workspace = true
 itertools.workspace = true
-parking_lot.workspace = true
 pathdiff.workspace = true
 salsa.workspace = true
 salsa-macros.workspace = true
