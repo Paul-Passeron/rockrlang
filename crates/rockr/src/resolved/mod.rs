@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::name_resolve::type_expr::{templates_of_enum, templates_of_struct};
-pub use plumbing::*;
+pub use builtin::*;
 use rockr_base::{
     Db, SourceFile, Span, lang::arch::IntWidth, mutability::Mutability, symbol::Symbol,
     unord::Set,
@@ -24,9 +24,9 @@ use rockr_base::{
 use rockr_syntax::parse_tree::top_level::{AstImplItem, AstTemplateArg};
 use type_printer::TypePrinter;
 
+pub mod builtin;
 pub mod concrete_ty;
 pub mod packages;
-pub mod plumbing;
 pub mod type_printer;
 pub mod type_ref;
 
