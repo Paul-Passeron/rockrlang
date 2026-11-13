@@ -27,7 +27,7 @@ use crate::{
     resolved::{
         BuiltinTypeId, FunctionId, ImplSource, InterfaceId, PtrKind, ScopeOwnerId,
         TypeDefId, TypeId, TypeRef,
-        concrete_ty::int_ty_with_witdh,
+        concrete_ty::int_ty_with_width,
         type_ref::{CastClass, TyLike},
     },
     typecheck::{
@@ -263,7 +263,7 @@ impl<'db> InferenceCtx<'db> {
                         && let Some(ScalarKind::Int(rwidth)) = rty.scalar(self.db)
                     {
                         let max_width = lwidth.max(rwidth);
-                        let ty = int_ty_with_witdh(self.db, max_width);
+                        let ty = int_ty_with_width(self.db, max_width);
                         let infer_ty = InferTy::simple(ty.def(self.db));
                         self.unify(&res_ty.into(), &infer_ty)?;
                         return ConstraintSolveResult::Solved;

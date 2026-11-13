@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::resolved::concrete_ty::int_ty_with_witdh;
+use crate::resolved::concrete_ty::int_ty_with_width;
 use crate::resolved::type_ref::TyLike;
 use crate::{
     Db,
@@ -109,7 +109,7 @@ impl<'a, 'b> MatchLowerer<'a, 'b> {
                         todo!()
                     };
 
-                    let discr_ty: ConcreteTy = int_ty_with_witdh(self.db, discr_width);
+                    let discr_ty: ConcreteTy = int_ty_with_width(self.db, discr_width);
 
                     let discr = MIRRValue {
                         kind: MIRRValueKind::Discriminant(scrut_place),

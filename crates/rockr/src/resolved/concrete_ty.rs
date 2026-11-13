@@ -359,7 +359,7 @@ impl<'db> InternedConcreteStructRef<'db> {
     }
 }
 
-pub fn int_ty_with_witdh(db: &dyn Db, width: IntWidth) -> ConcreteTy {
+pub fn int_ty_with_width(db: &dyn Db, width: IntWidth) -> ConcreteTy {
     match width {
         IntWidth::I8 => char_id(db),
         IntWidth::I16 => todo!(),
