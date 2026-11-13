@@ -24,9 +24,6 @@ use rockr_base::{
     },
 };
 
-pub mod error;
-pub mod load;
-
 #[salsa::tracked(returns(deref))]
 pub fn submodules_of_file(db: &dyn Db, file: SourceFile) -> Vec<FileModule<'_>> {
     if file.path(db).file_name().unwrap() != ANCHOR_FILE_NAME {

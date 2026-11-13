@@ -27,4 +27,3 @@ regex.workspace = true
 rustc-literal-escaper.workspace = true
 salsa.workspace = true
 salsa-macros.workspace = true
-walkdir.workspace = true

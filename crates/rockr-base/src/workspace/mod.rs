@@ -25,8 +25,8 @@ use salsa::Setter;
 
 pub mod config;
 pub mod discover;
-// pub mod error;
-// pub mod load;
+pub mod error;
+pub mod load;
 
 #[salsa::input(singleton)]
 pub struct Workspace {

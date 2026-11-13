@@ -19,3 +19,4 @@ parking_lot.workspace = true
 pathdiff.workspace = true
 salsa.workspace = true
 salsa-macros.workspace = true
+walkdir.workspace = true

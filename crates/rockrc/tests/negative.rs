@@ -16,16 +16,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use common::workspace_root;
-use rockr::{
-    check::{check, program_has_errors},
-    workspace::load::load_workspace_from_disk,
-};
+use rockr::check::{check, program_has_errors};
 use rockr_base::{
     diagnostic::Severity,
     source::location::LocationInfo,
     workspace::{
         Workspace,
         config::{Config, OptLevel},
+        load::load_workspace_from_disk,
     },
 };
 use std::collections::BTreeSet;

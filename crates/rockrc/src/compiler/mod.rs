@@ -37,9 +37,7 @@ use rockr::{
     resolved::{FunctionId, concrete_ty::Substitution},
     thir::ExprKind,
     thir_to_mir::mir,
-    workspace::{
-        error::CompilerError, load::load_workspace_from_disk, workspace_packages,
-    },
+    workspace::workspace_packages,
 };
 use rockr_base::{
     Db,
@@ -49,6 +47,8 @@ use rockr_base::{
     workspace::{
         Workspace,
         config::{Config, OptLevel},
+        error::CompilerError,
+        load::load_workspace_from_disk,
     },
 };
 use rockrc_codegen::codegen::{Codegen, MIRToLIRBuild, MIRToLIRDeclare};
