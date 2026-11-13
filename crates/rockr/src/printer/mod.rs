@@ -31,8 +31,6 @@ use codespan_reporting::{
 };
 use std::{collections::HashMap, io};
 
-pub mod type_printer;
-
 pub fn render_diagnostics<'db, 'diag>(
     db: &'db dyn Db,
     diags: impl Iterator<Item = &'diag Diag>,

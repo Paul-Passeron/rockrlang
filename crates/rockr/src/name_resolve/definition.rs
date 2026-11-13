@@ -28,9 +28,8 @@ use crate::{
     },
     parse_tree::top_level::{AstIncludePathDesc, AstTopLevelItem, AstTopLevelItemDesc},
     parser::parse_file,
-    printer::type_printer::TypePrinter,
     resolved::{
-        EnumId, FunctionId, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
+        EnumId, FunctionId, type_printer::TypePrinter, InterfaceId, InternedModuleId, ModuleId, ScopeOwnerId,
         StructId, TypeDefId, bool_id, char_id, i8_id, i16_id, i32_id, i64_id, i128_id,
         int_id, isize_id, never_id, u8_id, u16_id, u32_id, u64_id, u128_id, usize_id,
         void_id,
@@ -450,4 +449,19 @@ pub fn get_module_pretty_name<'db>(db: &'db dyn Db, id: InternedModuleId<'db>) -
         String::new()
     };
     format!("{}{}", prefix, id.name(db).display(db))
+}
+
+impl TypePrinter {
+    pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {
+        match def {
+            Definition::Function(function_id) => {
+                self.function_id_to_string(db, function_id)
+            }
+            Definition::Interface(interface_id) => {
+                self.interface_id_to_string(db, interface_id)
+            }
+            Definition::Module(module_id) => self.module_to_string(db, module_id),
+            Definition::Type(type_def_id) => self.type_def_id_to_string(db, type_def_id),
+        }
+    }
 }

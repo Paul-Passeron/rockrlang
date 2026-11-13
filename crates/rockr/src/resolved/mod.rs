@@ -23,12 +23,13 @@ use crate::{
     },
     name_resolve::type_expr::{templates_of_enum, templates_of_struct},
     parse_tree::top_level::{AstImplItem, AstTemplateArg},
-    printer::type_printer::TypePrinter,
 };
 pub use plumbing::*;
+use type_printer::TypePrinter;
 
 pub mod concrete_ty;
 pub mod plumbing;
+pub mod type_printer;
 pub mod type_ref;
 
 #[salsa::tracked]

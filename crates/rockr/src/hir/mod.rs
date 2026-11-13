@@ -50,6 +50,7 @@ use std::sync::Arc;
 pub mod display;
 pub mod lower_fundef;
 pub mod signature;
+pub mod type_printer;
 pub mod utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

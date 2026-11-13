@@ -24,8 +24,9 @@ use crate::{
     Db,
     common::{mutability::Mutability, symbols::Symbol},
     parse_tree::top_level::AstEnumVariantKind,
-    printer::type_printer::TypePrinter,
-    resolved::{AdtLike, EnumId, ScopeOwnerId, StructId, slice_of},
+    resolved::{
+        AdtLike, EnumId, ScopeOwnerId, StructId, slice_of, type_printer::TypePrinter,
+    },
     typecheck::inference::implicit::{AsAstImplCtx, AstImplicitContext},
 };
 

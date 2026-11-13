@@ -29,10 +29,9 @@ use crate::{
         },
     },
     parse_tree::top_level::AstTemplateArg,
-    printer::type_printer::TypePrinter,
     resolved::{
         BuiltinTypeId, FunctionId, InterfaceId, Package, StructId, TypeDefId, TypeId,
-        TypeParamId, TypeRef, type_ref::TyLike,
+        TypeParamId, TypeRef, type_printer::TypePrinter, type_ref::TyLike,
     },
     typecheck::{
         ExprId, InferCallInfos, PatternId, PlaceId,
@@ -59,6 +58,7 @@ pub mod expr;
 mod implems;
 pub mod implicit;
 pub mod pattern;
+mod type_printer;
 mod types;
 mod unify;
 pub mod var;

@@ -20,10 +20,9 @@ use itertools::Itertools;
 use rockr::{
     common::{location::Location, mutability::Mutability},
     hir::signature::{FunctionSignature, get_sig_of_function},
-    printer::type_printer::TypePrinter,
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceRef, ScopeOwnerId,
-        TypeDefId, TypeId, TypeRef,
+        TypeDefId, TypeId, TypeRef, type_printer::TypePrinter,
     },
 };
 use std::fmt::Write;

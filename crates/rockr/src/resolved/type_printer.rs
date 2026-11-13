@@ -18,21 +18,15 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db,
     common::mutability::Mutability,
-    hir::signature::{FunctionSignature, get_sig_of_function},
-    name_resolve::{
-        builtin_module, core_package, definition::Definition, main_package, std_package,
-    },
+    name_resolve::{builtin_module, core_package, main_package, std_package},
     resolved::{
         BuiltinTypeId, BuiltinTypeKind, FunctionId, ImplId, InterfaceId, InterfaceRef,
         ModuleId, Package, ScopeOwnerId, TypeDefId, TypeId, TypeParamId, TypeRef,
     },
-    typecheck::inference::{InferTy, InferenceCtx},
 };
 use itertools::Itertools;
-use std::{collections::HashSet, fmt::Write};
+use std::collections::HashSet;
 
-/// Whether the crate prefix of `pkg` should be elided when printing paths:
-/// true for `core`, `std`, and the current crate.
 fn is_elided_package(db: &dyn Db, pkg: Package) -> bool {
     pkg == core_package(db)
         || std_package(db) == Some(pkg)
@@ -54,14 +48,14 @@ impl TypePrinter {
         Self { options: TypePrinterOptionSet::with_options(opts) }
     }
 
-    fn is_def_builtin(def: TypeDefId) -> Option<BuiltinTypeId> {
+    pub(crate) fn is_def_builtin(def: TypeDefId) -> Option<BuiltinTypeId> {
         match def {
             TypeDefId::Builtin(id) => Some(id),
             _ => None,
         }
     }
 
-    fn is_builtin_pretty_print(
+    pub(crate) fn is_builtin_pretty_print(
         db: &dyn Db,
         def: BuiltinTypeId,
     ) -> Option<(String, String)> {
@@ -131,45 +125,6 @@ impl TypePrinter {
             res
         } else {
             id.name(db).to_string(db)
-        }
-    }
-
-    pub fn infer_ty_to_string(
-        &self,
-        db: &dyn Db,
-        infer_ty: InferTy,
-        ctx: Option<&InferenceCtx>,
-    ) -> String {
-        let infer_ty =
-            if let Some(ctx) = ctx { ctx.find_const(&infer_ty) } else { infer_ty };
-        match infer_ty {
-            InferTy::Var(infer_var) => {
-                if self.options.has(TypePrinterOption::DebugInferenceVars) {
-                    infer_var.to_string()
-                } else {
-                    String::from("_")
-                }
-            }
-            InferTy::Adt { def, args: fields } => {
-                let no_fields = fields.is_empty();
-                let fields_str = fields
-                    .into_iter()
-                    .map(|ty| self.infer_ty_to_string(db, ty, ctx))
-                    .collect_vec()
-                    .join(", ");
-                if self.options.has(TypePrinterOption::PrettyPrintBuiltinADTs)
-                    && let Some(id) = Self::is_def_builtin(def)
-                    && let Some((prefix, suffix)) = Self::is_builtin_pretty_print(db, id)
-                {
-                    format!("{prefix}{fields_str}{suffix}")
-                } else if no_fields {
-                    self.type_def_id_to_string(db, def)
-                } else {
-                    format!("{}<{fields_str}>", self.type_def_id_to_string(db, def))
-                }
-            }
-            InferTy::Param(type_param_id) => format!("T{}", type_param_id.0),
-            InferTy::Error => "<ERROR>".to_owned(),
         }
     }
 
@@ -262,68 +217,6 @@ impl TypePrinter {
         }
     }
 
-    pub fn function_sig_to_string(&self, db: &dyn Db, sig: &FunctionSignature) -> String {
-        let mut s = String::new();
-        let f = &mut s;
-        let mut aux = || -> std::fmt::Result {
-            write!(f, "{}", sig.name.display(db))?;
-            if !sig.added_templates.is_empty() || !sig.implicit_templates.is_empty() {
-                write!(f, "<")?;
-                for (i, t) in
-                    sig.implicit_templates.iter().chain(&sig.added_templates).enumerate()
-                {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "T{i}")?;
-                    if !t.is_empty() {
-                        write!(
-                            f,
-                            ": {}",
-                            t.iter()
-                                .map(|c| self.interface_ref_to_string(db, *c))
-                                .collect_vec()
-                                .join(" + ")
-                        )?;
-                    }
-                }
-                write!(f, ">")?;
-            }
-            write!(f, "(")?;
-            if let Some(arg) = sig.zelf {
-                write!(f, "{arg}")?;
-                if !sig.args.is_empty() {
-                    write!(f, ", ")?;
-                }
-            }
-            write!(
-                f,
-                "{}): {}",
-                sig.args
-                    .iter()
-                    .map(|arg| format!(
-                        "{}: {}",
-                        arg.0.display(db),
-                        self.type_ref_to_string(db, arg.1)
-                    ))
-                    .collect_vec()
-                    .join(", "),
-                self.type_ref_to_string(db, sig.ret)
-            )?;
-            Ok(())
-        };
-        aux().unwrap();
-        s
-    }
-
-    pub fn function_id_to_string(&self, db: &dyn Db, function_id: FunctionId) -> String {
-        let sig = get_sig_of_function(db, function_id.interned());
-        Self::join_path(
-            &self.scope_owner_to_string(db, function_id.parent(db)),
-            &self.function_sig_to_string(db, sig),
-        )
-    }
-
     pub fn called_function_to_string(
         &self,
         db: &dyn Db,
@@ -337,21 +230,8 @@ impl TypePrinter {
 
     /// Joins a scope prefix and a name with `::`, dropping the separator when
     /// the prefix is empty (e.g. an elided crate root).
-    fn join_path(prefix: &str, name: &str) -> String {
+    pub(crate) fn join_path(prefix: &str, name: &str) -> String {
         if prefix.is_empty() { name.to_owned() } else { format!("{prefix}::{name}") }
-    }
-
-    pub fn definition_to_string(&self, db: &dyn Db, def: Definition) -> String {
-        match def {
-            Definition::Function(function_id) => {
-                self.function_id_to_string(db, function_id)
-            }
-            Definition::Interface(interface_id) => {
-                self.interface_id_to_string(db, interface_id)
-            }
-            Definition::Module(module_id) => self.module_to_string(db, module_id),
-            Definition::Type(type_def_id) => self.type_def_id_to_string(db, type_def_id),
-        }
     }
 }
 
