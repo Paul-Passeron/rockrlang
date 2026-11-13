@@ -16,9 +16,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 use crate::common::location::Span;
+pub use error::ParseError;
 use std::{fmt, hash::Hash};
 
 pub mod annotation;
+pub mod error;
 pub mod expr;
 pub mod pattern;
 pub mod stmt;

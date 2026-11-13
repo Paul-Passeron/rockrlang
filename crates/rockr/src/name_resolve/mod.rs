@@ -18,8 +18,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     Db, SourceFile,
     common::{diagnostic::Diag, location::Span, symbols::Symbol, unord::Set},
-    parse_tree::top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
-    parser::{ParseError, parse_file},
+    parse_tree::{
+        ParseError,
+        top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
+    },
+    parser::parse_file,
     resolved::{FileModule, InternedModuleId, ModuleId, Package},
     workspace::{Workspace, workspace_packages},
 };

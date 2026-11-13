@@ -22,9 +22,10 @@ use crate::{
         symbols::Symbol,
         timing::{Counts, Phase, timed},
     },
-    lexer::{LexError, Token, TokenKind, lex_file},
+    lexer::{Token, TokenKind, lex_file},
     parse_tree::{
-        Spanned,
+        ParseError, Spanned,
+        error::ParseErrorKind,
         top_level::{Ast, AstAnyTopLevelItemDesc, AstTopLevelItemDesc},
     },
 };
@@ -42,31 +43,6 @@ pub struct Parser<'db> {
     pub tokens: &'db [Token],
     pub db: &'db dyn Db,
     pub restrict_struct_lit: bool,
-}
-
-#[salsa::accumulator]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ParseError {
-    pub kind: ParseErrorKind,
-    pub file: SourceFile,
-    pub start: usize,
-    pub end: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ParseErrorKind {
-    LexError(LexError),
-    UnexpectedEOF,
-    ExpectedSymbol(String),
-    ExpectedToken {
-        expected: TokenKind,
-        found: TokenKind,
-    },
-    ExpectedIntLit(TokenKind),
-    ExpectedTypeName,
-    NotATopLevelItem,
-    /// `[T]` used other than as `&[T]` / `&mut [T]`, e.g. bare or as `*[T]`.
-    SliceMustBeBehindRef,
 }
 
 impl<'db> Parser<'db> {
@@ -288,7 +264,8 @@ pub fn parse_file(db: &dyn Db, file: SourceFile) -> Ast<'_> {
                     )
                 })
                 .count(),
-            // The parser produces boxed AST trees (no arena/map to size cheaply).
+            // The parser produces boxed AST trees (no arena/map to size
+            // cheaply).
             stmts: None,
             exprs: None,
         },

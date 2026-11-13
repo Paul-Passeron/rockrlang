@@ -19,11 +19,12 @@ use crate::{
     common::location::{self, Span},
     lexer::TokenKind,
     parse_tree::{
-        Spanned,
+        ParseError, Spanned,
+        error::ParseErrorKind,
         expr::{AstExpr, AstExprDesc, AstStructField, BinaryOperator},
         type_expr::{AstAnyTypeExpr, AstTypeExpr, AstTypeExprDesc},
     },
-    parser::{ParseError, ParseErrorKind, Parser},
+    parser::Parser,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

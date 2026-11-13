@@ -19,14 +19,13 @@ use crate::{
     Db,
     common::{location::Span, symbols::Symbol},
     parse_tree::{
-        Spanned,
+        ParseError, Spanned,
         annotation::AstAnnotation,
         expr::AstExpr,
         pattern::AstPattern,
         stmt::AstStmt,
         type_expr::{AstTypeExpr, AstTypeExprDesc},
     },
-    parser::ParseError,
     resolved::display::Display,
 };
 use itertools::Itertools;

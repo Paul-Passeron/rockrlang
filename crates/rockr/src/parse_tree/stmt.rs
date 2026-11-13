@@ -15,14 +15,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{
-    parse_tree::{
-        Spanned,
-        expr::{AstExpr, BinaryOperator},
-        pattern::AstPattern,
-        type_expr::AstAnyTypeExpr,
-    },
-    parser::ParseError,
+use crate::parse_tree::{
+    ParseError, Spanned,
+    expr::{AstExpr, BinaryOperator},
+    pattern::AstPattern,
+    type_expr::AstAnyTypeExpr,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

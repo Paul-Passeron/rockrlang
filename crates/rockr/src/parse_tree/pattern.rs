@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
     common::{location::Span, symbols::Symbol},
-    parse_tree::Spanned,
-    parser::ParseError,
+    parse_tree::{ParseError, Spanned},
 };
 
 pub type AstPattern = Spanned<AstPatternDesc>;

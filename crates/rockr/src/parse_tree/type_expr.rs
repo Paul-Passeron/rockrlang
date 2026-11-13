@@ -15,21 +15,42 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use crate::{common::symbols::Symbol, parse_tree::Spanned, parser::ParseError};
+use crate::{
+    common::symbols::Symbol,
+    parse_tree::{ParseError, Spanned},
+};
 
 pub type AstTypeExpr = Spanned<AstTypeExprDesc>;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AstTypeExprDesc {
-    Named { name: Spanned<Symbol>, args: Vec<AstAnyTypeExpr> },
-    NameResolved { from: Spanned<Symbol>, to: Box<AstTypeExpr> },
-    Ref { mutable: bool, pointee: Box<AstAnyTypeExpr> },
-    Pointer { mutable: bool, pointee: Box<AstAnyTypeExpr> },
+    Named {
+        name: Spanned<Symbol>,
+        args: Vec<AstAnyTypeExpr>,
+    },
+    NameResolved {
+        from: Spanned<Symbol>,
+        to: Box<AstTypeExpr>,
+    },
+    Ref {
+        mutable: bool,
+        pointee: Box<AstAnyTypeExpr>,
+    },
+    Pointer {
+        mutable: bool,
+        pointee: Box<AstAnyTypeExpr>,
+    },
     /// `&[T]` or `&mut [T]`. A slice is itself a (fat) reference, so the `&`
     /// is part of this node rather than a separate `Ref`.
-    Slice { mutable: bool, elem: Box<AstAnyTypeExpr> },
+    Slice {
+        mutable: bool,
+        elem: Box<AstAnyTypeExpr>,
+    },
     /// `[T; N]`.
-    Array { elem: Box<AstAnyTypeExpr>, len: usize },
+    Array {
+        elem: Box<AstAnyTypeExpr>,
+        len: usize,
+    },
     Tuple(Vec<AstAnyTypeExpr>),
     Error(ParseError),
 }
