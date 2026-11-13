@@ -16,7 +16,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
 pub use crate::db::Db;
-pub use crate::source::{Location, SourceFile, Span};
+pub use crate::source::SourceFile;
+pub use crate::source::location::Location;
+pub use crate::source::location::Span;
 
 pub mod db;
 pub mod source;

@@ -1,0 +1,135 @@
+/* Rockr programming language
+Copyright (C) 2026  NoRezap
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+use std::{fmt::Display, path::PathBuf};
+
+use crate::{Db, SourceFile};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Location {
+    pub file: SourceFile,
+    pub offset: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Span {
+    pub file: SourceFile,
+    pub start_offset: usize,
+    pub end_offset: usize,
+}
+
+impl Location {
+    #[must_use]
+    pub fn advance(self, db: &dyn Db, offset: usize) -> Self {
+        let next_offset = self.offset + offset;
+        if self.file.content(db).len() <= next_offset {
+            return self;
+        }
+        Self { offset: next_offset, ..self }
+    }
+
+    #[must_use]
+    pub fn span(self, other: Self) -> Span {
+        let file = self.file;
+        assert_eq!(file, other.file, "Span across different files");
+        let (start_offset, end_offset) = if self.offset > other.offset {
+            (other.offset, self.offset)
+        } else {
+            (self.offset, other.offset)
+        };
+        Span { file, start_offset, end_offset }
+    }
+
+    pub fn loc_info(self, db: &dyn Db) -> &LocationInfo {
+        #[salsa::interned]
+        struct Interned {
+            inner: Location,
+        }
+        #[salsa::tracked]
+        fn loc_info_impl<'a>(db: &'a dyn Db, loc: Interned<'a>) -> LocationInfo {
+            let loc = loc.inner(db);
+            let lines = line_starts(db, loc.file);
+            let line = lines.partition_point(|&start| start <= loc.offset);
+            let column = loc.offset - lines[line - 1] + 1;
+            LocationInfo {
+                file: loc.file.path(db).clone(),
+                line,
+                column,
+                offset: loc.offset,
+            }
+        }
+        loc_info_impl(db, Interned::new(db, self))
+    }
+
+    pub fn new(file: SourceFile, offset: usize) -> Self {
+        Self { file, offset }
+    }
+}
+
+#[salsa::tracked]
+fn line_starts(db: &dyn Db, file: SourceFile) -> Vec<usize> {
+    let content = file.content(db);
+    let mut starts = vec![0];
+    starts.extend(content.match_indices('\n').map(|(i, _)| i + 1));
+    starts
+}
+
+#[salsa::tracked(returns(copy))]
+pub fn offset_at(db: &dyn Db, file: SourceFile, line: usize, col: usize) -> usize {
+    let line = line - 1;
+    let col = col - 1;
+    let lines = line_starts(db, file);
+    let length = file.content(db).len();
+    if lines.len() <= line {
+        return length;
+    }
+    let line_offset = lines[line];
+    let offset = line_offset + col;
+    if lines.len() > line + 1 && lines[line + 1] <= offset {
+        return lines[line + 1] - 1;
+    }
+    offset.min(length)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LocationInfo {
+    pub file: PathBuf,
+    pub line: usize,
+    pub column: usize,
+    pub offset: usize,
+}
+
+impl PartialOrd for LocationInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LocationInfo {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.file.cmp(&other.file).then_with(|| self.offset.cmp(&other.offset))
+    }
+}
+
+impl Display for LocationInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let path =
+            pathdiff::diff_paths(&self.file, cwd).unwrap_or_else(|| self.file.clone());
+        write!(f, "{}:{}:{}", path.display(), self.line, self.column)
+    }
+}

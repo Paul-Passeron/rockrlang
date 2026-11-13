@@ -17,22 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use std::{path::PathBuf, sync::Arc};
 
+pub mod location;
+
 #[salsa::input]
 #[derive(Debug, PartialOrd, Ord)]
 pub struct SourceFile {
     pub path: PathBuf,
     pub content: Arc<str>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Location {
-    pub file: SourceFile,
-    pub offset: usize,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Span {
-    pub file: SourceFile,
-    pub start_offset: usize,
-    pub end_offset: usize,
 }
