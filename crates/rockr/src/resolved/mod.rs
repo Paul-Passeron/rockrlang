@@ -27,6 +27,7 @@ use rockr_base::{
 use type_printer::TypePrinter;
 
 pub mod concrete_ty;
+pub mod packages;
 pub mod plumbing;
 pub mod type_printer;
 pub mod type_ref;

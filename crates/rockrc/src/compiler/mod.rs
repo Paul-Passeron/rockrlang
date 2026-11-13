@@ -34,10 +34,9 @@ use rockr::{
     mir::{MIRKey, passes::dead_code_elimination::dce},
     name_resolve::file_module_id,
     printer::render_diagnostics,
-    resolved::{FunctionId, concrete_ty::Substitution},
+    resolved::{FunctionId, concrete_ty::Substitution, packages::workspace_packages},
     thir::ExprKind,
     thir_to_mir::mir,
-    workspace::workspace_packages,
 };
 use rockr_base::{
     Db,

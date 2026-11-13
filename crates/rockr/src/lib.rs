@@ -31,4 +31,3 @@ pub mod resolved;
 pub mod thir;
 pub mod thir_to_mir;
 pub mod typecheck;
-pub mod workspace;

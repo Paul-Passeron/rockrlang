@@ -32,10 +32,9 @@ use crate::{
     parse_tree::top_level::{AstImplItem, AstInterfaceItem, AstTopLevelItemDesc},
     resolved::{
         FileModule, FunctionId, InterfaceId, InterfaceRef, ModuleId, Package,
-        ScopeOwnerId, TypeParamId, TypeRef,
+        ScopeOwnerId, TypeParamId, TypeRef, packages::workspace_packages,
     },
     thir::Thir,
-    workspace::workspace_packages,
 };
 
 pub mod path;

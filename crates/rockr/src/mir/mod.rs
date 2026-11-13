@@ -39,9 +39,9 @@ use crate::{
     resolved::{
         FunctionId, ScopeOwnerId, TypeRef,
         concrete_ty::{ConcreteTy, Substitution},
+        packages::workspace_packages,
     },
     thir::{self, FunctionRef},
-    workspace::workspace_packages,
 };
 use std::{
     collections::{HashMap, HashSet},

@@ -26,8 +26,8 @@ use crate::{
     resolved::{
         FunctionId, ImplId, InterfaceId, InterfaceRef, InternedInterfaceRef,
         InternedTypeId, ScopeOwnerId, TypeId, TypeParamId, TypeRef,
+        packages::workspace_packages,
     },
-    workspace::workspace_packages,
 };
 use itertools::Itertools;
 use rockr_base::symbol::{InternedSymbol, Symbol};

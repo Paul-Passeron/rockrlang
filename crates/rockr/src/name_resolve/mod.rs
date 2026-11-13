@@ -26,8 +26,9 @@ use crate::{
         top_level::{Ast, AstTopLevelItem, AstTopLevelItemDesc},
     },
     parser::parse_file,
-    resolved::{FileModule, InternedModuleId, ModuleId, Package},
-    workspace::workspace_packages,
+    resolved::{
+        FileModule, InternedModuleId, ModuleId, Package, packages::workspace_packages,
+    },
 };
 
 pub mod definition;
